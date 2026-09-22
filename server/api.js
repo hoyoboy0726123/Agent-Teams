@@ -30,6 +30,7 @@ const SETTINGS_DEFAULTS = {
   utilityModel: null,    // { providerId, model } for summaries & memory extraction
   memory: { autoExtract: true, autoSummarize: true, defaultTtlDays: null },
   synthesis: true,
+  timezone: null,       // IANA zone for automations (default: server zone)
 };
 export const settings = () => Object.fromEntries(Object.entries(SETTINGS_DEFAULTS).map(([k, v]) => [k, getSetting(k, v)]));
 

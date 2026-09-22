@@ -183,3 +183,112 @@ r.patch('/api/settings/search', async ({ user, req }) => {
 });
 
 export { handleHumanMessage, emit };
+
+// ------------------------------------------------------------------ agent library & teams
+
+import { LIBRARY, TEAMS, CATEGORIES, libraryAgent } from './agents/library.js';
+
+r.get('/api/library', ({ user }) => { need(user, 'guest'); return { categories: CATEGORIES, agents: LIBRARY, teams: TEAMS }; });
+
+// Reuse an existing agent made from the same template, otherwise create it.
+function ensureFromTemplate(key, { providerId, model }, user) {
+  const tpl = libraryAgent(key);
+  if (!tpl) return null;
+  const existing = agents.listAgents().find((x) => x.templateKey === key);
+  if (existing) return existing;
+  let handle = tpl.handle;
+  for (let i = 2; agents.getAgentByHandle(handle); i++) handle = `${tpl.handle}${i}`;
+  return agents.createAgent({ ...tpl, handle, providerId, model }, user);
+}
+
+r.post('/api/teams/:key', async ({ user, req, params }) => {
+  need(user, 'member');
+  const team = TEAMS.find((t) => t.key === params.key) || fail(404, 'Team template not found');
+  const { providerId, model, name } = await readJson(req);
+  const members = team.members.map((k) => ensureFromTemplate(k, { providerId, model }, user)).filter(Boolean);
+  const channel = ch.createChannel({ name: name || team.name.replace(/\s+[A-Za-z].*$/, '') || team.key, topic: team.description, mode: team.mode, agentIds: members.map((m) => m.id) }, user);
+  for (const u of (await import('./users.js')).listUsers()) if (u.role !== 'guest') ch.addMember(channel.id, 'user', u.id);
+  ch.createMessage({ channelId: channel.id, authorType: 'system', content: `${team.icon} **${team.name}** — ${members.map((m) => `@${m.handle}`).join(' ')}\n\n${team.kickoff}` });
+  audit('user', user.id, 'team.create', channel.id, { team: team.key });
+  return { channel, agents: members };
+});
+
+r.post('/api/library/:key/add', async ({ user, req, params }) => {
+  need(user, 'member');
+  const { providerId, model, channelId } = await readJson(req);
+  const a = ensureFromTemplate(params.key, { providerId, model }, user) || fail(404, 'Template not found');
+  if (channelId) { readable(user, channelId); ch.addMember(channelId, 'agent', a.id); }
+  return a;
+});
+
+// Portable agent definitions (share / fork between workspaces).
+r.get('/api/agents/:id/export', ({ user, params }) => {
+  need(user, 'member');
+  const a = agents.getAgent(params.id) || fail(404, 'Agent not found');
+  const { name, handle, avatar, color, description, systemPrompt, model, temperature, tools, memoryEnabled, category, starters } = a;
+  return { format: 'agent-teams/agent@1', agent: { name, handle, avatar, color, description, systemPrompt, model, temperature, tools, memoryEnabled, category, starters } };
+});
+r.post('/api/agents/import', async ({ user, req }) => {
+  need(user, 'member');
+  const b = await readJson(req);
+  const def = b.agent || b;
+  if (!def?.name) fail(400, 'Not an agent definition');
+  let handle = agents.normalizeHandle(def.handle || def.name);
+  for (let i = 2; agents.getAgentByHandle(handle); i++) handle = `${agents.normalizeHandle(def.handle || def.name)}${i}`;
+  return agents.createAgent({ ...def, handle, providerId: b.providerId || null, mcpServers: [] }, user);
+});
+
+// ------------------------------------------------------------------ automations
+
+import * as wf from './workflows/engine.js';
+import { validateSchedule, nextRuns, describe } from './workflows/schedule.js';
+import { render as renderTpl } from './workflows/engine.js';
+
+r.get('/api/automations/templates', ({ user }) => { need(user, 'guest'); return wf.AUTOMATION_TEMPLATES; });
+
+// Install a template: creates the agents it needs, a channel to post in and the automation.
+r.post('/api/automations/templates/:key', async ({ user, req, params }) => {
+  need(user, 'member');
+  const tpl = wf.AUTOMATION_TEMPLATES.find((t) => t.key === params.key) || fail(404, 'Template not found');
+  const { values = {}, channelId, schedule, providerId, model, name, trigger } = await readJson(req);
+  const stepAgents = tpl.steps.map((s) => ensureFromTemplate(s.agent, { providerId, model }, user));
+  let cid = channelId;
+  if (cid) { readable(user, cid); for (const a of stepAgents) ch.addMember(cid, 'agent', a.id); }
+  else {
+    const c = ch.createChannel({ name: `${tpl.icon} ${name || tpl.name.zh}`, topic: tpl.description.zh, isPrivate: true, mode: 'mention', agentIds: stepAgents.map((a) => a.id) }, user);
+    cid = c.id;
+  }
+  // Fill form fields now; runtime variables ({{input}}, {{digest}}, …) stay for each run.
+  const filled = Object.fromEntries((tpl.fields || []).map((f) => [f.key, String(values[f.key] ?? '').trim() || f.placeholder || '']));
+  const runtime = new Set(['input', 'prev', 'date', 'digest', 'digest_week']);
+  const steps = tpl.steps.map((s, i) => ({
+    agentId: stepAgents[i].id, parallel: !!s.parallel,
+    instruction: s.instruction.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (runtime.has(k) || /^step\d+$/.test(k) ? m : filled[k] ?? m)),
+  }));
+  const trig = trigger || tpl.trigger;
+  const w = wf.saveWorkflow({
+    name: name || tpl.name.zh, description: tpl.description.zh, steps, channelId: cid, trigger: trig,
+    schedule: trig === 'schedule' ? schedule || tpl.schedule : null, category: tpl.category, icon: tpl.icon, templateKey: tpl.key,
+    scheduleInput: values.input || '',
+  }, user);
+  ch.createMessage({ channelId: cid, authorType: 'system', content: `${tpl.icon} Automation **${w.name}** is set up — ${w.scheduleLabel.zh}${trig === 'webhook' ? ' (webhook)' : ''}.` });
+  return w;
+});
+
+r.post('/api/workflows/:id/enabled', async ({ user, req, params }) => {
+  need(user, 'member');
+  const w = wf.getWorkflow(params.id) || fail(404, 'Workflow not found');
+  if (!atLeast(user, 'admin') && w.createdBy !== user.id) fail(403, 'Only the creator or an admin can change this automation');
+  const { enabled } = await readJson(req);
+  return wf.setEnabled(w.id, !!enabled, user);
+});
+
+r.post('/api/schedule/preview', async ({ user, req }) => {
+  need(user, 'guest');
+  const { schedule } = await readJson(req);
+  const s = validateSchedule(schedule);
+  const tz = wf.workspaceTz();
+  return { tz, label: { zh: describe(s, 'zh'), en: describe(s, 'en') }, next: nextRuns(s, { tz, count: 3 }).map((d) => d.getTime()) };
+});
+
+export { renderTpl };

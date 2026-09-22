@@ -10,6 +10,8 @@ import { get as dbGet } from './db.js';
 import { renderArtifact } from './artifacts/render.js';
 import { getArtifact } from './artifacts/store.js';
 import { expireStale } from './approvals.js';
+import { findByHook, startWorkflow } from './workflows/engine.js';
+import { readJson } from './http.js';
 import { serveStatic, send, parseCookies } from './http.js';
 import { userForToken } from './users.js';
 import { attachRealtime } from './ws.js';
@@ -33,6 +35,17 @@ export function createApp() {
         }
         const token = parseCookies(req.headers.cookie).at_session;
         return await handleApi({ req, res, path, query: url.searchParams, token, user: userForToken(token) });
+      }
+      // Inbound webhooks trigger automations: POST /hooks/<token> with JSON or text.
+      const hook = /^\/hooks\/([A-Za-z0-9_-]{20,})$/.exec(path);
+      if (hook && req.method === 'POST') {
+        const w = findByHook(hook[1]);
+        if (!w || !w.enabled) return send(res, 404, { error: 'Unknown or disabled hook' });
+        let input = '';
+        if (/json/.test(req.headers['content-type'] || '')) { const b = await readJson(req, 1_000_000); input = typeof b.text === 'string' ? b.text : JSON.stringify(b, null, 2); }
+        else { const chunks = []; for await (const c of req) chunks.push(c); input = Buffer.concat(chunks).toString('utf8'); }
+        const { runId } = startWorkflow(w.id, { input: input.slice(0, 20000) });
+        return send(res, 202, { ok: true, runId });
       }
       // Public, read-only share links for artifacts (opt-in per artifact, revocable).
       const share = /^\/s\/([A-Za-z0-9_-]{20,})$/.exec(path);

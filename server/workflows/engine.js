@@ -6,11 +6,30 @@ import { createMessage, getChannel } from '../channels.js';
 import { getAgent, getAgentByHandle } from '../agents/store.js';
 import { runAgent } from '../agents/runtime.js';
 import { enqueue, maintainChannel } from '../agents/orchestrator.js';
+import { randomBytes } from 'node:crypto';
+import { getSetting } from '../db.js';
+import { validateSchedule, matches, minuteKey, nextRuns, describe } from './schedule.js';
+import { buildDigest } from './digest.js';
 
-const toWorkflow = (r) => r && ({
-  id: r.id, name: r.name, description: r.description, steps: json(r.steps_json, []), channelId: r.channel_id,
-  scheduleMinutes: r.schedule_minutes, scheduleInput: r.schedule_input, lastRunAt: r.last_run_at, createdBy: r.created_by, createdAt: r.created_at,
-});
+export const workspaceTz = () => getSetting('timezone', null) || process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+const toWorkflow = (r) => {
+  if (!r) return r;
+  // Legacy rows only had schedule_minutes.
+  const schedule = json(r.schedule_json, null) || (r.schedule_minutes ? { kind: 'interval', minutes: r.schedule_minutes } : null);
+  const trigger = r.trigger === 'manual' && schedule ? 'schedule' : r.trigger || 'manual';
+  const wf = {
+    id: r.id, name: r.name, description: r.description, steps: json(r.steps_json, []), channelId: r.channel_id,
+    trigger, schedule, scheduleInput: r.schedule_input, enabled: r.enabled !== 0, category: r.category || '', icon: r.icon || '⚡',
+    hookToken: r.hook_token || null, templateKey: r.template_key || null,
+    lastRunAt: r.last_run_at, createdBy: r.created_by, createdAt: r.created_at,
+  };
+  wf.scheduleLabel = { zh: describe(trigger === 'schedule' ? schedule : null, 'zh'), en: describe(trigger === 'schedule' ? schedule : null, 'en') };
+  if (trigger === 'schedule' && schedule) {
+    try { wf.nextRuns = nextRuns(schedule, { tz: workspaceTz(), count: 2, lastRunAt: r.last_run_at }).map((d) => d.getTime()); } catch { wf.nextRuns = []; }
+  }
+  return wf;
+};
 const toRun = (r) => r && ({
   id: r.id, workflowId: r.workflow_id, channelId: r.channel_id, status: r.status, input: r.input,
   outputs: json(r.outputs_json, []), error: r.error, startedAt: r.started_at, finishedAt: r.finished_at,
@@ -32,19 +51,38 @@ export function saveWorkflow(input, user, wid = null) {
   const steps = cleanSteps(input.steps);
   if (!input.name) throw Object.assign(new Error('Workflow name required'), { status: 400 });
   if (!steps.length) throw Object.assign(new Error('Add at least one step with an agent and instruction'), { status: 400 });
-  const sched = input.scheduleMinutes ? Math.max(5, Number(input.scheduleMinutes)) : null;
+  let schedule = input.schedule ?? (input.scheduleMinutes ? { kind: 'interval', minutes: input.scheduleMinutes } : null);
+  let trigger = ['manual', 'schedule', 'webhook'].includes(input.trigger) ? input.trigger : schedule ? 'schedule' : 'manual';
+  if (trigger === 'schedule') {
+    schedule = validateSchedule(schedule);
+    if (!schedule) throw Object.assign(new Error('Choose when this automation should run'), { status: 400 });
+    if (!input.channelId) throw Object.assign(new Error('Scheduled automations need a channel to post in'), { status: 400 });
+  } else schedule = null;
+  if (trigger === 'webhook' && !input.channelId) throw Object.assign(new Error('Webhook automations need a channel to post in'), { status: 400 });
+  const prev = wid ? get('SELECT hook_token FROM workflows WHERE id = ?', wid) : null;
+  const hook = trigger === 'webhook' ? prev?.hook_token || randomBytes(18).toString('base64url') : prev?.hook_token || null;
+  const vals = [input.name, input.description || '', JSON.stringify(steps), input.channelId || null, input.scheduleInput || '', trigger,
+    schedule ? JSON.stringify(schedule) : null, hook, input.enabled === false ? 0 : 1, input.category || '', input.icon || '⚡'];
   if (wid) {
-    run('UPDATE workflows SET name=?, description=?, steps_json=?, channel_id=?, schedule_minutes=?, schedule_input=? WHERE id=?',
-      input.name, input.description || '', JSON.stringify(steps), input.channelId || null, sched, input.scheduleInput || '', wid);
+    run('UPDATE workflows SET name=?, description=?, steps_json=?, channel_id=?, schedule_input=?, trigger=?, schedule_json=?, hook_token=?, enabled=?, category=?, icon=?, schedule_minutes=NULL WHERE id=?', ...vals, wid);
   } else {
     wid = id('wf_');
-    run('INSERT INTO workflows(id, name, description, steps_json, channel_id, schedule_minutes, schedule_input, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?)',
-      wid, input.name, input.description || '', JSON.stringify(steps), input.channelId || null, sched, input.scheduleInput || '', user?.id ?? null, now());
+    run(`INSERT INTO workflows(name, description, steps_json, channel_id, schedule_input, trigger, schedule_json, hook_token, enabled, category, icon, id, created_by, created_at, template_key)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, ...vals, wid, user?.id ?? null, now(), input.templateKey || null);
   }
-  audit('user', user?.id, 'workflow.save', wid, {});
+  audit('user', user?.id, 'workflow.save', wid, { trigger });
   emit('workflow.updated', { workflowId: wid });
   return getWorkflow(wid);
 }
+
+export function setEnabled(wid, enabled, user) {
+  run('UPDATE workflows SET enabled = ? WHERE id = ?', enabled ? 1 : 0, wid);
+  audit('user', user?.id, enabled ? 'workflow.enable' : 'workflow.disable', wid, {});
+  emit('workflow.updated', { workflowId: wid });
+  return getWorkflow(wid);
+}
+
+export const findByHook = (token) => toWorkflow(get('SELECT * FROM workflows WHERE hook_token = ? AND trigger = ?', token, 'webhook'));
 
 export function deleteWorkflow(wid, user) {
   run('DELETE FROM workflows WHERE id = ?', wid);
@@ -77,7 +115,8 @@ export function startWorkflow(wid, { input = '', channelId, user } = {}) {
 
   const job = enqueue(cid, async () => {
     const outputs = [];
-    const vars = { input, prev: input };
+    const vars = { input, prev: input, date: new Date().toLocaleDateString('en-CA', { timeZone: workspaceTz() }) };
+    if (wf.steps.some((st) => /\{\{\s*digest/.test(st.instruction))) { vars.digest = buildDigest({ excludeChannelId: cid }); vars.digest_week = buildDigest({ hours: 168, excludeChannelId: cid }); }
     createMessage({ channelId: cid, authorType: 'system', authorId: user?.id, content: `▶ Workflow **${wf.name}** started${input ? `\n> ${input.replace(/\n/g, '\n> ')}` : ''}`, meta: { workflowRunId: rid } });
     try {
       let n = 0;
@@ -112,53 +151,34 @@ export function startWorkflow(wid, { input = '', channelId, user } = {}) {
   return { runId: rid, channelId: cid, done: job };
 }
 
-// Minute-level scheduler for recurring workflows.
+// Scheduler: every 30 s, fire enabled scheduled automations whose slot matches "now".
 let timer;
+export function tickScheduler(at = new Date()) {
+  const tz = workspaceTz();
+  const fired = [];
+  for (const r of all("SELECT * FROM workflows WHERE enabled = 1 AND (trigger = 'schedule' OR schedule_minutes IS NOT NULL)")) {
+    const wf = toWorkflow(r);
+    if (!wf.schedule || !wf.channelId) continue;
+    try {
+      if (wf.schedule.kind === 'interval') {
+        if (wf.lastRunAt && at.getTime() - wf.lastRunAt < wf.schedule.minutes * 60_000) continue;
+      } else {
+        if (!matches(wf.schedule, at, tz)) continue;
+        const key = minuteKey(at, tz);
+        if (r.last_fire_key === key) continue;
+        run('UPDATE workflows SET last_fire_key = ? WHERE id = ?', key, wf.id);
+      }
+      startWorkflow(wf.id, { input: wf.scheduleInput });
+      fired.push(wf.id);
+    } catch (e) { console.warn('[scheduler]', wf.name, e.message); }
+  }
+  return fired;
+}
+
 export function startScheduler() {
   clearInterval(timer);
-  timer = setInterval(() => {
-    for (const wf of listWorkflows()) {
-      if (!wf.scheduleMinutes || !wf.channelId) continue;
-      if (wf.lastRunAt && Date.now() - wf.lastRunAt < wf.scheduleMinutes * 60_000) continue;
-      try { startWorkflow(wf.id, { input: wf.scheduleInput }); } catch (e) { console.warn('[scheduler]', wf.name, e.message); }
-    }
-  }, 60_000);
+  timer = setInterval(() => tickScheduler(), 30_000);
   timer.unref?.();
 }
 
-export const WORKFLOW_TEMPLATES = [
-  {
-    key: 'research-report', name: '深度研究報告 Deep research report',
-    description: 'Research → critique → polished report artifact.',
-    steps: [
-      { handle: 'researcher', instruction: 'Research this topic thoroughly and list key findings with sources: {{input}}' },
-      { handle: 'critic', instruction: 'Review the research above. Point out gaps, weak sources and missing angles.' },
-      { handle: 'writer', instruction: 'Write the final research report as an artifact of type "research", incorporating the critique. Topic: {{input}}' },
-    ],
-  },
-  {
-    key: 'pitch-deck', name: '簡報產生器 Pitch deck',
-    description: 'Plan → numbers → slide deck.',
-    steps: [
-      { handle: 'lead', instruction: 'Outline the storyline (8–10 slides) for a presentation about: {{input}}. Do not delegate; just produce the outline.' },
-      { handle: 'analyst', instruction: 'Add the key numbers, market sizing and metrics the outline needs. Be explicit about assumptions.' },
-      { handle: 'designer', instruction: 'Build the final deck as a "slides" artifact from the outline and numbers above.' },
-    ],
-  },
-  {
-    key: 'kpi-dashboard', name: 'KPI 儀表板 KPI dashboard',
-    description: 'Turn pasted data or a description into a dashboard.',
-    steps: [
-      { handle: 'analyst', instruction: 'Create a dashboard artifact (type "dashboard") for: {{input}}. Include KPIs, 2–4 charts and a short notes section.' },
-    ],
-  },
-  {
-    key: 'landing-page', name: '產品網站 Landing page',
-    description: 'Copywriting and design in parallel, then a finished website.',
-    steps: [
-      { handle: 'writer', instruction: 'Write landing-page copy (hero, benefits, social proof, FAQ, CTA) for: {{input}}', parallel: true },
-      { handle: 'critic', instruction: 'List the 5 most important things a landing page for this must get right: {{input}}', parallel: true },
-      { handle: 'designer', instruction: 'Build the landing page as a "website" artifact using the copy and checklist above.' },
-    ],
-  },
-];
+export { WORKFLOW_TEMPLATES, AUTOMATION_TEMPLATES } from './templates.js';
