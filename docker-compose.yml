@@ -1,0 +1,13 @@
+services:
+  agent-teams:
+    build: .
+    ports:
+      - "3789:3789"
+    volumes:
+      - ./data:/data
+    env_file:
+      - path: .env
+        required: false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach Ollama on the host
+    restart: unless-stopped

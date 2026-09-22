@@ -8,12 +8,12 @@
     "agent-teams": "server/index.js"
   },
   "scripts": {
-    "start": "node --no-warnings server/index.js",
-    "dev": "node --no-warnings --watch server/index.js",
+    "start": "node --no-warnings --env-file-if-exists=.env server/index.js",
+    "dev": "node --no-warnings --env-file-if-exists=.env --watch server/index.js",
     "test": "node --no-warnings --test test/*.test.js"
   },
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=22.9.0"
   },
   "license": "MIT",
   "dependencies": {

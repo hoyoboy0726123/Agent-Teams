@@ -16,7 +16,7 @@ export function inline(text, opts = {}) {
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/__([^_]+)__/g, '<strong>$1</strong>');
   s = s.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, '$1<em>$2</em>').replace(/(^|[^_\w])_([^_\n]+)_(?!\w)/g, '$1<em>$2</em>');
   s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>');
-  if (opts.mentions) s = s.replace(/(^|[\s(（])@([\p{L}\p{N}_-]+)/gu, (_, pre, h) => `${pre}<span class="mention" data-handle="${h}">@${h}</span>`);
+  if (opts.mentions) s = s.replace(/(?<![A-Za-z0-9_.+-])@([\p{L}\p{N}_-]+)/gu, (_, h) => `<span class="mention" data-handle="${h}">@${h}</span>`);
   return s.replace(/\u0000(\d+)\u0000/g, (_, i) => stash[+i]);
 }
 

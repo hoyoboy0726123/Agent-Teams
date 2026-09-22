@@ -3,7 +3,7 @@
 import { config } from '../config.js';
 import { getSetting, setSetting, all, run } from '../db.js';
 import { getChannel, members, addMember, createMessage, listMessages } from '../channels.js';
-import { getAgent, getAgentByHandle } from './store.js';
+import { getAgent, listAgents } from './store.js';
 import { listUsers, atLeast } from '../users.js';
 import { runAgent } from './runtime.js';
 import { complete } from '../providers/index.js';
@@ -15,7 +15,16 @@ const EVERYONE = new Set(['all', 'everyone', 'team', '所有人', '大家', '全
 const MAX_TURNS_PER_MESSAGE = 10;
 const queues = new Map(); // channelId → Promise (serialises runs per channel)
 
-export const mentionHandles = (text) => [...String(text).matchAll(/(?:^|[\s(（,，])@([\p{L}\p{N}_-]+)/gu)].map((m) => m[1]);
+// "@handle" tokens. Not preceded by ASCII word chars (so emails don't count); CJK text may
+// run straight into the handle ("請@writer幫忙"), which resolveAgent handles by prefix match.
+export const mentionHandles = (text) => [...String(text).matchAll(/(?<![A-Za-z0-9_.+-])@([\p{L}\p{N}_-]+)/gu)].map((m) => m[1]);
+
+export function resolveAgent(token, agents) {
+  const t = token.toLowerCase();
+  const exact = agents.find((a) => a.handle.toLowerCase() === t);
+  if (exact) return exact;
+  return agents.filter((a) => t.startsWith(a.handle.toLowerCase())).sort((a, b) => b.handle.length - a.handle.length)[0] || null;
+}
 
 function channelAgents(channelId) {
   return members(channelId).agents.map(getAgent).filter((a) => a && !a.archived);
@@ -25,11 +34,12 @@ function channelAgents(channelId) {
 export async function pickResponders(channel, message, user) {
   const inChannel = channelAgents(channel.id);
   const handles = mentionHandles(message.content);
-  if (handles.some((h) => EVERYONE.has(h.toLowerCase()))) return inChannel;
+  if (handles.some((h) => EVERYONE.has(h.toLowerCase()) || [...EVERYONE].some((e) => /[^\x00-\x7f]/.test(e) && h.startsWith(e)))) return inChannel;
 
   const mentioned = [];
+  const everyAgent = listAgents();
   for (const h of handles) {
-    const a = getAgentByHandle(h);
+    const a = resolveAgent(h, everyAgent);
     if (!a || mentioned.some((x) => x.id === a.id)) continue;
     if (!inChannel.some((x) => x.id === a.id)) {
       if (!atLeast(user, 'member')) continue;
@@ -41,8 +51,8 @@ export async function pickResponders(channel, message, user) {
   if (mentioned.length) return mentioned;
 
   // Talking to a human only? Stay quiet.
-  const humans = new Set(listUsers().map((u) => u.username));
-  if (handles.some((h) => humans.has(h.toLowerCase()))) return [];
+  const humans = listUsers().map((u) => u.username);
+  if (handles.some((h) => humans.some((u) => h.toLowerCase().startsWith(u)))) return [];
 
   if (channel.kind === 'dm') return inChannel;
   if (!inChannel.length || channel.mode === 'mention') return [];
@@ -115,7 +125,7 @@ export async function runChain(channelId, queue, { userId, parentId, extraInstru
     const inChannel = channelAgents(channelId);
     const delegated = [];
     for (const h of mentionHandles(msg.content)) {
-      const target = inChannel.find((a) => a.handle.toLowerCase() === h.toLowerCase());
+      const target = resolveAgent(h, inChannel);
       if (!target || target.id === agentId || queue.some((q) => q.agentId === target.id)) continue;
       queue.push({ agentId: target.id, depth: depth + 1 });
       delegated.push(target.handle);

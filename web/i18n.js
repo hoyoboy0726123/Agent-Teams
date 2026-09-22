@@ -1,0 +1,93 @@
+// UI strings. Traditional Chinese first, English fallback.
+const dict = {
+  'zh-TW': {
+    appTagline: '人類與多個 AI Agent 一起工作的開源團隊空間',
+    signIn: '登入', signUp: '建立帳號', username: '帳號', password: '密碼', displayName: '顯示名稱', workspaceName: '工作空間名稱',
+    setupTitle: '歡迎！建立你的工作空間', setupHint: '第一個帳號會成為擁有者。系統會自動偵測你已登入的 Claude / Codex CLI、環境變數中的 API Key 與本機 Ollama，並幫你建好一支 AI 團隊。',
+    loginTitle: '登入 Agent Teams', noAccount: '還沒有帳號？請管理員幫你建立。', create: '建立', save: '儲存', cancel: '取消', close: '關閉', ok: '確定', confirm: '確定', delete: '刪除', edit: '編輯', add: '新增', remove: '移除', run: '執行', test: '測試', loading: '載入中…', areYouSure: '確定嗎？',
+    channels: '頻道', directMessages: '私訊 Agent', agents: 'AI Agents', newChannel: '新增頻道', search: '搜尋', settings: '設定', logout: '登出', theme: '主題', language: 'English',
+    justNow: '剛剛', minAgo: (n) => `${n} 分鐘前`, hrAgo: (n) => `${n} 小時前`, today: '今天', yesterday: '昨天',
+    modeAuto: '自動派工', modeMention: '僅 @提及', modeRoundtable: '圓桌討論',
+    modeAutoHint: '最適合的 Agent 會自動回覆（或用 @ 指定）', modeMentionHint: '只有被 @提及 的 Agent 會回覆', modeRoundtableHint: '頻道內所有 Agent 依序發言、互相補充', dmHint: '與這個 Agent 的私人對話',
+    composerPlaceholder: (name) => `傳訊息到 #${name}（@ 提及 Agent，Shift+Enter 換行）`, composerPlaceholderDm: (name) => `傳訊息給 ${name}…`,
+    send: '送出', stop: '停止', regenerate: '重新產生', copy: '複製', copied: '已複製', rememberThis: '記住這則', remembered: '已存入記憶', reply: '引用',
+    thinking: '思考中…', usingTools: '正在使用工具…', drafting: (t) => `正在撰寫「${t}」…`, stopped: '已停止', errorReply: '回覆失敗', retry: '重試',
+    memory: '記憶', artifacts: '產出物', workflows: '工作流程', members: '成員', summary: '對話摘要',
+    memoryIntro: 'Agent 會記住這些內容並在之後的對話中使用。你可以隨時檢視、修改、釘選或刪除——記憶完全透明可控。',
+    addMemory: '新增記憶', memoryPlaceholder: '例如：我們的目標客群是 25–35 歲的上班族', pin: '釘選', unpin: '取消釘選', pinned: '已釘選', forgetAll: '清除此範圍全部記憶',
+    scope_workspace: '整個工作空間', scope_channel: '此頻道', scope_agent: 'Agent 私人筆記', scope_user: '只有我（私人）',
+    noMemories: '還沒有記憶。Agent 會自動記下重要決策，你也可以手動新增。', expiresIn: (d) => `${d} 天後過期`, ttlDays: '保留天數（空白 = 永久）', source: '來源',
+    noArtifacts: '還沒有產出物。請 Agent 幫你做文件、簡報、Dashboard 或網站！', version: '版本', download: '下載', openNewTab: '新分頁開啟', editContent: '編輯內容', saveVersion: '另存新版本', newArtifact: '新增產出物',
+    type_document: '文件', type_research: '研究報告', type_slides: '簡報', type_dashboard: 'Dashboard', type_website: '網站',
+    noWorkflows: '還沒有工作流程。從範本開始，把多個 Agent 串成自動化流程！', newWorkflow: '新增工作流程', wfDescription: '說明', fromTemplate: '從範本建立', steps: '步驟', step: '步驟', addStep: '新增步驟', instruction: '指令', parallel: '與上一步平行執行', schedule: '排程（每 N 分鐘，空白=手動）', scheduleInput: '排程時的輸入', runWorkflow: '執行工作流程', workflowInput: '這次要處理的主題／資料', runs: '執行紀錄', templateVars: '可用變數：{{input}} 輸入、{{prev}} 上一步輸出、{{step1}} 第 1 步輸出',
+    humans: '人類成員', aiMembers: 'AI 成員', addAgentToChannel: '把 Agent 加入頻道', inviteUser: '邀請成員', online: '在線',
+    channelSettings: '頻道設定', name: '名稱', topic: '主題', mode: '回覆模式', privateChannel: '私人頻道', memoryEnabled: '啟用記憶', clearHistory: '清除對話紀錄', deleteChannel: '刪除頻道',
+    providers: '模型供應商', workspace: '工作空間', users: '使用者', usage: '用量', audit: '稽核紀錄', data: '資料與隱私',
+    addProvider: '新增供應商', subscription: '訂閱帳號（免 API Key）', apiProviders: 'API Key', local: '本機模型', apiKey: 'API Key', baseUrl: 'Base URL', defaultModel: '預設模型', cliPath: 'CLI 路徑', loadModels: '載入模型清單', testConnection: '測試連線', keySaved: '已儲存（加密）', enabled: '啟用', getKey: '取得 Key',
+    newAgent: '新增 Agent', addTeam: '從範本加入團隊', handle: '@代號', avatar: '頭像 (emoji)', color: '顏色', description: '職責描述', systemPrompt: '系統提示詞 / 個性', provider: '模型供應商', model: '模型', temperature: '溫度', tools: '能力', agentMemory: '啟用長期記憶',
+    tool_web_fetch: '讀取網頁', tool_recall: '搜尋記憶', tool_remember: '寫入記憶', tool_artifacts: '產出文件/簡報/網站', tool_handoff: '委派給隊友', tool_calc: '精確計算',
+    chatWith: '私訊', noProvider: '尚未設定模型', pickTemplates: '選擇要加入的角色',
+    router: '自動派工路由模型', routerHint: '「自動派工」頻道用哪個模型判斷該由誰回覆（關閉則用關鍵字比對）', utilityModel: '摘要／記憶萃取模型', utilityHint: '用來產生對話摘要與自動萃取記憶（預設用最後回覆的 Agent 的模型）', off: '關閉',
+    autoExtract: '自動從對話萃取重要事實到記憶', autoSummarize: '長對話自動摘要（無限上下文）', defaultTtl: '新記憶預設保留天數（空白 = 永久）', synthesis: 'Agent 委派後由委派者統整最終答案', allowRegistration: '開放自行註冊',
+    role: '角色', role_owner: '擁有者', role_admin: '管理員', role_member: '成員', role_guest: '訪客',
+    calls: '呼叫次數', inputTokens: '輸入 tokens', outputTokens: '輸出 tokens', avgLatency: '平均延遲', errors: '錯誤', byAgent: '依 Agent', byModel: '依模型', last30: '最近 30 天',
+    exportData: '匯出全部資料 (JSON)', exportHint: '包含訊息、記憶、產出物、Agent 與設定；API Key 不會被匯出。', forgetMe: '刪除我的個人記憶', forgetMeAndMessages: '同時刪除我發過的所有訊息',
+    when: '時間', who: '操作者', action: '動作', target: '對象',
+    searchPlaceholder: '搜尋訊息、記憶與產出物…', noResults: '沒有結果', messages: '訊息',
+    welcomeEmpty: '這裡還沒有訊息，說聲嗨吧 👋', loadOlder: '載入更早的訊息',
+    saved: '已儲存', deleted: '已刪除', created: '已建立', workflowStarted: '工作流程已開始',
+    isTyping: (n) => `${n} 正在輸入…`, areTyping: (n) => `${n} 正在回覆…`,
+    kind_subscription: '訂閱', kind_api: 'API', kind_local: '本機',
+  },
+  en: {
+    appTagline: 'The open-source team space where humans and many AI agents work together',
+    signIn: 'Sign in', signUp: 'Create account', username: 'Username', password: 'Password', displayName: 'Display name', workspaceName: 'Workspace name',
+    setupTitle: 'Welcome! Create your workspace', setupHint: 'The first account becomes the owner. We auto-detect logged-in Claude / Codex CLIs, API keys in your environment and local Ollama, and set up an AI team for you.',
+    loginTitle: 'Sign in to Agent Teams', noAccount: 'No account? Ask an admin to create one.', create: 'Create', save: 'Save', cancel: 'Cancel', close: 'Close', ok: 'OK', confirm: 'Confirm', delete: 'Delete', edit: 'Edit', add: 'Add', remove: 'Remove', run: 'Run', test: 'Test', loading: 'Loading…', areYouSure: 'Are you sure?',
+    channels: 'Channels', directMessages: 'Direct messages', agents: 'AI Agents', newChannel: 'New channel', search: 'Search', settings: 'Settings', logout: 'Sign out', theme: 'Theme', language: '中文',
+    justNow: 'just now', minAgo: (n) => `${n}m ago`, hrAgo: (n) => `${n}h ago`, today: 'Today', yesterday: 'Yesterday',
+    modeAuto: 'Auto-assign', modeMention: '@mention only', modeRoundtable: 'Roundtable',
+    modeAutoHint: 'The best-fit agent replies automatically (or @mention one)', modeMentionHint: 'Only @mentioned agents reply', modeRoundtableHint: 'Every agent in the channel replies in turn', dmHint: 'Private conversation with this agent',
+    composerPlaceholder: (name) => `Message #${name} (@mention agents, Shift+Enter for newline)`, composerPlaceholderDm: (name) => `Message ${name}…`,
+    send: 'Send', stop: 'Stop', regenerate: 'Regenerate', copy: 'Copy', copied: 'Copied', rememberThis: 'Remember this', remembered: 'Saved to memory', reply: 'Quote',
+    thinking: 'Thinking…', usingTools: 'Using tools…', drafting: (t) => `Drafting “${t}”…`, stopped: 'Stopped', errorReply: 'Reply failed', retry: 'Retry',
+    memory: 'Memory', artifacts: 'Artifacts', workflows: 'Workflows', members: 'Members', summary: 'Conversation summary',
+    memoryIntro: 'Agents remember these and use them in future conversations. View, edit, pin or delete anything at any time — memory is fully transparent.',
+    addMemory: 'Add memory', memoryPlaceholder: 'e.g. Our target customers are office workers aged 25–35', pin: 'Pin', unpin: 'Unpin', pinned: 'Pinned', forgetAll: 'Forget everything in this scope',
+    scope_workspace: 'Whole workspace', scope_channel: 'This channel', scope_agent: 'Agent private notes', scope_user: 'Only me (private)',
+    noMemories: 'No memories yet. Agents save key decisions automatically; you can add your own.', expiresIn: (d) => `expires in ${d}d`, ttlDays: 'Keep for days (blank = forever)', source: 'Source',
+    noArtifacts: 'No artifacts yet. Ask an agent for a doc, deck, dashboard or website!', version: 'Version', download: 'Download', openNewTab: 'Open in new tab', editContent: 'Edit content', saveVersion: 'Save as new version', newArtifact: 'New artifact',
+    type_document: 'Document', type_research: 'Research', type_slides: 'Slides', type_dashboard: 'Dashboard', type_website: 'Website',
+    noWorkflows: 'No workflows yet. Start from a template and chain agents into an automation!', newWorkflow: 'New workflow', wfDescription: 'Description', fromTemplate: 'From template', steps: 'Steps', step: 'Step', addStep: 'Add step', instruction: 'Instruction', parallel: 'Run in parallel with previous step', schedule: 'Schedule (every N minutes, blank = manual)', scheduleInput: 'Input for scheduled runs', runWorkflow: 'Run workflow', workflowInput: 'Topic / data for this run', runs: 'Runs', templateVars: 'Variables: {{input}}, {{prev}} previous output, {{step1}} output of step 1',
+    humans: 'People', aiMembers: 'AI members', addAgentToChannel: 'Add an agent to this channel', inviteUser: 'Invite member', online: 'online',
+    channelSettings: 'Channel settings', name: 'Name', topic: 'Topic', mode: 'Reply mode', privateChannel: 'Private channel', memoryEnabled: 'Memory enabled', clearHistory: 'Clear history', deleteChannel: 'Delete channel',
+    providers: 'Model providers', workspace: 'Workspace', users: 'Users', usage: 'Usage', audit: 'Audit log', data: 'Data & privacy',
+    addProvider: 'Add provider', subscription: 'Subscriptions (no API key)', apiProviders: 'API keys', local: 'Local models', apiKey: 'API key', baseUrl: 'Base URL', defaultModel: 'Default model', cliPath: 'CLI path', loadModels: 'Load models', testConnection: 'Test connection', keySaved: 'saved (encrypted)', enabled: 'Enabled', getKey: 'Get a key',
+    newAgent: 'New agent', addTeam: 'Add team from templates', handle: '@handle', avatar: 'Avatar (emoji)', color: 'Color', description: 'Role description', systemPrompt: 'System prompt / personality', provider: 'Provider', model: 'Model', temperature: 'Temperature', tools: 'Capabilities', agentMemory: 'Long-term memory',
+    tool_web_fetch: 'Read web pages', tool_recall: 'Search memory', tool_remember: 'Write memory', tool_artifacts: 'Create docs/decks/sites', tool_handoff: 'Delegate to teammates', tool_calc: 'Exact math',
+    chatWith: 'Message', noProvider: 'No model set', pickTemplates: 'Choose roles to add',
+    router: 'Auto-assign router model', routerHint: 'Which model decides who answers in “Auto-assign” channels (off = keyword matching)', utilityModel: 'Summary / memory model', utilityHint: 'Used for conversation summaries and memory extraction (defaults to the last replying agent’s model)', off: 'Off',
+    autoExtract: 'Automatically extract key facts into memory', autoSummarize: 'Summarize long conversations (unbounded context)', defaultTtl: 'Default memory retention in days (blank = forever)', synthesis: 'After delegating, the delegating agent synthesises a final answer', allowRegistration: 'Allow self sign-up',
+    role: 'Role', role_owner: 'Owner', role_admin: 'Admin', role_member: 'Member', role_guest: 'Guest',
+    calls: 'Calls', inputTokens: 'Input tokens', outputTokens: 'Output tokens', avgLatency: 'Avg latency', errors: 'Errors', byAgent: 'By agent', byModel: 'By model', last30: 'Last 30 days',
+    exportData: 'Export all data (JSON)', exportHint: 'Messages, memories, artifacts, agents and settings. API keys are never exported.', forgetMe: 'Delete my personal memories', forgetMeAndMessages: 'Also delete every message I sent',
+    when: 'When', who: 'Actor', action: 'Action', target: 'Target',
+    searchPlaceholder: 'Search messages, memories and artifacts…', noResults: 'No results', messages: 'Messages',
+    welcomeEmpty: 'No messages yet — say hi 👋', loadOlder: 'Load older messages',
+    saved: 'Saved', deleted: 'Deleted', created: 'Created', workflowStarted: 'Workflow started',
+    isTyping: (n) => `${n} is typing…`, areTyping: (n) => `${n} is replying…`,
+    kind_subscription: 'Subscription', kind_api: 'API', kind_local: 'Local',
+  },
+};
+
+let lang = (() => { try { return localStorage.getItem('lang'); } catch { return null; } })()
+  || (navigator.language?.startsWith('zh') ? 'zh-TW' : 'en');
+if (!dict[lang]) lang = 'en';
+
+export const getLang = () => lang;
+export function setLang(l) { lang = dict[l] ? l : 'en'; try { localStorage.setItem('lang', lang); } catch {} document.documentElement.lang = lang; }
+export function t(key, ...args) {
+  const v = dict[lang][key] ?? dict.en[key] ?? key;
+  return typeof v === 'function' ? v(...args) : v;
+}
+document.documentElement.lang = lang;

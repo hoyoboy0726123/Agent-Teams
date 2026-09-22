@@ -19,7 +19,7 @@ export const demo = {
     if (/Summarize|摘要/.test(system || '') && /conversation/i.test(system || '')) {
       out = `Summary: ${ask.slice(0, 120)}`;
     } else if (/Extract durable facts/.test(system || '')) {
-      out = /記住|remember/i.test(last) ? `["${ask.replace(/"/g, "'").slice(0, 120)}"]` : '[]';
+      out = '[]';
     } else if (/Pick the best agent/.test(system || '')) {
       out = /"handle":"([^"]+)"/.exec(last)?.[1] || 'none';
     } else if (/簡報|slides/i.test(ask)) {

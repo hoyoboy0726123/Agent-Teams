@@ -40,7 +40,7 @@ export function createProvider({ type, name, baseUrl, apiKey, extra }) {
   if (!adapters[type]) throw Object.assign(new Error(`Unknown provider type: ${type}`), { status: 400 });
   const pid = id('prv_');
   run('INSERT INTO providers(id, type, name, base_url, api_key_enc, extra_json, enabled, created_at) VALUES (?,?,?,?,?,?,1,?)',
-    pid, type, name || adapters[type].label, baseUrl || null, encrypt(apiKey), JSON.stringify(extra || {}), now());
+    pid, type, name || adapters[type].label || type, baseUrl || null, encrypt(apiKey), JSON.stringify(extra || {}), now());
   return publicProvider(get('SELECT * FROM providers WHERE id = ?', pid));
 }
 
@@ -102,7 +102,7 @@ export async function* streamChat(pid, opts, meta = {}) {
     throw e;
   } finally {
     run('INSERT INTO usage(agent_id, provider_id, model, input_tokens, output_tokens, latency_ms, ok, created_at) VALUES (?,?,?,?,?,?,?,?)',
-      meta.agentId || null, pid, model, input, output, Date.now() - started, ok, now());
+      meta.agentId || null, pid, model || null, input, output, Date.now() - started, ok, now());
   }
 }
 
