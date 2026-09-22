@@ -1,0 +1,23 @@
+{
+  "name": "agent-teams",
+  "version": "0.1.0",
+  "description": "Open-source multi-agent team workspace: humans and many AI agents collaborating in real-time channels with persistent, governable memory. Works with Claude / Codex subscriptions, 10+ API providers and local Ollama models.",
+  "type": "module",
+  "main": "server/index.js",
+  "bin": {
+    "agent-teams": "server/index.js"
+  },
+  "scripts": {
+    "start": "node --no-warnings server/index.js",
+    "dev": "node --no-warnings --watch server/index.js",
+    "test": "node --no-warnings --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
+    "ws": "^8.18.0"
+  }
+}
