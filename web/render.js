@@ -111,10 +111,16 @@ function renderDashboard(a) {
   return page(a.title, `<main><h1 style="margin:0">${esc(d.title || a.title)}</h1><div class="kpis">${kpis}</div><div class="charts">${charts}</div>${table}${notes}</main>`, css);
 }
 
+// Previews run in an opaque-origin sandbox where Web Storage throws; give pages an in-memory
+// fallback so apps that save state (checklists, trackers…) still work while previewing.
+const STORAGE_SHIM = `<script>(function(){function m(){var d={};return{getItem:function(k){return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null},setItem:function(k,v){d[k]=String(v)},removeItem:function(k){delete d[k]},clear:function(){d={}},key:function(i){return Object.keys(d)[i]||null},get length(){return Object.keys(d).length}}}['localStorage','sessionStorage'].forEach(function(n){try{window[n].getItem('_')}catch(e){try{Object.defineProperty(window,n,{value:m(),configurable:true})}catch(_){}}})})();</script>`;
+
 function renderWebsite(a) {
   const src = String(a.content).trim().replace(/^```(?:html)?\s*|\s*```$/g, '');
-  if (/<html[\s>]/i.test(src) || /<!doctype/i.test(src)) return src;
-  return page(a.title, src);
+  if (/<html[\s>]/i.test(src) || /<!doctype/i.test(src)) {
+    return /<head[^>]*>/i.test(src) ? src.replace(/<head[^>]*>/i, (m) => m + STORAGE_SHIM) : STORAGE_SHIM + src;
+  }
+  return page(a.title, STORAGE_SHIM + src);
 }
 
 export function renderArtifact(a) {

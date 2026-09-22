@@ -25,8 +25,17 @@ server/
     tools.js            directive protocol, web_fetch (SSRF-guarded), calc
   memory/               scoped memory store + BM25 (CJK bigram) retrieval
   artifacts/            versioned store + HTML renderers (docs, slides, dashboards, sites)
-  workflows/engine.js   multi-step / parallel / scheduled workflows
-web/                    SPA: app.js (chat), panels.js, settings.js, md.js (shared renderer)
+  workflows/            engine (multi-step / parallel), schedule.js (cron + time zones),
+                        templates.js (work & life automations), digest.js ({{digest}})
+  mcp/index.js          MCP client manager (stdio / HTTP / SSE), presets, approval policy
+  approvals.js          human-in-the-loop approvals for side-effecting tool calls
+  tasks.js files.js     task board; uploads + text extraction (PDF, DOCX, XLSX, PPTX)
+  agents/library.js     47 role templates, 8 team bundles
+  api-extra.js          routes for MCP, approvals, tasks, files, feedback, bookmarks,
+                        sharing, library/teams, automations, studio comments & revisions
+web/                    SPA: app.js (chat), views.js (agents, automations, tasks, memory,
+                        outputs), studio.js, panels.js, settings.js,
+                        md.js + render.js (shared with the server)
 test/                   node:test integration + unit tests
 ```
 
@@ -40,6 +49,27 @@ test/                   node:test integration + unit tests
 4. Directives in the reply are applied: ` ```artifact ` blocks become versioned artifacts, ` ```remember ` blocks become memories, ` ```tool ` blocks run and their results are fed back for another round (max 5).
 5. If the agent `@mentions` teammates, they are queued (depth-limited); the delegating agent then gets a synthesis turn.
 6. In the background, `maintainChannel` rolls older messages into the channel summary and extracts durable facts into channel memory.
+
+## Tools, MCP and approvals
+
+Built-in tools (`web_search`, `web_fetch`, `recall`, `read_artifact`, `calc`) and MCP tools share the same
+` ```tool ` protocol; MCP tools appear to the agent as `<server-slug>.<tool>`. Before an MCP call runs, the
+server's approval policy is checked (`auto` = read-only tools run, others need a human; `always`; `never`).
+A pending call pauses the agent's turn and shows an Approve / Deny card in the message; the decision (or a
+15-minute timeout) resumes it. Every call is audited.
+
+## Automations
+
+Workflows gain a trigger (`manual` | `schedule` | `webhook`). Schedules (daily / weekly / monthly /
+interval / cron) are evaluated every 30 s in the workspace time zone and fire at most once per slot.
+Webhooks are `POST /hooks/<token>`; the body becomes `{{input}}`.
+
+## Live previews and Studio
+
+While an agent streams an ` ```artifact ` block, the runtime emits throttled `artifact.draft` events; the
+client renders them with the same renderer the server uses (`web/render.js`) into a sandboxed `srcdoc`
+iframe. Studio revisions post a message asking the agent to output the complete next version with the same
+title, which `upsertArtifact` stores as a new version; addressed comments are then resolved.
 
 ## Why a text directive protocol instead of native tool calling?
 

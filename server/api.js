@@ -558,7 +558,7 @@ r.post('/api/me/forget', async ({ user, req }) => {
   return { ok: true, memories: m, messages: n };
 });
 
-r.get('/api/health', () => ({ ok: true, version: '0.1.0', time: Date.now() }));
+r.get('/api/health', () => ({ ok: true, version: '0.2.0', time: Date.now() }));
 
 export async function handleApi(ctx) {
   const m = router.match(ctx.req.method, ctx.path);

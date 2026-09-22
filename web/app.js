@@ -775,7 +775,9 @@ window.addEventListener('hashchange', () => {
   const view = /^#\/(\w+)$/.exec(location.hash)?.[1];
   if (view && VIEWS[view]) { if (view !== S.view) openView(view); return; }
   const id = /^#\/c\/(.+)$/.exec(location.hash)?.[1];
-  if (id && (id !== S.current || S.view !== 'chat') && channelById(id)) openChannel(id);
+  if (!id || (id === S.current && S.view === 'chat')) return;
+  if (channelById(id)) openChannel(id);
+  else refreshChannels().then(() => { if (channelById(id)) openChannel(id); }).catch(() => {});
 });
 
 boot().catch((e) => { document.body.innerHTML = `<div class="empty">⚠️ ${esc(e.message)}</div>`; });

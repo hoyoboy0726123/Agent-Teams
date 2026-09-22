@@ -1,6 +1,6 @@
 {
   "name": "agent-teams",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Open-source multi-agent team workspace: humans and many AI agents collaborating in real-time channels with persistent, governable memory. Works with Claude / Codex subscriptions, 10+ API providers and local Ollama models.",
   "type": "module",
   "main": "server/index.js",
