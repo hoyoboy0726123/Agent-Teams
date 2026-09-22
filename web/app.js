@@ -124,6 +124,7 @@ function renderShell() {
           <textarea id="input" rows="1" autocomplete="off"></textarea>
           <div class="composer-bar">
             <label class="icon-btn attach" title="${t('attach')}">📎<input type="file" id="file-input" multiple hidden></label>
+            <button type="button" class="icon-btn" id="mic-btn" title="${t('voiceInput')}" hidden>🎙️</button>
             <span class="muted small grow" id="mode-hint"></span>
             <button class="btn primary" type="submit" id="send-btn">${t('send')} ↵</button>
           </div>
@@ -354,7 +355,9 @@ function messageHtml(m, prev) {
   const footer = m.authorType === 'agent' && !streaming && m.status !== 'error' ? `<div class="msg-foot">
       ${secs ? `<span class="muted small" title="${t('genTime')}">⏱ ${secs >= 60 ? `${Math.floor(secs / 60)}m ${secs % 60}s` : `${secs}s`}</span>` : ''}
       ${m.meta?.tools?.length ? `<span class="muted small">· 🔧 ${m.meta.tools.length}</span>` : ''}
+      <button class="link small" data-process="${m.id}">${t('viewProcess')}</button>
       <span class="grow"></span>
+      <button class="icon-btn sm" data-translate="${m.id}" title="${t('translate')}">文A</button>
       <button class="icon-btn sm${fb.mine === 1 ? ' on' : ''}" data-fb-up="${m.id}" title="${t('helpful')}">👍${fb.up ? ` ${fb.up}` : ''}</button>
       <button class="icon-btn sm${fb.mine === -1 ? ' on' : ''}" data-fb-down="${m.id}" title="${t('notHelpful')}">👎${fb.down ? ` ${fb.down}` : ''}</button>
       <button class="icon-btn sm" data-bookmark-msg="${m.id}" title="${t('bookmark')}">${S.bookmarks.has('message:' + m.id) ? '🔖' : '📑'}</button>
@@ -365,6 +368,8 @@ function messageHtml(m, prev) {
       ${grouped ? '' : `<div class="meta"><strong>${esc(au.name)}</strong>${au.agent ? `<span class="badge">AI</span>${model ? `<span class="muted small">${esc(model)}</span>` : ''}` : ''}<span class="muted small">${clock(m.createdAt)}</span>${m.meta?.edited ? `<span class="muted small">(edited)</span>` : ''}</div>`}
       ${files ? `<div class="files">${files}</div>` : ''}
       <div class="body">${empty && streaming ? `<span class="dots"><i></i><i></i><i></i></span>` : renderBody(m)}</div>
+      ${S.showTr?.has(m.id) && m.meta?.translations?.[getLang()] ? `<div class="translation"><div class="muted tiny">文A ${t('translatedTo')} · <button class="link tiny" data-translate="${m.id}">${t('hideTranslation')}</button></div>${renderBody({ ...m, content: m.meta.translations[getLang()] })}</div>` : ''}
+      ${S.showProc?.has(m.id) ? processHtml(m, au.agent?.model || "") : ""}
       ${approvals}
       ${tools || mems || tasks ? `<div class="chips">${tools}${mems}${tasks}</div>` : ''}
       ${suggestions}${footer}
@@ -378,6 +383,18 @@ function messageHtml(m, prev) {
       ${m.authorType === 'agent' ? `<button class="icon-btn sm" data-regen="${m.id}" title="${t('regenerate')}">↻</button>` : ''}
       ${m.authorType === 'agent' || m.authorId === S.user.id || isAdmin() ? `<button class="icon-btn sm" data-del="${m.id}" title="${t('delete')}">🗑</button>` : ''}`}
     </div>
+  </div>`;
+}
+
+function processHtml(m, model) {
+  const meta = m.meta || {};
+  const secs = meta.durationMs ? (meta.durationMs / 1000).toFixed(1) : '?';
+  const agent = agentById(m.authorId);
+  const prov = S.providers.find((p) => p.id === agent?.providerId);
+  return `<div class="process">
+    <div class="muted small">🧠 ${esc(prov?.name || '')}${model ? ` · ${esc(model)}` : ''} · ⏱ ${secs}s${meta.depth ? ` · ${t('handoffDepth')} ${meta.depth}` : ''}${meta.workflowRunId ? ' · ⚡ workflow' : ''}</div>
+    ${(meta.tools || []).length ? `<ol class="steps-log">${meta.tools.map((x) => `<li><code>${esc(x.name)}</code> ${x.ok ? '✓' : '✗'}${x.approval ? ` · 🔐 ${t('approval_' + x.approval)}` : ''}<div class="muted tiny">${esc(JSON.stringify(x.args ?? {})).slice(0, 200)}</div>${x.summary ? `<div class="tiny">→ ${esc(x.summary)}</div>` : ''}</li>`).join('')}</ol>` : `<div class="muted tiny">${t('noToolsUsed')}</div>`}
+    ${(meta.memories || []).length ? `<div class="tiny">🧠 ${t('remembered')}: ${meta.memories.map((x) => esc(x.content)).join(' · ')}</div>` : ''}
   </div>`;
 }
 
@@ -453,6 +470,21 @@ const onMessageClick = safe(async (e) => {
   if (art) return openStudio(art);
   if (d('suggest')) { const input = $('#input'); input.value = d('suggest'); autoGrow(input); input.focus(); return; }
   if (e.target.closest('[data-goto-tasks]')) return openView('tasks');
+  if (d('process')) { S.showProc ||= new Set(); const id = d('process'); S.showProc.has(id) ? S.showProc.delete(id) : S.showProc.add(id); patchMessage(findMsg(id)); return; }
+  if (d('translate')) {
+    const id = d('translate');
+    S.showTr ||= new Set();
+    if (S.showTr.has(id)) { S.showTr.delete(id); patchMessage(findMsg(id)); return; }
+    const m = findMsg(id);
+    if (!m.meta?.translations?.[getLang()]) {
+      toast(t('translating'));
+      const r = await api('POST', `/api/messages/${id}/translate`, { lang: getLang() });
+      m.meta = { ...m.meta, translations: { ...(m.meta?.translations || {}), [getLang()]: r.text } };
+    }
+    S.showTr.add(id);
+    patchMessage(m);
+    return;
+  }
   if (d('approve') || d('deny')) { await api('POST', `/api/approvals/${d('approve') || d('deny')}`, { approve: !!d('approve') }); return; }
   if (d('fb-up') || d('fb-down')) {
     const mid = d('fb-up') || d('fb-down');
@@ -568,6 +600,26 @@ function bindComposer() {
     try { await api('POST', `/api/channels/${S.current}/messages`, { content, fileIds }); }
     catch (err) { input.value = content; throw err; }
   });
+  // Voice input via the browser's speech recognition (Chrome, Edge, Safari).
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const mic = $('#mic-btn');
+  if (SR) {
+    mic.hidden = false;
+    let rec = null;
+    mic.onclick = () => {
+      if (rec) { rec.stop(); return; }
+      rec = new SR();
+      rec.lang = getLang() === 'en' ? 'en-US' : 'zh-TW';
+      rec.interimResults = true;
+      rec.continuous = true;
+      const base = input.value ? input.value + ' ' : '';
+      rec.onresult = (ev) => { input.value = base + [...ev.results].map((r) => r[0].transcript).join(''); autoGrow(input); };
+      rec.onend = () => { rec = null; mic.classList.remove('recording'); };
+      rec.onerror = () => { rec = null; mic.classList.remove('recording'); };
+      mic.classList.add('recording');
+      rec.start();
+    };
+  }
   $('#file-input').onchange = (e) => { uploadFiles([...e.target.files]); e.target.value = ''; };
   input.addEventListener('paste', (e) => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) { e.preventDefault(); uploadFiles(fs); } });
   const comp = $('#composer');

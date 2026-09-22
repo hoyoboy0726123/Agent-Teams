@@ -356,3 +356,27 @@ r.post('/api/artifacts/:id/revise', async ({ user, req, params }) => {
     }).catch(() => {});
   return { ok: true, messageId: msg.id };
 });
+
+// ------------------------------------------------------------------ translation
+
+import { complete } from './providers/index.js';
+
+r.post('/api/messages/:id/translate', async ({ user, req, params }) => {
+  const m = ch.getMessage(params.id) || fail(404, 'Message not found');
+  readable(user, m.channelId);
+  const { lang = 'zh-TW' } = await readJson(req);
+  const target = { 'zh-TW': 'Traditional Chinese (Taiwan)', en: 'English' }[lang] || lang;
+  if (m.meta?.translations?.[lang]) return { text: m.meta.translations[lang], cached: true };
+  const util = getSetting('utilityModel', null);
+  const agent = m.authorType === 'agent' ? agents.getAgent(m.authorId) : null;
+  const fallback = agents.listAgents().find((a) => a.providerId);
+  const providerId = util?.providerId || agent?.providerId || fallback?.providerId || fail(400, 'No model available for translation');
+  const model = util?.providerId ? util.model : (agent || fallback)?.model;
+  const text = await complete(providerId, {
+    model,
+    system: `Translate the user's message into ${target}. Keep markdown, code, links, @mentions and [[...]] placeholders exactly as they are. Output only the translation.`,
+    messages: [{ role: 'user', content: m.content }],
+  });
+  ch.updateMessage(m.id, { meta: { translations: { ...(m.meta?.translations || {}), [lang]: text.trim() } } });
+  return { text: text.trim() };
+});

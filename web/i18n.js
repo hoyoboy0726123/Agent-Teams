@@ -59,6 +59,7 @@ const dict = {
     allChannels: '所有頻道', newTask: '新增任務', unassigned: '未指派', letAgentDo: '交給 Agent', pendingApprovals: '等待你核准', dropHere: '拖曳任務到這裡', agentWorking: 'Agent 開始處理，完成後會自動標記完成', taskTitle: '任務名稱', assignee: '負責人', due: '截止日',
     status_todo: '待辦', status_doing: '進行中', status_done: '完成', all: '全部', savedTab: '收藏', noSaved: '還沒有收藏。點訊息或產出物上的 📑 即可收藏。',
     tool_web_search: '網路搜尋', tool_tasks: '建立任務',
+    viewProcess: '查看過程', translate: '翻譯', translatedTo: '已翻譯為繁體中文', hideTranslation: '隱藏翻譯', translating: '翻譯中…', handoffDepth: '委派層級', noToolsUsed: '未使用工具', voiceInput: '語音輸入',
     kind_subscription: '訂閱', kind_api: 'API', kind_local: '本機',
   },
   en: {
@@ -120,6 +121,7 @@ const dict = {
     allChannels: 'All channels', newTask: 'New task', unassigned: 'Unassigned', letAgentDo: 'Let agent do it', pendingApprovals: 'Waiting for your approval', dropHere: 'Drop tasks here', agentWorking: 'The agent is on it; the task completes automatically', taskTitle: 'Task', assignee: 'Assignee', due: 'Due',
     status_todo: 'To do', status_doing: 'In progress', status_done: 'Done', all: 'All', savedTab: 'Saved', noSaved: 'Nothing saved yet. Click 📑 on a message or deliverable.',
     tool_web_search: 'Web search', tool_tasks: 'Create tasks',
+    viewProcess: 'View process', translate: 'Translate', translatedTo: 'Translated to English', hideTranslation: 'Hide translation', translating: 'Translating…', handoffDepth: 'hand-off depth', noToolsUsed: 'No tools used', voiceInput: 'Voice input',
     kind_subscription: 'Subscription', kind_api: 'API', kind_local: 'Local',
   },
 };
