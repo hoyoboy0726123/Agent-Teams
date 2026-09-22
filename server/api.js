@@ -9,6 +9,7 @@ import * as mem from './memory/store.js';
 import * as arts from './artifacts/store.js';
 import * as wf from './workflows/engine.js';
 import { renderArtifact, downloadName } from './artifacts/render.js';
+import { renderPptx, canExportPptx } from './artifacts/pptx.js';
 import { handleHumanMessage, runChain, enqueue } from './agents/orchestrator.js';
 import { stopMessage } from './agents/runtime.js';
 import { emit } from './bus.js';
@@ -442,8 +443,19 @@ r.get('/api/artifacts/:id/render', ({ user, params, query, res }) => {
   res.end(renderArtifact(a));
   return undefined;
 });
-r.get('/api/artifacts/:id/download', ({ user, params, query, res }) => {
+r.get('/api/artifacts/:id/download', async ({ user, params, query, res }) => {
   const a = readableArtifact(user, params.id, Number(query.get('version')) || undefined);
+  if (query.get('format') === 'pptx') {
+    if (!canExportPptx(a)) fail(400, 'Only slides and dashboards can be exported to PowerPoint');
+    let buf;
+    try { buf = await renderPptx(a); } catch (e) { fail(422, `Could not build PowerPoint: ${e.message}`); }
+    res.writeHead(200, {
+      'content-type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(downloadName(a).replace(/\.\w+$/, '.pptx'))}`,
+    });
+    res.end(buf);
+    return undefined;
+  }
   const md = a.type === 'document' || a.type === 'research';
   const body = md ? a.content : renderArtifact(a);
   res.writeHead(200, {

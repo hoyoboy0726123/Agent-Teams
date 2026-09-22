@@ -142,6 +142,7 @@ export async function openArtifact(id, version) {
         ${S.user.role !== 'guest' ? `<button class="btn sm" data-editc>✎ ${t('editContent')}</button>` : ''}
         <a class="btn sm" href="${src}" target="_blank" rel="noopener">↗ ${t('openNewTab')}</a>
         <a class="btn sm" href="/api/artifacts/${a.id}/download?version=${a.viewing}">⬇ ${t('download')}</a>
+        ${a.type === 'slides' || a.type === 'dashboard' ? `<a class="btn sm" href="/api/artifacts/${a.id}/download?version=${a.viewing}&format=pptx">📊 PowerPoint</a>` : ''}
         ${S.user.role !== 'guest' ? `<button class="btn sm danger-text" data-delart>🗑</button>` : ''}
       </div>
       <div class="art-frame-wrap"><iframe class="art-frame" sandbox="allow-scripts allow-popups allow-modals" src="${src}" title="${esc(a.title)}"></iframe></div>

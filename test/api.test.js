@@ -56,6 +56,8 @@ test('agents publish artifacts and they render sandboxed', async () => {
   const page = await fetch(`${app.base}/api/artifacts/${art.id}/render`, { headers: { cookie: owner.cookie } });
   assert.match(page.headers.get('content-security-policy'), /sandbox/);
   assert.match(await page.text(), /class="slide/);
+  await owner.call('POST', `/api/channels/${cid}/messages`, { content: '@analyst dashboard please' });
+  await waitFor(async () => (await messages(cid)).find((m) => m.meta?.artifacts?.some((x) => x.type === 'dashboard') && m.status === 'done'));
 });
 
 test('agents store memories via directives; humans can list, edit and delete them', async () => {
@@ -120,4 +122,17 @@ test('audit log and export are admin-only', async () => {
   await bob.call('POST', '/api/auth/login', { username: 'bob', password: 'secret123' });
   assert.equal((await bob.call('GET', '/api/audit')).status, 403);
   assert.equal((await bob.call('GET', '/api/export')).status, 403);
+});
+
+test('slides and dashboards export to real .pptx files', async () => {
+  const arts = (await owner.call('GET', '/api/artifacts')).data;
+  for (const type of ['slides', 'dashboard']) {
+    const a = arts.find((x) => x.type === type);
+    assert.ok(a, `has a ${type} artifact`);
+    const res = await fetch(`${app.base}/api/artifacts/${a.id}/download?format=pptx`, { headers: { cookie: owner.cookie } });
+    assert.equal(res.status, 200);
+    const buf = Buffer.from(await res.arrayBuffer());
+    assert.equal(buf.subarray(0, 2).toString(), 'PK', 'pptx is a zip');
+    assert.ok(buf.includes(Buffer.from('ppt/slides/slide1.xml')));
+  }
 });
