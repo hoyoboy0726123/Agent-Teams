@@ -1,7 +1,7 @@
 // Export slide decks and dashboards as real, editable PowerPoint files (.pptx).
 // Dashboards become KPI slides plus native (editable) PowerPoint charts.
 import PptxGenJS from 'pptxgenjs';
-import { parseDashboard } from './render.js';
+import { parseDashboard } from '../../web/render.js';
 
 const ACCENT = '6366F1';
 const INK = '1F2330';

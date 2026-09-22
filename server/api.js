@@ -8,7 +8,7 @@ import * as prov from './providers/index.js';
 import * as mem from './memory/store.js';
 import * as arts from './artifacts/store.js';
 import * as wf from './workflows/engine.js';
-import { renderArtifact, downloadName } from './artifacts/render.js';
+import { renderArtifact, downloadName } from '../web/render.js';
 import { renderPptx, canExportPptx } from './artifacts/pptx.js';
 import { handleHumanMessage, runChain, enqueue } from './agents/orchestrator.js';
 import { stopMessage } from './agents/runtime.js';

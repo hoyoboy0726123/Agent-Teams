@@ -292,3 +292,67 @@ r.post('/api/schedule/preview', async ({ user, req }) => {
 });
 
 export { renderTpl };
+
+// ------------------------------------------------------------------ studio: comments & AI revisions
+
+import { getArtifact } from './artifacts/store.js';
+import { id as newId } from './db.js';
+
+const toComment = (c) => ({ id: c.id, artifactId: c.artifact_id, version: c.version, quote: c.quote, body: c.body, authorType: c.author_type, authorId: c.author_id, status: c.status, createdAt: c.created_at });
+
+r.get('/api/artifacts/:id/comments', ({ user, params }) => {
+  readableArtifact(user, params.id);
+  return all('SELECT * FROM artifact_comments WHERE artifact_id = ? ORDER BY created_at', params.id).map(toComment);
+});
+r.post('/api/artifacts/:id/comments', async ({ user, req, params }) => {
+  need(user, 'guest');
+  const a = readableArtifact(user, params.id);
+  const { body, quote = '', version } = await readJson(req);
+  if (!String(body || '').trim()) fail(400, 'Comment is empty');
+  const cid = newId('cmt_');
+  run('INSERT INTO artifact_comments(id, artifact_id, version, quote, body, author_type, author_id, created_at) VALUES (?,?,?,?,?,?,?,?)',
+    cid, a.id, version || a.version, String(quote).slice(0, 500), String(body).slice(0, 2000), 'user', user.id, now());
+  emit('artifact.updated', { channelId: a.channelId, artifactId: a.id, comments: true });
+  return toComment(get('SELECT * FROM artifact_comments WHERE id = ?', cid));
+});
+r.patch('/api/artifact-comments/:id', async ({ user, req, params }) => {
+  const c = get('SELECT * FROM artifact_comments WHERE id = ?', params.id) || fail(404, 'Comment not found');
+  const a = readableArtifact(user, c.artifact_id);
+  const { status } = await readJson(req);
+  run('UPDATE artifact_comments SET status = ? WHERE id = ?', status === 'resolved' ? 'resolved' : 'open', c.id);
+  emit('artifact.updated', { channelId: a.channelId, artifactId: a.id, comments: true });
+  return { ok: true };
+});
+r.delete('/api/artifact-comments/:id', ({ user, params }) => {
+  const c = get('SELECT * FROM artifact_comments WHERE id = ?', params.id) || fail(404, 'Comment not found');
+  readableArtifact(user, c.artifact_id);
+  if (c.author_id !== user.id) need(user, 'admin');
+  run('DELETE FROM artifact_comments WHERE id = ?', c.id);
+  return { ok: true };
+});
+
+// Ask an agent to produce the next version, addressing an instruction and/or all open comments.
+r.post('/api/artifacts/:id/revise', async ({ user, req, params }) => {
+  need(user, 'member');
+  const a = readableArtifact(user, params.id);
+  if (!a.channelId) fail(400, 'Only artifacts that belong to a channel can be revised by an agent');
+  const { instruction = '', agentId, includeComments = true } = await readJson(req);
+  const agentRow = agents.getAgent(agentId || (a.createdByType === 'agent' ? a.createdById : null)) || fail(400, 'Choose an agent to make the revision');
+  const open = includeComments ? all("SELECT * FROM artifact_comments WHERE artifact_id = ? AND status = 'open' ORDER BY created_at", a.id) : [];
+  if (!instruction.trim() && !open.length) fail(400, 'Describe the change or add comments first');
+  ch.addMember(a.channelId, 'agent', agentRow.id);
+  const list = open.map((c, i) => `${i + 1}. ${c.quote ? `On "${c.quote}": ` : ''}${c.body}`).join('\n');
+  const text = `@${agentRow.handle} please revise “${a.title}” (v${a.version}).${instruction.trim() ? `\n${instruction.trim()}` : ''}${list ? `\n\nReview comments to address:\n${list}` : ''}`;
+  const msg = ch.createMessage({ channelId: a.channelId, authorType: 'user', authorId: user.id, content: text, meta: { studio: { artifactId: a.id } } });
+  const task = `Revise the existing artifact titled "${a.title}" (type ${a.type}). Its current content (v${a.version}) is below. Output the COMPLETE updated artifact in an artifact block with exactly the same title and type so it becomes version ${a.version + 1}. Keep everything that was not asked to change. After the block, list the changes in 1–4 short bullets.\n\n<current_artifact>\n${a.content.slice(0, 60000)}\n</current_artifact>`;
+  enqueue(a.channelId, () => runChain(a.channelId, [{ agentId: agentRow.id, depth: 99, instruction: task }], { userId: user.id, parentId: msg.id }))
+    .then((results) => {
+      const updated = getArtifact(a.id);
+      if (updated.version > a.version && open.length) {
+        run(`UPDATE artifact_comments SET status = 'resolved' WHERE id IN (${open.map(() => '?').join(',')})`, ...open.map((c) => c.id));
+        emit('artifact.updated', { channelId: a.channelId, artifactId: a.id, comments: true });
+      }
+      return results;
+    }).catch(() => {});
+  return { ok: true, messageId: msg.id };
+});

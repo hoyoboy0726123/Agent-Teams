@@ -7,7 +7,7 @@ import { config } from './config.js';
 import { handleApi } from './api.js';
 import './api-extra.js';
 import { get as dbGet } from './db.js';
-import { renderArtifact } from './artifacts/render.js';
+import { renderArtifact } from '../web/render.js';
 import { getArtifact } from './artifacts/store.js';
 import { expireStale } from './approvals.js';
 import { findByHook, startWorkflow } from './workflows/engine.js';

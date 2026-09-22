@@ -11,7 +11,7 @@ const KIND_LABEL = { subscription: 'subscription', api: 'apiProviders', local: '
 export function openSettings(tab) {
   const admin = isAdmin();
   const tabs = [
-    ...(admin ? [['providers', '🔌'], ['workspace', '🏢'], ['users', '👤'], ['usage', '📈'], ['audit', '📜']] : []),
+    ...(admin ? [['providers', '🧠'], ['integrations', '🔌'], ['workspace', '🏢'], ['users', '👤'], ['usage', '📈'], ['audit', '📜']] : []),
     ['data', '🔐'],
   ];
   tab ||= tabs[0][0];
@@ -23,7 +23,7 @@ export function openSettings(tab) {
     m.el.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === k));
     const body = m.el.querySelector('#set-body');
     body.innerHTML = `<p class="muted">${t('loading')}</p>`;
-    await ({ providers: providersTab, workspace: workspaceTab, users: usersTab, usage: usageTab, audit: auditTab, data: dataTab })[k](body);
+    await ({ providers: providersTab, integrations: integrationsTab, workspace: workspaceTab, users: usersTab, usage: usageTab, audit: auditTab, data: dataTab })[k](body);
   });
   m.el.querySelector('.set-nav').onclick = (e) => { const k = e.target.closest('[data-tab]')?.dataset.tab; if (k) show(k); };
   show(tab);
@@ -107,6 +107,91 @@ function providerForm(c, p, done) {
   });
 }
 
+// ------------------------------------------------------------------ integrations (MCP)
+
+const STATUS_ICON = { connected: '🟢', connecting: '🟡', error: '🔴', idle: '⚪' };
+
+async function integrationsTab(body) {
+  const [servers, presets] = await Promise.all([api('GET', '/api/mcp/servers'), api('GET', '/api/mcp/presets')]);
+  body.innerHTML = `<h3>🔌 ${t('integrations')}</h3><p class="muted small">${t('mcpIntro')}</p>
+    <div class="prov-list">${servers.map((sv) => `<div class="prov${sv.enabled ? '' : ' off'}">
+      <div class="grow"><strong>${esc(presets.find((p) => p.key === sv.preset)?.icon || '🧩')} ${esc(sv.name)}</strong> <code class="small">${esc(sv.slug)}.*</code>
+        <div class="muted small">${STATUS_ICON[sv.status?.state] || '⚪'} ${esc(sv.status?.state || 'idle')}${sv.status?.tools ? ` · ${sv.status.tools} tools` : ''}${sv.status?.error ? ` · ${esc(sv.status.error.slice(0, 160))}` : ''} · ${t('approval')}: ${t('approvalPolicy_' + sv.approval)}</div>
+        <div class="test-out small" data-out="${sv.id}"></div></div>
+      <button class="btn sm" data-connect="${sv.id}">${t('testConnection')}</button>
+      <button class="btn ghost sm" data-edit="${sv.id}">✎</button>
+      <button class="icon-btn sm" data-del="${sv.id}">🗑</button></div>`).join('') || `<p class="muted small">${t('noIntegrations')}</p>`}</div>
+    <h3>${t('addIntegration')}</h3>
+    <div class="cat-grid">${presets.map((p) => `<button class="cat" data-preset="${p.key}"><strong>${p.icon} ${esc(p.name)}</strong><span class="muted small">${esc(p.description)}</span></button>`).join('')}</div>`;
+  body.onclick = safe(async (e) => {
+    const d = (k) => e.target.closest(`[data-${k}]`)?.dataset[k];
+    if (d('preset')) mcpForm(presets.find((p) => p.key === d('preset')), null, () => integrationsTab(body));
+    if (d('edit')) { const sv = servers.find((x) => x.id === d('edit')); mcpForm(presets.find((p) => p.key === sv.preset) || presets.find((p) => p.key === (sv.transport === 'stdio' ? 'custom-stdio' : 'custom-http')), sv, () => integrationsTab(body)); }
+    if (d('del')) { if (await confirmBox(t('delete') + '?')) { await api('DELETE', `/api/mcp/servers/${d('del')}`); integrationsTab(body); } }
+    if (d('connect')) {
+      const out = body.querySelector(`[data-out="${d('connect')}"]`);
+      out.innerHTML = `<span class="spin">⏳</span> ${t('connecting')}`;
+      const r = await api('POST', `/api/mcp/servers/${d('connect')}/connect`, {});
+      out.innerHTML = r.ok ? `<span class="ok-text">✓ ${r.tools.length} tools</span><div class="tool-list">${r.tools.map((x) => `<span class="chip${x.approval ? ' warn' : ''}" title="${esc(x.description)}">${x.approval ? '🔐 ' : ''}${esc(x.name)}</span>`).join('')}</div>` : `<span class="danger-text">✗ ${esc(r.error)}</span>`;
+    }
+  });
+}
+
+function mcpForm(p, sv, done) {
+  const custom = p.key.startsWith('custom');
+  const isStdio = (sv?.transport || p.transport) === 'stdio';
+  const m = modal({
+    title: `${p.icon} ${sv ? t('edit') : t('addIntegration')}: ${p.name}`, wide: true,
+    body: `<form class="form" id="mcp-form">
+      <p class="muted small">${esc(p.description)} ${p.docs ? `<a href="${esc(p.docs)}" target="_blank" rel="noopener">Docs ↗</a>` : ''}</p>
+      ${p.note ? `<p class="hint">💡 ${esc(p.note)}</p>` : ''}
+      <label class="field"><span>${t('name')}</span><input name="name" value="${esc(sv?.name || p.name)}"></label>
+      ${sv || custom ? `
+        <label class="field"><span>Transport</span><select name="transport">${['stdio', 'http', 'sse'].map((x) => `<option value="${x}"${(sv?.transport || p.transport) === x ? ' selected' : ''}>${x === 'stdio' ? 'stdio (local command)' : x === 'http' ? 'Streamable HTTP' : 'SSE (legacy)'}</option>`).join('')}</select></label>
+        <label class="field" data-t="stdio"><span>${t('command')}</span><input name="command" value="${esc(sv?.command || p.command || '')}" placeholder="npx"></label>
+        <label class="field" data-t="stdio"><span>${t('argsOnePerLine')}</span><textarea name="args" rows="3" class="mono">${esc((sv?.args || p.args || []).join('\n'))}</textarea></label>
+        <label class="field" data-t="stdio"><span>${t('envVars')} (KEY=value)</span><textarea name="env" rows="3" class="mono">${esc(Object.entries(sv?.env || {}).map(([k, v]) => `${k}=${v}`).join('\n'))}</textarea></label>
+        <label class="field" data-t="http sse"><span>URL</span><input name="url" value="${esc(sv?.url || p.url || '')}" placeholder="https://example.com/mcp"></label>
+        <label class="field" data-t="http sse"><span>${t('headers')} (Name: value)</span><textarea name="headers" rows="2" class="mono">${esc(Object.entries(sv?.headers || {}).map(([k, v]) => `${k}: ${v}`).join('\n'))}</textarea></label>`
+      : `${(p.fields || []).map((f) => `<label class="field"><span>${esc(f.label)}</span><input name="v_${f.key}" ${f.secret ? 'type="password"' : ''} placeholder="${esc(f.placeholder || '')}" required></label>`).join('')}
+         ${(p.env || []).map((f) => `<label class="field"><span>${esc(f.label)}</span><input name="v_${f.key}" ${f.secret ? 'type="password" autocomplete="off"' : ''} required></label>`).join('')}
+         ${(p.headers || []).map((f) => `<label class="field"><span>${esc(f.label)}</span><input name="v_${f.key}" ${f.secret ? 'type="password" autocomplete="off"' : ''} required></label>`).join('')}
+         ${p.command ? `<p class="muted small">${t('willRun')}: <code>${esc([p.command, ...(p.args || [])].join(' '))}</code></p>` : `<p class="muted small">URL: <code>${esc(p.url)}</code></p>`}`}
+      <label class="field"><span>${t('approval')}</span><select name="approval">${['auto', 'always', 'never'].map((x) => `<option value="${x}"${(sv?.approval || 'auto') === x ? ' selected' : ''}>${t('approvalPolicy_' + x)}</option>`).join('')}</select><small class="muted">${t('approvalHint')}</small></label>
+      ${sv ? `<label class="check"><input type="checkbox" name="enabled"${sv.enabled ? ' checked' : ''}> ${t('enabled')}</label>` : ''}
+      <label class="field"><span>${t('grantAgents')}</span><div class="pick-grid">${S.agents.map((a) => `<label class="pick"><input type="checkbox" name="agents" data-multi="1" value="${a.id}"${sv && (a.mcpServers || []).includes(sv.id) ? ' checked' : ''}><span class="mini-av" style="--c:${esc(a.color)}">${esc(a.avatar)}</span>${esc(a.name)}</label>`).join('')}</div></label>
+    </form>`,
+    footer: `<button class="btn ghost" data-cancel>${t('cancel')}</button><button class="btn primary" form="mcp-form">${t('save')}</button>`,
+  });
+  const syncT = () => { const tr = m.el.querySelector('[name=transport]')?.value; m.el.querySelectorAll('[data-t]').forEach((x) => { x.hidden = !x.dataset.t.split(' ').includes(tr); }); };
+  m.el.querySelector('[name=transport]')?.addEventListener('change', syncT);
+  syncT();
+  m.el.querySelector('[data-cancel]').onclick = m.close;
+  m.el.querySelector('#mcp-form').onsubmit = safe(async (e) => {
+    e.preventDefault();
+    const f = formData(e.target);
+    const kv = (txt, sep) => Object.fromEntries(String(txt || '').split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const i = l.indexOf(sep); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }).filter(([k]) => k));
+    let saved;
+    if (sv || custom) {
+      const payload = { name: f.name, transport: f.transport, command: f.command, args: f.args, env: kv(f.env, '='), url: f.url, headers: kv(f.headers, ':'), approval: f.approval, enabled: sv ? f.enabled : true, preset: p.key };
+      saved = sv ? await api('PATCH', `/api/mcp/servers/${sv.id}`, payload) : await api('POST', '/api/mcp/servers', payload);
+    } else {
+      const values = Object.fromEntries(Object.entries(f).filter(([k]) => k.startsWith('v_')).map(([k, v]) => [k.slice(2), v]));
+      saved = await api('POST', '/api/mcp/servers', { preset: p.key, values: { ...values, name: f.name, approval: f.approval } });
+    }
+    // Grant / revoke per agent.
+    for (const a of S.agents) {
+      const has = (a.mcpServers || []).includes(saved.id);
+      const want = f.agents.includes(a.id);
+      if (has !== want) await api('PATCH', `/api/agents/${a.id}`, { mcpServers: want ? [...(a.mcpServers || []), saved.id] : a.mcpServers.filter((x) => x !== saved.id) });
+    }
+    await refreshAgents();
+    toast(t('saved'), 'ok');
+    m.close();
+    done();
+  });
+}
+
 // ------------------------------------------------------------------ workspace
 
 const modelPicker = (name, val, allowOff = true) => `<div class="row">
@@ -114,7 +199,7 @@ const modelPicker = (name, val, allowOff = true) => `<div class="row">
   <input name="${name}_model" placeholder="${t('model')}" value="${esc(val?.model || '')}"></div>`;
 
 async function workspaceTab(body) {
-  const s = await api('GET', '/api/settings');
+  const [s, search] = await Promise.all([api('GET', '/api/settings'), api('GET', '/api/settings/search')]);
   body.innerHTML = `<form class="form" id="ws-form">
     <label class="field"><span>${t('workspaceName')}</span><input name="workspaceName" value="${esc(s.workspaceName)}"></label>
     <div class="field"><span>${t('router')}</span>${modelPicker('router', s.router)}<small class="muted">${t('routerHint')}</small></div>
@@ -124,6 +209,9 @@ async function workspaceTab(body) {
     <label class="field"><span>${t('defaultTtl')}</span><input name="defaultTtlDays" type="number" min="1" value="${s.memory?.defaultTtlDays || ''}"></label>
     <label class="check"><input type="checkbox" name="synthesis"${s.synthesis !== false ? ' checked' : ''}> ${t('synthesis')}</label>
     <label class="check"><input type="checkbox" name="allowRegistration"${s.allowRegistration ? ' checked' : ''}> ${t('allowRegistration')}</label>
+    <label class="field"><span>${t('timezone')}</span><input name="timezone" list="tz-list" value="${esc(s.timezone || '')}" placeholder="${esc(Intl.DateTimeFormat().resolvedOptions().timeZone)}"><datalist id="tz-list">${(Intl.supportedValuesOf?.('timeZone') || []).map((z) => `<option value="${z}">`).join('')}</datalist></label>
+    <div class="field"><span>${t('searchProvider')}</span><div class="row"><select name="searchProvider">${['duckduckgo', 'tavily', 'brave'].map((p) => `<option value="${p}"${search.provider === p ? ' selected' : ''}>${p === 'duckduckgo' ? 'DuckDuckGo (free)' : p === 'tavily' ? 'Tavily' : 'Brave Search'}</option>`).join('')}</select>
+      <input name="searchKey" type="password" placeholder="${search.hasKey ? t('keySaved') : t('apiKey')}"></div><small class="muted">${t('searchHint')}</small></div>
     <div><button class="btn primary">${t('save')}</button></div></form>`;
   body.querySelector('#ws-form').onsubmit = safe(async (e) => {
     e.preventDefault();
@@ -135,7 +223,9 @@ async function workspaceTab(body) {
       memory: { autoExtract: f.autoExtract, autoSummarize: f.autoSummarize, defaultTtlDays: f.defaultTtlDays || null },
       synthesis: f.synthesis,
       allowRegistration: f.allowRegistration,
+      timezone: f.timezone || null,
     });
+    await api('PATCH', '/api/settings/search', { provider: f.searchProvider, apiKey: f.searchKey || undefined });
     renderSidebar();
     toast(t('saved'), 'ok');
   });
@@ -230,6 +320,8 @@ export function openAgentEditor(agent = null, { readOnly = false } = {}) {
       </div>
       <div class="field"><span>${t('tools')}</span><div class="pick-grid">${S.agentTools.map((x) => `<label class="pick"><input type="checkbox" name="tools" data-multi="1" value="${x}"${a.tools.includes(x) ? ' checked' : ''}> ${t('tool_' + x)}</label>`).join('')}</div></div>
       <label class="check"><input type="checkbox" name="memoryEnabled"${a.memoryEnabled ? ' checked' : ''}> ${t('agentMemory')}</label>
+      <div class="field" data-mcp-box><span>🔌 ${t('integrations')}</span><div class="pick-grid muted small">${t('loading')}</div></div>
+      <label class="field"><span>${t('starters')}</span><textarea name="startersText" rows="3" placeholder="${t('startersHint')}">${esc((a.starters || []).join('\n'))}</textarea></label>
     </form>`,
     footer: canEdit ? `${agent ? `<button class="btn danger" data-del>${t('delete')}</button>` : ''}<span class="grow"></span>
       ${agent ? `<button class="btn" data-dm>💬 ${t('chatWith')}</button>` : ''}
@@ -248,6 +340,11 @@ export function openAgentEditor(agent = null, { readOnly = false } = {}) {
   };
   provSel.onchange = loadModels;
   loadModels();
+  api('GET', '/api/mcp/servers').then((servers) => {
+    const box = m.el.querySelector('[data-mcp-box] .pick-grid');
+    box.classList.remove('muted', 'small');
+    box.innerHTML = servers.length ? servers.map((sv) => `<label class="pick"><input type="checkbox" name="mcpServers" data-multi="1" value="${sv.id}"${(a.mcpServers || []).includes(sv.id) ? ' checked' : ''}> ${esc(sv.name)}</label>`).join('') : `<span class="muted small">${t('noIntegrations')}</span>`;
+  }).catch(() => {});
   m.el.querySelector('[data-cancel]')?.addEventListener('click', m.close);
   m.el.querySelector('[data-dm]')?.addEventListener('click', safe(async () => {
     const c = await api('POST', '/api/dm', { agentId: agent.id });
@@ -261,6 +358,9 @@ export function openAgentEditor(agent = null, { readOnly = false } = {}) {
   m.el.querySelector('#agent-form').onsubmit = safe(async (e) => {
     e.preventDefault();
     const f = formData(e.target);
+    f.starters = String(f.startersText || '').split('\n').map((x) => x.trim()).filter(Boolean);
+    delete f.startersText;
+    if (!f.mcpServers) delete f.mcpServers;
     if (agent) await api('PATCH', `/api/agents/${agent.id}`, f);
     else {
       const created = await api('POST', '/api/agents', f);

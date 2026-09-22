@@ -8,6 +8,7 @@ export const TYPES = ['document', 'research', 'slides', 'dashboard', 'website'];
 const toArtifact = (r) => r && ({
   id: r.id, channelId: r.channel_id, type: r.type, title: r.title, createdByType: r.created_by_type,
   createdById: r.created_by_id, version: r.current_version, createdAt: r.created_at, updatedAt: r.updated_at,
+  shareToken: r.share_token || null,
 });
 
 export function listArtifacts({ channelIds, q } = {}) {

@@ -3,6 +3,9 @@ import { t } from './i18n.js';
 import { $, esc, api, toast, safe, modal, confirmBox, promptBox, formData, timeAgo, initials } from './ui.js';
 import { markdown } from './md.js';
 import { S, agentById, userById, currentChannel, isAdmin, refreshChannels, openChannel } from './app.js';
+import { openStudio as openArtifact } from './studio.js';
+import { scheduleEditorHtml, bindScheduleEditor, readSchedule, renderView } from './views.js';
+export { openArtifact };
 
 const TYPE_ICON = { slides: '🎞️', dashboard: '📊', website: '🌐', research: '🔬', document: '📄' };
 
@@ -130,42 +133,6 @@ function newArtifact(c) {
   });
 }
 
-export async function openArtifact(id, version) {
-  const a = await api('GET', `/api/artifacts/${id}${version ? `?version=${version}` : ''}`).catch((e) => { toast(e.message, 'error'); return null; });
-  if (!a) return;
-  const src = `/api/artifacts/${a.id}/render?version=${a.viewing}`;
-  const m = modal({
-    title: `${TYPE_ICON[a.type] || '📄'} ${a.title}`, wide: true,
-    body: `<div class="art-toolbar">
-        <select data-ver>${a.versions.map((v) => `<option value="${v.version}"${v.version === a.viewing ? ' selected' : ''}>${t('version')} ${v.version} · ${v.authorType === 'agent' ? esc(agentById(v.authorId)?.name || 'agent') : esc(userById(v.authorId)?.displayName || 'user')} · ${timeAgo(v.createdAt)}</option>`).join('')}</select>
-        <span class="grow"></span>
-        ${S.user.role !== 'guest' ? `<button class="btn sm" data-editc>✎ ${t('editContent')}</button>` : ''}
-        <a class="btn sm" href="${src}" target="_blank" rel="noopener">↗ ${t('openNewTab')}</a>
-        <a class="btn sm" href="/api/artifacts/${a.id}/download?version=${a.viewing}">⬇ ${t('download')}</a>
-        ${a.type === 'slides' || a.type === 'dashboard' ? `<a class="btn sm" href="/api/artifacts/${a.id}/download?version=${a.viewing}&format=pptx">📊 PowerPoint</a>` : ''}
-        ${S.user.role !== 'guest' ? `<button class="btn sm danger-text" data-delart>🗑</button>` : ''}
-      </div>
-      <div class="art-frame-wrap"><iframe class="art-frame" sandbox="allow-scripts allow-popups allow-modals" src="${src}" title="${esc(a.title)}"></iframe></div>
-      <form class="art-edit" hidden><textarea class="mono" rows="20">${esc(a.content)}</textarea><div class="row"><span class="grow muted small">${t('saveVersion')}</span><button class="btn primary">${t('save')}</button></div></form>`,
-  });
-  m.el.querySelector('[data-ver]').onchange = (e) => { m.close(); openArtifact(a.id, +e.target.value); };
-  m.el.querySelector('[data-editc]')?.addEventListener('click', () => {
-    const f = m.el.querySelector('.art-edit');
-    f.hidden = !f.hidden;
-    m.el.querySelector('.art-frame-wrap').hidden = !f.hidden;
-  });
-  m.el.querySelector('.art-edit').onsubmit = safe(async (e) => {
-    e.preventDefault();
-    await api('PUT', `/api/artifacts/${a.id}`, { content: e.target.querySelector('textarea').value });
-    toast(t('saved'), 'ok');
-    m.close();
-    openArtifact(a.id);
-  });
-  m.el.querySelector('[data-delart]')?.addEventListener('click', safe(async () => {
-    if (await confirmBox(`${t('delete')} “${a.title}”?`)) { await api('DELETE', `/api/artifacts/${a.id}`); m.close(); }
-  }));
-}
-
 // ------------------------------------------------------------------ workflows
 
 async function workflowsPanel(el, c, head) {
@@ -174,7 +141,7 @@ async function workflowsPanel(el, c, head) {
     <div class="panel-body">
       <p class="muted small">${t('templateVars')}</p>
       ${list.length ? list.map((w) => `<div class="wf-card" data-id="${w.id}">
-        <div class="row"><strong class="grow">${esc(w.name)}</strong>${w.scheduleMinutes ? `<span class="chip">⏱ ${w.scheduleMinutes}m</span>` : ''}</div>
+        <div class="row"><strong class="grow">${esc(w.name)}</strong>${w.trigger !== 'manual' ? `<span class="chip">${w.trigger === 'webhook' ? '🔗' : '⏰'} ${esc(w.scheduleLabel?.zh || '')}</span>` : ''}</div>
         ${w.description ? `<div class="muted small">${esc(w.description)}</div>` : ''}
         <div class="wf-steps">${w.steps.map((s, i) => { const a = agentById(s.agentId); return `${i ? `<span class="muted">${s.parallel ? '∥' : '→'}</span>` : ''}<span class="mini-av" title="${esc(a?.name || '?')}: ${esc(s.instruction)}" style="--c:${esc(a?.color || '#888')}">${esc(a?.avatar || '?')}</span>`; }).join('')}</div>
         <div class="row">${S.user.role !== 'guest' ? `<button class="btn primary sm" data-run="${w.id}">▶ ${t('run')}</button><button class="btn ghost sm" data-edit="${w.id}">✎</button>` : ''}
@@ -205,15 +172,17 @@ export async function openWorkflowEditor(w, c) {
     body: `<form id="wf-form" class="form">
       ${w ? '' : `<label class="field"><span>${t('fromTemplate')}</span><select data-tpl><option value="">—</option>${templates.map((x) => `<option value="${x.key}">${esc(x.name)} — ${esc(x.description)}</option>`).join('')}</select></label>`}
       <div class="row"><label class="field grow"><span>${t('name')}</span><input name="name" required value="${esc(w?.name || '')}"></label>
-      <label class="field grow"><span>${t('channels')}</span><select name="channelId">${S.channels.map((x) => `<option value="${x.id}"${(w?.channelId || c?.id) === x.id ? ' selected' : ''}>${x.kind === 'dm' ? '💬' : '#'} ${esc(x.name)}</option>`).join('')}</select></label></div>
+      <label class="field grow"><span>${t('channels')}</span><select name="channelId">${S.channels.map((x) => `<option value="${x.id}"${(w?.channelId || c?.id || S.current) === x.id ? ' selected' : ''}>${x.kind === 'dm' ? '💬' : '#'} ${esc(x.name)}</option>`).join('')}</select></label></div>
       <label class="field"><span>${t('wfDescription')}</span><input name="description" value="${esc(w?.description || '')}"></label>
       <div class="field"><span>${t('steps')}</span><div class="steps" id="wf-steps"></div><button type="button" class="btn ghost sm" data-add>＋ ${t('addStep')}</button><p class="muted small">${t('templateVars')}</p></div>
-      <div class="row"><label class="field"><span>${t('schedule')}</span><input name="scheduleMinutes" type="number" min="5" value="${w?.scheduleMinutes || ''}"></label>
-      <label class="field grow"><span>${t('scheduleInput')}</span><input name="scheduleInput" value="${esc(w?.scheduleInput || '')}"></label></div>
+      <div class="field"><span>${t('when')}</span>${scheduleEditorHtml(w?.trigger || 'manual', w?.schedule)}</div>
+      <label class="field"><span>${t('scheduleInput')}</span><input name="scheduleInput" value="${esc(w?.scheduleInput || '')}"></label>
+      ${w?.hookToken && w.trigger === 'webhook' ? `<p class="small">Webhook: <code>${esc(location.origin)}/hooks/${esc(w.hookToken)}</code></p>` : ''}
     </form>
     ${runs.length ? `<h4>${t('runs')}</h4><ul class="runs">${runs.map((r) => `<li><span class="chip ${r.status === 'error' ? 'bad' : ''}">${r.status}</span> ${timeAgo(r.startedAt)} ${r.input ? `— ${esc(r.input.slice(0, 80))}` : ''} ${r.error ? `<span class="danger-text small">${esc(r.error)}</span>` : ''}</li>`).join('')}</ul>` : ''}`,
     footer: `${w ? `<button class="btn danger" data-delwf>${t('delete')}</button><span class="grow"></span>` : ''}<button class="btn ghost" data-cancel>${t('cancel')}</button><button class="btn primary" form="wf-form">${t('save')}</button>`,
   });
+  bindScheduleEditor(m.el);
   const box = m.el.querySelector('#wf-steps');
   const draw = () => {
     box.innerHTML = steps.map((s, i) => `<div class="step" data-i="${i}">
@@ -249,11 +218,13 @@ export async function openWorkflowEditor(w, c) {
   });
   m.el.querySelector('#wf-form').onsubmit = safe(async (e) => {
     e.preventDefault();
-    const body = { ...formData(e.target), steps };
+    const f = formData(e.target);
+    const body = { name: f.name, description: f.description, channelId: f.channelId, scheduleInput: f.scheduleInput, trigger: f.trigger, schedule: readSchedule(f), steps, icon: w?.icon, category: w?.category };
     if (w) await api('PATCH', `/api/workflows/${w.id}`, body); else await api('POST', '/api/workflows', body);
     toast(t('saved'), 'ok');
     m.close();
     if (S.panel === 'workflows') renderPanel();
+    if (S.view === 'automations') renderView('automations', document.querySelector('#view'));
   });
   m.el.querySelector('[data-delwf]')?.addEventListener('click', safe(async () => {
     if (await confirmBox(`${t('delete')} “${w.name}”?`)) { await api('DELETE', `/api/workflows/${w.id}`); m.close(); renderPanel(); }

@@ -1,5 +1,5 @@
 // Render artifacts to standalone HTML pages (used for preview iframes and downloads).
-import { markdown, esc } from '../../web/md.js';
+import { markdown, esc } from './md.js';
 
 const BASE_CSS = `
 :root{--bg:#fff;--fg:#1f2330;--muted:#667085;--line:#e6e8ee;--accent:#6366f1;--card:#f7f8fb}

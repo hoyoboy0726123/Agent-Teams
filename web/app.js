@@ -1,14 +1,16 @@
 // Agent Teams web client: auth, layout, channels, realtime chat.
 import { markdown } from './md.js';
 import { t, getLang, setLang } from './i18n.js';
-import { $, $$, esc, api, toast, safe, modal, confirmBox, formData, clock, dayLabel, initials } from './ui.js';
-import { renderPanel, openArtifact, openWorkflowEditor } from './panels.js';
+import { $, $$, esc, api, toast, safe, modal, confirmBox, promptBox, formData, clock, dayLabel, initials } from './ui.js';
+import { renderPanel, openWorkflowEditor } from './panels.js';
 import { openSettings, openAgentEditor, openTeamTemplates } from './settings.js';
+import { openStudio, openArtifact, draftDoc, onStudioEvent } from './studio.js';
+import { renderView, VIEWS, onViewEvent } from './views.js';
 
 export const S = {
   user: null, users: [], agents: [], channels: [], providers: [], catalog: [], settings: {}, agentTemplates: [], agentTools: [],
   current: null, messages: new Map(), hasMore: new Map(), panel: null, unread: new Set(), typing: new Map(), online: new Set(),
-  sidebarOpen: false,
+  sidebarOpen: false, view: 'chat', drafts: new Map(), bookmarks: new Set(), pendingFiles: [],
 };
 
 export const agentById = (id) => S.agents.find((a) => a.id === id);
@@ -40,8 +42,29 @@ async function boot() {
   await loadState();
   renderShell();
   connectWs();
-  const fromHash = /^#\/c\/(.+)$/.exec(location.hash)?.[1];
-  openChannel(channelById(fromHash)?.id || S.channels.find((c) => c.name === 'general')?.id || S.channels[0]?.id);
+  api('GET', '/api/bookmarks/ids').then((ids) => { S.bookmarks = new Set(ids.map((b) => `${b.kind}:${b.id}`)); }).catch(() => {});
+  route();
+}
+
+// #/c/<channel> | #/agents | #/automations | #/tasks | #/memory | #/outputs
+function route() {
+  const h = location.hash;
+  const view = /^#\/(\w+)$/.exec(h)?.[1];
+  if (view && VIEWS[view]) return openView(view);
+  const fromHash = /^#\/c\/(.+)$/.exec(h)?.[1];
+  openChannel(channelById(fromHash)?.id || channelById(S.current)?.id || S.channels.find((c) => c.name === 'general')?.id || S.channels[0]?.id);
+}
+
+export function openView(name) {
+  S.view = name;
+  S.sidebarOpen = false;
+  if (location.hash !== `#/${name}`) history.replaceState(null, '', `#/${name}`);
+  $('#chat-view').hidden = true;
+  $('#view').hidden = false;
+  S.panel = null;
+  syncOverlays();
+  renderSidebar();
+  renderView(name, $('#view'));
 }
 
 export async function loadState() {
@@ -91,14 +114,22 @@ function renderShell() {
   <div class="app" id="app">
     <aside class="sidebar" id="sidebar"></aside>
     <main class="main">
-      <header class="chan-header" id="chan-header"></header>
-      <div class="messages" id="messages" aria-live="polite"></div>
-      <div class="typing" id="typing"></div>
-      <form class="composer" id="composer">
-        <div class="mention-pop" id="mention-pop" hidden></div>
-        <textarea id="input" rows="1" autocomplete="off"></textarea>
-        <div class="composer-bar"><span class="muted small" id="mode-hint"></span><button class="btn primary" type="submit" id="send-btn">${t('send')} ↵</button></div>
-      </form>
+      <section class="chat-view" id="chat-view">
+        <header class="chan-header" id="chan-header"></header>
+        <div class="messages" id="messages" aria-live="polite"></div>
+        <div class="typing" id="typing"></div>
+        <form class="composer" id="composer">
+          <div class="mention-pop" id="mention-pop" hidden></div>
+          <div class="pending-files" id="pending-files" hidden></div>
+          <textarea id="input" rows="1" autocomplete="off"></textarea>
+          <div class="composer-bar">
+            <label class="icon-btn attach" title="${t('attach')}">📎<input type="file" id="file-input" multiple hidden></label>
+            <span class="muted small grow" id="mode-hint"></span>
+            <button class="btn primary" type="submit" id="send-btn">${t('send')} ↵</button>
+          </div>
+        </form>
+      </section>
+      <section class="view" id="view" hidden></section>
     </main>
     <aside class="panel" id="panel" hidden></aside>
     <div class="scrim" id="scrim"></div>
@@ -132,11 +163,12 @@ export function renderSidebar() {
       <button class="icon-btn" data-act="search" title="${t('search')} (Ctrl+K)">🔍</button>
     </div>
     <nav>
+      <div class="view-nav">${Object.entries(VIEWS).map(([k, v]) => `<button class="view-item${S.view === k ? ' on' : ''}" data-view="${k}"><span>${v.icon}</span><span>${t('view_' + k)}</span></button>`).join('')}</div>
       <div class="nav-title"><span>${t('channels')}</span>${S.user.role !== 'guest' ? `<button class="icon-btn sm" data-act="new-channel" title="${t('newChannel')}">＋</button>` : ''}</div>
-      ${chans.map((c) => `<a href="#/c/${c.id}" class="nav-item${c.id === S.current ? ' active' : ''}${S.unread.has(c.id) ? ' unread' : ''}" data-channel="${c.id}">
+      ${chans.map((c) => `<a href="#/c/${c.id}" class="nav-item${c.id === S.current && S.view === 'chat' ? ' active' : ''}${S.unread.has(c.id) ? ' unread' : ''}" data-channel="${c.id}">
         <span class="hash">${c.private ? '🔒' : '#'}</span><span class="ellipsis">${esc(c.name)}</span></a>`).join('')}
       <div class="nav-title"><span>${t('directMessages')}</span></div>
-      ${dms.map((c) => { const a = dmAgent(c); return `<a href="#/c/${c.id}" class="nav-item${c.id === S.current ? ' active' : ''}${S.unread.has(c.id) ? ' unread' : ''}" data-channel="${c.id}">
+      ${dms.map((c) => { const a = dmAgent(c); return `<a href="#/c/${c.id}" class="nav-item${c.id === S.current && S.view === 'chat' ? ' active' : ''}${S.unread.has(c.id) ? ' unread' : ''}" data-channel="${c.id}">
         <span class="mini-av" style="--c:${esc(a?.color || '#888')}">${esc(a?.avatar || '🤖')}</span><span class="ellipsis">${esc(a?.name || c.name)}</span></a>`; }).join('')}
       <div class="nav-title"><span>${t('agents')}</span>${S.user.role !== 'guest' ? `<button class="icon-btn sm" data-act="new-agent" title="${t('newAgent')}">＋</button>` : ''}</div>
       ${S.agents.map((a) => `<div class="nav-item agent-row" data-dm="${a.id}" title="${esc(a.description)}">
@@ -154,6 +186,8 @@ export function renderSidebar() {
       <button class="icon-btn" data-act="logout" title="${t('logout')}">⎋</button>
     </div>`;
   el.onclick = safe(async (e) => {
+    const v = e.target.closest('[data-view]')?.dataset.view;
+    if (v) { openView(v); return; }
     const chan = e.target.closest('[data-channel]');
     if (chan) { e.preventDefault(); openChannel(chan.dataset.channel); return; }
     const edit = e.target.closest('[data-edit-agent]');
@@ -167,7 +201,7 @@ export function renderSidebar() {
     if (act === 'settings') openSettings();
     if (act === 'search') openSearch();
     if (act === 'theme') toggleTheme();
-    if (act === 'lang') { setLang(getLang() === 'en' ? 'zh-TW' : 'en'); renderShell(); openChannel(S.current); }
+    if (act === 'lang') { setLang(getLang() === 'en' ? 'zh-TW' : 'en'); renderShell(); route(); }
     if (act === 'logout') { await api('POST', '/api/auth/logout', {}); location.reload(); }
   });
 }
@@ -190,6 +224,9 @@ export async function refreshAgents() {
 export async function openChannel(cid) {
   if (!cid) { $('#messages').innerHTML = `<div class="empty">${t('welcomeEmpty')}</div>`; return; }
   S.current = cid;
+  S.view = 'chat';
+  $('#chat-view').hidden = false;
+  $('#view').hidden = true;
   S.unread.delete(cid);
   S.sidebarOpen = false;
   if (location.hash !== `#/c/${cid}`) history.replaceState(null, '', `#/c/${cid}`);
@@ -256,17 +293,35 @@ function authorOf(m) {
   return { name: 'System' };
 }
 
+const TYPE_BADGE = { slides: 'SLIDES', dashboard: 'DASHBOARD', website: 'WEB', research: 'RESEARCH', document: 'DOC' };
+const TYPE_ICON = { slides: '🎞️', dashboard: '📊', website: '🌐', research: '🔬', document: '📄' };
+
+// Deliverable card with a live, sandboxed preview of the artifact.
 function artifactCard(id, meta) {
-  const a = meta?.artifacts?.find((x) => x.id === id);
-  const icon = { slides: '🎞️', dashboard: '📊', website: '🌐', research: '🔬', document: '📄' }[a?.type] || '📄';
-  return `<button class="artifact-card" data-artifact="${esc(id)}"><span class="art-icon">${icon}</span><span class="grow"><strong>${esc(a?.title || 'Artifact')}</strong><span class="muted small">${t('type_' + (a?.type || 'document'))} · v${a?.version || 1}</span></span><span class="muted">↗</span></button>`;
+  const a = meta?.artifacts?.find((x) => x.id === id) || { type: 'document', title: 'Artifact', version: 1 };
+  return `<div class="deliverable" data-type="${esc(a.type)}">
+    <button class="deliv-head" data-artifact="${esc(id)}"><span>${TYPE_ICON[a.type] || '📄'}</span><strong class="ellipsis grow">${esc(a.title)}</strong><span class="type-badge t-${esc(a.type)}">${TYPE_BADGE[a.type] || 'DOC'}</span></button>
+    <div class="deliv-preview" data-artifact="${esc(id)}"><iframe loading="lazy" tabindex="-1" sandbox="allow-scripts" src="/api/artifacts/${esc(id)}/render" title="${esc(a.title)}"></iframe><span class="deliv-expand">⤢</span></div>
+    <div class="deliv-foot"><span class="muted small">v${a.version} · ${t('type_' + a.type)}</span><span class="grow"></span>
+      <button class="icon-btn sm" data-bookmark-art="${esc(id)}" title="${t('bookmark')}">${S.bookmarks.has('artifact:' + id) ? '🔖' : '📑'}</button>
+      <button class="btn primary sm" data-artifact="${esc(id)}">${t('openStudio')}</button></div>
+  </div>`;
+}
+
+// While the agent is still writing: a live preview that re-renders as tokens stream in.
+function draftCard(messageId, title) {
+  const d = S.drafts.get(messageId);
+  return `<div class="deliverable drafting" data-draft="${esc(messageId)}">
+    <div class="deliv-head"><span class="spin">✍️</span><strong class="ellipsis grow">${esc(t('drafting', title))}</strong><span class="type-badge live">LIVE</span></div>
+    <div class="deliv-preview">${d ? `<iframe tabindex="-1" sandbox="allow-scripts" srcdoc="${esc(draftDoc(d))}"></iframe>` : `<div class="deliv-skeleton"><i></i><i></i><i></i></div>`}</div>
+  </div>`;
 }
 
 export function renderBody(m) {
   const tokens = [];
   const src = m.content.replace(/\[\[(artifact|artifact-draft|tool-running)(?::([^\]]*))?\]\]/g, (_, kind, arg) => {
     tokens.push(kind === 'artifact' ? artifactCard(arg, m.meta)
-      : kind === 'artifact-draft' ? `<div class="artifact-card drafting"><span class="art-icon spin">✍️</span><span>${esc(t('drafting', arg))}</span></div>`
+      : kind === 'artifact-draft' ? draftCard(m.id, arg)
         : `<div class="tool-running"><span class="spin">⚙️</span> ${t('usingTools')}</div>`);
     return `\n\n\u0001${tokens.length - 1}\u0001\n\n`;
   });
@@ -284,12 +339,35 @@ function messageHtml(m, prev) {
   const tools = (m.meta?.tools || []).map((x) => `<span class="chip ${x.ok ? '' : 'bad'}" title="${esc(x.summary || '')}">🔧 ${esc(x.name)} ${x.ok ? '✓' : '✗'}</span>`).join('');
   const mems = (m.meta?.memories || []).map((x) => `<span class="chip mem" title="${esc(x.content)}">🧠 ${esc(x.content.slice(0, 48))}${x.content.length > 48 ? '…' : ''}</span>`).join('');
   const model = au.agent ? (au.agent.model || S.providers.find((p) => p.id === au.agent.providerId)?.name || '') : '';
+  const files = (m.meta?.files || []).map((f) => /^image\//.test(f.mime)
+    ? `<a class="file-thumb" href="/api/files/${esc(f.id)}" target="_blank" rel="noopener"><img src="/api/files/${esc(f.id)}" alt="${esc(f.name)}" loading="lazy"></a>`
+    : `<a class="file-chip" href="/api/files/${esc(f.id)}" target="_blank" rel="noopener">📎 ${esc(f.name)} <span class="muted small">${Math.max(1, Math.round(f.size / 1024))} KB</span></a>`).join('');
+  const approvals = (m.meta?.approvals || []).map((ap) => `<div class="approval ${esc(ap.status)}">
+      <div>🔐 <strong>${esc(au.name)}</strong> ${t('wantsToRun')} <code>${esc(ap.tool)}</code></div>
+      <pre class="approval-args">${esc(JSON.stringify(ap.args ?? {}, null, 2)).slice(0, 1200)}</pre>
+      ${ap.status === 'pending' ? (S.user.role !== 'guest' ? `<div class="row"><button class="btn primary sm" data-approve="${esc(ap.id)}">✓ ${t('approve')}</button><button class="btn sm" data-deny="${esc(ap.id)}">✕ ${t('deny')}</button></div>` : `<span class="muted small">${t('waitingApproval')}</span>`)
+        : `<span class="chip ${ap.status === 'approved' ? 'ok' : 'bad'}">${t('approval_' + ap.status)}</span>`}</div>`).join('');
+  const tasks = (m.meta?.tasks || []).map((x) => `<span class="chip task" data-goto-tasks>✅ ${esc(x.title)}${x.assigneeId ? ` → ${esc(x.assigneeType === 'agent' ? '@' + (agentById(x.assigneeId)?.handle || '') : userById(x.assigneeId)?.displayName || '')}` : ''}</span>`).join('');
+  const suggestions = !streaming && m.meta?.suggestions?.length ? `<div class="suggestions">${m.meta.suggestions.map((x) => `<button class="suggest" data-suggest="${esc(x)}">↗ ${esc(x)}</button>`).join('')}</div>` : '';
+  const fb = m.meta?.feedback || {};
+  const secs = m.meta?.durationMs ? Math.max(1, Math.round(m.meta.durationMs / 1000)) : 0;
+  const footer = m.authorType === 'agent' && !streaming && m.status !== 'error' ? `<div class="msg-foot">
+      ${secs ? `<span class="muted small" title="${t('genTime')}">⏱ ${secs >= 60 ? `${Math.floor(secs / 60)}m ${secs % 60}s` : `${secs}s`}</span>` : ''}
+      ${m.meta?.tools?.length ? `<span class="muted small">· 🔧 ${m.meta.tools.length}</span>` : ''}
+      <span class="grow"></span>
+      <button class="icon-btn sm${fb.mine === 1 ? ' on' : ''}" data-fb-up="${m.id}" title="${t('helpful')}">👍${fb.up ? ` ${fb.up}` : ''}</button>
+      <button class="icon-btn sm${fb.mine === -1 ? ' on' : ''}" data-fb-down="${m.id}" title="${t('notHelpful')}">👎${fb.down ? ` ${fb.down}` : ''}</button>
+      <button class="icon-btn sm" data-bookmark-msg="${m.id}" title="${t('bookmark')}">${S.bookmarks.has('message:' + m.id) ? '🔖' : '📑'}</button>
+    </div>` : '';
   return `<div class="msg${grouped ? ' grouped' : ''}${streaming ? ' streaming' : ''}${m.status === 'error' ? ' error' : ''}" data-id="${m.id}">
     <div class="gutter">${grouped ? `<span class="hover-time">${clock(m.createdAt)}</span>` : au.agent ? `<span class="avatar agent" style="--c:${esc(au.color)}">${esc(au.avatar)}</span>` : `<span class="avatar user">${esc(au.avatar)}</span>`}</div>
     <div class="content">
       ${grouped ? '' : `<div class="meta"><strong>${esc(au.name)}</strong>${au.agent ? `<span class="badge">AI</span>${model ? `<span class="muted small">${esc(model)}</span>` : ''}` : ''}<span class="muted small">${clock(m.createdAt)}</span>${m.meta?.edited ? `<span class="muted small">(edited)</span>` : ''}</div>`}
+      ${files ? `<div class="files">${files}</div>` : ''}
       <div class="body">${empty && streaming ? `<span class="dots"><i></i><i></i><i></i></span>` : renderBody(m)}</div>
-      ${tools || mems ? `<div class="chips">${tools}${mems}</div>` : ''}
+      ${approvals}
+      ${tools || mems || tasks ? `<div class="chips">${tools}${mems}${tasks}</div>` : ''}
+      ${suggestions}${footer}
       ${m.status === 'error' ? `<div class="err-box">⚠️ ${t('errorReply')}: ${esc(m.meta?.error || '')} <button class="btn sm" data-regen="${m.id}">${t('retry')}</button></div>` : ''}
     </div>
     <div class="msg-actions">
@@ -303,11 +381,22 @@ function messageHtml(m, prev) {
   </div>`;
 }
 
+function emptyState() {
+  const c = currentChannel();
+  const agentsIn = (c?.members.agents || []).map(agentById).filter(Boolean);
+  const starters = agentsIn.flatMap((a) => (a.starters || []).slice(0, c?.kind === 'dm' ? 4 : 1).map((x) => ({ a, x }))).slice(0, 6);
+  const dmA = c?.kind === 'dm' ? agentsIn[0] : null;
+  return `<div class="empty-chat">
+    ${dmA ? `<span class="avatar agent xl" style="--c:${esc(dmA.color)}">${esc(dmA.avatar)}</span><h2>${esc(dmA.name)}</h2><p class="muted">${esc(dmA.description)}</p>` : `<div class="big-emoji">👋</div><p class="muted">${t('welcomeEmpty')}</p>`}
+    ${starters.length ? `<div class="starters">${starters.map(({ a, x }) => `<button class="starter" data-suggest="${esc(c?.kind === 'dm' ? x : `@${a.handle} ${x}`)}"><span class="mini-av" style="--c:${esc(a.color)}">${esc(a.avatar)}</span>${esc(x)}</button>`).join('')}</div>` : ''}
+  </div>`;
+}
+
 export function renderMessages(scrollToEnd = false) {
   const box = $('#messages');
   const list = S.messages.get(S.current) || [];
   const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
-  if (!list.length) { box.innerHTML = `<div class="empty">${t('welcomeEmpty')}</div>`; return; }
+  if (!list.length) { box.innerHTML = emptyState(); return; }
   let html = S.hasMore.get(S.current) ? `<button class="btn ghost sm load-older" data-older>${t('loadOlder')}</button>` : '';
   let lastDay = '';
   list.forEach((m, i) => {
@@ -357,11 +446,37 @@ async function loadOlder() {
 }
 
 const onMessageClick = safe(async (e) => {
-  const d = (k) => e.target.closest(`[data-${k}]`)?.dataset[k];
+  const d = (k) => e.target.closest(`[data-${k}]`)?.dataset[k.replace(/-(\w)/g, (_, c) => c.toUpperCase())];
   const findMsg = (id) => (S.messages.get(S.current) || []).find((m) => m.id === id);
   if (e.target.closest('[data-older]')) return loadOlder();
   const art = d('artifact');
-  if (art) return openArtifact(art);
+  if (art) return openStudio(art);
+  if (d('suggest')) { const input = $('#input'); input.value = d('suggest'); autoGrow(input); input.focus(); return; }
+  if (e.target.closest('[data-goto-tasks]')) return openView('tasks');
+  if (d('approve') || d('deny')) { await api('POST', `/api/approvals/${d('approve') || d('deny')}`, { approve: !!d('approve') }); return; }
+  if (d('fb-up') || d('fb-down')) {
+    const mid = d('fb-up') || d('fb-down');
+    const m = findMsg(mid);
+    const mine = m.meta?.feedback?.mine;
+    const value = d('fb-up') ? (mine === 1 ? 0 : 1) : (mine === -1 ? 0 : -1);
+    let comment = '';
+    if (value === -1) comment = (await promptBox(t('whatWentWrong'), { placeholder: t('feedbackHint'), multiline: true, ok: t('send') })) ?? '';
+    const r = await api('POST', `/api/messages/${mid}/feedback`, { value, comment });
+    m.meta = { ...m.meta, feedback: { up: r.up, down: r.down, mine: r.value } };
+    patchMessage(m);
+    if (comment) toast(t('feedbackLearned'), 'ok');
+    return;
+  }
+  if (d('bookmark-msg') || d('bookmark-art')) {
+    const kind = d('bookmark-msg') ? 'message' : 'artifact';
+    const tid = d('bookmark-msg') || d('bookmark-art');
+    const on = !S.bookmarks.has(`${kind}:${tid}`);
+    await api('POST', '/api/bookmarks', { kind, id: tid, on });
+    if (on) S.bookmarks.add(`${kind}:${tid}`); else S.bookmarks.delete(`${kind}:${tid}`);
+    toast(on ? t('bookmarked') : t('unbookmarked'));
+    renderMessages();
+    return;
+  }
   const mention = e.target.closest('.mention')?.dataset.handle;
   if (mention) { const a = S.agents.find((x) => x.handle.toLowerCase() === mention.toLowerCase()); if (a) return openAgentEditor(a, { readOnly: S.user.role === 'guest' }); }
   if (d('stop')) return api('POST', `/api/messages/${d('stop')}/stop`, {});
@@ -441,13 +556,52 @@ function bindComposer() {
   $('#composer').onsubmit = safe(async (e) => {
     e.preventDefault();
     const content = input.value.trim();
-    if (!content || !S.current) return;
+    const ready = S.pendingFiles.filter((f) => f.id);
+    if ((!content && !ready.length) || !S.current) return;
+    if (S.pendingFiles.some((f) => !f.id)) return toast(t('uploading'));
     input.value = '';
     autoGrow(input);
     pop.hidden = true;
-    try { await api('POST', `/api/channels/${S.current}/messages`, { content }); }
+    const fileIds = ready.map((f) => f.id);
+    S.pendingFiles = [];
+    renderPendingFiles();
+    try { await api('POST', `/api/channels/${S.current}/messages`, { content, fileIds }); }
     catch (err) { input.value = content; throw err; }
   });
+  $('#file-input').onchange = (e) => { uploadFiles([...e.target.files]); e.target.value = ''; };
+  input.addEventListener('paste', (e) => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) { e.preventDefault(); uploadFiles(fs); } });
+  const comp = $('#composer');
+  comp.addEventListener('dragover', (e) => { e.preventDefault(); comp.classList.add('drop'); });
+  comp.addEventListener('dragleave', () => comp.classList.remove('drop'));
+  comp.addEventListener('drop', (e) => { e.preventDefault(); comp.classList.remove('drop'); uploadFiles([...e.dataTransfer.files]); });
+  $('#pending-files').onclick = (e) => { const i = e.target.closest('[data-rm-file]')?.dataset.rmFile; if (i != null) { S.pendingFiles.splice(+i, 1); renderPendingFiles(); } };
+}
+
+function renderPendingFiles() {
+  const el = $('#pending-files');
+  el.hidden = !S.pendingFiles.length;
+  el.innerHTML = S.pendingFiles.map((f, i) => `<span class="file-chip${f.id ? '' : ' uploading'}">${f.id ? '📎' : '<span class="spin">⏳</span>'} ${esc(f.name)}<button type="button" class="icon-btn sm" data-rm-file="${i}">✕</button></span>`).join('');
+}
+
+const readB64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(file); });
+
+async function uploadFiles(list) {
+  const cid = S.current;
+  for (const file of list) {
+    if (file.size > 15 * 1024 * 1024) { toast(`${file.name}: > 15 MB`, 'error'); continue; }
+    const entry = { name: file.name, id: null };
+    S.pendingFiles.push(entry);
+    renderPendingFiles();
+    try {
+      const f = await api('POST', `/api/channels/${cid}/files`, { name: file.name, mime: file.type || 'application/octet-stream', data: await readB64(file) });
+      entry.id = f.id;
+      if (!f.hasText && !/^image\//.test(f.mime)) toast(`${file.name}: ${t('fileNotReadable')}`);
+    } catch (e) {
+      S.pendingFiles.splice(S.pendingFiles.indexOf(entry), 1);
+      toast(e.message, 'error');
+    }
+    renderPendingFiles();
+  }
 }
 
 // ------------------------------------------------------------------ typing indicator
@@ -517,7 +671,13 @@ function onEvent(ev) {
       }
       break;
     }
-    case 'message.updated': patchMessage(ev.message); break;
+    case 'message.updated': {
+      const prev = (S.messages.get(ev.channelId) || []).find((x) => x.id === ev.message.id);
+      if (prev?.meta?.feedback?.mine != null && ev.message.meta?.feedback) ev.message.meta.feedback.mine = prev.meta.feedback.mine;
+      if (ev.message.status !== 'streaming') S.drafts.delete(ev.message.id);
+      patchMessage(ev.message);
+      break;
+    }
     case 'message.deleted': {
       const list = S.messages.get(ev.channelId);
       if (list) { S.messages.set(ev.channelId, list.filter((m) => m.id !== ev.messageId)); if (ev.channelId === S.current) renderMessages(); }
@@ -534,9 +694,22 @@ function onEvent(ev) {
       break;
     case 'agent.updated': debounced(refreshAgents); break;
     case 'presence': S.online = new Set(ev.online); if (S.panel === 'members') renderPanel(); break;
-    case 'memory.updated': if (S.panel === 'memory') renderPanel(); break;
-    case 'artifact.updated': if (S.panel === 'artifacts') renderPanel(); break;
-    case 'workflow.updated': if (S.panel === 'workflows') renderPanel(); break;
+    case 'artifact.draft': {
+      S.drafts.set(ev.messageId, { title: ev.title, type: ev.type, content: ev.content });
+      const frame = $(`#messages [data-draft="${ev.messageId}"] .deliv-preview`);
+      if (frame) {
+        const doc = draftDoc(S.drafts.get(ev.messageId));
+        const iframe = frame.querySelector('iframe');
+        if (iframe) iframe.srcdoc = doc; else frame.innerHTML = `<iframe tabindex="-1" sandbox="allow-scripts" srcdoc="${esc(doc)}"></iframe>`;
+      }
+      onStudioEvent(ev);
+      break;
+    }
+    case 'memory.updated': if (S.panel === 'memory') renderPanel(); onViewEvent(ev); break;
+    case 'artifact.updated': if (S.panel === 'artifacts') renderPanel(); onStudioEvent(ev); onViewEvent(ev); break;
+    case 'workflow.updated': if (S.panel === 'workflows') renderPanel(); onViewEvent(ev); break;
+    case 'task.updated': onViewEvent(ev); break;
+    case 'approval.updated': onViewEvent(ev); break;
   }
 }
 
@@ -596,11 +769,13 @@ function openSearch() {
   };
 }
 
-export { openWorkflowEditor };
+export { openWorkflowEditor, openArtifact };
 
 window.addEventListener('hashchange', () => {
+  const view = /^#\/(\w+)$/.exec(location.hash)?.[1];
+  if (view && VIEWS[view]) { if (view !== S.view) openView(view); return; }
   const id = /^#\/c\/(.+)$/.exec(location.hash)?.[1];
-  if (id && id !== S.current && channelById(id)) openChannel(id);
+  if (id && (id !== S.current || S.view !== 'chat') && channelById(id)) openChannel(id);
 });
 
 boot().catch((e) => { document.body.innerHTML = `<div class="empty">⚠️ ${esc(e.message)}</div>`; });
