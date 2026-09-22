@@ -91,7 +91,7 @@ export function startWorkflow(wid, { input = '', channelId, user } = {}) {
             .then((m) => ({ idx, m, agent }));
         }));
         for (const { idx, m, agent } of results) {
-          if (m.status !== 'done') throw new Error(`Step ${idx} (@${agent.handle}) failed: ${m.meta?.error || 'error'}`);
+          if (m.status !== 'done' && m.status !== 'passed') throw new Error(`Step ${idx} (@${agent.handle}) failed: ${m.meta?.error || 'error'}`);
           vars[`step${idx}`] = m.content;
           vars.prev = m.content;
           outputs.push({ step: idx, agentId: agent.id, messageId: m.id });

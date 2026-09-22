@@ -106,44 +106,70 @@ function titleSlide(pptx, title, subtitle) {
   return s;
 }
 
+// Rough text metrics (inches) so layout can wrap CJK and Latin text without overlaps.
+const charW = (ch, fs) => (/[⺀-￯]/.test(ch) ? 1 : /[A-Z0-9%$]/.test(ch) ? 0.62 : 0.52) * fs / 72;
+const textWidth = (str, fs) => { let w = 0; for (const ch of String(str)) w += charW(ch, fs); return w; };
+const wrapLines = (str, fs, width) => String(str).split('\n').reduce((n, part) => n + Math.max(1, Math.ceil(textWidth(part, fs) / Math.max(width, 0.5))), 0);
+const lineH = (fs) => (fs / 72) * 1.3;
+
+const BODY_X = 0.75, BODY_W = W - 1.5, TOP = 1.4, BOTTOM = H - 0.75, GAP = 0.18;
+
+function tableLayout(rows, fs, width) {
+  const cols = Math.max(...rows.map((r) => r.length));
+  const want = Array.from({ length: cols }, (_, c) => Math.min(Math.max(...rows.map((r) => textWidth(r[c] ?? '', fs))) + 0.3, width * 0.55));
+  const minW = Math.min(1.1, width / cols);
+  const raw = want.map((w) => Math.max(w, minW));
+  const scale = width / raw.reduce((a, b) => a + b, 0);
+  const colW = raw.map((w) => w * scale);
+  const rowH = rows.map((r) => Math.max(...colW.map((cw, c) => wrapLines(r[c] ?? '', fs, cw - 0.2))) * lineH(fs) + 0.14);
+  return { colW, rowH, height: rowH.reduce((a, b) => a + b, 0) };
+}
+
+function measure(b, fs) {
+  if (b.kind === 'bullets') return b.items.reduce((h, it) => h + wrapLines(it.text, it.indent ? fs - 2 : fs, BODY_W - 0.45 - it.indent * 0.4) * lineH(it.indent ? fs - 2 : fs) + (fs / 72) * 0.35, 0) + 0.1;
+  if (b.kind === 'heading') return lineH(fs + 2) + 0.08;
+  if (b.kind === 'para') return wrapLines(b.text, fs, BODY_W - 0.2) * lineH(fs) + 0.1;
+  if (b.kind === 'code') return b.text.split('\n').length * lineH(Math.min(fs - 4, 14)) + 0.25;
+  if (b.kind === 'table' && b.rows.length) return tableLayout(b.rows, Math.max(fs - 4, 10), BODY_W).height;
+  return 0;
+}
+
 function contentSlide(pptx, parsed) {
   const s = pptx.addSlide({ masterName: 'CONTENT' });
   s.addText(parsed.title || '', { x: 0.6, y: 0.35, w: W - 1.2, h: 0.9, fontFace: FONT, fontSize: 30, bold: true, color: INK, valign: 'middle', fit: 'shrink' });
-  let y = 1.4;
-  const bottom = H - 0.75;
-  const textBlocks = parsed.blocks.filter((b) => b.kind !== 'table');
-  const lineCount = textBlocks.reduce((n, b) => n + (b.kind === 'bullets' ? b.items.length : b.kind === 'code' ? b.text.split('\n').length * 0.7 : Math.ceil((b.text || '').length / 70)), 0);
-  const size = lineCount > 12 ? 14 : lineCount > 8 ? 16 : lineCount > 5 ? 19 : 22;
-  for (const b of parsed.blocks) {
-    const room = bottom - y;
-    if (room < 0.4) break;
+  const blocks = parsed.blocks.filter((b) => b.kind !== 'table' || b.rows.length);
+  const room = BOTTOM - TOP;
+  // Largest font size at which everything fits.
+  let fs = 12;
+  for (const size of [24, 22, 20, 18, 17, 16, 15, 14, 13, 12]) {
+    const total = blocks.reduce((h, b) => h + measure(b, size), 0) + GAP * Math.max(blocks.length - 1, 0);
+    if (total <= room) { fs = size; break; }
+  }
+  let y = TOP;
+  for (const b of blocks) {
+    const h = Math.min(measure(b, fs), BOTTOM - y);
+    if (h < 0.3) break;
     if (b.kind === 'bullets') {
-      const h = Math.min(room, b.items.length * size * 0.028 + 0.3);
       s.addText(b.items.map((it) => ({
         text: it.text,
-        options: { bullet: it.numbered ? { type: 'number' } : { code: it.indent ? '2013' : '25CF' }, indentLevel: it.indent, fontSize: it.indent ? size - 2 : size, color: it.indent ? MUTED : INK, paraSpaceAfter: 6 },
-      })), { x: 0.75, y, w: W - 1.5, h, fontFace: FONT, valign: 'top', fit: 'shrink' });
-      y += h + 0.1;
+        options: { bullet: it.numbered ? { type: 'number' } : { code: it.indent ? '2013' : '25CF' }, indentLevel: it.indent, fontSize: it.indent ? fs - 2 : fs, color: it.indent ? MUTED : INK, paraSpaceAfter: Math.round(fs * 0.35), breakLine: true },
+      })), { x: BODY_X, y, w: BODY_W, h, fontFace: FONT, valign: 'top', margin: 0.05, fit: 'shrink' });
     } else if (b.kind === 'heading') {
-      s.addText(b.text, { x: 0.75, y, w: W - 1.5, h: 0.5, fontFace: FONT, fontSize: size + 2, bold: true, color: ACCENT });
-      y += 0.55;
+      s.addText(b.text, { x: BODY_X, y, w: BODY_W, h, fontFace: FONT, fontSize: fs + 2, bold: true, color: ACCENT, margin: 0.05 });
     } else if (b.kind === 'para') {
-      const h = Math.min(room, Math.ceil(b.text.length / 80) * size * 0.022 + 0.35);
-      s.addText(b.text, { x: 0.75, y, w: W - 1.5, h, fontFace: FONT, fontSize: size, color: INK, valign: 'top', fit: 'shrink' });
-      y += h + 0.1;
+      s.addText(b.text, { x: BODY_X, y, w: BODY_W, h, fontFace: FONT, fontSize: fs, color: INK, valign: 'top', margin: 0.05, fit: 'shrink' });
     } else if (b.kind === 'code') {
-      const h = Math.min(room, b.text.split('\n').length * 0.25 + 0.3);
-      s.addText(b.text, { x: 0.75, y, w: W - 1.5, h, fontFace: 'Consolas', fontSize: 12, color: INK, fill: { color: 'F4F5F9' }, valign: 'top', fit: 'shrink' });
-      y += h + 0.1;
-    } else if (b.kind === 'table' && b.rows.length) {
+      s.addText(b.text, { x: BODY_X, y, w: BODY_W, h, fontFace: 'Consolas', fontSize: Math.min(fs - 4, 14), color: INK, fill: { color: 'F4F5F9' }, valign: 'top', fit: 'shrink' });
+    } else if (b.kind === 'table') {
+      const tfs = Math.max(fs - 4, 10);
+      const { colW, rowH } = tableLayout(b.rows, tfs, BODY_W);
       const [head, ...rows] = b.rows;
-      const fs = rows.length > 8 ? 11 : 13;
       s.addTable([
         head.map((c) => ({ text: c, options: { bold: true, color: 'FFFFFF', fill: { color: ACCENT } } })),
-        ...rows.map((r, ri) => r.map((c) => ({ text: c, options: { fill: { color: ri % 2 ? 'F7F8FB' : 'FFFFFF' } } }))),
-      ], { x: 0.75, y, w: W - 1.5, fontFace: FONT, fontSize: fs, color: INK, border: { type: 'solid', color: 'E6E8EE', pt: 0.75 }, autoPage: false });
-      y += Math.min(room, (rows.length + 1) * 0.4) + 0.15;
+        ...rows.map((r, ri) => head.map((_, c) => ({ text: r[c] ?? '', options: { fill: { color: ri % 2 ? 'F7F8FB' : 'FFFFFF' } } }))),
+      ], { x: BODY_X, y, w: BODY_W, colW, rowH, fontFace: FONT, fontSize: tfs, color: INK, valign: 'middle', margin: 0.08, border: { type: 'solid', color: 'E6E8EE', pt: 0.75 }, autoPage: false });
     }
+    y += h + GAP;
   }
   return s;
 }
@@ -174,15 +200,19 @@ function deckFromDashboard(a) {
     s.addText('KPI', { x: 0.6, y: 0.35, w: W - 1.2, h: 0.9, fontFace: FONT, fontSize: 30, bold: true, color: INK });
     const kpis = d.kpis.slice(0, 8);
     const cols = Math.min(kpis.length, 4);
+    const nRows = Math.ceil(kpis.length / cols);
     const cw = (W - 1.2 - (cols - 1) * 0.3) / cols;
+    const ch = nRows === 1 ? 3.0 : 2.4;
+    const top = 1.4 + (BOTTOM - 1.4 - (nRows * ch + (nRows - 1) * 0.3)) / 2;
     kpis.forEach((k, i) => {
       const x = 0.6 + (i % cols) * (cw + 0.3);
-      const y = 1.5 + Math.floor(i / cols) * 2.5;
-      s.addShape(pptx.ShapeType.roundRect, { x, y, w: cw, h: 2.2, fill: { color: 'F7F8FB' }, line: { color: 'E6E8EE' }, rectRadius: 0.12 });
-      s.addText(String(k.label ?? ''), { x: x + 0.25, y: y + 0.2, w: cw - 0.5, h: 0.45, fontFace: FONT, fontSize: 14, color: MUTED });
-      s.addText(String(k.value ?? ''), { x: x + 0.25, y: y + 0.65, w: cw - 0.5, h: 0.9, fontFace: FONT, fontSize: 34, bold: true, color: INK, fit: 'shrink' });
+      const y = top + Math.floor(i / cols) * (ch + 0.3);
+      s.addShape(pptx.ShapeType.roundRect, { x, y, w: cw, h: ch, fill: { color: 'F7F8FB' }, line: { color: 'E6E8EE' }, rectRadius: 0.12 });
+      s.addShape(pptx.ShapeType.rect, { x, y: y + 0.25, w: 0.07, h: ch - 0.5, fill: { color: PALETTE[i % PALETTE.length] }, line: { color: PALETTE[i % PALETTE.length] } });
+      s.addText(String(k.label ?? ''), { x: x + 0.3, y: y + 0.2, w: cw - 0.5, h: 0.75, fontFace: FONT, fontSize: 15, color: MUTED, valign: 'top', fit: 'shrink' });
+      s.addText(String(k.value ?? ''), { x: x + 0.3, y: y + 0.95, w: cw - 0.5, h: 1.1, fontFace: FONT, fontSize: nRows === 1 ? 44 : 36, bold: true, color: INK, fit: 'shrink' });
       const delta = String(k.delta ?? '');
-      if (delta) s.addText(delta, { x: x + 0.25, y: y + 1.55, w: cw - 0.5, h: 0.45, fontFace: FONT, fontSize: 14, bold: true, color: delta.trim().startsWith('-') ? 'EF4444' : '10B981' });
+      if (delta) s.addText(delta, { x: x + 0.3, y: y + ch - 0.8, w: cw - 0.5, h: 0.5, fontFace: FONT, fontSize: 14, bold: true, color: delta.trim().startsWith('-') ? 'EF4444' : '10B981', fit: 'shrink' });
     });
   }
   for (const c of d.charts || []) {

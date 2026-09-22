@@ -25,6 +25,7 @@ adapters.script = {
     const last = messages[messages.length - 1].content;
     calls.push({ handle, system, last });
     let out = `${handle} says hi`;
+    if (/nothing for you/.test(last)) out = '[pass]';
     if (handle === 'lead' && /synthesise/.test(system)) out = 'FINAL: combined answer';
     else if (handle === 'lead') out = 'Plan: @researcher find data, @writer draft the memo.';
     else if (handle === 'researcher' && !/Tool results/.test(last)) out = 'Let me compute.\n```tool\n{"name":"calc","args":{"expression":"6*7"}}\n```';
@@ -136,4 +137,12 @@ test('workflow helpers group parallel steps and render variables', () => {
   const g = stages([{ id: 1 }, { id: 2, parallel: true }, { id: 3, parallel: true }, { id: 4 }]);
   assert.deepEqual(g.map((x) => x.map((s) => s.id)), [[1], [2, 3], [4]]);
   assert.equal(render('Topic: {{input}} / {{prev}} / {{nope}}', { input: 'A', prev: 'B' }), 'Topic: A / B / {{nope}}');
+});
+
+test('agents with nothing to add pass silently instead of posting', async () => {
+  const m = createMessage({ channelId: ch.id, authorType: 'user', authorId: owner.id, content: '@writer nothing for you here' });
+  const before = listMessages(ch.id, { limit: 200 }).length;
+  const [r] = await handleHumanMessage(m, owner);
+  assert.equal(r.status, 'passed');
+  assert.equal(listMessages(ch.id, { limit: 200 }).length, before);
 });

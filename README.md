@@ -122,6 +122,8 @@ npm run dev   # 檔案變更自動重啟
 npm test      # 23 個整合 + 單元測試（使用離線 demo 與腳本化供應商，不需任何 API Key）
 ```
 
+實際用 Claude 訂閱跑一場上市策略會議並產出 PPT／Dashboard 的完整紀錄見 [examples/launch-strategy](examples/launch-strategy/)。
+
 專案結構與設計見 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；與 Teamily AI 的比較見 [docs/COMPARISON.md](docs/COMPARISON.md)。
 
 ## 🗺️ Roadmap

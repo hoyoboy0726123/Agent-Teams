@@ -44,7 +44,7 @@ export function modal({ title, body, wide = false, onClose, footer = '' }) {
     <header><h2>${esc(title)}</h2><button class="icon-btn" data-close aria-label="${t('close')}">✕</button></header>
     <div class="modal-body">${body}</div>${footer ? `<footer>${footer}</footer>` : ''}</div>`;
   const close = () => { wrap.remove(); document.removeEventListener('keydown', onKey); onClose?.(); };
-  const onKey = (e) => { if (e.key === 'Escape' && document.querySelector('.modal-backdrop:last-of-type') === wrap) close(); };
+  const onKey = (e) => { if (e.key === 'Escape' && [...document.querySelectorAll('.modal-backdrop')].pop() === wrap) close(); };
   wrap.addEventListener('mousedown', (e) => { if (e.target === wrap) close(); });
   wrap.querySelector('[data-close]').onclick = close;
   document.addEventListener('keydown', onKey);

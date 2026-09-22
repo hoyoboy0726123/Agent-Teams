@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { getSetting, audit } from '../db.js';
 import { emit } from '../bus.js';
 import { streamChat } from '../providers/index.js';
-import { getChannel, members, listMessages, createMessage, updateMessage, getMessage } from '../channels.js';
+import { getChannel, members, listMessages, createMessage, updateMessage, deleteMessage, getMessage } from '../channels.js';
 import { listAgents, getAgent } from './store.js';
 import { listUsers } from '../users.js';
 import { recall, visibleScopes, addMemory } from '../memory/store.js';
@@ -13,6 +13,7 @@ import { listArtifacts, upsertArtifact } from '../artifacts/store.js';
 import { extractBlocks, displayText, runTool, TOOL_DOCS } from './tools.js';
 
 const MAX_TOOL_ROUNDS = 5;
+const PASS = /^\s*\[?\s*pass\s*\]?\s*\.?\s*$/i;
 const running = new Map(); // messageId → AbortController
 
 export function stopMessage(messageId) {
@@ -114,6 +115,7 @@ ${callable.map(([, d]) => `  • ${d}`).join('\n')}`);
 - Reply in the language of the most recent human message${lastHuman ? '' : ' (default: the language the channel uses)'}.
 - This is a team chat: be concise, lead with the answer, use markdown when it helps.
 - You are not the only agent: stay in your lane, build on teammates' messages instead of repeating them.
+- If you were only mentioned in passing and there is nothing useful for you to add, reply with exactly [pass] and nothing else.
 - Today is ${new Date().toISOString().slice(0, 10)}.`);
   if (extraInstruction) sys.push(`## Current task\n${extraInstruction}`);
 
@@ -202,8 +204,12 @@ export async function runAgent({ agentId, channelId, userId = null, parentId = n
       full += '\n\n';
     }
     const content = displayText(full, { artifacts: savedArtifacts }) || '_(no reply)_';
-    const done = updateMessage(msg.id, { content, status: 'done', meta });
-    return done;
+    // Agents that have nothing to add stay silent instead of cluttering the channel.
+    if (PASS.test(content) && !meta.artifacts.length && !meta.memories.length) {
+      deleteMessage(msg.id);
+      return { ...msg, content, status: 'passed', meta };
+    }
+    return updateMessage(msg.id, { content, status: 'done', meta });
   } catch (e) {
     const aborted = ctl.signal.aborted;
     const content = displayText(full, { artifacts: savedArtifacts });
