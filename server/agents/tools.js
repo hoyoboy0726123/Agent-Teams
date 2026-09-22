@@ -8,10 +8,12 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { config } from '../config.js';
+import { getSetting } from '../db.js';
+import { decrypt } from '../secrets.js';
 import { recall } from '../memory/store.js';
 import { listArtifacts, getArtifact, findByTitle } from '../artifacts/store.js';
 
-const BLOCK = /```(artifact|remember|tool)([^\n]*)\n([\s\S]*?)\n?```/g;
+const BLOCK = /```(artifact|remember|tool|task|suggest)([^\n]*)\n([\s\S]*?)\n?```/g;
 
 export function parseAttrs(s) {
   const out = {};
@@ -37,7 +39,7 @@ export function displayText(text, { artifacts = {} } = {}) {
     return '';
   });
   // Hide an incomplete trailing directive while it is still streaming.
-  const open = /```(artifact|remember|tool)([^\n]*)(\n[\s\S]*)?$/.exec(s);
+  const open = /```(artifact|remember|tool|task|suggest)([^\n]*)(\n[\s\S]*)?$/.exec(s);
   if (open) {
     const a = parseAttrs(open[2] || '');
     s = s.slice(0, open.index) + (open[1] === 'artifact' ? `[[artifact-draft:${(a.title || 'Untitled').replace(/[\]\n]/g, '')}]]` : open[1] === 'tool' ? '[[tool-running]]' : '');
@@ -48,6 +50,7 @@ export function displayText(text, { artifacts = {} } = {}) {
 // ---------------------------------------------------------------- tools
 
 export const TOOL_DOCS = {
+  web_search: '{"name":"web_search","args":{"query":"...","count":6}} — search the web; returns titles, URLs and snippets.',
   web_fetch: '{"name":"web_fetch","args":{"url":"https://..."}} — download a web page and read it as text.',
   recall: '{"name":"recall","args":{"query":"..."}} — search team memory beyond what is shown above.',
   artifacts: '{"name":"read_artifact","args":{"title":"..."}} — read the current content of an artifact in this channel.',
@@ -104,6 +107,45 @@ async function webFetch({ url }, { signal }) {
   return `HTTP ${res.status} ${u.href}${title ? `\nTitle: ${title}` : ''}\n\n${text.slice(0, 12000)}${text.length > 12000 ? '\n…(truncated)' : ''}`;
 }
 
+// Web search: Tavily or Brave when a key is configured, otherwise DuckDuckGo (no key needed).
+async function webSearch({ query, count = 6 }, { signal }) {
+  if (!String(query || '').trim()) throw new Error('query is required');
+  const n = Math.min(Math.max(Number(count) || 6, 1), 10);
+  const cfg = getSetting('search', null) || {};
+  const key = cfg.apiKeyEnc ? decrypt(cfg.apiKeyEnc) : process.env[cfg.provider === 'brave' ? 'BRAVE_API_KEY' : 'TAVILY_API_KEY'] || '';
+  const sig = AbortSignal.any([signal, AbortSignal.timeout(15000)].filter(Boolean));
+  let results = [];
+  if (cfg.provider === 'tavily' && key) {
+    const r = await fetch('https://api.tavily.com/search', { method: 'POST', signal: sig, headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` }, body: JSON.stringify({ query, max_results: n }) });
+    if (!r.ok) throw new Error(`Tavily ${r.status}`);
+    results = (await r.json()).results.map((x) => ({ title: x.title, url: x.url, snippet: x.content }));
+  } else if (cfg.provider === 'brave' && key) {
+    const r = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${n}`, { signal: sig, headers: { 'x-subscription-token': key, accept: 'application/json' } });
+    if (!r.ok) throw new Error(`Brave ${r.status}`);
+    results = ((await r.json()).web?.results || []).map((x) => ({ title: x.title, url: x.url, snippet: htmlToText(x.description || '') }));
+  } else {
+    const r = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, { signal: sig, headers: { 'user-agent': 'Mozilla/5.0 (compatible; AgentTeams/0.2)' } });
+    if (!r.ok) throw new Error(`Search failed (${r.status})`);
+    results = parseDuckDuckGo(await r.text()).slice(0, n);
+  }
+  if (!results.length) return 'No results.';
+  return results.map((x, i) => `${i + 1}. ${x.title}\n   ${x.url}\n   ${String(x.snippet || '').slice(0, 300)}`).join('\n');
+}
+
+export function parseDuckDuckGo(html) {
+  const out = [];
+  const re = /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?(?:class="result__snippet"[^>]*>([\s\S]*?)<\/a>)?/g;
+  for (const m of html.matchAll(re)) {
+    let url = m[1].replace(/&amp;/g, '&');
+    const u = /[?&]uddg=([^&]+)/.exec(url);
+    if (u) url = decodeURIComponent(u[1]);
+    if (url.startsWith('//')) url = 'https:' + url;
+    if (/duckduckgo\.com\/y\.js/.test(url)) continue; // ads
+    out.push({ title: htmlToText(m[2]), url, snippet: htmlToText(m[3] || '') });
+  }
+  return out;
+}
+
 // Safe arithmetic: numbers, + - * / % ^, parentheses, and a few Math functions.
 export function calc(expression) {
   const src = String(expression).replace(/(\d),(?=\d{3}\b)/g, '$1').replace(/×/g, '*').replace(/÷/g, '/');
@@ -143,6 +185,9 @@ export function calc(expression) {
 export async function runTool(call, ctx) {
   const { name, args = {} } = call;
   switch (name) {
+    case 'web_search':
+      if (!ctx.tools.includes('web_search')) throw new Error('web_search is not enabled for this agent');
+      return webSearch(args, ctx);
     case 'web_fetch':
       if (!ctx.tools.includes('web_fetch')) throw new Error('web_fetch is not enabled for this agent');
       return webFetch(args, ctx);

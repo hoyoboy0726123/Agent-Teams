@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { config } from './config.js';
 import { handleApi } from './api.js';
+import './api-extra.js';
+import { get as dbGet } from './db.js';
+import { renderArtifact } from './artifacts/render.js';
+import { getArtifact } from './artifacts/store.js';
+import { expireStale } from './approvals.js';
 import { serveStatic, send, parseCookies } from './http.js';
 import { userForToken } from './users.js';
 import { attachRealtime } from './ws.js';
@@ -29,6 +34,14 @@ export function createApp() {
         const token = parseCookies(req.headers.cookie).at_session;
         return await handleApi({ req, res, path, query: url.searchParams, token, user: userForToken(token) });
       }
+      // Public, read-only share links for artifacts (opt-in per artifact, revocable).
+      const share = /^\/s\/([A-Za-z0-9_-]{20,})$/.exec(path);
+      if (share) {
+        const row = dbGet('SELECT id FROM artifacts WHERE share_token = ?', share[1]);
+        if (!row) return send(res, 404, 'This link is no longer shared.');
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "sandbox allow-scripts allow-popups allow-modals; default-src 'none'; img-src * data: blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src data: https://fonts.gstatic.com; script-src 'unsafe-inline'; media-src * data: blob:", 'cache-control': 'no-store' });
+        return res.end(renderArtifact(getArtifact(row.id)));
+      }
       if (await serveStatic(WEB, path, res)) return;
       if (await serveStatic(WEB, '/index.html', res)) return; // SPA fallback
       send(res, 404, 'Not found');
@@ -48,6 +61,7 @@ if (isMain) {
   // Any message left "streaming" by a crash is marked as interrupted.
   run("UPDATE messages SET status = 'error', meta_json = json_set(meta_json, '$.error', 'Interrupted by server restart') WHERE status = 'streaming'");
   purgeExpired();
+  expireStale();
   setInterval(purgeExpired, 3600_000).unref();
   startScheduler();
   const server = createApp();

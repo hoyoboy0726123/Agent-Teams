@@ -18,7 +18,9 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "pptxgenjs": "^4.0.1",
+    "unpdf": "^1.8.1",
     "ws": "^8.18.0"
   }
 }

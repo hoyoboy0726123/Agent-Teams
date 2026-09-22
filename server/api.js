@@ -13,14 +13,15 @@ import { renderPptx, canExportPptx } from './artifacts/pptx.js';
 import { handleHumanMessage, runChain, enqueue } from './agents/orchestrator.js';
 import { stopMessage } from './agents/runtime.js';
 import { emit } from './bus.js';
+import { getFile } from './files.js';
 
 const { atLeast } = users;
 export const router = new Router();
 const r = router;
 
-const need = (user, role = 'member') => { if (!user) fail(401, 'Sign in required'); if (!atLeast(user, role)) fail(403, 'You do not have permission to do that'); };
-const readable = (user, cid) => { const c = ch.getChannel(cid); if (!c || !ch.canRead(user, c)) fail(404, 'Channel not found'); return c; };
-const actor = (user) => ({ type: 'user', id: user.id });
+export const need = (user, role = 'member') => { if (!user) fail(401, 'Sign in required'); if (!atLeast(user, role)) fail(403, 'You do not have permission to do that'); };
+export const readable = (user, cid) => { const c = ch.getChannel(cid); if (!c || !ch.canRead(user, c)) fail(404, 'Channel not found'); return c; };
+export const actor = (user) => ({ type: 'user', id: user.id });
 
 const SETTINGS_DEFAULTS = {
   workspaceName: 'Agent Teams',
@@ -267,10 +268,11 @@ r.get('/api/channels/:id/messages', ({ user, params, query }) => {
 
 r.post('/api/channels/:id/messages', async ({ user, req, params }) => {
   const c = readable(user, params.id);
-  const { content } = await readJson(req);
-  if (!String(content || '').trim()) fail(400, 'Message is empty');
+  const { content, fileIds = [] } = await readJson(req);
+  const files = fileIds.map(getFile).filter((f) => f && f.channelId === c.id).map(({ id, name, mime, size }) => ({ id, name, mime, size }));
+  if (!String(content || '').trim() && !files.length) fail(400, 'Message is empty');
   if (!ch.isMember(c.id, 'user', user.id)) ch.addMember(c.id, 'user', user.id);
-  const m = ch.createMessage({ channelId: c.id, authorType: 'user', authorId: user.id, content: String(content).slice(0, 100_000) });
+  const m = ch.createMessage({ channelId: c.id, authorType: 'user', authorId: user.id, content: String(content || '').slice(0, 100_000), meta: files.length ? { files } : {} });
   handleHumanMessage(m, user).catch((e) => console.error('[orchestrator]', e));
   return m;
 });
@@ -399,7 +401,7 @@ r.post('/api/memories/clear', async ({ user, req }) => {
 
 // ------------------------------------------------------------------ artifacts
 
-const readableArtifact = (user, id, version) => {
+export const readableArtifact = (user, id, version) => {
   const a = arts.getArtifact(id, version) || fail(404, 'Artifact not found');
   if (a.channelId) readable(user, a.channelId);
   return a;

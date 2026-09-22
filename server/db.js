@@ -180,10 +180,123 @@ CREATE TABLE IF NOT EXISTS usage (
 );
 `;
 
+const SCHEMA_V2 = `
+CREATE TABLE IF NOT EXISTS mcp_servers (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  preset TEXT,
+  transport TEXT NOT NULL,                    -- stdio | http | sse
+  command TEXT,
+  args_json TEXT NOT NULL DEFAULT '[]',
+  env_enc TEXT,
+  url TEXT,
+  headers_enc TEXT,
+  approval TEXT NOT NULL DEFAULT 'auto',      -- auto | always | never
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_by TEXT,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS approvals (
+  id TEXT PRIMARY KEY,
+  channel_id TEXT,
+  message_id TEXT,
+  agent_id TEXT,
+  tool TEXT NOT NULL,
+  args_json TEXT NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'pending',     -- pending | approved | denied | expired
+  decided_by TEXT,
+  created_at INTEGER NOT NULL,
+  decided_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS feedback (
+  message_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  agent_id TEXT,
+  value INTEGER NOT NULL,                     -- 1 | -1
+  comment TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (message_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS bookmarks (
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,                         -- message | artifact
+  target_id TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, kind, target_id)
+);
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id TEXT PRIMARY KEY,
+  channel_id TEXT REFERENCES channels(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'todo',        -- todo | doing | done
+  assignee_type TEXT,                         -- user | agent
+  assignee_id TEXT,
+  due_at INTEGER,
+  created_by_type TEXT NOT NULL,
+  created_by_id TEXT,
+  source_message_id TEXT,
+  result_message_id TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS artifact_comments (
+  id TEXT PRIMARY KEY,
+  artifact_id TEXT NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL,
+  quote TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL,
+  author_type TEXT NOT NULL,
+  author_id TEXT,
+  status TEXT NOT NULL DEFAULT 'open',        -- open | resolved
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS files (
+  id TEXT PRIMARY KEY,
+  channel_id TEXT REFERENCES channels(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  mime TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  path TEXT NOT NULL,
+  text TEXT,
+  created_by TEXT,
+  created_at INTEGER NOT NULL
+);
+`;
+
+// Additive column migrations (safe to run on every start).
+const COLUMNS = [
+  ['agents', 'mcp_json', "TEXT NOT NULL DEFAULT '[]'"],
+  ['agents', 'category', "TEXT NOT NULL DEFAULT ''"],
+  ['agents', 'starters_json', "TEXT NOT NULL DEFAULT '[]'"],
+  ['agents', 'template_key', 'TEXT'],
+  ['workflows', 'trigger', "TEXT NOT NULL DEFAULT 'manual'"],
+  ['workflows', 'schedule_json', 'TEXT'],
+  ['workflows', 'hook_token', 'TEXT'],
+  ['workflows', 'enabled', 'INTEGER NOT NULL DEFAULT 1'],
+  ['workflows', 'category', "TEXT NOT NULL DEFAULT ''"],
+  ['workflows', 'icon', "TEXT NOT NULL DEFAULT '⚡'"],
+  ['workflows', 'last_fire_key', 'TEXT'],
+  ['workflows', 'template_key', 'TEXT'],
+  ['artifacts', 'share_token', 'TEXT'],
+];
+
 export function openDb(file = config.dbFile) {
   if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec(SCHEMA);
+  db.exec(SCHEMA_V2);
+  for (const [table, col, def] of COLUMNS) {
+    if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+  }
   return db;
 }
 

@@ -10,7 +10,11 @@ import { listAgents, getAgent } from './store.js';
 import { listUsers } from '../users.js';
 import { recall, visibleScopes, addMemory } from '../memory/store.js';
 import { listArtifacts, upsertArtifact } from '../artifacts/store.js';
-import { extractBlocks, displayText, runTool, TOOL_DOCS } from './tools.js';
+import { extractBlocks, displayText, runTool, TOOL_DOCS, parseAttrs } from './tools.js';
+import { toolsForAgent, describeTool, needsApproval, callTool } from '../mcp/index.js';
+import { requestApproval } from '../approvals.js';
+import { createTask } from '../tasks.js';
+import { fileContext } from '../files.js';
 
 const MAX_TOOL_ROUNDS = 5;
 const PASS = /^\s*\[?\s*pass\s*\]?\s*\.?\s*$/i;
@@ -36,7 +40,7 @@ function authorName(m, cache) {
 }
 
 // Strip machine placeholders before feeding history back to a model.
-const historyText = (m) => m.content.replace(/\[\[artifact:([^\]]+)\]\]/g, (_, id) => {
+const historyText = (m) => fileContext(m) + m.content.replace(/\[\[artifact:([^\]]+)\]\]/g, (_, id) => {
   const a = m.meta?.artifacts?.find((x) => x.id === id);
   return a ? `(published artifact "${a.title}" — ${a.type})` : '(artifact)';
 }).replace(/\[\[[^\]]+\]\]/g, '');
@@ -100,6 +104,18 @@ The launch date is 2026-11-03 (decided by Alice)
 \`\`\`
 Only remember things that will still matter later. Never store secrets or passwords.`);
   }
+  if (tools.includes('tasks')) {
+    proto.push(`- Create trackable tasks (with an owner) when work is split up or a follow-up is agreed. One block per task; assignee is an @handle of a teammate or human, due is optional (YYYY-MM-DD):
+\`\`\`task assignee="@writer" due="2026-10-01"
+Draft the launch blog post
+Optional details on the next lines
+\`\`\``);
+  }
+  proto.push(`- Optionally end with up to 3 short follow-up suggestions the human might click next (same language as the conversation):
+\`\`\`suggest
+Turn this into a one-page PDF summary
+Compare with last quarter
+\`\`\``);
   const callable = Object.entries(TOOL_DOCS).filter(([k]) => tools.includes(k));
   if (callable.length) {
     proto.push(`- Call a tool by replying with ONLY a tool block, then wait for the result:
@@ -152,16 +168,38 @@ export async function runAgent({ agentId, channelId, userId = null, parentId = n
   emit('typing', { channelId, agentId: agent.id, on: true });
 
   const ctx = buildContext({ agent, channel, userId, extraInstruction });
-  const meta = { tools: [], artifacts: [], memories: [] };
+  const started = Date.now();
+  const meta = { tools: [], artifacts: [], memories: [], tasks: [], suggestions: [], approvals: [], startedAt: started };
   const savedArtifacts = {};
   let full = '';      // everything the agent wrote across tool rounds (display source)
   let lastEmit = 0;
+  let lastDraft = 0;
   const push = (force = false) => {
     const t = Date.now();
     if (!force && t - lastEmit < 60) return;
     lastEmit = t;
     emit('message.delta', { channelId, messageId: msg.id, content: displayText(full, { artifacts: savedArtifacts }) });
+    // Live preview: stream the artifact being written so the UI can render it as it grows.
+    if (t - lastDraft > 450) {
+      const open = /```artifact([^\n]*)\n([\s\S]*)$/.exec(full);
+      if (open && !/\n```\s*$/.test(open[2])) {
+        lastDraft = t;
+        const a = parseAttrs(open[1]);
+        emit('artifact.draft', { channelId, messageId: msg.id, title: a.title || 'Untitled', type: a.type || 'document', content: open[2] });
+      }
+    }
   };
+
+  // External tools from MCP servers this agent may use.
+  let mcpTools = [];
+  if (agent.mcpServers?.length) {
+    mcpTools = await toolsForAgent(agent);
+    if (mcpTools.length) {
+      ctx.system += `\n\n## Connected tools (MCP)
+Call these exactly like other tools, using the full dotted name, e.g. {"name": "${mcpTools[0].fq}", "args": {...}}. Actions with side effects may wait for a human to approve them.
+${mcpTools.slice(0, 60).map((t) => `  • ${describeTool(t)}`).join('\n')}`;
+    }
+  }
 
   try {
     const convo = [...ctx.messages];
@@ -187,7 +225,26 @@ export async function runAgent({ agentId, channelId, userId = null, parentId = n
         try { call = JSON.parse(b.body); } catch { results.push('Tool error: tool block must contain valid JSON {"name": ..., "args": {...}}'); continue; }
         const trace = { name: call.name, args: call.args, ok: true };
         try {
-          const out = await runTool(call, { tools: ctx.tools, scopes: ctx.scopes, channelId, signal: ctl.signal });
+          const mcp = mcpTools.find((t) => t.fq === call.name && t.tool);
+          let out;
+          if (mcp) {
+            if (needsApproval(mcp.server, mcp.tool)) {
+              trace.approval = 'pending';
+              updateMessage(msg.id, { meta });
+              const status = await requestApproval({
+                channelId, messageId: msg.id, agentId: agent.id, tool: call.name, args: call.args, signal: ctl.signal,
+                onCreate: (a) => { meta.approvals.push({ id: a.id, tool: a.tool, args: a.args, status: 'pending' }); updateMessage(msg.id, { meta }); },
+              });
+              const entry = meta.approvals[meta.approvals.length - 1];
+              entry.status = status;
+              trace.approval = status;
+              updateMessage(msg.id, { meta });
+              if (status !== 'approved') throw new Error(`A human ${status === 'expired' ? 'did not respond to' : 'declined'} this action. Do not retry it; tell the team what you would have done.`);
+            }
+            out = await callTool(mcp.server.id, mcp.tool.name, call.args, { signal: ctl.signal });
+          } else {
+            out = await runTool(call, { tools: ctx.tools, scopes: ctx.scopes, channelId, signal: ctl.signal });
+          }
           results.push(`Result of ${call.name}:\n${out}`);
           trace.summary = out.slice(0, 160);
         } catch (e) {
@@ -203,6 +260,7 @@ export async function runAgent({ agentId, channelId, userId = null, parentId = n
       convo.push({ role: 'user', content: `[Tool results]\n${results.join('\n\n')}\n\nContinue your reply to the team using these results. Do not repeat what you already wrote.` });
       full += '\n\n';
     }
+    meta.durationMs = Date.now() - started;
     const content = displayText(full, { artifacts: savedArtifacts }) || '_(no reply)_';
     // Agents that have nothing to add stay silent instead of cluttering the channel.
     if (PASS.test(content) && !meta.artifacts.length && !meta.memories.length) {
@@ -216,7 +274,7 @@ export async function runAgent({ agentId, channelId, userId = null, parentId = n
     return updateMessage(msg.id, {
       content: aborted ? `${content}\n\n_(stopped)_`.trim() : content,
       status: aborted ? 'done' : 'error',
-      meta: { ...meta, error: aborted ? undefined : e.message },
+      meta: { ...meta, durationMs: Date.now() - started, error: aborted ? undefined : e.message },
     });
   } finally {
     running.delete(msg.id);
@@ -239,9 +297,19 @@ async function applyDirectives(text, { agent, channel, msg, meta, savedArtifacts
         if (m) meta.memories.push({ id: m.id, content: m.content, scope });
       }
       emit('memory.updated', { channelId: channel.id });
+    } else if (b.kind === 'task' && agent.tools.includes('tasks')) {
+      const [title, ...rest] = b.body.split('\n');
+      if (!title.trim()) continue;
+      const t = createTask({
+        channelId: channel.id, title: title.trim(), description: rest.join('\n').trim(), assignee: b.attrs.assignee, due: b.attrs.due,
+        byType: 'agent', byId: agent.id, sourceMessageId: msg.id,
+      });
+      meta.tasks.push({ id: t.id, title: t.title, assigneeType: t.assigneeType, assigneeId: t.assigneeId });
+    } else if (b.kind === 'suggest') {
+      meta.suggestions = b.body.split('\n').map((l) => l.replace(/^\s*[-*•\d.)]+\s*/, '').trim()).filter(Boolean).slice(0, 3);
     }
   }
-  if (meta.artifacts.length || meta.memories.length) updateMessage(msg.id, { meta });
+  if (meta.artifacts.length || meta.memories.length || meta.tasks.length || meta.suggestions.length) updateMessage(msg.id, { meta });
 }
 
 export { getMessage };
