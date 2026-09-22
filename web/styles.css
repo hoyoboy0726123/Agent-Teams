@@ -437,3 +437,4 @@ th { color: var(--muted); font-weight: 600; }
   .auto-row { flex-wrap: wrap; }
   .studio-bar select { max-width: 140px; }
 }
+.approval .chip { justify-self: start; }

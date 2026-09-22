@@ -134,15 +134,17 @@ async function webSearch({ query, count = 6 }, { signal }) {
 
 export function parseDuckDuckGo(html) {
   const out = [];
-  const re = /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?(?:class="result__snippet"[^>]*>([\s\S]*?)<\/a>)?/g;
-  for (const m of html.matchAll(re)) {
-    let url = m[1].replace(/&amp;/g, '&');
+  const links = [...html.matchAll(/<a([^>]*class="result__a"[^>]*)>([\s\S]*?)<\/a>/g)];
+  links.forEach((m, i) => {
+    let url = (/href="([^"]+)"/.exec(m[1])?.[1] || '').replace(/&amp;/g, '&');
     const u = /[?&]uddg=([^&]+)/.exec(url);
     if (u) url = decodeURIComponent(u[1]);
     if (url.startsWith('//')) url = 'https:' + url;
-    if (/duckduckgo\.com\/y\.js/.test(url)) continue; // ads
-    out.push({ title: htmlToText(m[2]), url, snippet: htmlToText(m[3] || '') });
-  }
+    if (!url || /duckduckgo\.com\/y\.js/.test(url)) return; // ads
+    const rest = html.slice(m.index + m[0].length, links[i + 1]?.index ?? html.length);
+    const snippet = /class="result__snippet"[^>]*>([\s\S]*?)<\/(?:a|div|span|td)>/.exec(rest)?.[1] || '';
+    out.push({ title: htmlToText(m[2]), url, snippet: htmlToText(snippet) });
+  });
   return out;
 }
 
