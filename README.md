@@ -75,6 +75,8 @@ npm i -g @google/gemini-cli && gemini              # 登入一次
 
 然後到 **設定 → 模型供應商** 新增（或重新啟動讓它自動偵測）。
 
+> 🌐 **網路搜尋**：所有 Agent 預設使用內建的免費搜尋（DuckDuckGo，可改 Tavily／Brave）。若不滿意，可在 Agent 編輯頁勾選 **「模型內建搜尋（訂閱）」**，讓 Claude Code／Codex 改用自己的網路搜尋與讀網頁（品質通常更好，但會用到訂閱額度）；其他內建工具（指令、檔案）仍然全部關閉。
+
 ### 使用 Ollama
 
 ```bash

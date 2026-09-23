@@ -67,13 +67,15 @@ export const claudeCode = {
   async listModels(p) { await version(this.bin(p)); return this.fallbackModels; },
   async test(p) { return version(this.bin(p)); },
 
-  async *stream(p, { model, system, messages, signal }) {
+  async *stream(p, { model, system, messages, signal, nativeSearch }) {
     const env = { ...process.env };
     // Force subscription auth even if an API key happens to be in the environment.
     if (p.extra?.forceSubscription !== false) delete env.ANTHROPIC_API_KEY;
     const cwd = mkdtempSync(join(tmpdir(), 'agent-teams-claude-'));
-    const args = ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
-      '--no-session-persistence', '--tools', ''];
+    // Built-in tools stay off (no shell, no file access). With nativeSearch, only Claude's own
+    // WebSearch / WebFetch are enabled and pre-approved; everything else is still refused.
+    const args = ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--no-session-persistence',
+      ...(nativeSearch ? ['--tools', 'WebSearch,WebFetch', '--allowedTools', 'WebSearch,WebFetch', '--permission-mode', 'dontAsk'] : ['--tools', ''])];
     if (model) args.push('--model', model);
     if (system) args.push('--system-prompt', system);
     let sawDelta = false;
@@ -85,8 +87,18 @@ export const claudeCode = {
         if (j.type === 'stream_event' && j.event?.type === 'content_block_delta' && j.event.delta?.type === 'text_delta') {
           sawDelta = true;
           yield { type: 'text', text: j.event.delta.text };
-        } else if (j.type === 'assistant' && !sawDelta) {
-          for (const c of j.message?.content || []) if (c.type === 'text') assistantText += c.text;
+        } else if (j.type === 'assistant') {
+          for (const c of j.message?.content || []) {
+            if (c.type === 'text' && !sawDelta) assistantText += c.text;
+            if (c.type === 'tool_use') yield { type: 'tool', id: c.id, name: c.name, args: c.input };
+          }
+        } else if (j.type === 'user') {
+          for (const c of j.message?.content || []) {
+            if (c.type !== 'tool_result') continue;
+            const text = Array.isArray(c.content) ? c.content.map((x) => x.text || '').join(' ') : String(c.content || '');
+            yield { type: 'tool_result', id: c.tool_use_id, ok: !c.is_error, summary: text.replace(/\s+/g, ' ').slice(0, 160) };
+            if (sawDelta) yield { type: 'text', text: '\n\n' };
+          }
         } else if (j.type === 'result') {
           if (j.is_error) throw new Error(`Claude Code: ${j.result || j.subtype}`);
           if (!sawDelta) yield { type: 'text', text: assistantText || j.result || '' };
@@ -113,11 +125,12 @@ export const codex = {
   async listModels(p) { await version(this.bin(p)); return this.fallbackModels; },
   async test(p) { return version(this.bin(p)); },
 
-  async *stream(p, { model, system, messages, signal }) {
+  async *stream(p, { model, system, messages, signal, nativeSearch }) {
     const cwd = mkdtempSync(join(tmpdir(), 'agent-teams-codex-'));
     const lastFile = join(cwd, 'last.txt');
     const args = ['exec', '--json', '--skip-git-repo-check', '-s', 'read-only', '--output-last-message', lastFile];
     if (model) args.push('-m', model);
+    if (nativeSearch) args.push('-c', 'tools.web_search=true');
     args.push('-');
     const prompt = (system ? `<instructions>\n${system}\n</instructions>\n\n` : '') + transcript(messages);
     let streamed = '';

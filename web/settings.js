@@ -367,7 +367,8 @@ export function openAgentEditor(agent = null, { readOnly = false } = {}) {
         <label class="field grow"><span>${t('model')}</span><input name="model" list="agent-models" value="${esc(a.model || '')}" placeholder="default"><datalist id="agent-models"></datalist></label>
         <label class="field" style="width:110px"><span>${t('temperature')}</span><input name="temperature" type="number" step="0.1" min="0" max="2" value="${a.temperature ?? ''}"></label>
       </div>
-      <div class="field"><span>${t('tools')}</span><div class="pick-grid">${S.agentTools.map((x) => `<label class="pick"><input type="checkbox" name="tools" data-multi="1" value="${x}"${a.tools.includes(x) ? ' checked' : ''}> ${t('tool_' + x)}</label>`).join('')}</div></div>
+      <div class="field"><span>${t('tools')}</span><div class="pick-grid">${S.agentTools.map((x) => `<label class="pick"${x === 'native_search' ? ` title="${esc(t('nativeSearchHint'))}"` : ''}><input type="checkbox" name="tools" data-multi="1" value="${x}"${a.tools.includes(x) ? ' checked' : ''}> ${t('tool_' + x)}</label>`).join('')}</div>
+        <small class="muted" data-native-hint>💡 ${t('nativeSearchHint')}</small></div>
       <label class="check"><input type="checkbox" name="memoryEnabled"${a.memoryEnabled ? ' checked' : ''}> ${t('agentMemory')}</label>
       <div class="field" data-mcp-box><span>🔌 ${t('integrations')}</span><div class="pick-grid muted small">${t('loading')}</div></div>
       <label class="field"><span>${t('starters')}</span><textarea name="startersText" rows="3" placeholder="${t('startersHint')}">${esc((a.starters || []).join('\n'))}</textarea></label>

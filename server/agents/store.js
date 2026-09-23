@@ -2,7 +2,9 @@
 import { all, get, run, id, now, json, audit } from '../db.js';
 import { emit } from '../bus.js';
 
-export const TOOLS = ['web_search', 'web_fetch', 'recall', 'remember', 'artifacts', 'handoff', 'tasks', 'calc'];
+export const TOOLS = ['web_search', 'web_fetch', 'recall', 'remember', 'artifacts', 'handoff', 'tasks', 'calc', 'native_search'];
+// native_search (the model's own web search, for Claude Code / Codex subscriptions) is opt-in.
+const DEFAULT_TOOLS = TOOLS.filter((t) => t !== 'native_search');
 
 export const toAgent = (r) => r && ({
   id: r.id, name: r.name, handle: r.handle, avatar: r.avatar, color: r.color, description: r.description,
@@ -29,7 +31,7 @@ export function createAgent(input, user) {
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     aid, String(input.name || handle).slice(0, 60), handle, input.avatar || '🤖', input.color || '#6366f1', input.description || '',
     input.systemPrompt || '', input.providerId || null, input.model || null, input.temperature ?? null,
-    JSON.stringify((input.tools || TOOLS).filter((t) => TOOLS.includes(t))), input.memoryEnabled === false ? 0 : 1, user?.id ?? null, now(),
+    JSON.stringify((input.tools || DEFAULT_TOOLS).filter((t) => TOOLS.includes(t))), input.memoryEnabled === false ? 0 : 1, user?.id ?? null, now(),
     JSON.stringify(input.mcpServers || []), input.category || '', JSON.stringify((input.starters || []).slice(0, 6)), input.templateKey || input.key || null);
   audit('user', user?.id, 'agent.create', aid, { handle });
   emit('agent.updated', { agentId: aid });

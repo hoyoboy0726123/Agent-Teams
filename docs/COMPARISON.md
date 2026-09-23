@@ -71,7 +71,7 @@ Teamily AI 是閉源的「Human + AI」社交／協作平台（[官網](https://
 |---|---|---|
 | Gmail、GitHub、Slack、Notion | ✅ 寄信、發更新 | ✅ 透過 **MCP** 標準：GitHub（官方）、Slack、Notion、Gmail、Google 日曆、Linear、Sentry、PostgreSQL、SQLite、本機資料夾、瀏覽器（Playwright）、Brave、Fetch、時區；以及**任何** MCP server（stdio / HTTP / SSE）；遠端服務（Notion、Linear、Sentry、Jira／Confluence、Asana、Canva、Stripe）支援 **OAuth 一鍵登入**：彈窗授權、自動註冊用戶端、PKCE、Token 加密保存並自動更新 |
 | 權限控管 | 未公開 | ✅ 每個 Agent 各自授權哪些整合；寫入類工具預設需人工核准（依 MCP `readOnlyHint` 判斷）；可設「每次都要核准」或「不需核准」；密鑰加密、介面只顯示遮罩 |
-| 網路搜尋 | 未公開 | ✅ 內建 `web_search`（DuckDuckGo 免 Key，或 Tavily / Brave）＋ `web_fetch`（SSRF 防護） |
+| 網路搜尋 | 未公開 | ✅ 內建 `web_search`（DuckDuckGo 免 Key，或 Tavily / Brave）＋ `web_fetch`（SSRF 防護）；每個 Agent 可切換成**模型內建搜尋**（Claude Code／Codex 訂閱自己的網路搜尋，搜尋紀錄同樣顯示在「查看過程」） |
 | 檔案 | 未公開 | ✅ 上傳／拖放／貼上；自動擷取 **PDF、DOCX、XLSX、PPTX**、CSV、程式碼等文字給 Agent 閱讀 |
 
 ## 8. 治理、安全、營運

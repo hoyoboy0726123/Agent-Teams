@@ -396,7 +396,7 @@ function processHtml(m, model) {
   const prov = S.providers.find((p) => p.id === agent?.providerId);
   return `<div class="process">
     <div class="muted small">🧠 ${esc(prov?.name || '')}${model ? ` · ${esc(model)}` : ''} · ⏱ ${secs}s${meta.depth ? ` · ${t('handoffDepth')} ${meta.depth}` : ''}${meta.workflowRunId ? ' · ⚡ workflow' : ''}</div>
-    ${(meta.tools || []).length ? `<ol class="steps-log">${meta.tools.map((x) => `<li><code>${esc(x.name)}</code> ${x.ok ? '✓' : '✗'}${x.approval ? ` · 🔐 ${t('approval_' + x.approval)}` : ''}<div class="muted tiny">${esc(JSON.stringify(x.args ?? {})).slice(0, 200)}</div>${x.summary ? `<div class="tiny">→ ${esc(x.summary)}</div>` : ''}</li>`).join('')}</ol>` : `<div class="muted tiny">${t('noToolsUsed')}</div>`}
+    ${(meta.tools || []).length ? `<ol class="steps-log">${meta.tools.map((x) => `<li>${x.native ? '🌐 ' : ''}<code>${esc(x.name)}</code> ${x.ok ? '✓' : '✗'}${x.approval ? ` · 🔐 ${t('approval_' + x.approval)}` : ''}<div class="muted tiny">${esc(JSON.stringify(x.args ?? {})).slice(0, 200)}</div>${x.summary ? `<div class="tiny">→ ${esc(x.summary)}</div>` : ''}</li>`).join('')}</ol>` : `<div class="muted tiny">${t('noToolsUsed')}</div>`}
     ${(meta.memories || []).length ? `<div class="tiny">🧠 ${t('remembered')}: ${meta.memories.map((x) => esc(x.content)).join(' · ')}</div>` : ''}
   </div>`;
 }

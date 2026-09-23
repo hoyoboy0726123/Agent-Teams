@@ -4,7 +4,10 @@
 import { config } from '../config.js';
 import { getSetting, audit } from '../db.js';
 import { emit } from '../bus.js';
-import { streamChat } from '../providers/index.js';
+import { streamChat, getProvider } from '../providers/index.js';
+
+// Providers whose own web search can be switched on per agent (the "native_search" tool).
+export const NATIVE_SEARCH = new Set(['claude-code', 'codex']);
 import { getChannel, members, listMessages, createMessage, updateMessage, deleteMessage, getMessage } from '../channels.js';
 import { listAgents, getAgent } from './store.js';
 import { listUsers } from '../users.js';
@@ -123,8 +126,14 @@ Optional details on the next lines
 Turn this into a one-page PDF summary
 Compare with last quarter
 \`\`\``);
-  const callable = Object.entries(TOOL_DOCS).filter(([k]) => tools.includes(k));
+  const providerType = getProvider(agent.providerId)?.type;
+  const native = tools.includes('native_search') && NATIVE_SEARCH.has(providerType);
+  // With the model's own search on, our web_search/web_fetch would only compete with it.
+  const callable = Object.entries(TOOL_DOCS).filter(([k]) => tools.includes(k) && !(native && (k === 'web_search' || k === 'web_fetch')));
   if (tools.includes('artifacts') && videoGenConfig()?.providerId) callable.push(['generate_video', GENERATE_VIDEO_DOC]);
+  if (native) {
+    proto.push(`- You have your own built-in web tools${providerType === 'claude-code' ? ' (WebSearch and WebFetch)' : ''}. Call them natively (not in a tool block) whenever fresh or verifiable facts matter, prefer primary sources, and cite them as markdown links. Do not narrate the searching; just give the answer.`);
+  }
   if (callable.length) {
     proto.push(`- Call a tool by replying with ONLY a tool block, then wait for the result:
 \`\`\`tool
@@ -217,7 +226,19 @@ ${mcpTools.slice(0, 60).map((t) => `  • ${describeTool(t)}`).join('\n')}`;
       let chunk = '';
       for await (const ev of streamChat(agent.providerId, {
         model: agent.model, system: ctx.system, messages: convo, temperature: agent.temperature ?? undefined, signal: ctl.signal,
+        nativeSearch: agent.tools.includes('native_search'),
       }, { agentId: agent.id })) {
+        // The model's own tools (native search) run inside the provider; record them for "view process".
+        if (ev.type === 'tool') {
+          meta.tools.push({ id: ev.id, name: ev.name, args: ev.args, ok: true, native: true });
+          updateMessage(msg.id, { meta });
+          continue;
+        }
+        if (ev.type === 'tool_result') {
+          const t = meta.tools.find((x) => x.native && x.id === ev.id);
+          if (t) { t.ok = ev.ok; t.summary = ev.summary; updateMessage(msg.id, { meta }); }
+          continue;
+        }
         if (ev.type !== 'text') continue;
         chunk += ev.text;
         full += ev.text;
