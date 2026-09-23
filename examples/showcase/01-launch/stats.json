@@ -1,0 +1,54 @@
+{
+  "key": "launch",
+  "dir": "01-launch",
+  "title": "🚀 產品上市小組：精品咖啡訂閱「晨光」",
+  "ok": true,
+  "wallSeconds": 884,
+  "agentReplies": 12,
+  "agents": 6,
+  "toolCalls": 7,
+  "artifacts": [
+    {
+      "id": "art_yKqFYSpS95B2",
+      "title": "晨光咖啡訂閱 30天上市計畫",
+      "type": "document",
+      "versions": 2,
+      "file": "晨光咖啡訂閱-30天上市計畫",
+      "author": "📣 行銷經理 Growth Marketer (@marketer)"
+    },
+    {
+      "id": "art_ay9EVRWrFmIG",
+      "title": "晨光咖啡訂閱 主要文案包",
+      "type": "document",
+      "versions": 2,
+      "file": "晨光咖啡訂閱-主要文案包",
+      "author": "🖋️ 文案寫手 Copywriter (@copywriter)"
+    },
+    {
+      "id": "art_oclB9y9D4q2B",
+      "title": "晨光咖啡訂閱 到達頁",
+      "type": "website",
+      "versions": 2,
+      "file": "晨光咖啡訂閱-到達頁",
+      "author": "🎨 設計師 Designer (@designer)"
+    },
+    {
+      "id": "art_O0s0J2O4cYiw",
+      "title": "晨光咖啡訂閱 單位經濟與毛利儀表板",
+      "type": "dashboard",
+      "versions": 1,
+      "file": "晨光咖啡訂閱-單位經濟與毛利儀表板",
+      "author": "📊 資料分析師 Analyst (@analyst)"
+    },
+    {
+      "id": "art_QgbFjL_Y5k4g",
+      "title": "晨光咖啡訂閱 投資人簡報",
+      "type": "slides",
+      "versions": 1,
+      "file": "晨光咖啡訂閱-投資人簡報",
+      "author": "🎨 設計師 Designer (@designer)"
+    }
+  ],
+  "genSeconds": 1072,
+  "extra": {}
+}

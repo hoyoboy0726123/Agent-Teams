@@ -41,12 +41,21 @@ addEventListener('keydown',e=>{if(['ArrowRight','PageDown',' '].includes(e.key))
   return page(a.title, body, css, js);
 }
 
+// 1234567 → 1.23M, 294042 → 294K; small numbers keep up to 2 decimals.
+export function compact(n) {
+  const a = Math.abs(n);
+  if (a >= 1e9) return `${+(n / 1e9).toFixed(2)}B`;
+  if (a >= 1e6) return `${+(n / 1e6).toFixed(2)}M`;
+  if (a >= 1e4) return `${+(n / 1e3).toFixed(1)}K`;
+  return String(+n.toFixed(2));
+}
+
 const PALETTE = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#0ea5e9', '#ec4899', '#8b5cf6', '#14b8a6'];
 
 function chartSvg(c) {
   const labels = c.labels || [];
   const series = (c.series || []).map((s) => ({ name: s.name || '', data: (s.data || []).map(Number) }));
-  const W = 520, H = 260, P = { l: 44, r: 12, t: 12, b: 36 };
+  const W = 520, H = 260, P = { l: 56, r: 12, t: 12, b: 36 };
   if (c.type === 'pie') {
     const data = series[0]?.data || [];
     const total = data.reduce((a, b) => a + (b > 0 ? b : 0), 0) || 1;
@@ -68,7 +77,7 @@ function chartSvg(c) {
   const iw = W - P.l - P.r, ih = H - P.t - P.b;
   const y = (v) => P.t + ih - ((v - min) / span) * ih;
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => min + f * span);
-  let g = ticks.map((t) => `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="currentColor" opacity=".12"/><text x="${P.l - 6}" y="${y(t) + 4}" font-size="11" text-anchor="end" fill="currentColor" opacity=".6">${+t.toFixed(2)}</text>`).join('');
+  let g = ticks.map((t) => `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="currentColor" opacity=".12"/><text x="${P.l - 6}" y="${y(t) + 4}" font-size="11" text-anchor="end" fill="currentColor" opacity=".6">${compact(t)}</text>`).join('');
   const step = iw / Math.max(labels.length, 1);
   g += labels.map((l, i) => `<text x="${P.l + step * i + step / 2}" y="${H - 12}" font-size="11" text-anchor="middle" fill="currentColor" opacity=".7">${esc(String(l).slice(0, 12))}</text>`).join('');
   if (c.type === 'line') {
@@ -98,12 +107,13 @@ function renderDashboard(a) {
     return page(a.title, `<main style="padding:32px"><h2>${esc(a.title)}</h2><p>Dashboard JSON could not be parsed: ${esc(e.message)}</p><pre>${esc(a.content)}</pre></main>`);
   }
   const css = `main{max-width:1180px;margin:0 auto;padding:28px 20px 60px}.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:18px 0}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}.kpi .v{font-size:1.9em;font-weight:700}.kpi .l{color:var(--muted);font-size:.9em}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}.kpi .v{font-size:1.9em;font-weight:700;line-height:1.2;overflow-wrap:anywhere}.kpi .v.m{font-size:1.45em}.kpi .v.s{font-size:1.1em}.kpi .l{color:var(--muted);font-size:.9em}
 .kpi .d{font-size:.85em;font-weight:600}.up{color:#10b981}.down{color:#ef4444}.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(460px,100%),1fr));gap:14px}
 .card h3{margin:0 0 8px;font-size:1em}.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}`;
   const kpis = (d.kpis || []).map((k) => {
     const delta = String(k.delta ?? '');
-    return `<div class="card kpi"><div class="l">${esc(k.label)}</div><div class="v">${esc(k.value)}</div>${delta ? `<div class="d ${delta.trim().startsWith('-') ? 'down' : 'up'}">${esc(delta)}</div>` : ''}</div>`;
+    const len = String(k.value ?? '').length;
+    return `<div class="card kpi"><div class="l">${esc(k.label)}</div><div class="v${len > 22 ? ' s' : len > 11 ? ' m' : ''}">${esc(k.value)}</div>${delta ? `<div class="d ${delta.trim().startsWith('-') ? 'down' : 'up'}">${esc(delta)}</div>` : ''}</div>`;
   }).join('');
   const charts = (d.charts || []).map((c) => `<div class="card"><h3>${esc(c.title || '')}</h3>${chartSvg(c)}</div>`).join('');
   const table = d.table ? `<div class="card" style="margin-top:14px"><div class="table-wrap"><table><thead><tr>${(d.table.columns || []).map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${(d.table.rows || []).map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>` : '';

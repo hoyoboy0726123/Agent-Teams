@@ -64,3 +64,10 @@ test('tasks resolve @agent and username assignees', () => {
   assert.throws(() => createTask({ title: ' ', byType: 'user' }));
   assert.equal(listTasks({ status: 'todo' }).length, 1);
 });
+
+test('chart axis labels are compact', async () => {
+  const { compact } = await import('../web/render.js');
+  assert.equal(compact(294042), '294K');
+  assert.equal(compact(23083589), '23.08M');
+  assert.equal(compact(12.345), '12.35');
+});

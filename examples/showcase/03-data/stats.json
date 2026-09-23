@@ -1,0 +1,22 @@
+{
+  "key": "data",
+  "dir": "03-data",
+  "title": "📊 資料分析：咖啡連鎖 12 個月營收（虛構資料）",
+  "ok": true,
+  "wallSeconds": 926,
+  "agentReplies": 4,
+  "agents": 2,
+  "toolCalls": 13,
+  "artifacts": [
+    {
+      "id": "art_gYKD_5KoxNV0",
+      "title": "咖啡連鎖 12個月營收 Dashboard",
+      "type": "dashboard",
+      "versions": 2,
+      "file": "咖啡連鎖-12個月營收-Dashboard",
+      "author": "📊 資料分析師 Analyst (@analyst)"
+    }
+  ],
+  "genSeconds": 893,
+  "extra": {}
+}

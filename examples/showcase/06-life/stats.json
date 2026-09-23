@@ -1,0 +1,30 @@
+{
+  "key": "life",
+  "dir": "06-life",
+  "title": "🏡 生活管家：京都秋季 5 日遊＋一週晚餐",
+  "ok": true,
+  "wallSeconds": 216,
+  "agentReplies": 2,
+  "agents": 2,
+  "toolCalls": 0,
+  "artifacts": [
+    {
+      "id": "art_Qvz9JwrI6f5k",
+      "title": "京都5日4夜親子賞楓行程（長輩友善版）",
+      "type": "website",
+      "versions": 1,
+      "file": "京都5日4夜親子賞楓行程長輩友善版",
+      "author": "✈️ 旅遊規劃師 Travel Planner (@travel)"
+    },
+    {
+      "id": "art_ZpvZ_Dj33U21",
+      "title": "回國後清淡一週晚餐計畫（2大人+2長輩・3000元）",
+      "type": "document",
+      "versions": 1,
+      "file": "回國後清淡一週晚餐計畫2大人+2長輩3000元",
+      "author": "👩‍🍳 私人廚師 Chef (@chef)"
+    }
+  ],
+  "genSeconds": 181,
+  "extra": {}
+}

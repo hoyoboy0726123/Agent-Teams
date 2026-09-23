@@ -126,6 +126,8 @@ npm test      # 35+ 個整合 + 單元測試（離線 demo、腳本化供應商�
 
 實際用 Claude 訂閱跑一場上市策略會議並產出 PPT／Dashboard 的完整紀錄見 [examples/launch-strategy](examples/launch-strategy/)。
 
+另有 **7 種不同類型專案**（上市、專家圓桌、資料分析、工程、自動化、生活、Studio）的實跑紀錄、產出物與觀察，見 [examples/showcase](examples/showcase/)。
+
 專案結構與設計見 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)；與 Teamily AI 的比較見 [docs/COMPARISON.md](docs/COMPARISON.md)。
 
 ## 🗺️ Roadmap

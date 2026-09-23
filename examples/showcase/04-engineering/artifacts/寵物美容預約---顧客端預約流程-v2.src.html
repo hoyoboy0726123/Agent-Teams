@@ -1,0 +1,974 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<title>寵物美容預約</title>
+<style>
+  :root{
+    --primary:#0f766e; --primary-dark:#0b5c56; --primary-light:#e6f6f4;
+    --accent:#f97316;
+    --bg:#f8fafc; --surface:#ffffff; --text:#1e293b; --muted:#64748b;
+    --border:#cbd5e1; --border-strong:#94a3b8;
+    --danger:#dc2626; --danger-bg:#fef2f2;
+    --success:#16a34a; --success-bg:#f0fdf4;
+    --radius:12px; --radius-sm:8px;
+    --shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.06);
+    --focus:3px solid #1d4ed8;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang TC","Noto Sans TC",sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.55; font-size:16px;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .visually-hidden{
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+  a{color:var(--primary-dark);}
+  button{font-family:inherit;}
+  :focus-visible{outline:var(--focus); outline-offset:2px; border-radius:4px;}
+
+  .app-header{
+    background:var(--primary); color:#fff; padding:14px 16px;
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    position:sticky; top:0; z-index:20; box-shadow:var(--shadow);
+  }
+  .app-header h1{font-size:1.05rem; margin:0; font-weight:700;}
+  .app-header .brand{display:flex; align-items:center; gap:8px;}
+  .header-link{
+    background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.4);
+    border-radius:999px; padding:6px 12px; font-size:.8rem; cursor:pointer; min-height:36px;
+  }
+  .header-link:hover{background:rgba(255,255,255,.25);}
+
+  .container{max-width:640px; margin:0 auto; padding:16px;}
+
+  .stepper{list-style:none; display:flex; gap:4px; padding:0; margin:0 0 20px; counter-reset:step;}
+  .stepper li{
+    flex:1; text-align:center; font-size:.72rem; color:var(--muted); position:relative; padding-top:30px;
+  }
+  .stepper li::before{
+    counter-increment:step; content:counter(step);
+    display:flex; align-items:center; justify-content:center;
+    width:24px; height:24px; border-radius:50%; background:#e2e8f0; color:var(--muted);
+    font-weight:700; font-size:.75rem; position:absolute; top:0; left:50%; transform:translateX(-50%);
+  }
+  .stepper li.is-done::before{background:var(--primary); color:#fff; content:"✓";}
+  .stepper li[aria-current="step"]{color:var(--primary-dark); font-weight:700;}
+  .stepper li[aria-current="step"]::before{background:var(--primary-dark); color:#fff;}
+  .stepper li::after{
+    content:""; position:absolute; top:12px; left:calc(50% + 16px); right:calc(-50% + 16px);
+    height:2px; background:#e2e8f0; z-index:-1;
+  }
+  .stepper li:last-child::after{content:none;}
+  .stepper li.is-done::after{background:var(--primary);}
+
+  .badge-demo{
+    display:inline-block; background:#fff7ed; color:#9a3412; border:1px solid #fdba74;
+    font-size:.72rem; padding:3px 8px; border-radius:999px; margin-bottom:14px;
+  }
+
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow);}
+  .step-panel h2{font-size:1.15rem; margin:0 0 4px; scroll-margin-top:80px;}
+  .step-panel .step-desc{color:var(--muted); font-size:.88rem; margin:0 0 16px;}
+
+  fieldset{border:0; padding:0; margin:0 0 16px;}
+  legend{font-weight:700; font-size:.95rem; margin-bottom:8px; padding:0;}
+
+  .field-error{
+    color:var(--danger); background:var(--danger-bg); border:1px solid #fecaca;
+    border-radius:var(--radius-sm); padding:10px 12px; font-size:.85rem; margin:8px 0 0; display:none;
+  }
+  .field-error.is-visible{display:block;}
+  .inline-error{color:var(--danger); font-size:.8rem; margin-top:4px; display:none;}
+  .inline-error.is-visible{display:block;}
+
+  .error-summary{
+    background:var(--danger-bg); border:1px solid #fecaca; border-radius:var(--radius);
+    padding:14px; margin-bottom:16px; display:none;
+  }
+  .error-summary.is-visible{display:block;}
+  .error-summary h3{margin:0 0 8px; font-size:.95rem; color:var(--danger);}
+  .error-summary ul{margin:0; padding-left:18px;}
+  .error-summary a{color:var(--danger); text-decoration:underline; font-size:.88rem;}
+  .error-summary p{margin:0; font-size:.9rem; color:var(--danger);}
+
+  .service-grid{display:grid; grid-template-columns:1fr; gap:10px;}
+  .service-card{
+    display:flex; align-items:center; gap:12px; border:2px solid var(--border);
+    border-radius:var(--radius); padding:12px 14px; cursor:pointer; background:#fff; position:relative;
+  }
+  .service-card:has(input:checked){border-color:var(--primary); background:var(--primary-light);}
+  .service-card:has(input:focus-visible){outline:var(--focus); outline-offset:2px;}
+  .service-card input{position:absolute; opacity:0; width:1px; height:1px;}
+  .service-icon{font-size:1.5rem; flex-shrink:0;}
+  .service-info{flex:1; min-width:0;}
+  .service-name{font-weight:700; font-size:.98rem;}
+  .service-meta{color:var(--muted); font-size:.82rem; margin-top:2px;}
+  .service-price{font-weight:700; color:var(--primary-dark); white-space:nowrap;}
+
+  .date-field{margin-bottom:16px;}
+  .date-field label{display:block; font-weight:700; font-size:.92rem; margin-bottom:6px;}
+  input[type="date"]{
+    width:100%; padding:10px 12px; border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+    font-size:1rem; min-height:44px; background:#fff;
+  }
+
+  .slot-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+  .slot-label{position:relative;}
+  .slot-label input{position:absolute; opacity:0; width:1px; height:1px;}
+  .slot-btn{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); padding:8px 4px;
+    min-height:48px; font-size:.9rem; font-weight:600; cursor:pointer; background:#fff; text-align:center;
+  }
+  .slot-label input:checked + .slot-btn{background:var(--primary); border-color:var(--primary); color:#fff;}
+  .slot-label input:focus-visible + .slot-btn{outline:var(--focus); outline-offset:2px;}
+  .slot-label input:disabled + .slot-btn{
+    background:#f1f5f9; color:#94a3b8; border-color:#e2e8f0; cursor:not-allowed; text-decoration:line-through;
+  }
+  .slot-note{font-size:.68rem; font-weight:400; text-decoration:none;}
+  .slot-loading, .slot-empty{color:var(--muted); font-size:.88rem; padding:12px 0;}
+
+  .form-group{margin-bottom:16px;}
+  .form-group label{display:block; font-weight:700; font-size:.92rem; margin-bottom:6px;}
+  .form-group .hint{font-weight:400; color:var(--muted); font-size:.78rem; margin-left:4px;}
+  input[type="text"], input[type="tel"], select, textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+    font-size:1rem; min-height:44px; background:#fff; font-family:inherit;
+  }
+  textarea{min-height:88px; resize:vertical;}
+  input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"]{
+    border-color:var(--danger); background:var(--danger-bg);
+  }
+  .char-count{font-size:.75rem; color:var(--muted); text-align:right; margin-top:4px;}
+  .radio-row{display:flex; gap:16px; flex-wrap:wrap;}
+  .radio-row label{display:flex; align-items:center; gap:6px; font-weight:400; font-size:.92rem; min-height:44px;}
+  .radio-row input{width:18px; height:18px;}
+
+  .summary-list{list-style:none; padding:0; margin:0 0 16px;}
+  .summary-list li{
+    display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--border);
+    font-size:.92rem;
+  }
+  .summary-list li:last-child{border-bottom:0;}
+  .summary-list dt, .summary-label{color:var(--muted); flex-shrink:0;}
+  .summary-value{font-weight:600; text-align:right; word-break:break-word;}
+  .edit-link{background:none; border:0; color:var(--primary-dark); text-decoration:underline; font-size:.82rem; cursor:pointer; padding:4px; min-height:32px;}
+
+  .actions-bar{
+    display:flex; gap:10px; padding:12px 16px; background:var(--surface); border-top:1px solid var(--border);
+    position:sticky; bottom:0; padding-bottom:calc(12px + env(safe-area-inset-bottom));
+  }
+  .btn{
+    flex:1; min-height:48px; border-radius:999px; font-size:1rem; font-weight:700; cursor:pointer; border:2px solid transparent;
+  }
+  .btn-primary{background:var(--primary); color:#fff;}
+  .btn-primary:hover{background:var(--primary-dark);}
+  .btn-primary:disabled{background:#94a3b8; cursor:not-allowed;}
+  .btn-secondary{background:#fff; border-color:var(--border-strong); color:var(--text);}
+  .btn-secondary:hover{background:#f1f5f9;}
+
+  .success-panel{text-align:center; padding:24px 16px;}
+  .success-icon{
+    width:64px; height:64px; border-radius:50%; background:var(--success-bg); color:var(--success);
+    display:flex; align-items:center; justify-content:center; font-size:2rem; margin:0 auto 16px;
+  }
+  .success-panel h2{margin:0 0 8px;}
+  .appt-id-box{
+    background:var(--primary-light); border:1px dashed var(--primary); border-radius:var(--radius-sm);
+    padding:12px; font-family:ui-monospace,monospace; font-size:.95rem; margin:16px 0; word-break:break-all;
+  }
+  .success-note{background:#fff7ed; border:1px solid #fdba74; color:#9a3412; border-radius:var(--radius-sm); padding:10px 12px; font-size:.85rem; text-align:left; margin-top:16px;}
+
+  .lookup-panel{margin-top:16px;}
+  .lookup-result{margin-top:16px; padding-top:16px; border-top:1px solid var(--border);}
+
+  dialog{
+    border:0; border-radius:var(--radius); padding:0; max-width:420px; width:calc(100% - 32px);
+    box-shadow:0 10px 40px rgba(0,0,0,.2);
+  }
+  dialog::backdrop{background:rgba(15,23,42,.5);}
+  .dialog-body{padding:20px;}
+  .dialog-body h2{margin-top:0; font-size:1.05rem;}
+  .dialog-actions{display:flex; gap:10px; margin-top:18px;}
+
+  [hidden]{display:none !important;}
+
+  @media (min-width:600px){
+    .container{padding:24px;}
+    .service-grid{grid-template-columns:1fr 1fr;}
+    .slot-grid{grid-template-columns:repeat(4,1fr);}
+    .card{padding:24px;}
+    .app-header h1{font-size:1.2rem;}
+  }
+  @media (prefers-reduced-motion:no-preference){
+    .step-panel{scroll-behavior:smooth;}
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <span aria-hidden="true">🐾</span>
+    <h1>毛孩美容預約</h1>
+  </div>
+  <button type="button" class="header-link" id="openLookupBtn">查詢／取消預約</button>
+</header>
+
+<main class="container" id="mainContent">
+
+  <p class="badge-demo" id="demoBadge" hidden>⚠️ 示範資料模式：尚未連接正式後端 API，資料僅暫存於本次瀏覽階段（關閉分頁即清除）</p>
+
+  <nav aria-label="預約進度" id="stepperNav">
+    <ol class="stepper" id="stepperList">
+      <li id="stepper-0" aria-current="step">選擇服務</li>
+      <li id="stepper-1">選擇時段</li>
+      <li id="stepper-2">填寫資料</li>
+      <li id="stepper-3">確認送出</li>
+    </ol>
+  </nav>
+
+  <div id="bookingWizard">
+
+    <section class="card step-panel" id="step-service" tabindex="-1" aria-labelledby="step-service-h">
+      <h2 id="step-service-h">Step 1・選擇美容服務</h2>
+      <p class="step-desc">請選擇本次要預約的服務項目</p>
+      <div id="serviceError" class="field-error" role="alert" tabindex="-1">請選擇一項服務後再繼續。</div>
+      <fieldset id="serviceFieldset">
+        <legend class="visually-hidden">服務項目</legend>
+        <div class="service-grid" id="serviceList" aria-busy="true">
+          <p class="slot-loading">載入服務項目中…</p>
+        </div>
+      </fieldset>
+    </section>
+
+    <section class="card step-panel" id="step-time" tabindex="-1" aria-labelledby="step-time-h" hidden>
+      <h2 id="step-time-h">Step 2・選擇日期與時段</h2>
+      <p class="step-desc">已選服務：<strong id="timeStepServiceName">—</strong>（<span id="timeStepDuration"></span> 分鐘）</p>
+      <div class="date-field">
+        <label for="apptDate">預約日期</label>
+        <input type="date" id="apptDate" name="apptDate" autocomplete="off">
+      </div>
+      <div id="timeError" class="field-error" role="alert" tabindex="-1">請選擇日期並選擇一個可預約時段。</div>
+      <fieldset id="slotFieldset">
+        <legend>可預約時段</legend>
+        <div class="slot-grid" id="slotList" aria-busy="false">
+          <p class="slot-empty">請先選擇日期，系統將顯示可預約時段。</p>
+        </div>
+      </fieldset>
+    </section>
+
+    <section class="card step-panel" id="step-info" tabindex="-1" aria-labelledby="step-info-h" hidden>
+      <h2 id="step-info-h">Step 3・填寫顧客與寵物資料</h2>
+      <p class="step-desc">請填寫聯絡人資訊，方便店家與您確認預約</p>
+
+      <div id="infoErrorSummary" class="error-summary" role="alert" tabindex="-1">
+        <h3>請修正以下欄位：</h3>
+        <ul id="infoErrorList"></ul>
+      </div>
+
+      <form id="infoForm" novalidate>
+        <fieldset>
+          <legend>顧客資料</legend>
+          <div class="form-group">
+            <label for="customerName">姓名 <span class="hint">必填</span></label>
+            <input type="text" id="customerName" name="customerName" autocomplete="name" aria-describedby="customerNameError" maxlength="40">
+            <p class="inline-error" id="customerNameError">請輸入姓名（至少 2 個字）。</p>
+          </div>
+          <div class="form-group">
+            <label for="customerPhone">手機號碼 <span class="hint">必填，格式 09xxxxxxxx</span></label>
+            <input type="tel" id="customerPhone" name="customerPhone" autocomplete="tel" inputmode="numeric" placeholder="0912345678" aria-describedby="customerPhoneError" maxlength="10">
+            <p class="inline-error" id="customerPhoneError">請輸入正確的手機號碼格式（例如 0912345678）。</p>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>寵物資料</legend>
+          <div class="form-group">
+            <label for="petName">寵物名字 <span class="hint">必填</span></label>
+            <input type="text" id="petName" name="petName" maxlength="30" aria-describedby="petNameError">
+            <p class="inline-error" id="petNameError">請輸入寵物名字。</p>
+          </div>
+          <div class="form-group">
+            <label for="petSpecies">物種 <span class="hint">必填</span></label>
+            <select id="petSpecies" name="petSpecies" aria-describedby="petSpeciesError">
+              <option value="">請選擇</option>
+              <option value="dog">狗</option>
+              <option value="cat">貓</option>
+              <option value="other">其他</option>
+            </select>
+            <p class="inline-error" id="petSpeciesError">請選擇物種。</p>
+          </div>
+          <div class="form-group">
+            <label for="petBreed">品種 <span class="hint">選填</span></label>
+            <input type="text" id="petBreed" name="petBreed" maxlength="30">
+          </div>
+          <div class="form-group">
+            <label for="petSize">體型 <span class="hint">必填</span></label>
+            <div class="radio-row" id="petSizeGroup" role="radiogroup" aria-describedby="petSizeError">
+              <label><input type="radio" name="petSize" value="small"> 小型</label>
+              <label><input type="radio" name="petSize" value="medium"> 中型</label>
+              <label><input type="radio" name="petSize" value="large"> 大型</label>
+            </div>
+            <p class="inline-error" id="petSizeError">請選擇寵物體型。</p>
+          </div>
+          <div class="form-group">
+            <label for="petNotes">備註 <span class="hint">選填，例如：怕吹風機、皮膚敏感</span></label>
+            <textarea id="petNotes" name="petNotes" maxlength="200" aria-describedby="petNotesCount"></textarea>
+            <p class="char-count" id="petNotesCount">0 / 200 字</p>
+          </div>
+        </fieldset>
+      </form>
+    </section>
+
+    <section class="card step-panel" id="step-confirm" tabindex="-1" aria-labelledby="step-confirm-h" hidden>
+      <h2 id="step-confirm-h">Step 4・確認預約資訊</h2>
+      <p class="step-desc">請確認以下內容無誤後送出預約</p>
+      <div id="submitError" class="field-error" role="alert" tabindex="-1"></div>
+      <ul class="summary-list" id="confirmSummary"></ul>
+    </section>
+
+    <section class="card success-panel" id="step-success" hidden aria-labelledby="successHeading" tabindex="-1">
+      <div class="success-icon" aria-hidden="true">✓</div>
+      <h2 id="successHeading">預約成功！</h2>
+      <p>我們已收到您的預約，店家將盡快為您確認。</p>
+      <div class="appt-id-box">
+        預約編號：<strong id="successApptId"></strong>
+      </div>
+      <ul class="summary-list" id="successSummary"></ul>
+      <p class="success-note">請妥善保存您的<strong>手機號碼</strong>與<strong>預約編號</strong>，日後可用於查詢或取消預約。</p>
+      <div class="actions-bar" style="position:static; border:0; padding:20px 0 0;">
+        <button type="button" class="btn btn-secondary" id="bookAnotherBtn">再預約一筆</button>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<div class="actions-bar" id="wizardActions">
+  <button type="button" class="btn btn-secondary" id="prevBtn" hidden>上一步</button>
+  <button type="button" class="btn btn-primary" id="nextBtn">下一步</button>
+</div>
+
+<dialog id="lookupDialog" aria-labelledby="lookupTitle">
+  <div class="dialog-body">
+    <h2 id="lookupTitle">查詢／取消預約</h2>
+    <p class="step-desc">請輸入預約時填寫的手機號碼與預約編號</p>
+    <form id="lookupForm" novalidate>
+      <div id="lookupErrorSummary" class="error-summary" role="alert" tabindex="-1">
+        <p id="lookupErrorText">查無此預約，請確認電話與預約編號是否正確。</p>
+      </div>
+      <div class="form-group">
+        <label for="lookupPhone">手機號碼</label>
+        <input type="tel" id="lookupPhone" inputmode="numeric" maxlength="10" placeholder="0912345678">
+      </div>
+      <div class="form-group">
+        <label for="lookupId">預約編號</label>
+        <input type="text" id="lookupId" placeholder="貼上預約編號">
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-secondary" id="closeLookupBtn">關閉</button>
+        <button type="submit" class="btn btn-primary" id="lookupSubmitBtn">查詢</button>
+      </div>
+    </form>
+    <div class="lookup-result" id="lookupResult" hidden>
+      <ul class="summary-list" id="lookupResultSummary"></ul>
+      <p id="lookupCancelledNote" class="success-note" hidden>此預約已取消。</p>
+      <button type="button" class="btn btn-secondary" id="cancelApptBtn" style="width:100%; border-color:var(--danger); color:var(--danger);">取消此預約</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     API 設定
+     GET  /api/services
+     GET  /api/availability?service_id=&date=
+     POST /api/appointments
+     GET  /api/appointments/:id?phone=
+     DELETE /api/appointments/:id?phone=
+     錯誤格式對齊 @backend 定案：{ error: { code, message, fields? , retryAfterSeconds? } }
+     API 不可用時自動退回本機示範資料（DEMO_MODE）。
+  ============================================================ */
+  const API_BASE = "";
+  let DEMO_MODE = false;
+  const REQUEST_TIMEOUT = 4000;
+  const DEMO_STORAGE_KEY = "petbooking_demo_appts_v1"; // sessionStorage：分頁關閉即清除，不落地保存 PII
+
+  const SPECIES_LABEL = { dog:"狗", cat:"貓", other:"其他" };
+  const SIZE_LABEL = { small:"小型", medium:"中型", large:"大型" };
+
+  function $(id){ return document.getElementById(id); }
+  function updateDemoBadge(){ $("demoBadge").hidden = !DEMO_MODE; }
+
+  function fetchWithTimeout(url, opts, ms){
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms || REQUEST_TIMEOUT);
+    return fetch(url, Object.assign({}, opts, { signal: controller.signal })).finally(() => clearTimeout(timer));
+  }
+
+  function genId(){
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "demo-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+  }
+  function hashCode(str){
+    let h = 0;
+    for (let i = 0; i < str.length; i++){ h = (h << 5) - h + str.charCodeAt(i); h |= 0; }
+    return Math.abs(h);
+  }
+  function pad2(n){ return String(n).padStart(2, "0"); }
+  function fmtDate(d){ return d.getFullYear() + "-" + pad2(d.getMonth()+1) + "-" + pad2(d.getDate()); }
+  function todayStr(){ return fmtDate(new Date()); }
+  function maxDateStr(days){ const d = new Date(); d.setDate(d.getDate()+days); return fmtDate(d); }
+  function formatPrice(cents){ return "NT$ " + Math.round(cents/100).toLocaleString("zh-Hant-TW"); }
+
+  /* ---------------- 安全的 DOM 建構 helper（不使用 innerHTML 拼接使用者輸入） ---------------- */
+  function clearChildren(el){ while (el.firstChild) el.removeChild(el.firstChild); }
+  function addSummaryRow(ul, label, value){
+    const li = document.createElement("li");
+    const dt = document.createElement("span"); dt.className = "summary-label"; dt.textContent = label;
+    const dd = document.createElement("span"); dd.className = "summary-value"; dd.textContent = value;
+    li.appendChild(dt); li.appendChild(dd);
+    ul.appendChild(li);
+  }
+
+  /* ---------------- demo 資料：僅存於 sessionStorage（分頁關閉即清除） ---------------- */
+  function readDemoAppts(){
+    try { return JSON.parse(sessionStorage.getItem(DEMO_STORAGE_KEY) || "[]"); }
+    catch (e) { return []; }
+  }
+  function writeDemoAppts(list){
+    try { sessionStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(list)); } catch (e) { /* storage 不可用時忽略，僅影響 demo 查詢 */ }
+  }
+  function saveDemoAppt(appt){
+    const list = readDemoAppts();
+    list.push(appt);
+    writeDemoAppts(list);
+  }
+  function findDemoAppt(id, phone){
+    return readDemoAppts().find(a => a.id === id && a.customer.phone === phone) || null;
+  }
+  function cancelDemoAppt(id, phone){
+    const list = readDemoAppts();
+    const target = list.find(a => a.id === id && a.customer.phone === phone);
+    if (target) target.status = "cancelled";
+    writeDemoAppts(list);
+    return target || null;
+  }
+
+  const DEMO_SERVICES = [
+    { id:"svc-bath", name:"基礎洗澡", duration_min:60, price_cents:80000, icon:"🛁" },
+    { id:"svc-full", name:"全套美容（洗澡＋剪毛）", duration_min:120, price_cents:180000, icon:"✂️" },
+    { id:"svc-nail", name:"剪指甲", duration_min:20, price_cents:30000, icon:"💅" },
+    { id:"svc-teeth", name:"潔牙", duration_min:20, price_cents:35000, icon:"🦷" }
+  ];
+
+  function generateDemoSlots(serviceId, date){
+    const times = ["09:00","09:30","10:00","10:30","11:00","13:00","13:30","14:00","14:30","15:00","15:30","16:00"];
+    return times.map((t, idx) => {
+      const seed = hashCode(serviceId + date + t);
+      const available = (seed % 3 !== 0) && !(idx === 0 && seed % 5 === 0);
+      return { time: t, available };
+    });
+  }
+
+  /* ============================================================
+     狀態與流程控制
+  ============================================================ */
+  const state = {
+    step: 0,
+    services: [],
+    selectedServiceId: null,
+    apptDate: "",
+    slots: [],
+    selectedSlot: null,
+    customer: { name:"", phone:"" },
+    pet: { name:"", species:"", breed:"", size:"", notes:"" }
+  };
+
+  const PANELS = ["step-service","step-time","step-info","step-confirm"];
+
+  function showStep(n){
+    state.step = n;
+    PANELS.forEach((id, idx) => { $(id).hidden = idx !== n; });
+    $("step-success").hidden = true;
+    for (let i = 0; i < PANELS.length; i++){
+      const li = $("stepper-" + i);
+      li.classList.toggle("is-done", i < n);
+      if (i === n) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
+    }
+    $("stepperNav").hidden = false;
+    $("wizardActions").hidden = false;
+    $("prevBtn").hidden = n === 0;
+    $("nextBtn").disabled = false;
+    $("nextBtn").textContent = n === 3 ? "送出預約" : "下一步";
+    const panel = $(PANELS[n]);
+    panel.focus();
+  }
+
+  function selectedService(){
+    return state.services.find(s => s.id === state.selectedServiceId) || null;
+  }
+
+  /* ---------------- Step 1: 服務 ---------------- */
+  async function loadServices(){
+    const container = $("serviceList");
+    try {
+      const res = await fetchWithTimeout(API_BASE + "/api/services", {}, REQUEST_TIMEOUT);
+      if (!res.ok) throw new Error("bad status");
+      const data = await res.json();
+      state.services = Array.isArray(data) ? data : (data.data || []);
+      if (!state.services.length) throw new Error("empty");
+    } catch (e) {
+      DEMO_MODE = true; updateDemoBadge();
+      state.services = DEMO_SERVICES;
+    }
+    renderServices();
+  }
+
+  function renderServices(){
+    const container = $("serviceList");
+    clearChildren(container);
+    container.setAttribute("aria-busy", "false");
+    state.services.forEach(svc => {
+      const label = document.createElement("label");
+      label.className = "service-card";
+      const input = document.createElement("input");
+      input.type = "radio"; input.name = "service"; input.value = svc.id;
+      input.addEventListener("change", () => {
+        state.selectedServiceId = svc.id;
+        $("serviceError").classList.remove("is-visible");
+      });
+      const icon = document.createElement("span");
+      icon.className = "service-icon"; icon.setAttribute("aria-hidden","true"); icon.textContent = svc.icon || "🐾";
+      const info = document.createElement("div");
+      info.className = "service-info";
+      const name = document.createElement("div"); name.className = "service-name"; name.textContent = svc.name;
+      const meta = document.createElement("div"); meta.className = "service-meta"; meta.textContent = "約 " + svc.duration_min + " 分鐘";
+      info.appendChild(name); info.appendChild(meta);
+      const price = document.createElement("span"); price.className = "service-price"; price.textContent = formatPrice(svc.price_cents);
+      label.appendChild(input); label.appendChild(icon); label.appendChild(info); label.appendChild(price);
+      container.appendChild(label);
+    });
+  }
+
+  function validateStep0(){
+    if (!state.selectedServiceId){
+      const err = $("serviceError");
+      err.classList.add("is-visible");
+      err.focus();
+      return false;
+    }
+    return true;
+  }
+
+  /* ---------------- Step 2: 時段 ---------------- */
+  async function loadAvailability(){
+    const svc = selectedService();
+    if (!svc || !state.apptDate) return;
+    const list = $("slotList");
+    list.setAttribute("aria-busy", "true");
+    clearChildren(list);
+    const loading = document.createElement("p"); loading.className = "slot-loading"; loading.textContent = "載入可預約時段中…";
+    list.appendChild(loading);
+    state.selectedSlot = null;
+
+    try {
+      const res = await fetchWithTimeout(
+        API_BASE + "/api/availability?service_id=" + encodeURIComponent(svc.id) + "&date=" + encodeURIComponent(state.apptDate),
+        {}, REQUEST_TIMEOUT
+      );
+      if (!res.ok) throw new Error("bad status");
+      const data = await res.json();
+      state.slots = Array.isArray(data) ? data : (data.slots || []);
+    } catch (e) {
+      DEMO_MODE = true; updateDemoBadge();
+      state.slots = generateDemoSlots(svc.id, state.apptDate);
+    }
+    renderSlots();
+  }
+
+  function renderSlots(){
+    const list = $("slotList");
+    clearChildren(list);
+    list.setAttribute("aria-busy", "false");
+    if (!state.slots.length){
+      const p = document.createElement("p"); p.className = "slot-empty"; p.textContent = "此日期無可預約時段，請選擇其他日期。";
+      list.appendChild(p);
+      return;
+    }
+    state.slots.forEach(slot => {
+      const label = document.createElement("label"); label.className = "slot-label";
+      const input = document.createElement("input");
+      input.type = "radio"; input.name = "slot"; input.value = slot.time; input.disabled = !slot.available;
+      input.addEventListener("change", () => {
+        state.selectedSlot = slot.time;
+        $("timeError").classList.remove("is-visible");
+      });
+      const btn = document.createElement("span"); btn.className = "slot-btn";
+      btn.appendChild(document.createTextNode(slot.time));
+      if (!slot.available){
+        const note = document.createElement("span"); note.className = "slot-note"; note.textContent = "已滿";
+        btn.appendChild(document.createElement("br"));
+        btn.appendChild(note);
+      }
+      label.appendChild(input); label.appendChild(btn);
+      list.appendChild(label);
+    });
+  }
+
+  function validateStep1(){
+    if (!state.apptDate || !state.selectedSlot){
+      const err = $("timeError");
+      err.classList.add("is-visible");
+      err.focus();
+      return false;
+    }
+    return true;
+  }
+
+  /* ---------------- Step 3: 顧客/寵物資料 ---------------- */
+  function setInlineError(inputEl, errorEl, show){
+    inputEl.setAttribute("aria-invalid", show ? "true" : "false");
+    errorEl.classList.toggle("is-visible", !!show);
+  }
+
+  function validateStep2(){
+    const errors = [];
+    const nameEl = $("customerName"), nameErr = $("customerNameError");
+    const nameOk = nameEl.value.trim().length >= 2;
+    setInlineError(nameEl, nameErr, !nameOk);
+    if (!nameOk) errors.push({ id:"customerName", msg:"請輸入姓名（至少 2 個字）" });
+
+    const phoneEl = $("customerPhone"), phoneErr = $("customerPhoneError");
+    const phoneOk = /^09\d{8}$/.test(phoneEl.value.trim());
+    setInlineError(phoneEl, phoneErr, !phoneOk);
+    if (!phoneOk) errors.push({ id:"customerPhone", msg:"手機號碼格式錯誤（需為 09xxxxxxxx）" });
+
+    const petNameEl = $("petName"), petNameErr = $("petNameError");
+    const petNameOk = petNameEl.value.trim().length >= 1;
+    setInlineError(petNameEl, petNameErr, !petNameOk);
+    if (!petNameOk) errors.push({ id:"petName", msg:"請輸入寵物名字" });
+
+    const speciesEl = $("petSpecies"), speciesErr = $("petSpeciesError");
+    const speciesOk = !!speciesEl.value;
+    setInlineError(speciesEl, speciesErr, !speciesOk);
+    if (!speciesOk) errors.push({ id:"petSpecies", msg:"請選擇物種" });
+
+    const sizeChecked = document.querySelector('input[name="petSize"]:checked');
+    const sizeErr = $("petSizeError");
+    sizeErr.classList.toggle("is-visible", !sizeChecked);
+    if (!sizeChecked) errors.push({ id:"petSizeGroup", msg:"請選擇寵物體型" });
+
+    const notesEl = $("petNotes");
+    if (notesEl.value.length > 200) errors.push({ id:"petNotes", msg:"備註不可超過 200 字" });
+
+    const summary = $("infoErrorSummary");
+    const errList = $("infoErrorList");
+    clearChildren(errList);
+    if (errors.length){
+      errors.forEach(e => {
+        const li = document.createElement("li");
+        const a = document.createElement("a"); a.href = "#" + e.id; a.textContent = e.msg;
+        a.addEventListener("click", (ev) => { ev.preventDefault(); const target = $(e.id); if (target) target.focus(); });
+        li.appendChild(a);
+        errList.appendChild(li);
+      });
+      summary.classList.add("is-visible");
+      summary.focus();
+      return false;
+    }
+    summary.classList.remove("is-visible");
+
+    state.customer.name = nameEl.value.trim();
+    state.customer.phone = phoneEl.value.trim();
+    state.pet.name = petNameEl.value.trim();
+    state.pet.species = speciesEl.value;
+    state.pet.breed = $("petBreed").value.trim();
+    state.pet.size = sizeChecked.value;
+    state.pet.notes = notesEl.value.trim();
+    return true;
+  }
+
+  $("petNotes").addEventListener("input", function(){
+    $("petNotesCount").textContent = this.value.length + " / 200 字";
+  });
+
+  /* ---------------- Step 4: 確認與送出 ---------------- */
+  function buildConfirmSummary(){
+    const svc = selectedService();
+    const ul = $("confirmSummary");
+    clearChildren(ul);
+    addSummaryRow(ul, "服務項目", svc ? svc.name : "—");
+    addSummaryRow(ul, "預約日期", state.apptDate);
+    addSummaryRow(ul, "預約時段", state.selectedSlot || "—");
+    addSummaryRow(ul, "姓名", state.customer.name);
+    addSummaryRow(ul, "手機號碼", state.customer.phone);
+    addSummaryRow(ul, "寵物名字", state.pet.name);
+    addSummaryRow(ul, "物種", SPECIES_LABEL[state.pet.species] || state.pet.species);
+    if (state.pet.breed) addSummaryRow(ul, "品種", state.pet.breed);
+    addSummaryRow(ul, "體型", SIZE_LABEL[state.pet.size] || state.pet.size);
+    addSummaryRow(ul, "備註", state.pet.notes || "無");
+    $("submitError").classList.remove("is-visible");
+  }
+
+  function buildBookingPayload(){
+    const svc = selectedService();
+    return {
+      customer: { name: state.customer.name, phone: state.customer.phone },
+      pet: { name: state.pet.name, species: state.pet.species, breed: state.pet.breed, size: state.pet.size, notes: state.pet.notes },
+      service_id: svc ? svc.id : state.selectedServiceId,
+      appt_date: state.apptDate,
+      start_time: state.selectedSlot
+    };
+  }
+
+  function showSubmitError(msg){
+    const el = $("submitError");
+    el.textContent = msg;
+    el.classList.add("is-visible");
+    el.focus();
+  }
+
+  async function submitBooking(){
+    const nextBtn = $("nextBtn");
+    nextBtn.disabled = true;
+    const originalLabel = nextBtn.textContent;
+    nextBtn.textContent = "送出中…";
+    $("submitError").classList.remove("is-visible");
+
+    try {
+      const res = await fetchWithTimeout(API_BASE + "/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildBookingPayload())
+      }, REQUEST_TIMEOUT);
+
+      if (res.ok){
+        const data = await res.json();
+        const id = data.id || (data.data && data.data.id) || genId();
+        showSuccess(id);
+        return;
+      }
+
+      const errBody = await res.json().catch(() => null);
+      const code = errBody && errBody.error && errBody.error.code;
+
+      if (code === "VALIDATION_ERROR"){
+        showStep(2);
+        showSubmitError((errBody.error.message) || "輸入資料有誤，請檢查後再試一次。");
+        return;
+      }
+      if (code === "SLOT_CONFLICT"){
+        showStep(1);
+        $("timeError").textContent = (errBody.error.message) || "此時段已滿，請重新選擇。";
+        $("timeError").classList.add("is-visible");
+        $("timeError").focus();
+        await loadAvailability();
+        return;
+      }
+      if (code === "RATE_LIMITED"){
+        showSubmitError((errBody.error.message || "操作過於頻繁，請稍後再試。") +
+          (errBody.error.retryAfterSeconds ? "（約 " + errBody.error.retryAfterSeconds + " 秒後再試）" : ""));
+        return;
+      }
+      showSubmitError((errBody && errBody.error && errBody.error.message) || "系統發生錯誤，請稍後再試。");
+    } catch (networkErr) {
+      // API 尚未部署或連線失敗：退回本機示範資料，維持可展示的完整流程
+      DEMO_MODE = true; updateDemoBadge();
+      const id = genId();
+      saveDemoAppt({
+        id,
+        service: selectedService(),
+        appt_date: state.apptDate,
+        start_time: state.selectedSlot,
+        customer: { name: state.customer.name, phone: state.customer.phone },
+        pet: Object.assign({}, state.pet),
+        status: "pending"
+      });
+      showSuccess(id);
+    } finally {
+      nextBtn.disabled = false;
+      nextBtn.textContent = originalLabel;
+    }
+  }
+
+  function showSuccess(id){
+    PANELS.forEach(pid => { $(pid).hidden = true; });
+    $("wizardActions").hidden = true;
+    $("stepperNav").hidden = true;
+    $("successApptId").textContent = id;
+
+    const ul = $("successSummary");
+    clearChildren(ul);
+    const svc = selectedService();
+    addSummaryRow(ul, "服務項目", svc ? svc.name : "—");
+    addSummaryRow(ul, "預約時間", state.apptDate + " " + state.selectedSlot);
+    addSummaryRow(ul, "寵物", state.pet.name);
+
+    const panel = $("step-success");
+    panel.hidden = false;
+    panel.focus();
+  }
+
+  function resetWizard(){
+    state.selectedServiceId = null;
+    state.apptDate = "";
+    state.slots = [];
+    state.selectedSlot = null;
+    state.customer = { name:"", phone:"" };
+    state.pet = { name:"", species:"", breed:"", size:"", notes:"" };
+    $("infoForm").reset();
+    $("petNotesCount").textContent = "0 / 200 字";
+    document.querySelectorAll('input[name="service"]').forEach(i => { i.checked = false; });
+    $("apptDate").value = "";
+    clearChildren($("slotList"));
+    const p = document.createElement("p"); p.className = "slot-empty"; p.textContent = "請先選擇日期，系統將顯示可預約時段。";
+    $("slotList").appendChild(p);
+    ["customerName","customerPhone","petName","petSpecies"].forEach(id => $(id).removeAttribute("aria-invalid"));
+    $("infoErrorSummary").classList.remove("is-visible");
+    showStep(0);
+  }
+
+  /* ---------------- 導覽按鈕 ---------------- */
+  $("nextBtn").addEventListener("click", async function(){
+    if (state.step === 0){
+      if (!validateStep0()) return;
+      showStep(1);
+      if (!$("apptDate").value) $("apptDate").value = todayStr();
+      state.apptDate = $("apptDate").value;
+      $("timeStepServiceName").textContent = selectedService() ? selectedService().name : "—";
+      $("timeStepDuration").textContent = selectedService() ? selectedService().duration_min : "";
+      await loadAvailability();
+    } else if (state.step === 1){
+      if (!validateStep1()) return;
+      showStep(2);
+    } else if (state.step === 2){
+      if (!validateStep2()) return;
+      buildConfirmSummary();
+      showStep(3);
+    } else if (state.step === 3){
+      await submitBooking();
+    }
+  });
+
+  $("prevBtn").addEventListener("click", function(){ showStep(Math.max(0, state.step - 1)); });
+  $("bookAnotherBtn").addEventListener("click", resetWizard);
+
+  $("apptDate").min = todayStr();
+  $("apptDate").max = maxDateStr(60);
+  $("apptDate").addEventListener("change", function(){
+    state.apptDate = this.value;
+    if (state.selectedServiceId) loadAvailability();
+  });
+
+  /* ---------------- 查詢／取消預約 ---------------- */
+  const lookupDialog = $("lookupDialog");
+  $("openLookupBtn").addEventListener("click", function(){
+    $("lookupForm").reset();
+    $("lookupErrorSummary").classList.remove("is-visible");
+    $("lookupResult").hidden = true;
+    lookupDialog.showModal();
+    $("lookupPhone").focus();
+  });
+  $("closeLookupBtn").addEventListener("click", function(){ lookupDialog.close(); });
+
+  let currentLookup = null; // { id, phone }
+
+  $("lookupForm").addEventListener("submit", async function(ev){
+    ev.preventDefault();
+    const phone = $("lookupPhone").value.trim();
+    const id = $("lookupId").value.trim();
+    const errSummary = $("lookupErrorSummary");
+    const errText = $("lookupErrorText");
+    $("lookupResult").hidden = true;
+
+    // 輸入格式基本檢查（僅避免無效請求，不影響「查無此預約」統一訊息語意）
+    if (!/^09\d{8}$/.test(phone) || id.length < 6){
+      errText.textContent = "查無此預約，請確認電話與預約編號是否正確。";
+      errSummary.classList.add("is-visible");
+      errSummary.focus();
+      return;
+    }
+
+    try {
+      const res = await fetchWithTimeout(
+        API_BASE + "/api/appointments/" + encodeURIComponent(id) + "?phone=" + encodeURIComponent(phone),
+        {}, REQUEST_TIMEOUT
+      );
+      if (res.status === 404){
+        errText.textContent = "查無此預約，請確認電話與預約編號是否正確。";
+        errSummary.classList.add("is-visible");
+        errSummary.focus();
+        return;
+      }
+      if (!res.ok) throw new Error("bad status");
+      const data = await res.json();
+      const appt = data.data || data;
+      currentLookup = { id, phone };
+      renderLookupResult(appt);
+      errSummary.classList.remove("is-visible");
+    } catch (e) {
+      // API 未部署／連線失敗：查詢 demo 資料
+      const appt = findDemoAppt(id, phone);
+      if (!appt){
+        errText.textContent = "查無此預約，請確認電話與預約編號是否正確。";
+        errSummary.classList.add("is-visible");
+        errSummary.focus();
+        return;
+      }
+      currentLookup = { id, phone };
+      renderLookupResult(appt, true);
+      errSummary.classList.remove("is-visible");
+    }
+  });
+
+  function renderLookupResult(appt, isDemo){
+    const ul = $("lookupResultSummary");
+    clearChildren(ul);
+    const svcName = appt.service && appt.service.name ? appt.service.name : (appt.service_id || "—");
+    addSummaryRow(ul, "服務項目", svcName);
+    addSummaryRow(ul, "預約時間", (appt.appt_date || "") + " " + (appt.start_time || ""));
+    addSummaryRow(ul, "寵物", (appt.pet && appt.pet.name) || "—");
+    addSummaryRow(ul, "狀態", appt.status === "cancelled" ? "已取消" : "預約中");
+    $("lookupCancelledNote").hidden = appt.status !== "cancelled";
+    $("cancelApptBtn").hidden = appt.status === "cancelled";
+    $("lookupResult").hidden = false;
+  }
+
+  $("cancelApptBtn").addEventListener("click", async function(){
+    if (!currentLookup) return;
+    if (!confirm("確定要取消此預約嗎？")) return;
+    try {
+      const res = await fetchWithTimeout(
+        API_BASE + "/api/appointments/" + encodeURIComponent(currentLookup.id) + "?phone=" + encodeURIComponent(currentLookup.phone),
+        { method: "DELETE" }, REQUEST_TIMEOUT
+      );
+      if (res.status === 404) throw new Error("not found");
+      if (!res.ok) throw new Error("bad status");
+    } catch (e) {
+      cancelDemoAppt(currentLookup.id, currentLookup.phone);
+    }
+    $("lookupCancelledNote").hidden = false;
+    $("cancelApptBtn").hidden = true;
+    const ul = $("lookupResultSummary");
+    const statusRow = ul.querySelectorAll(".summary-value");
+    if (statusRow.length) statusRow[statusRow.length - 1].textContent = "已取消";
+  });
+
+  /* ---------------- 初始化 ---------------- */
+  loadServices();
+  showStep(0);
+})();
+</script>
+</body>
+</html>

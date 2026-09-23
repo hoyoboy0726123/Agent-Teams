@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>京都5日4夜賞楓行程</title>
+<style>
+  :root{
+    --maple:#c0392b; --gold:#d4a017; --green:#2f6f4f; --cream:#fdf6ec; --ink:#3a2e2c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:"Noto Sans TC","PingFang TC",sans-serif;
+    background:var(--cream); color:var(--ink); line-height:1.6;
+  }
+  header{
+    background:linear-gradient(135deg,#8b1e1e,#c0392b 40%,#d4a017);
+    color:#fff; padding:36px 20px 28px; text-align:center;
+  }
+  header h1{margin:0 0 6px; font-size:1.6em;}
+  header p{margin:4px 0; opacity:.95; font-size:.95em;}
+  .badges{display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:12px;}
+  .badge{background:rgba(255,255,255,.2); padding:4px 12px; border-radius:20px; font-size:.85em;}
+  .container{max-width:760px; margin:0 auto; padding:20px 14px 60px;}
+  .notice{
+    background:#fff3cd; border:1px solid #ffe08a; color:#7a5c00;
+    padding:12px 16px; border-radius:12px; font-size:.9em; margin-bottom:24px;
+  }
+  h2.section-title{
+    color:var(--maple); border-left:6px solid var(--gold); padding-left:10px;
+    margin:36px 0 14px; font-size:1.25em;
+  }
+  .day-card{
+    background:#fff; border-radius:16px; box-shadow:0 3px 10px rgba(0,0,0,.06);
+    margin-bottom:18px; overflow:hidden; border:1px solid #f0e2d0;
+  }
+  .day-head{
+    background:var(--green); color:#fff; padding:12px 16px;
+    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;
+  }
+  .day-head .d{font-weight:700; font-size:1.05em;}
+  .day-head .tag{font-size:.8em; background:rgba(255,255,255,.2); padding:3px 10px; border-radius:12px;}
+  .day-body{padding:14px 18px;}
+  .timeline{list-style:none; margin:0; padding:0;}
+  .timeline li{
+    position:relative; padding:6px 0 6px 26px; border-left:2px solid #eadcc8; margin-left:6px;
+  }
+  .timeline li:last-child{border-left:2px solid transparent;}
+  .timeline li::before{
+    content:"🍁"; position:absolute; left:-13px; top:5px; font-size:.9em;
+  }
+  .time{font-weight:700; color:var(--maple); margin-right:6px;}
+  .tip{
+    background:#f2f7f0; border-left:4px solid var(--green); padding:8px 12px;
+    margin-top:10px; font-size:.88em; border-radius:0 8px 8px 0;
+  }
+  .elder{
+    background:#fdeeee; border-left:4px solid var(--maple); padding:8px 12px;
+    margin-top:8px; font-size:.88em; border-radius:0 8px 8px 0;
+  }
+  table{width:100%; border-collapse:collapse; margin:10px 0; font-size:.9em;}
+  th,td{border:1px solid #eadcc8; padding:8px 10px; text-align:left;}
+  th{background:#f7ecd8; color:var(--maple);}
+  tr:nth-child(even){background:#fffaf2;}
+  .total-row td{font-weight:700; background:#f2e6c8;}
+  .pack-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  @media(max-width:480px){.pack-grid{grid-template-columns:1fr;}}
+  .pack-box{background:#fff; border:1px solid #f0e2d0; border-radius:12px; padding:12px 16px;}
+  .pack-box h3{margin:0 0 8px; color:var(--green); font-size:1em;}
+  .pack-box ul{margin:0; padding-left:18px; font-size:.9em;}
+  .pack-box li{margin-bottom:5px;}
+  footer{text-align:center; color:#a08b6f; font-size:.8em; padding:20px; }
+  .transport-box{background:#fff; border-radius:12px; padding:14px 18px; border:1px solid #f0e2d0; margin-bottom:14px;}
+  .transport-box h3{margin-top:0; color:var(--maple); font-size:1em;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🍁 京都 5 日 4 夜賞楓行程</h1>
+  <p>親子孝親版・爸媽走路友善設計</p>
+  <div class="badges">
+    <span class="badge">11月下旬出發</span>
+    <span class="badge">3人・每人預算 5萬 TWD（含機票）</span>
+    <span class="badge">低走路量 × 賞楓 × 美食</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="notice">
+    ⚠️ <b>提醒：</b>本行程以既有經驗規劃，<b>未即時上網查證</b>。出發前請務必再次確認：①各景點/餐廳最新營業時間與公休日 ②楓葉狀況（京都賞楓高峰約每年 11/20～11/30，會隨氣候浮動）③嵐山小火車、順正、限定甜點等是否需要事先預約。
+  </div>
+
+  <h2 class="section-title">✈️ 行前總覽</h2>
+  <table>
+    <tr><th>項目</th><th>建議</th></tr>
+    <tr><td>航班</td><td>桃園／高雄 ⇄ 關西機場（KIX），早去晚回，避開紅眼班機</td></tr>
+    <tr><td>住宿</td><td>建議住「京都車站」或「烏丸／河原町」一帶，有電梯的飯店（4晚不換飯店，減少搬行李）</td></tr>
+    <tr><td>市內交通</td><td>市巴士一日券／地鐵一日券 + 視情況搭計程車（爬坡、遠距離、下雨時直接叫車，長輩較舒適）</td></tr>
+    <tr><td>IC卡</td><td>ICOCA（機場、車站皆可購買儲值，搭車超方便）</td></tr>
+    <tr><td>節奏原則</td><td>每天安排「1個主景點 + 1餐重點美食 + 彈性午休」，避免趕行程</td></tr>
+  </table>
+
+  <h2 class="section-title">📅 每日行程</h2>
+
+  <div class="day-card">
+    <div class="day-head"><span class="d">Day 1 ・ 抵達京都</span><span class="tag">輕鬆適應日</span></div>
+    <div class="day-body">
+      <ul class="timeline">
+        <li><span class="time">上午</span>桃園／高雄飛關西機場（KIX）</li>
+        <li><span class="time">午後</span>抵達後搭「利木津巴士」直達京都車站附近飯店（比 Haruka 電車少一次轉車搬行李，更適合長輩）</li>
+        <li><span class="time">15:30</span>飯店 Check-in，稍作休息</li>
+        <li><span class="time">17:00</span>散步至京都塔 / 車站周邊，欣賞夜景（全程平地）</li>
+        <li><span class="time">18:30</span>晚餐：京都車站「拉麵小路」或車站內和食街，選擇多、走路少</li>
+      </ul>
+      <div class="elder">👴👵 長輩貼士：第一天搭機+移動已耗體力，晚上不安排景點趕場，早點休息調時差。</div>
+    </div>
+  </div>
+
+  <div class="day-card">
+    <div class="day-head"><span class="d">Day 2 ・ 東山賞楓與祇園</span><span class="tag">平地為主</span></div>
+    <div class="day-body">
+      <ul class="timeline">
+        <li><span class="time">09:30</span>南禪寺（境內平坦好走，紅葉配水路閣古蹟，超上鏡）</li>
+        <li><span class="time">10:30</span>永觀堂（永観堂／もみじの永観堂，京都紅葉名所，建議走平緩迴廊區域，不強求爬到最高處）</li>
+        <li><span class="time">12:00</span>午餐：南禪寺「順正」湯豆腐懷石（日式庭園座位，無障礙、氣氛優雅）</li>
+        <li><span class="time">13:30</span>哲學之道，散步一小段（不必走全程，賞楓拍照即可折返）</li>
+        <li><span class="time">15:00</span>叫計程車前往祇園白川，沿河散步賞楓＋古街風情（平地）</li>
+        <li><span class="time">18:00</span>晚餐：祇園京懷石或湯豆腐料理店</li>
+      </ul>
+      <div class="tip">🍁 永觀堂夜楓點燈期間常延長開放，若想看夜楓需另外確認點燈日期與夜間門票。</div>
+    </div>
+  </div>
+
+  <div class="day-card">
+    <div class="day-head"><span class="d">Day 3 ・ 嵐山慢遊</span><span class="tag">坐著賞楓最推薦</span></div>
+    <div class="day-body">
+      <ul class="timeline">
+        <li><span class="time">09:30</span>天龍寺（世界遺產，庭園以平緩步道為主，坐在廊下賞楓非常舒服）</li>
+        <li><span class="time">10:30</span>竹林小徑（短短一段平路，慢慢走拍照即可）</li>
+        <li><span class="time">11:00</span>渡月橋河畔散步，或搭「嵐山人力車」（車夫拉車導覽，長輩完全不用走路，很推薦當作驚喜體驗）</li>
+        <li><span class="time">12:30</span>午餐：嵐山湯豆腐或抹茶甜點午茶</li>
+        <li><span class="time">14:00</span>【重點】嵯峨野嵐山小火車（トロッコ列車）沿保津峽賞楓，全程坐著看風景，對長輩超友善（需事先訂票，秋季熱門）</li>
+        <li><span class="time">16:00</span>河畔咖啡廳休息，悠閒返回市區</li>
+        <li><span class="time">18:30</span>晚餐：飯店周邊或錦市場周邊小食</li>
+      </ul>
+      <div class="elder">👴👵 這天是全程最「不費腳」的一天，人力車 + 小火車都是坐著賞楓，很適合當作旅程亮點安排給爸媽。</div>
+    </div>
+  </div>
+
+  <div class="day-card">
+    <div class="day-head"><span class="d">Day 4 ・ 金閣寺與市場美食</span><span class="tag">觀光＋採買</span></div>
+    <div class="day-body">
+      <ul class="timeline">
+        <li><span class="time">09:30</span>金閣寺（金閣寺）：參觀動線是單一平緩環形步道，約30-40分鐘走完，金黃楓紅配金閣非常漂亮</li>
+        <li><span class="time">11:00</span>計程車前往京都御苑（皇宮外苑，腹地大、步道平坦寬敞，很適合長輩漫步賞楓）</li>
+        <li><span class="time">12:30</span>午餐 + 逛錦市場（京都的廚房，邊走邊吃、隨時可找椅子休息）</li>
+        <li><span class="time">15:00</span>回飯店午休（保留彈性，體力不足可直接休息不安排景點）</li>
+        <li><span class="time">18:00</span>京都最後一晚：京懷石或鴨川納涼床風格晚餐（依季節，11月鴨川納涼床已結束，改室內雅座）</li>
+      </ul>
+      <div class="tip">💡 若爸媽當天體力還很好，可選擇性加碼「清水寺夜楓點燈」（有階梯，建議衡量體力，非必去）。</div>
+    </div>
+  </div>
+
+  <div class="day-card">
+    <div class="day-head"><span class="d">Day 5 ・ 賦歸</span><span class="tag">悠閒退房</span></div>
+    <div class="day-body">
+      <ul class="timeline">
+        <li><span class="time">09:00</span>飯店退房，行李寄放</li>
+        <li><span class="time">09:30</span>京都車站 Isetan 百貨地下美食街採買伴手禮（八橋、清水燒小物、抹茶零食）</li>
+        <li><span class="time">11:00</span>搭利木津巴士前往關西機場（預留充裕時間過安檢）</li>
+        <li><span class="time">下午</span>飛回台灣</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 class="section-title">💰 預算表（每人・TWD）</h2>
+  <table>
+    <tr><th>項目</th><th>估算金額</th><th>備註</th></tr>
+    <tr><td>來回機票</td><td>9,000 - 12,000</td><td>及早訂票、避開週末航班較便宜</td></tr>
+    <tr><td>住宿（4晚）</td><td>15,000 - 18,000</td><td>以每人每晚約4,000-4,500元估算，中價位有電梯飯店</td></tr>
+    <tr><td>三餐飲食</td><td>8,000 - 10,000</td><td>含1-2餐懷石/湯豆腐等特色餐</td></tr>
+    <tr><td>市內交通</td><td>3,000 - 4,000</td><td>含巴士/地鐵票、計程車、人力車、小火車票</td></tr>
+    <tr><td>景點門票</td><td>1,500 - 2,500</td><td>南禪寺、永觀堂、天龍寺、金閣寺等</td></tr>
+    <tr><td>伴手禮/購物</td><td>3,000 - 5,000</td><td>依個人喜好彈性調整</td></tr>
+    <tr><td>雜支/保險/備用金</td><td>1,500 - 2,000</td><td>含旅平險、突發花費</td></tr>
+    <tr class="total-row"><td>合計</td><td>約 41,000 - 53,500</td><td>可控制在 5萬內，留意匯率波動</td></tr>
+  </table>
+  <div class="tip">💱 匯率抓 100 日圓 ≈ 21-22 台幣估算（出發前請以當天匯率為準）。想更精準拆算，可請 @money 幫忙做細部匯率換算與三人總支出試算。</div>
+
+  <h2 class="section-title">🎒 打包清單</h2>
+  <div class="pack-grid">
+    <div class="pack-box">
+      <h3>穿著（11月京都約8-16°C）</h3>
+      <ul>
+        <li>保暖外套（洋蔥式穿搭，早晚溫差大）</li>
+        <li>圍巾、薄手套</li>
+        <li>止滑好走的鞋（部分寺院是碎石/石板路）</li>
+        <li>輕便雨具（折疊傘或輕便雨衣）</li>
+      </ul>
+    </div>
+    <div class="pack-box">
+      <h3>長輩必備</h3>
+      <ul>
+        <li>常備藥品＋處方箋（英文/日文對照更佳）</li>
+        <li>可摺疊拐杖或健走杖（視需要）</li>
+        <li>暖暖包（カイロ，日本超商都買得到）</li>
+        <li>備用老花眼鏡</li>
+        <li>飛機上防止水腫的彈性襪</li>
+      </ul>
+    </div>
+    <div class="pack-box">
+      <h3>證件與金錢</h3>
+      <ul>
+        <li>護照（效期6個月以上）</li>
+        <li>日幣現金 + 一張可海外刷卡的信用卡</li>
+        <li>旅平險保單影本</li>
+        <li>行程紙本備份（避免手機沒電找不到路）</li>
+      </ul>
+    </div>
+    <div class="pack-box">
+      <h3>其他實用小物</h3>
+      <ul>
+        <li>行動電源、充電線</li>
+        <li>OK繃/防水泡貼（走路多容易磨腳）</li>
+        <li>隨身小零食（血糖低時應急）</li>
+        <li>環保購物袋（日本部分店家塑膠袋收費）</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 class="section-title">✅ 出發前確認清單</h2>
+  <div class="transport-box">
+    <ul>
+      <li>□ 再次確認各寺院最新開放時間、公休日與門票（尤其永觀堂、天龍寺夜間特別開放期間）</li>
+      <li>□ 嵯峨野嵐山小火車事先訂票（秋季熱門，建議1-2週前預訂）</li>
+      <li>□ 順正等特色餐廳事先訂位</li>
+      <li>□ 查詢出發前一週的楓葉狀況預報，微調賞楓景點順序</li>
+      <li>□ 確認飯店有電梯／無障礙設施</li>
+    </ul>
+  </div>
+
+</div>
+
+<footer>為 Hoyo 與爸媽規劃・京都 5 日 4 夜賞楓行程 🍁 建議出發前再核實營業資訊</footer>
+
+</body>
+</html>

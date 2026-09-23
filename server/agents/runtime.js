@@ -105,7 +105,7 @@ The launch date is 2026-11-03 (decided by Alice)
 Only remember things that will still matter later. Never store secrets or passwords.`);
   }
   if (tools.includes('tasks')) {
-    proto.push(`- Create trackable tasks (with an owner) when work is split up or a follow-up is agreed. One block per task; assignee is an @handle of a teammate or human, due is optional (YYYY-MM-DD):
+    proto.push(`- Create trackable tasks only when a human asks for a plan / breakdown, or when a concrete follow-up must be tracked beyond this conversation (not for review notes or things you do right now). At most 8 per reply, each with a short title (under 60 characters) on the first line and details below. One block per task; assignee is an @handle of a teammate or human, due is optional (YYYY-MM-DD):
 \`\`\`task assignee="@writer" due="2026-10-01"
 Draft the launch blog post
 Optional details on the next lines
@@ -317,8 +317,12 @@ async function applyDirectives(text, { agent, channel, msg, meta, savedArtifacts
       }
       emit('memory.updated', { channelId: channel.id });
     } else if (b.kind === 'task' && agent.tools.includes('tasks')) {
-      const [title, ...rest] = b.body.split('\n');
-      if (!title.trim()) continue;
+      if (meta.tasks.length >= 8) continue;
+      let [title, ...rest] = b.body.split('\n');
+      title = title.trim();
+      if (!title) continue;
+      // Keep board titles scannable; overflow goes into the description.
+      if (title.length > 80) { rest = [title, ...rest]; title = title.slice(0, 77).replace(/[，,、：:；;\s]+\S*$/, '') + '…'; }
       const t = createTask({
         channelId: channel.id, title: title.trim(), description: rest.join('\n').trim(), assignee: b.attrs.assignee, due: b.attrs.due,
         byType: 'agent', byId: agent.id, sourceMessageId: msg.id,
