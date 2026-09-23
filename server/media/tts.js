@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { getSetting } from '../db.js';
 import { getProvider, adapters } from '../providers/index.js';
+import { edgeSpeak, EDGE_VOICES } from './edge-tts.js';
 
 const OPENAI_LIKE = new Set(['openai', 'openai-compatible', 'groq']);
 // Provider types that can speak; shown in the narration voice picker.
@@ -16,6 +17,7 @@ export const ttsConfig = () => getSetting('tts', null);
 export function ttsLabel(cfg = ttsConfig()) {
   if (!cfg?.providerId) return null;
   if (cfg.providerId === 'demo') return 'Demo voice (offline tone)';
+  if (cfg.providerId === 'edge') return `Edge voice (free) · ${EDGE_VOICES.find((v) => v.id === cfg.voice)?.label || cfg.voice || 'auto'}`;
   if (cfg.providerId === 'command') return process.env.TTS_COMMAND ? `Local command: ${process.env.TTS_COMMAND.split(' ')[0]}` : null;
   const p = getProvider(cfg.providerId);
   return p ? `${p.name}${cfg.voice ? ` · ${cfg.voice}` : ''}` : null;
@@ -65,6 +67,7 @@ function commandVoice(text) {
 export async function synthesize(text, cfg = ttsConfig()) {
   if (!cfg?.providerId) throw new Error('No narration voice configured (Settings → Workspace → Video narration)');
   if (cfg.providerId === 'demo') return demoVoice(text);
+  if (cfg.providerId === 'edge') return edgeSpeak(text, { voice: cfg.voice || undefined, rate: cfg.rate || undefined });
   if (cfg.providerId === 'command') {
     if (!process.env.TTS_COMMAND) throw new Error('TTS_COMMAND is not set');
     return commandVoice(text);

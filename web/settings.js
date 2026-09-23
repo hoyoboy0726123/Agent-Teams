@@ -252,14 +252,43 @@ async function workspaceTab(body) {
       <input name="searchKey" type="password" placeholder="${search.hasKey ? t('keySaved') : t('apiKey')}"></div><small class="muted">${t('searchHint')}</small></div>
     <h3>${t('videoSection')}</h3>
     <div class="field"><span>${t('ttsVoice')}</span><div class="row">
-      <select name="tts_provider"><option value="">${t('off')}</option><option value="demo"${s.tts?.providerId === 'demo' ? ' selected' : ''}>${t('ttsDemo')}</option><option value="command"${s.tts?.providerId === 'command' ? ' selected' : ''}>${t('ttsCommand')}</option>
+      <select name="tts_provider"><option value="">${t('off')}</option><option value="edge"${s.tts?.providerId === 'edge' ? ' selected' : ''}>${t('ttsEdge')}</option><option value="demo"${s.tts?.providerId === 'demo' ? ' selected' : ''}>${t('ttsDemo')}</option><option value="command"${s.tts?.providerId === 'command' ? ' selected' : ''}>${t('ttsCommand')}</option>
         ${S.providers.filter((p) => ['openai', 'openai-compatible', 'groq', 'gemini'].includes(p.type)).map((p) => `<option value="${p.id}"${s.tts?.providerId === p.id ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
-      <input name="tts_model" placeholder="${t('model')} (gpt-4o-mini-tts)" value="${esc(s.tts?.model || '')}"><input name="tts_voice" placeholder="${t('voiceName')} (alloy / Kore)" value="${esc(s.tts?.voice || '')}"></div><small class="muted">${t('ttsHint')}</small></div>
+      <input name="tts_model" placeholder="${t('model')} (gpt-4o-mini-tts)" value="${esc(s.tts?.model || '')}"><input name="tts_voice" list="tts-voices" placeholder="${t('voiceName')} (alloy / Kore)" value="${esc(s.tts?.voice || '')}"><datalist id="tts-voices"></datalist>
+      <button type="button" class="btn sm" data-tts-try>▶ ${t('ttsTry')}</button></div><small class="muted" data-tts-hint>${t('ttsHint')}</small><audio data-tts-audio hidden controls></audio></div>
     <div class="field"><span>${t('videoGen')}</span><div class="row">
       <select name="vg_provider"><option value="">${t('off')}</option><option value="demo"${s.videoGen?.providerId === 'demo' ? ' selected' : ''}>${t('videoGenDemo')}</option>
         ${S.providers.filter((p) => ['openai', 'gemini'].includes(p.type)).map((p) => `<option value="${p.id}"${s.videoGen?.providerId === p.id ? ' selected' : ''}>${esc(p.name)} (${p.type === 'gemini' ? 'Veo' : 'Sora'})</option>`).join('')}</select>
       <input name="vg_model" placeholder="${t('model')} (sora-2 / veo-3.0-fast-generate-001)" value="${esc(s.videoGen?.model || '')}"></div><small class="muted">${t('videoGenHint')}</small></div>
     <div><button class="btn primary">${t('save')}</button></div></form>`;
+  // Voice-over picker: Edge voices come with a list and no model; everything can be previewed.
+  const form = body.querySelector('#ws-form');
+  const syncTts = async () => {
+    const edge = form.tts_provider.value === 'edge';
+    form.tts_model.hidden = edge || ['', 'demo', 'command'].includes(form.tts_provider.value);
+    form.querySelector('[data-tts-hint]').textContent = edge ? t('ttsEdgeHint') : t('ttsHint');
+    const list = form.querySelector('#tts-voices');
+    if (edge && !list.children.length) {
+      const caps = await api('GET', '/api/video/capabilities').catch(() => ({ edgeVoices: [] }));
+      list.innerHTML = caps.edgeVoices.map((v) => `<option value="${esc(v.id)}">${esc(v.label)}</option>`).join('');
+      if (!form.tts_voice.value) form.tts_voice.value = 'zh-TW-HsiaoChenNeural';
+    }
+    if (!edge) list.innerHTML = '';
+  };
+  form.tts_provider.addEventListener('change', () => { if (form.tts_provider.value === 'edge') form.tts_voice.value = ''; syncTts(); });
+  syncTts();
+  form.querySelector('[data-tts-try]').onclick = safe(async () => {
+    const btn = form.querySelector('[data-tts-try]');
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/video/tts-preview', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ providerId: form.tts_provider.value, model: form.tts_model.value, voice: form.tts_voice.value }) });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+      const audio = form.querySelector('[data-tts-audio]');
+      audio.src = URL.createObjectURL(await res.blob());
+      audio.hidden = false;
+      audio.play().catch(() => {});
+    } finally { btn.disabled = false; }
+  });
   body.querySelector('#ws-form').onsubmit = safe(async (e) => {
     e.preventDefault();
     const f = formData(e.target);

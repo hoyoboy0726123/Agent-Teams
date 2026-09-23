@@ -385,13 +385,25 @@ r.post('/api/artifacts/:id/revise', async ({ user, req, params }) => {
 // ------------------------------------------------------------------ video
 
 import * as videoExport from './media/video-export.js';
-import { TTS_TYPES, ttsLabel } from './media/tts.js';
+import { TTS_TYPES, ttsLabel, synthesize } from './media/tts.js';
+import { EDGE_VOICES } from './media/edge-tts.js';
 import { sendFile } from './http.js';
 import { downloadName } from '../web/render.js';
 
 r.get('/api/video/capabilities', async ({ user }) => {
   need(user, 'guest');
-  return { ...(await videoExport.capabilities()), ttsLabel: ttsLabel(), ttsTypes: TTS_TYPES };
+  return { ...(await videoExport.capabilities()), ttsLabel: ttsLabel(), ttsTypes: TTS_TYPES, edgeVoices: EDGE_VOICES };
+});
+// Try a voice from Settings before exporting a whole video.
+r.post('/api/video/tts-preview', async ({ user, req, res }) => {
+  need(user, 'admin');
+  const b = await readJson(req);
+  const cfg = { providerId: String(b.providerId || ''), model: b.model || null, voice: b.voice || null };
+  if (!cfg.providerId) fail(400, 'Choose a voice first');
+  let out;
+  try { out = await synthesize(String(b.text || '').slice(0, 300) || '你好，這是 Agent Teams 的旁白試聽。', cfg); } catch (e) { fail(502, e.message); }
+  res.writeHead(200, { 'content-type': out.ext === 'mp3' ? 'audio/mpeg' : 'audio/wav', 'cache-control': 'no-store' });
+  res.end(out.buf);
 });
 r.post('/api/artifacts/:id/export-video', async ({ user, req, params }) => {
   need(user, 'member');
