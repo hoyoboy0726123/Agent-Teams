@@ -118,6 +118,18 @@ async function exportVideo(a, { narration, hd, fps, update }) {
     const tl = timeline(v);
     const total = tl.at(-1).start + tl.at(-1).duration;
 
+    // Open-source Chromium builds cannot decode H.264, so clips are recorded from VP8 proxies
+    // (keyframe every 6 frames for fast, exact seeks). Their audio is mixed by ffmpeg below.
+    const proxies = new Map();
+    for (const s of v.scenes) {
+      const local = s.layout === 'clip' ? localMediaPath(s.clip || s.src) : null;
+      if (!local || proxies.has(local)) continue;
+      update({ stage: 'prepare', pct: 15 });
+      const out = join(tmp, `clip-${proxies.size}.webm`);
+      await runFfmpeg(['-y', '-i', local, '-an', '-c:v', 'libvpx', '-b:v', '5M', '-g', '6', '-deadline', 'realtime', '-cpu-used', '8', out]).done;
+      proxies.set(local, out);
+    }
+
     // 2. Player page, served from a private origin; /media/ files come straight from disk.
     const html = renderArtifact({ ...a, type: 'video', content: JSON.stringify(v) });
     const [w, h] = outSize(FORMATS[v.format] || FORMATS['16:9'], hd);
@@ -128,7 +140,17 @@ async function exportVideo(a, { narration, hd, fps, update }) {
       const url = route.request().url();
       if (url === 'http://video.local/') return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html });
       const local = url.startsWith('http://video.local/media/') ? localMediaPath(url) : null;
-      if (local) return route.fulfill({ status: 200, body: await readFile(local), contentType: /\.mp4$/.test(local) ? 'video/mp4' : undefined });
+      if (local) {
+        // Media elements seek with Range requests; answer them so clips can be scrubbed frame by frame.
+        const file = proxies.get(local) || local;
+        const buf = await readFile(file);
+        const type = /\.webm$/.test(file) ? 'video/webm' : /\.mp4$/.test(file) ? 'video/mp4' : 'application/octet-stream';
+        const m = /bytes=(\d*)-(\d*)/.exec(route.request().headers().range || '');
+        if (!m) return route.fulfill({ status: 200, body: buf, headers: { 'content-type': type, 'accept-ranges': 'bytes' } });
+        const start = m[1] ? Number(m[1]) : Math.max(0, buf.length - Number(m[2]));
+        const end = m[1] && m[2] ? Math.min(Number(m[2]), buf.length - 1) : buf.length - 1;
+        return route.fulfill({ status: 206, body: buf.subarray(start, end + 1), headers: { 'content-type': type, 'accept-ranges': 'bytes', 'content-range': `bytes ${start}-${end}/${buf.length}` } });
+      }
       if (url.startsWith('http://video.local/')) return route.fulfill({ status: 404, body: '' });
       return route.continue();
     });

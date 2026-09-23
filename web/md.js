@@ -10,6 +10,7 @@ export function inline(text, opts = {}) {
   const put = (html) => `\u0000${stash.push(html) - 1}\u0000`;
   let s = String(text).replace(/`([^`\n]+)`/g, (_, c) => put(`<code>${esc(c)}</code>`));
   s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_, alt, url) => put(`<img alt="${esc(alt)}" src="${esc(safeUrl(url))}" loading="lazy">`));
+  s = s.replace(/(^|[\s(（：:])(\/media\/[A-Za-z0-9_-]{20,}\.(?:mp4|webm))(?=$|[\s)）。，,.])/gm, (_, pre, url) => pre + put(`<video class="md-video" controls preload="metadata" playsinline src="${esc(url)}"></video>`));
   s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label, url) => put(`<a href="${esc(safeUrl(url))}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>`));
   s = s.replace(/(^|[\s(])(https?:\/\/[^\s<>)\]]+)/g, (_, pre, url) => pre + put(`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`));
   s = esc(s);

@@ -15,6 +15,10 @@ import { toolsForAgent, describeTool, needsApproval, callTool } from '../mcp/ind
 import { requestApproval } from '../approvals.js';
 import { createTask } from '../tasks.js';
 import { fileContext } from '../files.js';
+import { generateVideo, videoGenConfig } from '../media/videogen.js';
+import { saveMedia } from '../media/store.js';
+
+const GENERATE_VIDEO_DOC = '{"name":"generate_video","args":{"prompt":"one shot: subject, action, setting, camera, lighting, style","seconds":8,"aspect":"16:9|9:16"}} — generate a short AI video clip (a human approves each call; it costs money). Returns a /media/… URL to use in a video artifact "clip" scene. Use sparingly.';
 
 const MAX_TOOL_ROUNDS = 5;
 const PASS = /^\s*\[?\s*pass\s*\]?\s*\.?\s*$/i;
@@ -120,6 +124,7 @@ Turn this into a one-page PDF summary
 Compare with last quarter
 \`\`\``);
   const callable = Object.entries(TOOL_DOCS).filter(([k]) => tools.includes(k));
+  if (tools.includes('artifacts') && videoGenConfig()?.providerId) callable.push(['generate_video', GENERATE_VIDEO_DOC]);
   if (callable.length) {
     proto.push(`- Call a tool by replying with ONLY a tool block, then wait for the result:
 \`\`\`tool
@@ -252,6 +257,23 @@ ${mcpTools.slice(0, 60).map((t) => `  • ${describeTool(t)}`).join('\n')}`;
               if (status !== 'approved') throw new Error(`A human ${status === 'expired' ? 'did not respond to' : 'declined'} this action. Do not retry it; tell the team what you would have done.`);
             }
             out = await callTool(mcp.server.id, mcp.tool.name, call.args, { signal: ctl.signal });
+          } else if (call.name === 'generate_video' && agent.tools.includes('artifacts') && videoGenConfig()?.providerId) {
+            // Paid and slow: always ask a human first.
+            trace.approval = 'pending';
+            updateMessage(msg.id, { meta });
+            const status = await requestApproval({
+              channelId, messageId: msg.id, agentId: agent.id, tool: 'generate_video', args: call.args, signal: ctl.signal,
+              onCreate: (a) => { meta.approvals.push({ id: a.id, tool: a.tool, args: a.args, status: 'pending' }); updateMessage(msg.id, { meta }); },
+            });
+            meta.approvals[meta.approvals.length - 1].status = status;
+            trace.approval = status;
+            updateMessage(msg.id, { meta });
+            if (status !== 'approved') throw new Error(`A human ${status === 'expired' ? 'did not respond to' : 'declined'} this video generation. Do not retry it; continue without the clip.`);
+            const args = call.args || {};
+            const buf = await generateVideo({ prompt: args.prompt, seconds: args.seconds, aspect: args.aspect, signal: ctl.signal });
+            const media = saveMedia({ buf, ext: 'mp4', kind: 'video', channelId, meta: { prompt: String(args.prompt || '').slice(0, 500), seconds: args.seconds, aspect: args.aspect, provider: videoGenConfig().providerId }, byType: 'agent', byId: agent.id });
+            meta.media = [...(meta.media || []), { id: media.id, url: media.url, prompt: media.meta.prompt }];
+            out = `Video clip ready: ${media.url} (${Math.round(buf.length / 1024)} KB). Use it in a video artifact scene as {"layout":"clip","clip":"${media.url}"}, or put the URL on its own line in chat to show it.`;
           } else {
             out = await runTool(call, { tools: ctx.tools, scopes: ctx.scopes, channelId, signal: ctl.signal });
           }
