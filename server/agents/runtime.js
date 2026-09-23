@@ -305,7 +305,7 @@ async function applyDirectives(text, { agent, channel, msg, meta, savedArtifacts
   for (const b of extractBlocks(text)) {
     if (b.kind === 'artifact' && agent.tools.includes('artifacts')) {
       const title = (b.attrs.title || 'Untitled').trim();
-      const art = upsertArtifact({ channelId: channel.id, type: b.attrs.type || 'document', title, content: b.body, byType: 'agent', byId: agent.id });
+      const art = upsertArtifact({ channelId: channel.id, type: b.attrs.type || 'document', title, content: b.body, byType: 'agent', byId: agent.id, baseAt: msg.createdAt });
       savedArtifacts[title] = art.id;
       meta.artifacts.push({ id: art.id, title: art.title, type: art.type, version: art.version });
     } else if (b.kind === 'remember' && agent.tools.includes('remember') && channel.memoryEnabled) {

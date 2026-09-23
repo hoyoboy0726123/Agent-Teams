@@ -425,7 +425,7 @@ r.put('/api/artifacts/:id', async ({ user, req, params }) => {
   need(user, 'member');
   readableArtifact(user, params.id);
   const b = await readJson(req);
-  return arts.addVersion(params.id, { content: String(b.content ?? ''), title: b.title, byType: 'user', byId: user.id });
+  return arts.addVersion(params.id, { content: String(b.content ?? ''), title: b.title, byType: 'user', byId: user.id, baseVersion: Number(b.baseVersion) || undefined, force: !!b.force });
 });
 r.delete('/api/artifacts/:id', ({ user, params }) => {
   need(user, 'member');

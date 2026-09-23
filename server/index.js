@@ -61,7 +61,7 @@ export function createApp() {
     } catch (e) {
       const status = e.status || 500;
       if (status >= 500) console.error(e);
-      if (!res.headersSent) send(res, status, { error: e.message || 'Server error' });
+      if (!res.headersSent) send(res, status, { error: e.message || 'Server error', ...(e.body || {}) });
       else res.end();
     }
   });

@@ -1,7 +1,7 @@
 // Studio: full-screen workspace for a deliverable — live preview (with device sizes),
 // source editing, version history, review comments, "ask AI to edit" and sharing.
 import { t } from './i18n.js';
-import { $, esc, api, toast, safe, confirmBox, timeAgo } from './ui.js';
+import { $, esc, api, toast, safe, confirmBox, timeAgo, modal } from './ui.js';
 import { renderArtifact } from './render.js';
 import { S, agentById, userById } from './app.js';
 
@@ -147,12 +147,10 @@ function bind() {
     if (await confirmBox(`${t('delete')} “${a.title}”?`)) { await api('DELETE', `/api/artifacts/${a.id}`); close(); }
   }));
   const code = el.querySelector('.studio-code');
+  code.querySelector('textarea').oninput = () => { current.dirty = true; };
   code.onsubmit = safe(async (e) => {
     e.preventDefault();
-    await api('PUT', `/api/artifacts/${a.id}`, { content: code.querySelector('textarea').value });
-    toast(t('saved'), 'ok');
-    current.tab = 'preview';
-    reload();
+    await saveSource(code.querySelector('textarea').value);
   });
   el.querySelector('[data-quote]')?.addEventListener('click', () => {
     const ta = code.querySelector('textarea');
@@ -184,6 +182,47 @@ function bind() {
   });
 }
 
+// Save the source as a new version. The server three-way merges edits made from an older
+// version; on a real conflict the user picks: resolve the merged text by hand, overwrite, or discard.
+async function saveSource(content, { force = false } = {}) {
+  const a = current.artifact;
+  // Editing an older version and saving it is an explicit restore.
+  const restoring = a.viewing !== a.version && !current.base;
+  try {
+    const r = await api('PUT', `/api/artifacts/${a.id}`, { content, baseVersion: current.base || a.viewing, force: force || restoring });
+    toast(r.merge?.from ? t('mergedAuto', r.merge.into) : t('saved'), 'ok');
+    current.base = null;
+    current.dirty = false;
+    current.tab = 'preview';
+    reload();
+  } catch (err) {
+    if (err.status !== 409 || !err.data?.conflict) throw err;
+    const choice = await conflictBox(err.data);
+    if (choice === 'merge') {
+      current.base = err.data.currentVersion;
+      const ta = current.el.querySelector('.studio-code textarea');
+      ta.value = err.data.merged;
+      const at = ta.value.indexOf('<<<<<<<');
+      ta.focus();
+      if (at >= 0) ta.setSelectionRange(at, at);
+      toast(t('resolveMarkers'), 'info', 6000);
+    } else if (choice === 'force') await saveSource(content, { force: true });
+    else if (choice === 'discard') { current.base = null; current.dirty = false; reload(); }
+  }
+}
+
+function conflictBox(d) {
+  return new Promise((resolve) => {
+    const m = modal({
+      title: `⚠️ ${t('editConflict')}`,
+      body: `<p>${esc(t('editConflictBody', d.currentVersion, d.conflicts))}</p>`,
+      footer: `<button class="btn ghost" data-c="discard">${t('discardMine')}</button><button class="btn danger" data-c="force">${t('overwriteLatest')}</button><button class="btn primary" data-c="merge">${t('resolveByHand')}</button>`,
+      onClose: () => resolve(null),
+    });
+    m.el.querySelectorAll('[data-c]').forEach((b) => { b.onclick = () => { resolve(b.dataset.c); m.el.remove(); }; });
+  });
+}
+
 // Realtime: live drafts of this artifact, new versions and comment changes.
 export function onStudioEvent(ev) {
   if (!current) return;
@@ -197,6 +236,8 @@ export function onStudioEvent(ev) {
     if (ev.deleted) return close();
     if (ev.comments) return loadComments();
     current.revising = false;
+    // Don't wipe unsaved source edits; saving will merge with the new version.
+    if (current.tab === 'code' && current.dirty) { toast(t('newVersionWhileEditing'), 'info', 6000); return; }
     reload();
   }
 }

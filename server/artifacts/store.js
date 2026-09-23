@@ -2,6 +2,7 @@
 // slide decks, dashboards and websites.
 import { all, get, run, id, now, audit, tx } from '../db.js';
 import { emit } from '../bus.js';
+import { merge3 } from './merge.js';
 
 export const TYPES = ['document', 'research', 'slides', 'dashboard', 'website'];
 
@@ -46,24 +47,52 @@ export function createArtifact({ channelId = null, type, title, content, byType,
   return getArtifact(aid);
 }
 
-export function addVersion(aid, { content, title, byType, byId }) {
+export const versionContent = (aid, version) => get('SELECT content FROM artifact_versions WHERE artifact_id = ? AND version = ?', aid, version)?.content;
+
+// Newest version that existed at a point in time (what an agent saw when its turn started).
+export const versionAt = (aid, t) => get('SELECT max(version) AS v FROM artifact_versions WHERE artifact_id = ? AND created_at <= ?', aid, t)?.v || null;
+
+// Hook for live collaboration: when people are editing the artifact right now, a new version
+// is merged into their shared document instead of replacing it (set by collab.js).
+let liveMerge = null;
+export const setLiveMerge = (fn) => { liveMerge = fn; };
+
+// `baseVersion` is the version the author started from. If someone saved in between, the two
+// edits are three-way merged. Humans get a 409 on a real conflict (unless `force`); agents' output
+// is kept as the new version (the human's edit stays in history) and the conflict is reported.
+export function addVersion(aid, { content, title, byType, byId, baseVersion, force = false }) {
   const a = getArtifact(aid);
   if (!a) return null;
+  let merge = null;
+  const live = liveMerge?.(aid, { content, baseVersion: baseVersion || a.version, byType, byId });
+  if (live != null) { content = live; merge = { live: true }; }
+  else if (baseVersion && baseVersion < a.version && !force) {
+    const base = versionContent(aid, baseVersion) ?? '';
+    const m = merge3(base, content, a.content, { oursLabel: byType === 'agent' ? 'agent' : 'yours', theirsLabel: `v${a.version}` });
+    if (m.ok) { content = m.text; merge = { from: baseVersion, into: a.version }; }
+    else if (byType === 'user') {
+      throw Object.assign(new Error(`Someone saved v${a.version} while you were editing v${baseVersion}`), {
+        status: 409, body: { conflict: true, currentVersion: a.version, merged: m.text, conflicts: m.conflicts },
+      });
+    } else merge = { from: baseVersion, into: a.version, conflicts: m.conflicts, kept: 'agent' };
+  }
+  if (content === a.content && (!title || title === a.title)) return { ...a, merge, unchanged: true };
   const v = a.version + 1;
   const t = now();
   tx(() => {
     run('INSERT INTO artifact_versions(artifact_id, version, content, author_type, author_id, created_at) VALUES (?,?,?,?,?,?)', aid, v, content, byType, byId, t);
     run('UPDATE artifacts SET current_version = ?, updated_at = ?, title = ? WHERE id = ?', v, t, title || a.title, aid);
   });
-  audit(byType, byId, 'artifact.version', aid, { version: v });
+  audit(byType, byId, 'artifact.version', aid, { version: v, ...(merge ? { merge } : {}) });
   emit('artifact.updated', { channelId: a.channelId, artifactId: aid });
-  return getArtifact(aid);
+  return { ...getArtifact(aid), merge };
 }
 
 // Create, or add a new version if an artifact with the same title exists in the channel.
-export function upsertArtifact({ channelId, type, title, content, byType, byId }) {
+export function upsertArtifact({ channelId, type, title, content, byType, byId, baseAt }) {
   const existing = findByTitle(channelId, title);
-  return existing ? addVersion(existing.id, { content, byType, byId }) : createArtifact({ channelId, type, title, content, byType, byId });
+  if (!existing) return createArtifact({ channelId, type, title, content, byType, byId });
+  return addVersion(existing.id, { content, byType, byId, baseVersion: baseAt ? versionAt(existing.id, baseAt) || undefined : undefined });
 }
 
 export function deleteArtifact(aid, actor) {
