@@ -16,6 +16,7 @@ import { serveStatic, send, parseCookies, sendFile } from './http.js';
 import { mediaByToken } from './media/store.js';
 import { userForToken } from './users.js';
 import { attachRealtime } from './ws.js';
+import { flushAll } from './collab.js';
 import { startScheduler } from './workflows/engine.js';
 import { purgeExpired } from './memory/store.js';
 import { run } from './db.js';
@@ -63,8 +64,8 @@ export function createApp() {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "sandbox allow-scripts allow-popups allow-modals; default-src 'none'; img-src * data: blob:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src data: https://fonts.gstatic.com; script-src 'unsafe-inline'; media-src * data: blob:", 'cache-control': 'no-store' });
         return res.end(renderArtifact(getArtifact(row.id)));
       }
-      if (await serveStatic(WEB, path, res)) return;
-      if (await serveStatic(WEB, '/index.html', res)) return; // SPA fallback
+      if (await serveStatic(WEB, path, res, req)) return;
+      if (await serveStatic(WEB, '/index.html', res, req)) return; // SPA fallback
       send(res, 404, 'Not found');
     } catch (e) {
       const status = e.status || 500;
@@ -89,4 +90,6 @@ if (isMain) {
   server.listen(config.port, config.host, () => {
     console.log(`\n  🤝 Agent Teams is running → http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}\n  data: ${config.dbFile}\n`);
   });
+  // Save documents people are co-editing before exiting.
+  for (const sig of ['SIGINT', 'SIGTERM']) process.once(sig, () => { try { flushAll(); } finally { process.exit(0); } });
 }

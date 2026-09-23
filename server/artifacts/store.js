@@ -60,12 +60,12 @@ export const setLiveMerge = (fn) => { liveMerge = fn; };
 // `baseVersion` is the version the author started from. If someone saved in between, the two
 // edits are three-way merged. Humans get a 409 on a real conflict (unless `force`); agents' output
 // is kept as the new version (the human's edit stays in history) and the conflict is reported.
-export function addVersion(aid, { content, title, byType, byId, baseVersion, force = false }) {
+export function addVersion(aid, { content, title, byType, byId, baseVersion, force = false, live: useLive = true }) {
   const a = getArtifact(aid);
   if (!a) return null;
   let merge = null;
-  const live = liveMerge?.(aid, { content, baseVersion: baseVersion || a.version, byType, byId });
-  if (live != null) { content = live; merge = { live: true }; }
+  const live = useLive && !force ? liveMerge?.(aid, { content, baseVersion: baseVersion || a.version, byType, byId }) : null;
+  if (live) { content = live.content; merge = { live: true }; }
   else if (baseVersion && baseVersion < a.version && !force) {
     const base = versionContent(aid, baseVersion) ?? '';
     const m = merge3(base, content, a.content, { oursLabel: byType === 'agent' ? 'agent' : 'yours', theirsLabel: `v${a.version}` });
@@ -83,6 +83,7 @@ export function addVersion(aid, { content, title, byType, byId, baseVersion, for
     run('INSERT INTO artifact_versions(artifact_id, version, content, author_type, author_id, created_at) VALUES (?,?,?,?,?,?)', aid, v, content, byType, byId, t);
     run('UPDATE artifacts SET current_version = ?, updated_at = ?, title = ? WHERE id = ?', v, t, title || a.title, aid);
   });
+  live?.saved(v);
   audit(byType, byId, 'artifact.version', aid, { version: v, ...(merge ? { merge } : {}) });
   emit('artifact.updated', { channelId: a.channelId, artifactId: aid });
   return { ...getArtifact(aid), merge };

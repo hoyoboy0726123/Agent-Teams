@@ -4,6 +4,7 @@ import { t } from './i18n.js';
 import { $, esc, api, toast, safe, confirmBox, timeAgo, modal } from './ui.js';
 import { renderArtifact } from './render.js';
 import { S, agentById, userById } from './app.js';
+import { openCollabEditor, colorFor } from './collab.js';
 
 const TYPE_ICON = { slides: '🎞️', dashboard: '📊', website: '🌐', research: '🔬', document: '📄', video: '🎬' };
 let current = null; // { id, el, artifact, revising, device, tab }
@@ -29,12 +30,66 @@ export async function openStudio(id, version) {
   const el = document.createElement('div');
   el.className = 'studio';
   document.body.append(el);
-  current = { id, el, artifact: a, revising: false, device: 'desktop', tab: 'preview' };
+  current = { id, el, artifact: a, revising: false, device: 'desktop', tab: 'preview', collab: null, peers: [] };
   document.addEventListener('keydown', onKey);
   render();
+  syncCollab();
+}
+
+// Live co-editing runs while the latest version is open; older versions use the plain editor.
+async function syncCollab() {
+  const c = current;
+  if (!c) return;
+  const latest = c.artifact.viewing === c.artifact.version;
+  if (!latest) { c.collab?.destroy(); c.collab = null; return; }
+  if (c.collab || c.collabStarting) return;
+  c.collabStarting = true;
+  try {
+    const collab = await openCollabEditor({
+      artifactId: c.id, type: c.artifact.type, user: S.user,
+      onText: (text) => { if (current === c) livePreview(text); },
+      onSaved: (ev) => { if (current === c) { if (ev.by === S.user.id && !ev.external) toast(t('savedAs', ev.version), 'ok'); reload(); } },
+      onPeers: (list) => { if (current === c) { c.peers = list; showPeers(); } },
+      onStatus: (s) => { if (s === 'reloaded') toast(t('collabReloaded'), 'info'); if (s === 'synced' && current === c) mountEditor(); },
+    });
+    if (current !== c) return collab.destroy();
+    c.collab = collab;
+    render();
+  } catch (e) {
+    console.warn('Live editing unavailable, using the plain editor', e);
+  } finally { c.collabStarting = false; }
+}
+
+function mountEditor() {
+  const host = current?.el.querySelector('.editor-host');
+  if (host && current.collab && current.collab.dom.parentNode !== host) host.append(current.collab.dom);
+}
+
+let previewTimer;
+function livePreview(text) {
+  const a = current.artifact;
+  current.liveText = text;
+  const note = current.el.querySelector('[data-unsaved]');
+  if (note) note.hidden = text === a.content;
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => {
+    const frame = current?.el.querySelector('.studio-frame');
+    if (!frame || current.revising) return;
+    if (text === a.content && !frame.srcdoc) return;
+    frame.removeAttribute('src');
+    frame.srcdoc = draftDoc({ type: a.type, title: a.title, content: text });
+  }, 700);
+}
+
+function showPeers() {
+  const box = current?.el.querySelector('[data-peers]');
+  if (!box) return;
+  box.innerHTML = current.peers.map((u) => `<span class="peer" style="--c:${esc(u.color || colorFor(u.id))}" title="${esc(u.name)} ${t('isEditing')}">${esc(String(u.name || '?').slice(0, 1).toUpperCase())}</span>`).join('');
+  box.title = current.peers.length ? current.peers.map((u) => u.name).join(', ') : '';
 }
 
 function close() {
+  current?.collab?.destroy();
   current?.el.remove();
   current = null;
   document.removeEventListener('keydown', onKey);
@@ -45,6 +100,7 @@ async function reload(version) {
   if (!current) return;
   current.artifact = await api('GET', `/api/artifacts/${current.id}${version ? `?version=${version}` : ''}`);
   render();
+  syncCollab();
 }
 
 function render() {
@@ -57,6 +113,7 @@ function render() {
     <header class="studio-bar">
       <button class="icon-btn" data-close aria-label="${t('close')}">✕</button>
       <span class="studio-icon">${TYPE_ICON[a.type] || '📄'}</span>
+      <span class="peers" data-peers></span>
       <div class="grow ellipsis"><strong>${esc(a.title)}</strong> <span class="type-badge t-${esc(a.type)}">${esc(t('type_' + a.type))}</span>
         <div class="muted small">${t('version')} ${a.viewing}/${a.version}${isLatest ? '' : ` · ${t('olderVersion')}`}</div></div>
       <select data-ver title="${t('version')}">${a.versions.map((v) => `<option value="${v.version}"${v.version === a.viewing ? ' selected' : ''}>v${v.version} · ${v.authorType === 'agent' ? esc(agentById(v.authorId)?.name || 'agent') : esc(userById(v.authorId)?.displayName || 'user')} · ${timeAgo(v.createdAt)}</option>`).join('')}</select>
@@ -82,8 +139,8 @@ function render() {
           </div>
         </div>
         <form class="studio-code" ${current.tab === 'code' ? '' : 'hidden'}>
-          <textarea class="mono" spellcheck="false" ${canEdit ? '' : 'readonly'}>${esc(a.content)}</textarea>
-          ${canEdit ? `<div class="row"><span class="muted small grow">${t('codeHint')}</span><button class="btn sm" type="button" data-quote>💬 ${t('commentSelection')}</button><button class="btn primary sm">${t('saveVersion')}</button></div>` : ''}
+          ${current.collab ? `<div class="editor-host"></div>` : `<textarea class="mono" spellcheck="false" ${canEdit ? '' : 'readonly'}>${esc(a.content)}</textarea>`}
+          ${canEdit ? `<div class="row"><span class="muted small grow">${current.collab ? `🟢 ${t('liveEditing')} <span class="unsaved" data-unsaved ${current.liveText != null && current.liveText !== a.content ? '' : 'hidden'}>· ${t('unsavedChanges')}</span>` : t('codeHint')}</span><button class="btn sm" type="button" data-quote>💬 ${t('commentSelection')}</button><button class="btn primary sm">${t('saveVersion')}</button></div>` : ''}
         </form>
       </section>
       <aside class="studio-side">
@@ -106,6 +163,8 @@ function render() {
       </aside>
     </div>`;
   bind();
+  mountEditor();
+  showPeers();
   loadComments();
   if (a.type === 'video') loadVideoStatus();
 }
@@ -194,14 +253,15 @@ function bind() {
     if (await confirmBox(`${t('delete')} “${a.title}”?`)) { await api('DELETE', `/api/artifacts/${a.id}`); close(); }
   }));
   const code = el.querySelector('.studio-code');
-  code.querySelector('textarea').oninput = () => { current.dirty = true; };
+  const ta = code.querySelector('textarea');
+  if (ta) ta.oninput = () => { current.dirty = true; };
   code.onsubmit = safe(async (e) => {
     e.preventDefault();
-    await saveSource(code.querySelector('textarea').value);
+    if (current.collab) return current.collab.save();
+    await saveSource(ta.value);
   });
   el.querySelector('[data-quote]')?.addEventListener('click', () => {
-    const ta = code.querySelector('textarea');
-    const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd).trim();
+    const sel = (current.collab ? current.collab.selection() : ta.value.slice(ta.selectionStart, ta.selectionEnd)).trim();
     const q = el.querySelector('[data-add-comment] [name=quote]');
     q.value = sel.slice(0, 300);
     el.querySelector('[data-add-comment] [name=body]').focus();
@@ -290,7 +350,7 @@ export function onStudioEvent(ev) {
     if (ev.comments) return loadComments();
     current.revising = false;
     // Don't wipe unsaved source edits; saving will merge with the new version.
-    if (current.tab === 'code' && current.dirty) { toast(t('newVersionWhileEditing'), 'info', 6000); return; }
+    if (!current.collab && current.tab === 'code' && current.dirty) { toast(t('newVersionWhileEditing'), 'info', 6000); return; }
     reload();
   }
 }

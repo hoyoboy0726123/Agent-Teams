@@ -4,9 +4,10 @@ import { bus } from './bus.js';
 import { parseCookies } from './http.js';
 import { userForToken } from './users.js';
 import { getChannel, canRead } from './channels.js';
+import { handleCollabMessage, onSocketClose } from './collab.js';
 
 export function attachRealtime(server) {
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 * 1024 });
   const online = new Map(); // userId → count
 
   server.on('upgrade', (req, socket, head) => {
@@ -30,6 +31,7 @@ export function attachRealtime(server) {
     ws.on('message', (raw) => {
       try {
         const m = JSON.parse(raw);
+        if (typeof m.kind === 'string' && m.kind.startsWith('doc.')) return handleCollabMessage(ws, m);
         if (m.kind === 'typing' && m.channelId) {
           const c = getChannel(m.channelId);
           if (c && canRead(user, c)) bus.emit('event', { kind: 'typing', channelId: c.id, userId: user.id, on: !!m.on });
@@ -37,6 +39,7 @@ export function attachRealtime(server) {
       } catch {}
     });
     ws.on('close', () => {
+      onSocketClose(ws);
       const n = (online.get(user.id) || 1) - 1;
       if (n <= 0) online.delete(user.id); else online.set(user.id, n);
       broadcastPresence();

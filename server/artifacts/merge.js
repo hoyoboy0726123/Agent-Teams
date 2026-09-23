@@ -31,7 +31,7 @@ export function diffLines(a, b) {
 
 // Merge `ours` and `theirs`, both edited from `base`.
 // Returns { ok, text, conflicts } — on conflict, `text` carries git-style markers.
-export function merge3(base, ours, theirs, { oursLabel = 'yours', theirsLabel = 'latest' } = {}) {
+export function merge3(base, ours, theirs, { oursLabel = 'yours', theirsLabel = 'latest', prefer = null } = {}) {
   if (ours === theirs) return { ok: true, text: ours, conflicts: 0 };
   if (base === theirs) return { ok: true, text: ours, conflicts: 0 };
   if (base === ours) return { ok: true, text: theirs, conflicts: 0 };
@@ -72,6 +72,7 @@ export function merge3(base, ours, theirs, { oursLabel = 'yours', theirsLabel = 
     else {
       const O = sideText(g, 'o'), T = sideText(g, 't');
       if (O.join('\n') === T.join('\n')) out.push(...O);
+      else if (prefer) out.push(...(prefer === 'ours' ? O : T));
       else {
         conflicts++;
         out.push(`<<<<<<< ${oursLabel}`, ...O, '=======', ...T, `>>>>>>> ${theirsLabel}`);

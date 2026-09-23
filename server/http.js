@@ -58,19 +58,31 @@ export function send(res, status, body, headers = {}) {
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 
-export async function serveStatic(root, urlPath, res) {
+const gzCache = new Map(); // file → { mtime, gz }
+
+export async function serveStatic(root, urlPath, res, req) {
   const rootAbs = resolve(root);
   let file = normalize(join(rootAbs, decodeURIComponent(urlPath)));
   if (!file.startsWith(rootAbs)) return false;
   try {
     const s = await stat(file);
     if (s.isDirectory()) file = join(file, 'index.html');
-    const data = await readFile(file);
-    res.writeHead(200, {
+    let data = await readFile(file);
+    const headers = {
       'content-type': MIME[extname(file)] || 'application/octet-stream',
       'cache-control': 'no-cache',
       'x-content-type-options': 'nosniff',
-    });
+    };
+    // Compress larger text assets (e.g. the editor bundle) once and keep them in memory.
+    if (data.length > 20_000 && /\.(js|css|html|svg|json)$/.test(file) && /\bgzip\b/.test(req?.headers['accept-encoding'] || '')) {
+      const st = await stat(file);
+      let c = gzCache.get(file);
+      if (!c || c.mtime !== st.mtimeMs) { c = { mtime: st.mtimeMs, gz: (await import('node:zlib')).gzipSync(data) }; gzCache.set(file, c); }
+      data = c.gz;
+      headers['content-encoding'] = 'gzip';
+      headers.vary = 'accept-encoding';
+    }
+    res.writeHead(200, headers);
     res.end(data);
     return true;
   } catch {

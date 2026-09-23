@@ -686,16 +686,25 @@ let wsRetry = 0;
 let refreshTimer;
 const debounced = (fn, ms = 250) => { clearTimeout(refreshTimer); refreshTimer = setTimeout(fn, ms); };
 
+// Low-level channel for features that talk over the socket directly (live co-editing).
+export const realtime = {
+  listeners: new Set(),
+  openListeners: new Set(),
+  send(msg) { if (ws?.readyState === 1) { ws.send(JSON.stringify(msg)); return true; } return false; },
+};
+
 function connectWs() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   ws.onopen = () => {
     if (wsRetry) { toast('✓ reconnected', 'ok', 1500); if (S.current) openChannel(S.current); }
     wsRetry = 0;
+    for (const f of realtime.openListeners) f();
   };
   ws.onclose = () => { setTimeout(connectWs, Math.min(1000 * 2 ** wsRetry++, 15000)); };
   ws.onmessage = (e) => {
     let ev;
     try { ev = JSON.parse(e.data); } catch { return; }
+    if (ev.kind?.startsWith('doc.')) { for (const f of realtime.listeners) f(ev); return; }
     onEvent(ev);
   };
 }
