@@ -297,8 +297,8 @@ function authorOf(m) {
   return { name: 'System' };
 }
 
-const TYPE_BADGE = { slides: 'SLIDES', dashboard: 'DASHBOARD', website: 'WEB', research: 'RESEARCH', document: 'DOC' };
-const TYPE_ICON = { slides: '🎞️', dashboard: '📊', website: '🌐', research: '🔬', document: '📄' };
+const TYPE_BADGE = { slides: 'SLIDES', dashboard: 'DASHBOARD', website: 'WEB', research: 'RESEARCH', document: 'DOC', video: 'VIDEO' };
+const TYPE_ICON = { slides: '🎞️', dashboard: '📊', website: '🌐', research: '🔬', document: '📄', video: '🎬' };
 
 // Deliverable card with a live, sandboxed preview of the artifact.
 function artifactCard(id, meta) {
@@ -764,6 +764,7 @@ function onEvent(ev) {
     case 'artifact.updated': if (S.panel === 'artifacts') renderPanel(); onStudioEvent(ev); onViewEvent(ev); break;
     case 'workflow.updated': if (S.panel === 'workflows') renderPanel(); onViewEvent(ev); break;
     case 'task.updated': onViewEvent(ev); break;
+    case 'video.export': onStudioEvent(ev); break;
     case 'approval.updated': onViewEvent(ev); break;
   }
 }

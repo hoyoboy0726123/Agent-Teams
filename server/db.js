@@ -181,6 +181,19 @@ CREATE TABLE IF NOT EXISTS usage (
 `;
 
 const SCHEMA_V2 = `
+CREATE TABLE IF NOT EXISTS media (
+  id TEXT PRIMARY KEY,
+  token TEXT UNIQUE NOT NULL,                 -- capability URL: /media/<token>.<ext>
+  kind TEXT NOT NULL,                         -- video | image | audio
+  mime TEXT NOT NULL,
+  file TEXT NOT NULL,
+  bytes INTEGER NOT NULL,
+  channel_id TEXT,
+  meta_json TEXT NOT NULL DEFAULT '{}',
+  created_by_type TEXT,
+  created_by_id TEXT,
+  created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS mcp_servers (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

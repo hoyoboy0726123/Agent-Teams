@@ -382,6 +382,36 @@ r.post('/api/artifacts/:id/revise', async ({ user, req, params }) => {
   return { ok: true, messageId: msg.id };
 });
 
+// ------------------------------------------------------------------ video
+
+import * as videoExport from './media/video-export.js';
+import { TTS_TYPES, ttsLabel } from './media/tts.js';
+import { sendFile } from './http.js';
+import { downloadName } from '../web/render.js';
+
+r.get('/api/video/capabilities', async ({ user }) => {
+  need(user, 'guest');
+  return { ...(await videoExport.capabilities()), ttsLabel: ttsLabel(), ttsTypes: TTS_TYPES };
+});
+r.post('/api/artifacts/:id/export-video', async ({ user, req, params }) => {
+  need(user, 'member');
+  const b = await readJson(req);
+  const a = readableArtifact(user, params.id, Number(b.version) || undefined);
+  if (a.type !== 'video') fail(400, 'Only video artifacts can be exported to MP4');
+  try { (await import('../web/video.js')).parseVideo(a.content); } catch (e) { fail(422, `Video storyboard is invalid: ${e.message}`); }
+  return videoExport.startExport(a, { narration: b.narration !== false, hd: !!b.hd, user });
+});
+r.get('/api/artifacts/:id/video/status', ({ user, params, query }) => {
+  const a = readableArtifact(user, params.id, Number(query.get('version')) || undefined);
+  return videoExport.exportStatus(a.id, a.viewing);
+});
+r.get('/api/artifacts/:id/video', async ({ user, req, res, params, query }) => {
+  const a = readableArtifact(user, params.id, Number(query.get('version')) || undefined);
+  const file = videoExport.outputPath(a.id, a.viewing);
+  if (videoExport.exportStatus(a.id, a.viewing).status !== 'done') fail(404, 'This version has not been exported yet');
+  await sendFile(req, res, file, { type: 'video/mp4', headers: query.get('download') ? { 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(downloadName(a, 'mp4'))}` } : {} });
+});
+
 // ------------------------------------------------------------------ translation
 
 import { complete } from './providers/index.js';

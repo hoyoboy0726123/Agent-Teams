@@ -7,7 +7,7 @@ import { openStudio as openArtifact } from './studio.js';
 import { scheduleEditorHtml, bindScheduleEditor, readSchedule, renderView } from './views.js';
 export { openArtifact };
 
-const TYPE_ICON = { slides: '🎞️', dashboard: '📊', website: '🌐', research: '🔬', document: '📄' };
+const TYPE_ICON = { slides: '🎞️', dashboard: '📊', website: '🌐', research: '🔬', document: '📄', video: '🎬' };
 
 export async function renderPanel() {
   const el = $('#panel');
@@ -121,7 +121,7 @@ function newArtifact(c) {
     title: t('newArtifact'), wide: true,
     body: `<form id="art-new" class="form">
       <div class="row"><label class="field grow"><span>${t('name')}</span><input name="title" required></label>
-      <label class="field"><span>Type</span><select name="type">${['document', 'research', 'slides', 'dashboard', 'website'].map((x) => `<option value="${x}">${t('type_' + x)}</option>`).join('')}</select></label></div>
+      <label class="field"><span>Type</span><select name="type">${['document', 'research', 'slides', 'dashboard', 'website', 'video'].map((x) => `<option value="${x}">${t('type_' + x)}</option>`).join('')}</select></label></div>
       <label class="field"><span>Content</span><textarea name="content" rows="14" class="mono"></textarea></label></form>`,
     footer: `<button class="btn primary" form="art-new">${t('create')}</button>`,
   });

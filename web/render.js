@@ -1,5 +1,6 @@
 // Render artifacts to standalone HTML pages (used for preview iframes and downloads).
 import { markdown, esc } from './md.js';
+import { renderVideo } from './video.js';
 
 const BASE_CSS = `
 :root{--bg:#fff;--fg:#1f2330;--muted:#667085;--line:#e6e8ee;--accent:#6366f1;--card:#f7f8fb}
@@ -138,8 +139,9 @@ export function renderArtifact(a) {
     case 'slides': return renderSlides(a);
     case 'dashboard': return renderDashboard(a);
     case 'website': return renderWebsite(a);
+    case 'video': return renderVideo(a, { page, chartSvg });
     default: return renderDocument(a);
   }
 }
 
-export const downloadName = (a) => `${a.title.replace(/[^\p{L}\p{N}_ -]/gu, '').trim().replace(/\s+/g, '-') || 'artifact'}.${a.type === 'document' || a.type === 'research' ? 'md' : 'html'}`;
+export const downloadName = (a, ext) => `${a.title.replace(/[^\p{L}\p{N}_ -]/gu, '').trim().replace(/\s+/g, '-') || 'artifact'}.${ext || (a.type === 'document' || a.type === 'research' ? 'md' : 'html')}`;

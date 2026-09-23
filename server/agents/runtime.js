@@ -40,6 +40,8 @@ function authorName(m, cache) {
 }
 
 // Strip machine placeholders before feeding history back to a model.
+export const VIDEO_SCHEMA = `{"title","format":"16:9|9:16|1:1","theme":{"bg":"#hex","fg":"#hex","accent":"#hex","font":"sans|serif|rounded"},"scenes":[{"layout":"title|bullets|stat|quote|image|chart|split|clip|end","title","subtitle","kicker","icon":"one emoji","items":["≤5 short lines"],"value":"94%","label","caption","text","author","image":"https URL","chart":{"type":"bar|line|pie","labels":[],"series":[{"name","data":[]}]},"clip":"/media/… URL from generate_video","narration":"what the voice says (1–2 sentences)","duration":seconds (optional),"animation":"rise|zoom|slide|fade"}]}. 5–10 scenes, one idea per scene, on-screen text much shorter than the narration, strong hook first, call to action last.`;
+
 const historyText = (m) => fileContext(m) + m.content.replace(/\[\[artifact:([^\]]+)\]\]/g, (_, id) => {
   const a = m.meta?.artifacts?.find((x) => x.id === id);
   return a ? `(published artifact "${a.title}" — ${a.type})` : '(artifact)';
@@ -91,11 +93,12 @@ To delegate, @mention a teammate with a specific, self-contained request (e.g. "
 
   const proto = [];
   if (tools.includes('artifacts')) {
-    proto.push(`- Publish a deliverable (document, report, deck, dashboard, website) as an artifact instead of pasting it into chat:
-\`\`\`artifact type="document|research|slides|dashboard|website" title="Short title"
+    proto.push(`- Publish a deliverable (document, report, deck, dashboard, website, video) as an artifact instead of pasting it into chat:
+\`\`\`artifact type="document|research|slides|dashboard|website|video" title="Short title"
 ...full content...
 \`\`\`
-Reusing an existing title creates a new version of that artifact. Keep your chat message around the block short.`);
+Reusing an existing title creates a new version of that artifact. Keep your chat message around the block short.
+A "video" artifact is a JSON storyboard the app animates and exports to MP4 with voice-over: ${VIDEO_SCHEMA}`);
   }
   if (tools.includes('remember')) {
     proto.push(`- Save durable facts, decisions or preferences worth knowing in future conversations (one per line; scope is "channel" by default, "workspace" for org-wide facts, "agent" for your private notes):

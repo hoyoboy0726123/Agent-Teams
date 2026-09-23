@@ -12,7 +12,8 @@ import { getArtifact } from './artifacts/store.js';
 import { expireStale } from './approvals.js';
 import { findByHook, startWorkflow } from './workflows/engine.js';
 import { readJson } from './http.js';
-import { serveStatic, send, parseCookies } from './http.js';
+import { serveStatic, send, parseCookies, sendFile } from './http.js';
+import { mediaByToken } from './media/store.js';
 import { userForToken } from './users.js';
 import { attachRealtime } from './ws.js';
 import { startScheduler } from './workflows/engine.js';
@@ -46,6 +47,13 @@ export function createApp() {
         else { const chunks = []; for await (const c of req) chunks.push(c); input = Buffer.concat(chunks).toString('utf8'); }
         const { runId } = startWorkflow(w.id, { input: input.slice(0, 20000) });
         return send(res, 202, { ok: true, runId });
+      }
+      // Generated media (AI clips) at unguessable URLs, so sandboxed previews can play them.
+      const media = /^\/media\/([A-Za-z0-9_-]{20,})\.\w+$/.exec(path);
+      if (media && (req.method === 'GET' || req.method === 'HEAD')) {
+        const m = mediaByToken(media[1]);
+        if (!m) return send(res, 404, 'Not found');
+        return await sendFile(req, res, m.path, { type: m.mime, headers: { 'cache-control': 'private, max-age=86400', 'access-control-allow-origin': '*' } });
       }
       // Public, read-only share links for artifacts (opt-in per artifact, revocable).
       const share = /^\/s\/([A-Za-z0-9_-]{20,})$/.exec(path);

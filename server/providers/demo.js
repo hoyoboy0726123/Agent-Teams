@@ -31,6 +31,15 @@ export const demo = {
       out = /"handle":"([^"]+)"/.exec(last)?.[1] || 'none';
     } else if (/簡報|slides/i.test(ask)) {
       out = `${name} here — I drafted a deck for you.\n\n\`\`\`artifact type="slides" title="Demo deck"\n# ${ask}\n\n---\n\n## Key points\n- Point one\n- Point two\n\n---\n\n## Next steps\n- Review with the team\n\`\`\``;
+    } else if (/影片|video/i.test(ask)) {
+      const topic = ask.replace(/["\\]/g, '').slice(0, 40);
+      const video = { title: topic, format: '16:9', theme: { bg: '#111827', fg: '#f9fafb', accent: '#a78bfa' }, scenes: [
+        { layout: 'title', icon: '🎬', kicker: 'DEMO', title: topic, subtitle: 'Made by the demo agent', narration: 'Here is a short demo video.' },
+        { layout: 'bullets', title: 'Three things', items: ['Plan the story', 'Animate every scene', 'Export to MP4'], narration: 'Plan the story, animate every scene, and export it.' },
+        { layout: 'stat', value: '3x', label: 'faster than editing by hand', narration: 'About three times faster than editing by hand.' },
+        { layout: 'end', title: 'Thanks for watching', subtitle: 'Agent Teams', narration: 'Thanks for watching.' },
+      ] };
+      out = `Here is a storyboard — open it in Studio to play it or export MP4.\n\n\`\`\`artifact type="video" title="Demo video"\n${JSON.stringify(video, null, 2)}\n\`\`\``;
     } else if (/dashboard|儀表板/i.test(ask)) {
       out = `Here is a dashboard.\n\n\`\`\`artifact type="dashboard" title="Demo dashboard"\n{"title":"Demo","kpis":[{"label":"Users","value":"1,204","delta":"+12%"}],"charts":[{"type":"bar","title":"Weekly","labels":["Mon","Tue","Wed"],"series":[{"name":"Visits","data":[3,7,5]}]}]}\n\`\`\``;
     } else if (/網頁|website|html|landing/i.test(ask)) {

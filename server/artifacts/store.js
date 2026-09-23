@@ -4,7 +4,7 @@ import { all, get, run, id, now, audit, tx } from '../db.js';
 import { emit } from '../bus.js';
 import { merge3 } from './merge.js';
 
-export const TYPES = ['document', 'research', 'slides', 'dashboard', 'website'];
+export const TYPES = ['document', 'research', 'slides', 'dashboard', 'website', 'video'];
 
 const toArtifact = (r) => r && ({
   id: r.id, channelId: r.channel_id, type: r.type, title: r.title, createdByType: r.created_by_type,

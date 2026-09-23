@@ -77,3 +77,24 @@ export async function serveStatic(root, urlPath, res) {
     return false;
   }
 }
+
+// Stream a file with HTTP Range support (video players seek with ranges).
+export async function sendFile(req, res, path, { type = 'application/octet-stream', headers = {} } = {}) {
+  const { stat } = await import('node:fs/promises');
+  const { createReadStream } = await import('node:fs');
+  const { size } = await stat(path);
+  const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+  let start = 0, end = size - 1, status = 200;
+  if (m && (m[1] || m[2])) {
+    start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
+    end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+    if (start > end || start >= size) { res.writeHead(416, { 'content-range': `bytes */${size}` }); return res.end(); }
+    status = 206;
+  }
+  res.writeHead(status, {
+    'content-type': type, 'accept-ranges': 'bytes', 'content-length': end - start + 1,
+    ...(status === 206 ? { 'content-range': `bytes ${start}-${end}/${size}` } : {}), ...headers,
+  });
+  if (req.method === 'HEAD') return res.end();
+  createReadStream(path, { start, end }).pipe(res);
+}

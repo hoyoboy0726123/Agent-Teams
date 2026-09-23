@@ -408,7 +408,7 @@ async function memoryView() {
 
 async function outputsView() {
   const [arts, marks] = await Promise.all([api('GET', '/api/artifacts'), api('GET', '/api/bookmarks')]);
-  const tabs = ['all', 'slides', 'dashboard', 'website', 'document', 'research', 'saved'];
+  const tabs = ['all', 'slides', 'dashboard', 'website', 'video', 'document', 'research', 'saved'];
   const shown = state.outTab === 'saved' ? [] : arts.filter((a) => state.outTab === 'all' || a.type === state.outTab);
   body().innerHTML = `<div class="chips-row">${tabs.map((k) => `<button class="chip-btn${state.outTab === k ? ' on' : ''}" data-tab="${k}">${k === 'all' ? t('all') : k === 'saved' ? `🔖 ${t('savedTab')}` : t('type_' + k)} ${k === 'all' ? arts.length : k === 'saved' ? marks.length : arts.filter((a) => a.type === k).length}</button>`).join('')}</div>
     ${state.outTab === 'saved' ? (marks.length ? `<div class="saved-list">${marks.map((b) => b.kind === 'artifact'

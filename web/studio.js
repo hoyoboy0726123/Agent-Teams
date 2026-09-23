@@ -5,15 +5,15 @@ import { $, esc, api, toast, safe, confirmBox, timeAgo, modal } from './ui.js';
 import { renderArtifact } from './render.js';
 import { S, agentById, userById } from './app.js';
 
-const TYPE_ICON = { slides: '🎞️', dashboard: '📊', website: '🌐', research: '🔬', document: '📄' };
+const TYPE_ICON = { slides: '🎞️', dashboard: '📊', website: '🌐', research: '🔬', document: '📄', video: '🎬' };
 let current = null; // { id, el, artifact, revising, device, tab }
 
 // Best-effort render of a partially written artifact (used for live previews).
 export function draftDoc(d) {
   let content = d.content || '';
-  if (d.type === 'dashboard') {
+  if (d.type === 'dashboard' || d.type === 'video') {
     try { JSON.parse(content.trim()); } catch {
-      return `<!doctype html><meta charset="utf-8"><body style="font:15px system-ui;display:grid;place-items:center;height:90vh;color:#667085;background:#f7f8fb">📊 ${esc(t('buildingDashboard'))}…</body>`;
+      return `<!doctype html><meta charset="utf-8"><body style="font:15px system-ui;display:grid;place-items:center;height:90vh;color:#667085;background:#f7f8fb">${d.type === 'video' ? `🎬 ${esc(t('buildingVideo'))}` : `📊 ${esc(t('buildingDashboard'))}`}…</body>`;
     }
   }
   if (d.type === 'website' && !/<\/html>\s*$/i.test(content)) content += '\n</body></html>';
@@ -64,6 +64,7 @@ function render() {
       <a class="btn sm" href="/api/artifacts/${a.id}/render?version=${a.viewing}" target="_blank" rel="noopener">↗</a>
       <a class="btn sm" href="/api/artifacts/${a.id}/download?version=${a.viewing}">⬇</a>
       ${a.type === 'slides' || a.type === 'dashboard' ? `<a class="btn sm" href="/api/artifacts/${a.id}/download?version=${a.viewing}&format=pptx">📊 PPTX</a>` : ''}
+      ${a.type === 'video' ? `<span class="video-export" data-vstatus></span>` : ''}
       ${canEdit ? `<button class="icon-btn" data-del title="${t('delete')}">🗑</button>` : ''}
     </header>
     <div class="studio-body">
@@ -106,6 +107,52 @@ function render() {
     </div>`;
   bind();
   loadComments();
+  if (a.type === 'video') loadVideoStatus();
+}
+
+// ---- MP4 export (video artifacts)
+
+async function loadVideoStatus() {
+  const a = current.artifact;
+  const st = await api('GET', `/api/artifacts/${a.id}/video/status?version=${a.viewing}`).catch(() => ({ status: 'none' }));
+  showVideoStatus(st);
+}
+
+function showVideoStatus(st) {
+  const box = current?.el.querySelector('[data-vstatus]');
+  if (!box) return;
+  const a = current.artifact;
+  const canEdit = S.user.role !== 'guest';
+  const url = `/api/artifacts/${a.id}/video?version=${a.viewing}`;
+  if (st.status === 'running') {
+    box.innerHTML = `<span class="chip"><span class="spin">🎬</span> ${t('videoStage_' + (st.stage || 'prepare'))} ${st.pct || 0}%</span>`;
+  } else if (st.status === 'done') {
+    box.innerHTML = `<a class="btn sm" href="${url}" target="_blank" rel="noopener">▶ MP4</a><a class="btn sm" href="${url}&download=1">⬇ MP4</a>${canEdit ? `<button class="icon-btn sm" data-export-video title="${t('reExport')}">↻</button>` : ''}`;
+  } else {
+    box.innerHTML = `${st.status === 'error' ? `<span class="danger-text small" title="${esc(st.error || '')}">✗ ${esc((st.error || '').slice(0, 60))}</span>` : ''}${canEdit ? `<button class="btn sm primary" data-export-video>🎬 ${t('exportMp4')}</button>` : ''}`;
+  }
+  box.querySelector('[data-export-video]')?.addEventListener('click', safe(exportDialog));
+}
+
+async function exportDialog() {
+  const a = current.artifact;
+  const caps = await api('GET', '/api/video/capabilities');
+  const missing = [!caps.chromium && 'Chromium (npm i playwright-core && npx playwright install chromium)', !caps.ffmpeg && 'ffmpeg'].filter(Boolean);
+  const m = modal({
+    title: `🎬 ${t('exportMp4')}`,
+    body: missing.length ? `<p>${t('videoMissing')}</p><ul>${missing.map((x) => `<li><code>${esc(x)}</code></li>`).join('')}</ul>`
+      : `<form class="form" id="vx">
+        <label class="check"><input type="checkbox" name="narration" ${caps.tts ? 'checked' : 'disabled'}> ${t('videoNarration')} ${caps.tts ? `<span class="muted small">(${esc(caps.ttsLabel || '')})</span>` : `<span class="muted small">— ${t('videoNoVoice')}</span>`}</label>
+        <label class="check"><input type="checkbox" name="hd"> ${t('videoHd')}</label>
+        <p class="muted small">${t('videoExportHint')}</p></form>`,
+    footer: missing.length ? '' : `<button class="btn primary" form="vx">${t('exportMp4')}</button>`,
+  });
+  m.el.querySelector('#vx')?.addEventListener('submit', safe(async (e) => {
+    e.preventDefault();
+    const st = await api('POST', `/api/artifacts/${a.id}/export-video`, { version: a.viewing, narration: e.target.narration.checked, hd: e.target.hd.checked });
+    m.close();
+    showVideoStatus(st);
+  }));
 }
 
 async function loadComments() {
@@ -226,6 +273,12 @@ function conflictBox(d) {
 // Realtime: live drafts of this artifact, new versions and comment changes.
 export function onStudioEvent(ev) {
   if (!current) return;
+  if (ev.kind === 'video.export' && ev.artifactId === current.id && ev.version === current.artifact.viewing) {
+    showVideoStatus(ev);
+    if (ev.status === 'done') toast(t('videoReady'), 'ok');
+    if (ev.status === 'error') toast(ev.error, 'error', 6000);
+    return;
+  }
   if (ev.kind === 'artifact.draft' && ev.title === current.artifact.title) {
     current.revising = true;
     const frame = current.el.querySelector('.studio-frame');

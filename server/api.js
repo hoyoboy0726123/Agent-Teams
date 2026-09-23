@@ -31,6 +31,8 @@ const SETTINGS_DEFAULTS = {
   memory: { autoExtract: true, autoSummarize: true, defaultTtlDays: null },
   synthesis: true,
   timezone: null,       // IANA zone for automations (default: server zone)
+  tts: null,            // { providerId | 'demo' | 'command', model, voice } narration for video export
+  videoGen: null,       // { providerId | 'demo', model } AI video clips (generate_video tool)
 };
 export const settings = () => Object.fromEntries(Object.entries(SETTINGS_DEFAULTS).map(([k, v]) => [k, getSetting(k, v)]));
 
@@ -403,6 +405,7 @@ r.post('/api/memories/clear', async ({ user, req }) => {
 // ------------------------------------------------------------------ artifacts
 
 export const readableArtifact = (user, id, version) => {
+  need(user, 'guest');
   const a = arts.getArtifact(id, version) || fail(404, 'Artifact not found');
   if (a.channelId) readable(user, a.channelId);
   return a;

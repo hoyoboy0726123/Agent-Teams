@@ -250,6 +250,15 @@ async function workspaceTab(body) {
     <label class="field"><span>${t('timezone')}</span><input name="timezone" list="tz-list" value="${esc(s.timezone || '')}" placeholder="${esc(Intl.DateTimeFormat().resolvedOptions().timeZone)}"><datalist id="tz-list">${(Intl.supportedValuesOf?.('timeZone') || []).map((z) => `<option value="${z}">`).join('')}</datalist></label>
     <div class="field"><span>${t('searchProvider')}</span><div class="row"><select name="searchProvider">${['duckduckgo', 'tavily', 'brave'].map((p) => `<option value="${p}"${search.provider === p ? ' selected' : ''}>${p === 'duckduckgo' ? 'DuckDuckGo (free)' : p === 'tavily' ? 'Tavily' : 'Brave Search'}</option>`).join('')}</select>
       <input name="searchKey" type="password" placeholder="${search.hasKey ? t('keySaved') : t('apiKey')}"></div><small class="muted">${t('searchHint')}</small></div>
+    <h3>${t('videoSection')}</h3>
+    <div class="field"><span>${t('ttsVoice')}</span><div class="row">
+      <select name="tts_provider"><option value="">${t('off')}</option><option value="demo"${s.tts?.providerId === 'demo' ? ' selected' : ''}>${t('ttsDemo')}</option><option value="command"${s.tts?.providerId === 'command' ? ' selected' : ''}>${t('ttsCommand')}</option>
+        ${S.providers.filter((p) => ['openai', 'openai-compatible', 'groq', 'gemini'].includes(p.type)).map((p) => `<option value="${p.id}"${s.tts?.providerId === p.id ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
+      <input name="tts_model" placeholder="${t('model')} (gpt-4o-mini-tts)" value="${esc(s.tts?.model || '')}"><input name="tts_voice" placeholder="${t('voiceName')} (alloy / Kore)" value="${esc(s.tts?.voice || '')}"></div><small class="muted">${t('ttsHint')}</small></div>
+    <div class="field"><span>${t('videoGen')}</span><div class="row">
+      <select name="vg_provider"><option value="">${t('off')}</option><option value="demo"${s.videoGen?.providerId === 'demo' ? ' selected' : ''}>${t('videoGenDemo')}</option>
+        ${S.providers.filter((p) => ['openai', 'gemini'].includes(p.type)).map((p) => `<option value="${p.id}"${s.videoGen?.providerId === p.id ? ' selected' : ''}>${esc(p.name)} (${p.type === 'gemini' ? 'Veo' : 'Sora'})</option>`).join('')}</select>
+      <input name="vg_model" placeholder="${t('model')} (sora-2 / veo-3.0-fast-generate-001)" value="${esc(s.videoGen?.model || '')}"></div><small class="muted">${t('videoGenHint')}</small></div>
     <div><button class="btn primary">${t('save')}</button></div></form>`;
   body.querySelector('#ws-form').onsubmit = safe(async (e) => {
     e.preventDefault();
@@ -262,6 +271,8 @@ async function workspaceTab(body) {
       synthesis: f.synthesis,
       allowRegistration: f.allowRegistration,
       timezone: f.timezone || null,
+      tts: f.tts_provider ? { providerId: f.tts_provider, model: f.tts_model || null, voice: f.tts_voice || null } : null,
+      videoGen: f.vg_provider ? { providerId: f.vg_provider, model: f.vg_model || null } : null,
     });
     await api('PATCH', '/api/settings/search', { provider: f.searchProvider, apiKey: f.searchKey || undefined });
     renderSidebar();
