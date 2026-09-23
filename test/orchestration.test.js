@@ -26,6 +26,7 @@ adapters.script = {
     calls.push({ handle, system, last });
     let out = `${handle} says hi`;
     if (/nothing for you/.test(last)) out = '[pass]';
+    if (handle === 'looper') out = /Tool budget reached/.test(last) ? 'FINAL without tools' : '```tool\n{"name":"nope","args":{}}\n```';
     if (handle === 'lead' && /synthesise/.test(system)) out = 'FINAL: combined answer';
     else if (handle === 'lead') out = 'Plan: @researcher find data, @writer draft the memo.';
     else if (handle === 'researcher' && !/Tool results/.test(last)) out = 'Let me compute.\n```tool\n{"name":"calc","args":{"expression":"6*7"}}\n```';
@@ -145,4 +146,13 @@ test('agents with nothing to add pass silently instead of posting', async () => 
   const [r] = await handleHumanMessage(m, owner);
   assert.equal(r.status, 'passed');
   assert.equal(listMessages(ch.id, { limit: 200 }).length, before);
+});
+
+test('an agent stuck calling failing tools still gets a final tool-free answer', async () => {
+  const looper = mk('looper');
+  const c = createChannel({ name: 'loop', agentIds: [looper.id] }, owner);
+  const [r] = await handleHumanMessage(createMessage({ channelId: c.id, authorType: 'user', authorId: owner.id, content: '@looper go' }), owner);
+  assert.equal(r.content, 'FINAL without tools');
+  assert.equal(r.meta.tools.length, 5);
+  assert.ok(r.meta.tools.every((x) => !x.ok));
 });

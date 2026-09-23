@@ -203,7 +203,9 @@ ${mcpTools.slice(0, 60).map((t) => `  • ${describeTool(t)}`).join('\n')}`;
 
   try {
     const convo = [...ctx.messages];
-    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+    const failures = new Map(); // tool name → consecutive failures
+    let unanswered = false;     // loop ended while the agent still wanted tools
+    const stream = async () => {
       let chunk = '';
       for await (const ev of streamChat(agent.providerId, {
         model: agent.model, system: ctx.system, messages: convo, temperature: agent.temperature ?? undefined, signal: ctl.signal,
@@ -215,9 +217,14 @@ ${mcpTools.slice(0, 60).map((t) => `  • ${describeTool(t)}`).join('\n')}`;
         // Stop streaming as soon as a complete tool call has been written.
         if (/```tool[^\n]*\n[\s\S]*?\n?```/.test(chunk)) break;
       }
+      return chunk;
+    };
+    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+      const chunk = await stream();
       await applyDirectives(chunk, { agent, channel, msg, meta, savedArtifacts, userId });
       const calls = extractBlocks(chunk).filter((b) => b.kind === 'tool');
-      if (!calls.length || round === MAX_TOOL_ROUNDS) break;
+      if (!calls.length) break;
+      if (round === MAX_TOOL_ROUNDS) { unanswered = true; convo.push({ role: 'assistant', content: chunk }); break; }
 
       const results = [];
       for (const b of calls) {
@@ -247,18 +254,30 @@ ${mcpTools.slice(0, 60).map((t) => `  • ${describeTool(t)}`).join('\n')}`;
           }
           results.push(`Result of ${call.name}:\n${out}`);
           trace.summary = out.slice(0, 160);
+          failures.delete(call.name);
         } catch (e) {
           trace.ok = false;
           trace.summary = e.message;
-          results.push(`Tool ${call.name} failed: ${e.message}`);
+          const n = (failures.get(call.name) || 0) + 1;
+          failures.set(call.name, n);
+          results.push(`Tool ${call.name} failed: ${e.message}${n >= 2 ? `\n${call.name} appears to be unavailable right now. Do NOT call it again; continue from your own knowledge and say clearly that live data could not be retrieved.` : ''}`);
         }
         meta.tools.push(trace);
         audit('agent', agent.id, 'tool.call', call.name, { channelId, ok: trace.ok, args: call.args });
       }
       updateMessage(msg.id, { meta });
       convo.push({ role: 'assistant', content: chunk });
-      convo.push({ role: 'user', content: `[Tool results]\n${results.join('\n\n')}\n\nContinue your reply to the team using these results. Do not repeat what you already wrote.` });
+      const last = round === MAX_TOOL_ROUNDS - 1 ? '\nThis was your last tool round: write your answer now without calling more tools.' : '';
+      convo.push({ role: 'user', content: `[Tool results]\n${results.join('\n\n')}\n\nContinue your reply to the team using these results. Do not repeat what you already wrote.${last}` });
       full += '\n\n';
+    }
+    // Never end a turn with nothing to show: if the tool budget ran out (or only tool calls were
+    // written), give the agent one final, tool-free round to answer.
+    if (unanswered || !displayText(full, { artifacts: savedArtifacts }).trim()) {
+      convo.push({ role: 'user', content: '[System] Tool budget reached. Write your final answer to the team now, from what you already know and found. Do not call any tools.' });
+      full += '\n\n';
+      const chunk = (await stream()).replace(/```tool[\s\S]*?(```|$)/g, '');
+      await applyDirectives(chunk, { agent, channel, msg, meta, savedArtifacts, userId });
     }
     meta.durationMs = Date.now() - started;
     const content = displayText(full, { artifacts: savedArtifacts }) || '_(no reply)_';
