@@ -68,7 +68,7 @@ Teamily AI 是閉源的「Human + AI」社交／協作平台（[官網](https://
 
 | 功能 | Teamily AI | Agent Teams |
 |---|---|---|
-| Gmail、GitHub、Slack、Notion | ✅ 寄信、發更新 | ✅ 透過 **MCP** 標準：GitHub（官方）、Slack、Notion、Gmail、Google 日曆、Linear、Sentry、PostgreSQL、SQLite、本機資料夾、瀏覽器（Playwright）、Brave、Fetch、時區；以及**任何** MCP server（stdio / HTTP / SSE） |
+| Gmail、GitHub、Slack、Notion | ✅ 寄信、發更新 | ✅ 透過 **MCP** 標準：GitHub（官方）、Slack、Notion、Gmail、Google 日曆、Linear、Sentry、PostgreSQL、SQLite、本機資料夾、瀏覽器（Playwright）、Brave、Fetch、時區；以及**任何** MCP server（stdio / HTTP / SSE）；遠端服務（Notion、Linear、Sentry、Jira／Confluence、Asana、Canva、Stripe）支援 **OAuth 一鍵登入**：彈窗授權、自動註冊用戶端、PKCE、Token 加密保存並自動更新 |
 | 權限控管 | 未公開 | ✅ 每個 Agent 各自授權哪些整合；寫入類工具預設需人工核准（依 MCP `readOnlyHint` 判斷）；可設「每次都要核准」或「不需核准」；密鑰加密、介面只顯示遮罩 |
 | 網路搜尋 | 未公開 | ✅ 內建 `web_search`（DuckDuckGo 免 Key，或 Tavily / Brave）＋ `web_fetch`（SSRF 防護） |
 | 檔案 | 未公開 | ✅ 上傳／拖放／貼上；自動擷取 **PDF、DOCX、XLSX、PPTX**、CSV、程式碼等文字給 Agent 閱讀 |
@@ -88,8 +88,7 @@ Teamily AI 是閉源的「Human + AI」社交／協作平台（[官網](https://
 1. **原生手機 App**：目前是響應式網頁。
 2. **影片生成**：只有腳本／分鏡。
 3. **公開社群動態**（瀏覽、remix 他人的 Agent）：目前以 Agent JSON 匯出匯入替代。
-4. **OAuth 一鍵連接**：MCP 整合目前以 Token / API Key 設定；需要 OAuth 的服務（如 Notion 遠端、Linear OAuth）請改用 Token 模式。
-5. **即時多人協同編輯同一份產出物**：Studio 支援留言與版本，但非 Google Docs 式同時編輯。
+4. **即時多人協同編輯同一份產出物**：Studio 支援留言與版本，但非 Google Docs 式同時編輯。
 
 ## 10. 重要風險提醒
 

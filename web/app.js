@@ -53,6 +53,9 @@ function route() {
   if (view && VIEWS[view]) return openView(view);
   const fromHash = /^#\/c\/(.+)$/.exec(h)?.[1];
   openChannel(channelById(fromHash)?.id || channelById(S.current)?.id || S.channels.find((c) => c.name === 'general')?.id || S.channels[0]?.id);
+  // #/settings/<tab> (e.g. coming back from an OAuth sign-in without a popup)
+  const setTab = /^#\/settings(?:\/(\w+))?$/.exec(h);
+  if (setTab) openSettings(setTab[1]);
 }
 
 export function openView(name) {

@@ -287,6 +287,8 @@ const COLUMNS = [
   ['workflows', 'last_fire_key', 'TEXT'],
   ['workflows', 'template_key', 'TEXT'],
   ['artifacts', 'share_token', 'TEXT'],
+  ['mcp_servers', 'auth', "TEXT NOT NULL DEFAULT 'none'"],
+  ['mcp_servers', 'oauth_enc', 'TEXT'],
 ];
 
 export function openDb(file = config.dbFile) {

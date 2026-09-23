@@ -109,25 +109,49 @@ function providerForm(c, p, done) {
 
 // ------------------------------------------------------------------ integrations (MCP)
 
-const STATUS_ICON = { connected: '🟢', connecting: '🟡', error: '🔴', idle: '⚪' };
+const STATUS_ICON = { connected: '🟢', connecting: '🟡', error: '🔴', idle: '⚪', auth_required: '🔑' };
+
+// Open the provider's sign-in page in a popup (opened synchronously so it isn't blocked),
+// then wait for the callback page to report back or for the popup to close.
+async function oauthSignIn(sid) {
+  const w = window.open('', 'mcp-oauth', 'width=520,height=720');
+  let r;
+  try {
+    r = await api('POST', `/api/mcp/servers/${sid}/oauth/start`, {});
+  } catch (e) { w?.close(); throw e; }
+  if (r.authorized) { w?.close(); toast(t('oauthDone'), 'ok'); return; }
+  if (!w) { location.href = r.url; return new Promise(() => {}); }
+  w.location.href = r.url;
+  const result = await new Promise((resolve) => {
+    const onMsg = (ev) => { if (ev.origin === location.origin && ev.data?.type === 'mcp-oauth') finish(ev.data); };
+    const iv = setInterval(() => { if (w.closed) finish(null); }, 700);
+    function finish(v) { clearInterval(iv); window.removeEventListener('message', onMsg); resolve(v); }
+    window.addEventListener('message', onMsg);
+  });
+  if (result?.ok) toast(t('oauthDone'), 'ok');
+  else if (result) toast(`${t('oauthFailed')}: ${result.error}`, 'error');
+}
 
 async function integrationsTab(body) {
   const [servers, presets] = await Promise.all([api('GET', '/api/mcp/servers'), api('GET', '/api/mcp/presets')]);
   body.innerHTML = `<h3>🔌 ${t('integrations')}</h3><p class="muted small">${t('mcpIntro')}</p>
     <div class="prov-list">${servers.map((sv) => `<div class="prov${sv.enabled ? '' : ' off'}">
       <div class="grow"><strong>${esc(presets.find((p) => p.key === sv.preset)?.icon || '🧩')} ${esc(sv.name)}</strong> <code class="small">${esc(sv.slug)}.*</code>
-        <div class="muted small">${STATUS_ICON[sv.status?.state] || '⚪'} ${esc(sv.status?.state || 'idle')}${sv.status?.tools ? ` · ${sv.status.tools} tools` : ''}${sv.status?.error ? ` · ${esc(sv.status.error.slice(0, 160))}` : ''} · ${t('approval')}: ${t('approvalPolicy_' + sv.approval)}</div>
+        <div class="muted small">${STATUS_ICON[sv.status?.state] || '⚪'} ${sv.status?.state === 'auth_required' ? t('oauthNeeded') : esc(sv.status?.state || 'idle')}${sv.auth === 'oauth' && sv.oauth?.signedIn ? ` · 🔑 ${t('oauthSignedIn')}` : ''}${sv.status?.tools ? ` · ${sv.status.tools} tools` : ''}${sv.status?.error && sv.status.state !== 'auth_required' ? ` · ${esc(sv.status.error.slice(0, 160))}` : ''} · ${t('approval')}: ${t('approvalPolicy_' + sv.approval)}</div>
         <div class="test-out small" data-out="${sv.id}"></div></div>
+      ${sv.auth === 'oauth' ? `<button class="btn sm${sv.oauth?.signedIn ? '' : ' primary'}" data-signin="${sv.id}">🔑 ${t(sv.oauth?.signedIn ? 'oauthReSignIn' : 'oauthSignIn')}</button>${sv.oauth?.signedIn ? `<button class="btn ghost sm" data-signout="${sv.id}">${t('oauthSignOut')}</button>` : ''}` : ''}
       <button class="btn sm" data-connect="${sv.id}">${t('testConnection')}</button>
       <button class="btn ghost sm" data-edit="${sv.id}">✎</button>
       <button class="icon-btn sm" data-del="${sv.id}">🗑</button></div>`).join('') || `<p class="muted small">${t('noIntegrations')}</p>`}</div>
     <h3>${t('addIntegration')}</h3>
-    <div class="cat-grid">${presets.map((p) => `<button class="cat" data-preset="${p.key}"><strong>${p.icon} ${esc(p.name)}</strong><span class="muted small">${esc(p.description)}</span></button>`).join('')}</div>`;
+    <div class="cat-grid">${presets.map((p) => `<button class="cat" data-preset="${p.key}"><strong>${p.icon} ${esc(p.name)}${p.auth === 'oauth' ? ' <span class="chip">OAuth</span>' : ''}</strong><span class="muted small">${esc(p.description)}</span></button>`).join('')}</div>`;
   body.onclick = safe(async (e) => {
     const d = (k) => e.target.closest(`[data-${k}]`)?.dataset[k];
     if (d('preset')) mcpForm(presets.find((p) => p.key === d('preset')), null, () => integrationsTab(body));
     if (d('edit')) { const sv = servers.find((x) => x.id === d('edit')); mcpForm(presets.find((p) => p.key === sv.preset) || presets.find((p) => p.key === (sv.transport === 'stdio' ? 'custom-stdio' : 'custom-http')), sv, () => integrationsTab(body)); }
     if (d('del')) { if (await confirmBox(t('delete') + '?')) { await api('DELETE', `/api/mcp/servers/${d('del')}`); integrationsTab(body); } }
+    if (d('signin')) { await oauthSignIn(d('signin')); integrationsTab(body); }
+    if (d('signout')) { await api('POST', `/api/mcp/servers/${d('signout')}/oauth/signout`, {}); integrationsTab(body); }
     if (d('connect')) {
       const out = body.querySelector(`[data-out="${d('connect')}"]`);
       out.innerHTML = `<span class="spin">⏳</span> ${t('connecting')}`;
@@ -136,6 +160,11 @@ async function integrationsTab(body) {
     }
   });
 }
+
+const oauthFields = (sv, dt) => `<div${dt ? ` data-t="${dt}" data-auth="oauth"` : ''}>
+  <label class="field"><span>${t('oauthClientId')}</span><input name="oauth_clientId" value="${esc(sv?.oauth?.clientId || '')}" autocomplete="off" placeholder="${t('optional')}"></label>
+  <label class="field"><span>Client secret</span><input name="oauth_clientSecret" type="password" value="${esc(sv?.oauth?.clientSecret || '')}" autocomplete="off" placeholder="${t('optional')}"></label>
+  <label class="field"><span>Scope</span><input name="oauth_scope" value="${esc(sv?.oauth?.scope || '')}" placeholder="${t('optional')}"></label></div>`;
 
 function mcpForm(p, sv, done) {
   const custom = p.key.startsWith('custom');
@@ -152,10 +181,13 @@ function mcpForm(p, sv, done) {
         <label class="field" data-t="stdio"><span>${t('argsOnePerLine')}</span><textarea name="args" rows="3" class="mono">${esc((sv?.args || p.args || []).join('\n'))}</textarea></label>
         <label class="field" data-t="stdio"><span>${t('envVars')} (KEY=value)</span><textarea name="env" rows="3" class="mono">${esc(Object.entries(sv?.env || {}).map(([k, v]) => `${k}=${v}`).join('\n'))}</textarea></label>
         <label class="field" data-t="http sse"><span>URL</span><input name="url" value="${esc(sv?.url || p.url || '')}" placeholder="https://example.com/mcp"></label>
-        <label class="field" data-t="http sse"><span>${t('headers')} (Name: value)</span><textarea name="headers" rows="2" class="mono">${esc(Object.entries(sv?.headers || {}).map(([k, v]) => `${k}: ${v}`).join('\n'))}</textarea></label>`
+        <label class="field" data-t="http sse"><span>${t('headers')} (Name: value)</span><textarea name="headers" rows="2" class="mono">${esc(Object.entries(sv?.headers || {}).map(([k, v]) => `${k}: ${v}`).join('\n'))}</textarea></label>
+        <label class="field" data-t="http sse"><span>${t('authMethod')}</span><select name="auth"><option value="none">${t('authNone')}</option><option value="oauth"${(sv?.auth || p.auth) === 'oauth' ? ' selected' : ''}>${t('authOAuth')}</option></select></label>
+        ${oauthFields(sv, 'http sse')}`
       : `${(p.fields || []).map((f) => `<label class="field"><span>${esc(f.label)}</span><input name="v_${f.key}" ${f.secret ? 'type="password"' : ''} placeholder="${esc(f.placeholder || '')}" required></label>`).join('')}
          ${(p.env || []).map((f) => `<label class="field"><span>${esc(f.label)}</span><input name="v_${f.key}" ${f.secret ? 'type="password" autocomplete="off"' : ''} required></label>`).join('')}
          ${(p.headers || []).map((f) => `<label class="field"><span>${esc(f.label)}</span><input name="v_${f.key}" ${f.secret ? 'type="password" autocomplete="off"' : ''} required></label>`).join('')}
+         ${p.auth === 'oauth' ? `<p class="hint">🔑 ${t('oauthHint')}</p><details><summary class="muted small">${t('advanced')}</summary>${oauthFields(null, '')}</details>` : ''}
          ${p.command ? `<p class="muted small">${t('willRun')}: <code>${esc([p.command, ...(p.args || [])].join(' '))}</code></p>` : `<p class="muted small">URL: <code>${esc(p.url)}</code></p>`}`}
       <label class="field"><span>${t('approval')}</span><select name="approval">${['auto', 'always', 'never'].map((x) => `<option value="${x}"${(sv?.approval || 'auto') === x ? ' selected' : ''}>${t('approvalPolicy_' + x)}</option>`).join('')}</select><small class="muted">${t('approvalHint')}</small></label>
       ${sv ? `<label class="check"><input type="checkbox" name="enabled"${sv.enabled ? ' checked' : ''}> ${t('enabled')}</label>` : ''}
@@ -163,21 +195,27 @@ function mcpForm(p, sv, done) {
     </form>`,
     footer: `<button class="btn ghost" data-cancel>${t('cancel')}</button><button class="btn primary" form="mcp-form">${t('save')}</button>`,
   });
-  const syncT = () => { const tr = m.el.querySelector('[name=transport]')?.value; m.el.querySelectorAll('[data-t]').forEach((x) => { x.hidden = !x.dataset.t.split(' ').includes(tr); }); };
+  const syncT = () => {
+    const tr = m.el.querySelector('[name=transport]')?.value;
+    const oauth = m.el.querySelector('[name=auth]')?.value === 'oauth';
+    m.el.querySelectorAll('[data-t]').forEach((x) => { x.hidden = !x.dataset.t.split(' ').includes(tr) || (x.dataset.auth === 'oauth' && !oauth); });
+  };
   m.el.querySelector('[name=transport]')?.addEventListener('change', syncT);
+  m.el.querySelector('[name=auth]')?.addEventListener('change', syncT);
   syncT();
   m.el.querySelector('[data-cancel]').onclick = m.close;
   m.el.querySelector('#mcp-form').onsubmit = safe(async (e) => {
     e.preventDefault();
     const f = formData(e.target);
+    const oauth = { clientId: f.oauth_clientId, clientSecret: f.oauth_clientSecret, scope: f.oauth_scope };
     const kv = (txt, sep) => Object.fromEntries(String(txt || '').split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const i = l.indexOf(sep); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }).filter(([k]) => k));
     let saved;
     if (sv || custom) {
-      const payload = { name: f.name, transport: f.transport, command: f.command, args: f.args, env: kv(f.env, '='), url: f.url, headers: kv(f.headers, ':'), approval: f.approval, enabled: sv ? f.enabled : true, preset: p.key };
+      const payload = { name: f.name, transport: f.transport, command: f.command, args: f.args, env: kv(f.env, '='), url: f.url, headers: kv(f.headers, ':'), approval: f.approval, enabled: sv ? f.enabled : true, preset: p.key, auth: f.auth, oauth };
       saved = sv ? await api('PATCH', `/api/mcp/servers/${sv.id}`, payload) : await api('POST', '/api/mcp/servers', payload);
     } else {
       const values = Object.fromEntries(Object.entries(f).filter(([k]) => k.startsWith('v_')).map(([k, v]) => [k.slice(2), v]));
-      saved = await api('POST', '/api/mcp/servers', { preset: p.key, values: { ...values, name: f.name, approval: f.approval } });
+      saved = await api('POST', '/api/mcp/servers', { preset: p.key, values: { ...values, ...oauth, name: f.name, approval: f.approval } });
     }
     // Grant / revoke per agent.
     for (const a of S.agents) {
@@ -186,7 +224,7 @@ function mcpForm(p, sv, done) {
       if (has !== want) await api('PATCH', `/api/agents/${a.id}`, { mcpServers: want ? [...(a.mcpServers || []), saved.id] : a.mcpServers.filter((x) => x !== saved.id) });
     }
     await refreshAgents();
-    toast(t('saved'), 'ok');
+    toast(saved.auth === 'oauth' && !saved.oauth?.signedIn ? t('oauthSavedHint') : t('saved'), 'ok');
     m.close();
     done();
   });

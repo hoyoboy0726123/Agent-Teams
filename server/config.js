@@ -16,4 +16,6 @@ export const config = {
   // How many recent messages go verbatim into an agent's context window.
   contextMessages: Number(process.env.CONTEXT_MESSAGES || 30),
   sessionDays: 30,
+  // Public origin (e.g. https://team.example.com) for OAuth redirects when behind a proxy; else taken from the request.
+  publicUrl: (process.env.PUBLIC_URL || '').replace(/\/+$/, ''),
 };

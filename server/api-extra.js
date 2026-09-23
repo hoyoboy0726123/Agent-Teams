@@ -4,6 +4,7 @@ import { router as r, need, readable, actor, readableArtifact } from './api.js';
 import { fail, readJson } from './http.js';
 import { all, get, run, now, audit, setSetting, getSetting } from './db.js';
 import { atLeast } from './users.js';
+import { config } from './config.js';
 import * as ch from './channels.js';
 import * as agents from './agents/store.js';
 import * as mcp from './mcp/index.js';
@@ -46,6 +47,30 @@ r.post('/api/mcp/servers/:id/connect', async ({ user, params }) => {
   } catch (e) {
     return { ok: false, error: e.message };
   }
+});
+
+// OAuth sign-in for remote MCP servers: start → provider's page → callback → tokens.
+const originOf = (req) => config.publicUrl || `${String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || (req.socket.encrypted ? 'https' : 'http')}://${req.headers.host}`;
+r.post('/api/mcp/servers/:id/oauth/start', async ({ user, req, params }) => {
+  need(user, 'admin');
+  return mcp.beginOAuth(params.id, `${originOf(req)}/api/mcp/oauth/callback`, user);
+});
+r.post('/api/mcp/servers/:id/oauth/signout', ({ user, params }) => { need(user, 'admin'); return mcp.signOutOAuth(params.id, user) || fail(404, 'MCP server not found'); });
+r.get('/api/mcp/oauth/callback', async ({ user, res, query }) => {
+  let result;
+  try {
+    need(user, 'admin');
+    const s = await mcp.finishOAuth({ state: query.get('state'), code: query.get('code'), error: query.get('error'), errorDescription: query.get('error_description') }, user);
+    result = { ok: true, id: s.id, name: s.name };
+  } catch (e) {
+    result = { ok: false, error: e.message };
+  }
+  // Tell the opener (settings page) and close the popup; without a popup, go back to the app.
+  const msg = JSON.stringify({ type: 'mcp-oauth', ...result }).replace(/</g, '\\u003c');
+  const text = String(result.ok ? `✓ ${result.name}` : `✗ ${result.error}`).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+  res.writeHead(result.ok ? 200 : 400, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+  res.end(`<!doctype html><meta charset="utf-8"><title>Agent Teams</title><body style="font:16px system-ui;padding:32px;text-align:center">
+<p>${text}</p><script>const m=${msg};try{if(window.opener){window.opener.postMessage(m,location.origin);setTimeout(()=>window.close(),300)}else{setTimeout(()=>location.replace('/#/settings/integrations'),1500)}}catch{}</script>`);
 });
 
 // ------------------------------------------------------------------ approvals

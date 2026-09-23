@@ -27,7 +27,8 @@ server/
   artifacts/            versioned store + HTML renderers (docs, slides, dashboards, sites)
   workflows/            engine (multi-step / parallel), schedule.js (cron + time zones),
                         templates.js (work & life automations), digest.js ({{digest}})
-  mcp/index.js          MCP client manager (stdio / HTTP / SSE), presets, approval policy
+  mcp/index.js          MCP client manager (stdio / HTTP / SSE), presets, approval policy, OAuth flow
+  mcp/oauth.js          OAuth client provider for remote MCP servers (encrypted per-server state)
   approvals.js          human-in-the-loop approvals for side-effecting tool calls
   tasks.js files.js     task board; uploads + text extraction (PDF, DOCX, XLSX, PPTX)
   agents/library.js     47 role templates, 8 team bundles
@@ -57,6 +58,15 @@ Built-in tools (`web_search`, `web_fetch`, `recall`, `read_artifact`, `calc`) an
 server's approval policy is checked (`auto` = read-only tools run, others need a human; `always`; `never`).
 A pending call pauses the agent's turn and shows an Approve / Deny card in the message; the decision (or a
 15-minute timeout) resumes it. Every call is audited.
+
+Remote servers can use **OAuth sign-in** instead of pasted tokens. `POST /api/mcp/servers/:id/oauth/start`
+runs the SDK's discovery (RFC 9728 protected-resource metadata → RFC 8414 authorization server), dynamic
+client registration (RFC 7591, or an admin-supplied client ID) and PKCE, and returns the authorization URL;
+the settings page opens it in a popup. The provider redirects to `/api/mcp/oauth/callback`, which checks the
+single-use `state` and that the same admin is signed in, exchanges the code, and posts the result back to the
+opener. Tokens, client registration and verifier are stored AES-encrypted per server (`oauth_enc`) and never
+sent to the browser; expired access tokens are refreshed automatically, and when refresh fails the server
+shows "Sign-in required". Set `PUBLIC_URL` when behind a reverse proxy so the redirect URL is correct.
 
 ## Automations
 

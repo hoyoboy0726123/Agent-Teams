@@ -17,7 +17,7 @@
 | 👥 **智能體團隊** | **8 組一鍵團隊**（產品上市、創業、內容工作室、專家研究小組、工程、客服、招募、生活管家），自動建頻道 |
 | 🧭 **多 Agent 協作** | `@提及`、**自動派工**、**圓桌討論**、`@all`；Agent 互相 `@委派` 後由委派者**統整最終答案**；沒事可做的 Agent 自動略過不洗版 |
 | ⚡ **自動化** | **16 個工作／生活範本**（每日工作簡報、會議準備、競品監控「有變動才通知」、專家小組研究、每週回顧、每日新聞、健身計畫、每週菜單…）；每天／每週／每月／間隔／cron 排程（依時區）、**Webhook 觸發**、視覺化多步驟流程 |
-| 🔌 **外部整合 (MCP)** | GitHub、Slack、Notion、Gmail、Google 日曆、Linear、Sentry、PostgreSQL、SQLite、本機資料夾、瀏覽器、Brave 搜尋…及任何 MCP server；每個 Agent 各自授權；**寫入類動作需人工核准** |
+| 🔌 **外部整合 (MCP)** | GitHub、Slack、Notion、Gmail、Google 日曆、Linear、Sentry、Jira／Confluence、Asana、Canva、Stripe、PostgreSQL、SQLite、本機資料夾、瀏覽器、Brave 搜尋…及任何 MCP server；**OAuth 一鍵登入**（彈窗授權、自動註冊、PKCE、Token 自動更新）；每個 Agent 各自授權；**寫入類動作需人工核准** |
 | 🎨 **對話 → 成果** | 網頁／互動工具、簡報、Dashboard、文件、研究報告；**Agent 邊寫、聊天裡邊即時預覽**；可編輯 **PPTX** 匯出（Dashboard 為原生圖表） |
 | 🖼️ **Studio** | 全螢幕工作室：桌機／平板／手機預覽、原始碼編輯、版本歷史、**批次留言 →「請 AI 修改」一次處理**、公開分享連結（可撤銷） |
 | ✅ **任務看板** | Agent 在對話中直接建立並指派任務；看板拖拉；**交給 Agent 執行**後自動完成；待核准動作集中處理 |
@@ -121,7 +121,7 @@ docker compose up -d
 
 ```bash
 npm run dev   # 檔案變更自動重啟
-npm test      # 35+ 個整合 + 單元測試（離線 demo、腳本化供應商與真實 MCP server，不需任何 API Key）
+npm test      # 40+ 個整合 + 單元測試（離線 demo、腳本化供應商與真實 MCP server，不需任何 API Key）
 ```
 
 實際用 Claude 訂閱跑一場上市策略會議並產出 PPT／Dashboard 的完整紀錄見 [examples/launch-strategy](examples/launch-strategy/)。
@@ -136,7 +136,7 @@ npm test      # 35+ 個整合 + 單元測試（離線 demo、腳本化供應商�
 - [x] 自動化排程、Webhook 與範本
 - [x] Studio、即時預覽、批次留言修訂、分享連結
 - [x] 檔案上傳（PDF / Office / 文字）
-- [ ] MCP OAuth 一鍵登入
+- [x] MCP OAuth 一鍵登入
 - [ ] 向量嵌入記憶（與現有 BM25 混合檢索）
 - [ ] 圖片理解（多模態）、語音輸入
 - [ ] 討論串（threads）與表情回應
