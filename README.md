@@ -19,7 +19,8 @@
 | ⚡ **自動化** | **16 個工作／生活範本**（每日工作簡報、會議準備、競品監控「有變動才通知」、專家小組研究、每週回顧、每日新聞、健身計畫、每週菜單…）；每天／每週／每月／間隔／cron 排程（依時區）、**Webhook 觸發**、視覺化多步驟流程 |
 | 🔌 **外部整合 (MCP)** | GitHub、Slack、Notion、Gmail、Google 日曆、Linear、Sentry、Jira／Confluence、Asana、Canva、Stripe、PostgreSQL、SQLite、本機資料夾、瀏覽器、Brave 搜尋…及任何 MCP server；**OAuth 一鍵登入**（彈窗授權、自動註冊、PKCE、Token 自動更新）；每個 Agent 各自授權；**寫入類動作需人工核准** |
 | 🎨 **對話 → 成果** | 網頁／互動工具、簡報、Dashboard、文件、研究報告；**Agent 邊寫、聊天裡邊即時預覽**；可編輯 **PPTX** 匯出（Dashboard 為原生圖表） |
-| 🖼️ **Studio** | 全螢幕工作室：桌機／平板／手機預覽、原始碼編輯、版本歷史、**批次留言 →「請 AI 修改」一次處理**、公開分享連結（可撤銷） |
+| 🎬 **影片** | Agent 產出**影片分鏡**（標題、重點、數字、引言、圖表、圖片、片段、結尾…），Studio 內直接播放動畫與字幕；**一鍵匯出 MP4**（伺服器逐格錄製＋ffmpeg，可加 **AI 旁白**：OpenAI／Gemini TTS 或本機指令）；可接 **Sora／Veo** 讓 Agent 生成真實影片片段（每次都需人工核准） |
+| 🖼️ **Studio** | 全螢幕工作室：桌機／平板／手機預覽、**多人即時共同編輯**（看得到彼此游標）、版本歷史、**同時修改自動合併**、**批次留言 →「請 AI 修改」一次處理**（AI 的修改也會即時合併進正在編輯的文件）、公開分享連結（可撤銷） |
 | ✅ **任務看板** | Agent 在對話中直接建立並指派任務；看板拖拉；**交給 Agent 執行**後自動完成；待核准動作集中處理 |
 | 🧠 **可治理的持續記憶** | 工作空間／頻道／Agent 私人／只有我 四種範圍；自動萃取、長對話滾動摘要；來源可追溯、編輯、釘選、TTL、一鍵清除；👍👎 回饋會變成 Agent 的記憶讓它**越用越好** |
 | 📦 **成果與收藏** | 成果畫廊（即時縮圖）、收藏訊息與產出物 |
@@ -82,6 +83,17 @@ ollama pull qwen2.5      # 或 llama3.1、gemma3…
 
 設定 → 模型供應商 → Ollama，預設模型填 `qwen2.5`。
 
+### 影片匯出（選用）
+
+影片分鏡在瀏覽器裡就能播放。若要**匯出 MP4**，伺服器需要 Chromium 和 ffmpeg：
+
+```bash
+npx playwright install chromium   # playwright-core 已隨 npm install 安裝（選用相依）
+sudo apt install ffmpeg            # macOS：brew install ffmpeg
+```
+
+AI 旁白與 Sora／Veo 片段在 **設定 → 工作空間 → 🎬 影片** 選擇要用哪一組 API Key。Docker 映像已內建 Chromium、ffmpeg 和中文字型。
+
 ### Docker
 
 ```bash
@@ -121,7 +133,7 @@ docker compose up -d
 
 ```bash
 npm run dev   # 檔案變更自動重啟
-npm test      # 40+ 個整合 + 單元測試（離線 demo、腳本化供應商與真實 MCP server，不需任何 API Key）
+npm test      # 55+ 個整合 + 單元測試（離線 demo、腳本化供應商與真實 MCP server，不需任何 API Key）
 ```
 
 實際用 Claude 訂閱跑一場上市策略會議並產出 PPT／Dashboard 的完整紀錄見 [examples/launch-strategy](examples/launch-strategy/)。
@@ -137,6 +149,9 @@ npm test      # 40+ 個整合 + 單元測試（離線 demo、腳本化供應商�
 - [x] Studio、即時預覽、批次留言修訂、分享連結
 - [x] 檔案上傳（PDF / Office / 文字）
 - [x] MCP OAuth 一鍵登入
+- [x] 影片分鏡、MP4 匯出（含 AI 旁白）、Sora／Veo 影片片段
+- [x] 多人即時共同編輯（Yjs）與同時修改自動合併
+- [ ] Cloudflare Workers 雲端版（BYOK）— 評估見 [docs/CLOUDFLARE-WORKERS.md](docs/CLOUDFLARE-WORKERS.md)
 - [ ] 向量嵌入記憶（與現有 BM25 混合檢索）
 - [ ] 圖片理解（多模態）、語音輸入
 - [ ] 討論串（threads）與表情回應

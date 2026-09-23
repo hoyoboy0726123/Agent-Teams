@@ -29,6 +29,10 @@ server/
                         templates.js (work & life automations), digest.js ({{digest}})
   mcp/index.js          MCP client manager (stdio / HTTP / SSE), presets, approval policy, OAuth flow
   mcp/oauth.js          OAuth client provider for remote MCP servers (encrypted per-server state)
+  artifacts/merge.js    line diff + three-way merge for concurrent saves
+  collab.js             Yjs rooms for live co-editing (sync over /ws, cursors, live merge of new versions)
+  media/                store.js (generated media at /media/<token>), tts.js (voice-over),
+                        video-export.js (Chromium frames + ffmpeg → MP4), videogen.js (Sora / Veo clips)
   approvals.js          human-in-the-loop approvals for side-effecting tool calls
   tasks.js files.js     task board; uploads + text extraction (PDF, DOCX, XLSX, PPTX)
   agents/library.js     47 role templates, 8 team bundles
@@ -36,7 +40,8 @@ server/
                         sharing, library/teams, automations, studio comments & revisions
 web/                    SPA: app.js (chat), views.js (agents, automations, tasks, memory,
                         outputs), studio.js, panels.js, settings.js,
-                        md.js + render.js (shared with the server)
+                        md.js + render.js + video.js (shared with the server),
+                        collab.js + vendor/collab.js (CodeMirror + Yjs bundle, `npm run build:vendor`)
 test/                   node:test integration + unit tests
 ```
 
@@ -80,6 +85,28 @@ While an agent streams an ` ```artifact ` block, the runtime emits throttled `ar
 client renders them with the same renderer the server uses (`web/render.js`) into a sandboxed `srcdoc`
 iframe. Studio revisions post a message asking the agent to output the complete next version with the same
 title, which `upsertArtifact` stores as a new version; addressed comments are then resolved.
+
+## Concurrent edits and live co-editing
+
+Every save carries the version it started from. If someone saved in between, `artifacts/merge.js` three-way
+merges the two edits line by line; edits to the same lines return 409 with the merged text so the person can
+resolve by hand, overwrite, or discard. Agents' new versions merge against the version that existed when
+their turn started, so a human edit made meanwhile is kept.
+
+While anyone has an artifact open in Studio, `collab.js` keeps a Yjs document for it and syncs updates and
+cursor awareness over the existing WebSocket (`doc.*` messages). The room is saved as a normal version on
+request, after a quiet minute, when the last editor leaves and on shutdown. A version written elsewhere
+(an agent revision, the REST API) while the room is open is replayed on a fork of the room state for the
+version it was based on, and that delta is applied to the live document, so the CRDT merges it with
+whatever people typed meanwhile.
+
+## Video
+
+A `video` artifact is a JSON storyboard. `web/video.js` renders it as a player whose every frame is a pure
+function of the playhead (`window.__video.seek(t)`), which lets `media/video-export.js` record it frame by
+frame in headless Chromium and pipe JPEGs to ffmpeg. Narration comes from the configured TTS; each scene is
+stretched to fit its voice. `generate_video` clips (Sora / Veo, always human-approved) are stored as media and
+recorded from VP8 proxies because open-source Chromium cannot decode H.264; their audio is mixed by ffmpeg.
 
 ## Why a text directive protocol instead of native tool calling?
 
