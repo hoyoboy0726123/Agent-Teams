@@ -30,6 +30,9 @@ if [ -n "$BROWSER" ]; then
 import { Config } from "@remotion/cli/config";
 Config.setBrowserExecutable("$BROWSER");
 EOF
+  # Local-only file: keep it out of OpenMontage's git status without touching their .gitignore.
+  grep -qx "remotion-composer/remotion.config.ts" .git/info/exclude 2>/dev/null \
+    || echo "remotion-composer/remotion.config.ts" >> .git/info/exclude
   echo "==> Remotion will use $BROWSER"
 fi
 
