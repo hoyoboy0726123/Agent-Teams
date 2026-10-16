@@ -111,6 +111,23 @@ await page.click("#c-skip");
 await page.waitForSelector("#end:not([hidden])", { timeout: 20000 });
 check("a random life gets a name card", /姓名：/.test(await page.textContent("#personal")));
 
+// 只問人生大事: everyday choices follow the personality and say so; the big ones are still asked.
+await page.click("#again-new");
+await page.click("#tab-random");
+await page.click("#go-random");
+await page.waitForSelector("#play:not([hidden])");
+await page.check("#c-major");
+await page.click('[data-speed="10"]');
+let asked = 0;
+for (let i = 0; i < 60 && !(await page.isVisible("#end")); i++) {
+  await page.waitForSelector("#choice:not([hidden]), #end:not([hidden])", { timeout: 20000 });
+  if (await page.isVisible("#choice .options button")) { asked++; await page.click("#choice .options button"); }
+}
+await page.waitForSelector("#end:not([hidden])", { timeout: 20000 });
+const majorFeed = await page.textContent("#feed");
+check("with 只問人生大事 the big decisions are asked and the rest follow the personality", asked >= 3 && /依你的個性：/.test(majorFeed), `${asked} asked`);
+await page.uncheck("#c-major");
+
 // The Claude path, with a stand-in for the artifact's sample capability that answers like Claude would.
 const ai = watch(await browser.newPage({ viewport: { width: 1000, height: 1200 } }));
 await ai.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());

@@ -11,5 +11,7 @@ import { LATER } from "./later.js";
 import { HEALTH } from "./health.js";
 
 export const ALL_EVENTS = [...ERA, ...CORE, ...WORK, ...CHILD, ...TEEN, ...YOUNG, ...ADULT, ...LATER, ...HEALTH];
+// The big decisions: the life's backbone and the multi-year work storylines. With "只問人生大事" only these are asked.
+for (const ev of [...CORE, ...WORK]) ev.major = true;
 export const MODULES = { ERA, CORE, WORK, CHILD, TEEN, YOUNG, ADULT, LATER, HEALTH };
 export { deathEvent };

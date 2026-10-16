@@ -36,6 +36,8 @@ export const WORK = [
           { id: "sy1.pivot", label: "轉型", hint: "換個做法", act: "careerSwitch", style: "learn", weight: busy ? 0.05 : 0.2, apply: s2 => { a.push = (a.push || 0) + 0.1; a.kind = `${kind}（轉型後）`; ctx.arc.go("startup", "year2", 1); return { text: ctx.w(`你決定讓${kind}轉型，{改做外送和網購。|改成預約制。|增加課程和活動。}`), mood: 1 }; } },
           { id: "sy1.close", label: "收掉，停損", hint: "認賠回去上班", act: "quitJob", style: "safe", weight: busy ? 0.05 : 0.25, apply: (s2, c) => { ctx.arc.end("startup", "closed"); s2.savings = Math.max(0, s2.savings - 0.3); return { text: `${kind}收掉了，你算了算，賠的錢還在可以接受的範圍。`, mood: -5 }; } },
         ],
+        // A written answer moves the story on too: giving up closes the shop, anything else carries on into year two.
+        onFree: id => (["quitJob", "jobSearch", "jobHop", "careerSwitch", "civilService", "sellAsset", "retire", "workAbroad", "emigrate"].includes(id) ? ctx.arc.end("startup", "closed") : ctx.arc.go("startup", "year2", 1)),
       };
     },
   },
@@ -51,7 +53,8 @@ export const WORK = [
         return { text: ctx.w(`{撐過了最難的頭幾年，|口碑慢慢傳開，}${a.kind.replace(/（轉型後）/, "")}的生意越做越好，{你終於可以準時下班了。|開始有人來問加盟。}`), mood: 12, big: true };
       }
       ctx.arc.end("startup", "failed");
-      s.savings = Math.max(0, s.savings - 1); s.employed = false; s.unemployedFor = 1;
+      s.savings = Math.max(0, s.savings - 1);
+      if (!s.retired) { s.employed = false; s.unemployedFor = 1; }
       if (a.side) { s.employed = true; s.unemployedFor = 0; return { text: `${a.kind}撐不下去，收掉了。還好你沒辭職，賠的錢慢慢還。`, mood: -6 }; }
       return { text: ctx.w(`${a.kind}撐不下去，{收掉了，還背了一些債。|最後一天營業，老客人來跟你道別。}`), mood: -12, big: true };
     },
@@ -87,6 +90,8 @@ export const WORK = [
           { id: "civil.work", label: "邊工作邊考", hint: "有收入比較安心", act: "jobSearch", style: "safe", weight: 0.3, apply: s2 => { if (!s2.employed) startJob(s2, ctx); ctx.arc.go("civil", "start", 1); return { text: "差幾分沒考上。你先找了工作，晚上和週末繼續讀。", mood: -2 }; } },
           { id: "civil.quit", label: "放棄，回去找工作", hint: "換條路走", act: "jobSearch", style: "safe", weight: a.tries < 3 ? 0.15 : 0.5, apply: s2 => { ctx.arc.end("civil", "gaveUp"); return { text: "差幾分沒考上。你決定放棄公職，回到一般的工作。", mood: -4 }; } },
         ],
+        // A written answer: studying on (or waiting) means another try next year; any other path gives the exam up.
+        onFree: id => (["civilService", "study", "pushThrough", "wait", "sideJob", "rest", "spiritual"].includes(id) ? ctx.arc.go("civil", "start", 1) : ctx.arc.end("civil", "gaveUp")),
       };
     },
   },

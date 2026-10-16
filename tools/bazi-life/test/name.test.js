@@ -72,7 +72,7 @@ test("neither the name nor the family charts ever tilt a death or a serious illn
   const huge = { young: Object.fromEntries(Object.keys(DOMAINS).map(d => [d, 3])), old: Object.fromEntries(Object.keys(DOMAINS).map(d => [d, 3])), split: 36 };
   const tilts = familyTilts({ members: [{ relation: "father", bond: { net: 1 } }, { relation: "mother", bond: { net: 1 } }, { relation: "olderBrother", bond: { net: 1 } }] });
   const grave = [...EVENTS, deathEvent].filter(e => e.grave).map(e => e.id).sort();
-  assert.deepEqual(grave, ["childIllness", "death", "fatherDeath", "motherDeath", "serious", "widowed"]);
+  assert.deepEqual(grave, ["childIllness", "death", "fatherDeath", "motherDeath", "serious", "siblingDeath", "widowed"]);
   for (const age of [5, 30, 70]) {
     for (const ev of [...EVENTS, deathEvent].filter(e => e.grave)) assert.equal(personalTilt(ev, { age, tilts }, huge), 0, ev.id);
     assert.ok(personalTilt(EVENTS.find(e => e.id === "chronic"), { age, tilts }, huge) < 0);

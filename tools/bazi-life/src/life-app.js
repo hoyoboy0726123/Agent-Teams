@@ -37,6 +37,13 @@ function setup() {
   $("#form-me").addEventListener("submit", e => { e.preventDefault(); startFromForm(); });
   $("#go-random").addEventListener("click", startRandom);
   $("#c-pause").addEventListener("click", () => { paused = !paused; $("#c-pause").textContent = paused ? "繼續" : "暫停"; if (!paused) schedule(); });
+  // "只問人生大事": everyday choices follow the personality; remembered in this browser only.
+  try { $("#c-major").checked = localStorage.getItem("bazi-life.majorOnly") === "1"; } catch {}
+  $("#c-major").addEventListener("change", () => {
+    const on = $("#c-major").checked;
+    try { localStorage.setItem("bazi-life.majorOnly", on ? "1" : "0"); } catch {}
+    if (run) run.life.setMajorOnly(on);
+  });
   for (const b of document.querySelectorAll("[data-speed]")) b.addEventListener("click", () => {
     speed = Number(b.dataset.speed);
     for (const x of document.querySelectorAll("[data-speed]")) x.setAttribute("aria-pressed", String(x === b));
@@ -143,7 +150,7 @@ function begin(input, born, extra = {}) {
   // A name without Kangxi strokes still appears in the story; it just isn't scored.
   const name = prep.name || (extra.name ? { full: extra.name, effects: null } : null);
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-  run = { input, extra, chart, prep, name, seed, born, life: createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed, name, family: prep.family }), summary: null };
+  run = { input, extra, chart, prep, name, seed, born, life: createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed, name, family: prep.family, majorOnly: $("#c-major").checked }), summary: null };
   $("#setup").hidden = true; $("#end").hidden = true; $("#play").hidden = false;
   $("#feed").innerHTML = ""; $("#choice").hidden = true;
   $("#born").textContent = born || `${input.date.y} 年 ${input.date.m} 月 ${input.date.d} 日在${input.place.name}出生。`;
@@ -189,7 +196,7 @@ function skipToEnd() {
   finish();
 }
 
-const lineOf = e => `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">${e.free ? "你自己的決定" : "你的選擇"}：${esc(e.choice)}</span>` : ""}${e.reason ? `<span class="why">${e.reasonFrom === "family" ? "合盤" : "命盤"}：${esc(e.reason)}</span>` : ""}`;
+const lineOf = e => `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">${e.free ? "你自己的決定" : e.picked ? "依你的個性" : "你的選擇"}：${esc(e.choice)}</span>` : ""}${e.reason ? `<span class="why">${e.reasonFrom === "family" ? "合盤" : "命盤"}：${esc(e.reason)}</span>` : ""}`;
 
 function render(entries) {
   if (!entries.length) return;

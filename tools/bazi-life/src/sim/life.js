@@ -32,7 +32,7 @@ function initialState({ sex, birthYear, county, rng, family, name, analysis }) {
     employed: false, job: null, career: 0, income: 0, savings: 0, debt: 0, retired: false, unemployedFor: 0,
     rel: "single", partner: null, exes: [], since: null, marriages: 0, divorces: 0, guard: 0, crisis: 0, spells: [],
     kids: [], friends: [], siblings: siblingsOf(family, birthYear, rng), tilts,
-    traits: initTraits(analysis, rng),
+    traits: initTraits(analysis, rng),   // traitBase is set right after, from these
     health: { chronic: false, serious: null, checkups: false, hr: 1, fitness: 0.5, smoke: false, drink: false, stress: 0.3 },
     father: { alive: true, age: fatherAge, name: (father && father.name) || "" },
     mother: { alive: true, age: motherAge, name: (mother && mother.name) || "" },
@@ -83,13 +83,22 @@ export function personalTilt(ev, s, nameEffects) {
 }
 
 // How a choice leaves its mark on the person: bold choices make you bolder, and so on.
-const STYLE_NUDGE = { risk: [["drive", 0.02], ["caution", -0.02]], safe: [["caution", 0.02], ["drive", -0.015]], family: [["warmth", 0.02]], self: [["warmth", -0.02]], health: [["health", 0.02]], social: [["warmth", 0.015]], learn: [["curiosity", 0.02]] };
+// Opposite styles move the same traits in opposite directions, and every year each trait drifts 5 % of the way back
+// toward where it started, so a long life of choices shapes the person without running away.
+const STYLE_NUDGE = { risk: [["drive", 0.02], ["caution", -0.02]], safe: [["caution", 0.02], ["drive", -0.02]], family: [["warmth", 0.02]], self: [["warmth", -0.02]], health: [["health", 0.02]], social: [["warmth", 0.01], ["curiosity", 0.01]], learn: [["curiosity", 0.02]] };
 
-export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed = 1, auto = false, policy = null, county = null, name = null, family = null }) {
+//   majorOnly  ask the player only the big decisions (core.js and work.js); everyday choices follow the personality
+export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed = 1, auto = false, policy = null, county = null, name = null, family = null, majorOnly = false }) {
   const rng = makeRng(seed);
+  // A separate stream decides whether the calibrated core events happen and who dies when, so adding a story
+  // event (which draws from rng) does not reshuffle the statistics.
+  const fate = makeRng((seed ^ 0x5bd1e995) >>> 0);
   const s = initialState({ sex, birthYear: chart.input.date.y, county: county || placeCounty(chart.input.place), rng, family, name, analysis });
+  s.traitBase = { ...s.traits };
   const log = [], kline = [];
   let queue = null, pending = null, open = 60;
+  // Pacing: the choices asked this year. The core ones always come; a story choice waits for a year without one.
+  let choicesThisYear = 0;
 
   const yearLuck = age => luck[Math.max(0, Math.min(luck.length - 1, age - 1))];
   // An event's ln-odds tilt this year: the chart's yearly luck, then the name and the family charts.
@@ -102,12 +111,14 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
   // Wording. A list of templates gives one this life has not used yet; every template is expanded with the
   // story's usual words ({partner}, {city}, {kid}…) plus `vars`, and a sentence already told is told differently.
   s.used = new Set();
+  // The friend and the trip of one event stay the same from its question to its result (fire() starts a new scene).
+  let scene = {};
   const slots = () => ({
     city: s.abroad || s.county || chart.input.place.name, job: s.job ? s.job.title : "工作",
     partner: s.partner ? s.partner.call : "另一半", ta: pronoun(s.partner),
     kid: s.kids.length ? s.kids[s.kids.length - 1].call : "孩子", kids: s.kids.length > 1 ? "孩子們" : "孩子",
-    friend: () => { const f = s.friends.filter(x => x.alive); return f.length ? rng.pick(f).call : "老朋友"; },
-    grand: s.sex === "female" ? "阿嬤" : "阿公", chat: chatTool(s.year), trip: () => tripPlace(s, ctx), age: s.age, year: s.year,
+    friend: () => (scene.friend ??= (() => { const f = s.friends.filter(x => x.alive); return f.length ? rng.pick(f).call : "老朋友"; })()),
+    grand: s.sex === "female" ? "阿嬤" : "阿公", chat: chatTool(s.year), trip: () => (scene.trip ??= tripPlace(s, ctx)), age: s.age, year: s.year,
   });
   function words(templates, vars = {}) {
     const list = Array.isArray(templates) ? templates : [templates];
@@ -130,7 +141,8 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     remember: (kind, text, extra = {}) => s.memory.push({ kind, text, age: s.age, ...extra }),
     nudge: (key, delta) => nudge(s, key, delta),
     arc: {
-      start: (id, data = {}, inYears = 1, stage = "start") => { s.arcs[id] = { stage, next: s.age + inYears, since: s.age, data }; return s.arcs[id]; },
+      // An arc already under way is kept, not restarted.
+      start: (id, data = {}, inYears = 1, stage = "start") => s.arcs[id] || (s.arcs[id] = { stage, next: s.age + inYears, since: s.age, data }),
       at: (id, stage) => !!s.arcs[id] && s.arcs[id].stage === stage && s.age >= s.arcs[id].next,
       go: (id, stage, inYears = 1) => { if (s.arcs[id]) { s.arcs[id].stage = stage; s.arcs[id].next = s.age + inYears; } },
       end: (id, outcome = true) => { delete s.arcs[id]; s.flags[`arc_${id}`] = outcome; },
@@ -166,10 +178,12 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     return familyReason ? { text: familyReason, from: "family" } : null;
   };
 
-  function record(ev, out, l, lnm, choice = null, free = false) {
+  // How an entry came about:  choice  the option's label    asked  it was a real choice (more than one option)
+  //   free  the player wrote it    picked  chosen by the personality (majorOnly)
+  function record(ev, out, l, lnm, { choice = null, asked = false, free = false, picked = false } = {}) {
     if (!out || !out.text) return null;
     const why = explain(ev, l, lnm);
-    const entry = { age: s.age, year: s.year, id: ev.id, domain: ev.domain, channel: ev.channel, text: out.text, mood: out.mood || 0, reason: why && why.text, reasonFrom: why && why.from, big: !!(out.big || ev.big), choice, free };
+    const entry = { age: s.age, year: s.year, id: ev.id, domain: ev.domain, channel: ev.channel, text: out.text, mood: out.mood || 0, reason: why && why.text, reasonFrom: why && why.from, big: !!(out.big || ev.big), choice, asked, free, picked };
     s.happiness = Math.max(0, Math.min(100, s.happiness + (out.mood || 0)));
     log.push(entry);
     // Big moments are remembered, so later years can look back on them.
@@ -178,26 +192,35 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
   }
 
   // The options a choice offers right now: those whose condition holds, with their weights for the auto player.
-  function offered(c) {
+  // A calibrated choice (its weights reproduce a statistic) is answered by the weights alone, not the personality.
+  function offered(c, ev) {
     const options = c.options.filter(o => !o.when || o.when(s, ctx));
-    return options.map(o => ({ ...o, w: Math.max(0, typeof o.weight === "function" ? o.weight(s, ctx) : o.weight ?? 1) * styleWeight(s.traits, o.style) }));
+    return options.map(o => ({ ...o, w: Math.max(0, typeof o.weight === "function" ? o.weight(s, ctx) : o.weight ?? 1) * (ev.calibrated ? 1 : styleWeight(s.traits, o.style)) }));
   }
-  function applyOption(option) {
+  // A choice nudges the personality by how it differs from what a typical person would pick here (the weights of the
+  // options on offer), so a population does not drift one way, while someone who keeps choosing boldly grows bolder.
+  function applyOption(option, list = [option]) {
     const out = option.apply ? option.apply(s, ctx) : act(option.act, s, ctx, { label: option.label });
-    for (const [k, d] of STYLE_NUDGE[option.style] || []) nudge(s, k, d);
+    const total = list.reduce((a, o) => a + (o.w || 0), 0) || 1, delta = {};
+    for (const [k, d] of STYLE_NUDGE[option.style] || []) delta[k] = (delta[k] || 0) + d;
+    for (const o of list) for (const [k, d] of STYLE_NUDGE[o.style] || []) delta[k] = (delta[k] || 0) - d * (o.w || 0) / total;
+    for (const [k, d] of Object.entries(delta)) nudge(s, k, d);
     return out;
   }
 
   function fire(ev, l, lnm) {
+    scene = {};
     s.done.add(ev.id); s.count[ev.id] = (s.count[ev.id] || 0) + 1; s.last[ev.id] = s.age;
     if (ev.choice) {
       const c = ev.choice(s, ctx);
       if (!c) return;
-      const options = offered(c);
+      const options = offered(c, ev);
       if (!options.length) return;
-      if (auto || options.length === 1) {
+      if (options.length > 1) choicesThisYear += 1;
+      const everyday = majorOnly && !ev.major;
+      if (auto || options.length === 1 || everyday) {
         const i = policy ? policy(ev, { ...c, options }, s, ctx) : rng.weighted(options.map((o, k) => [k, o.w || 0.0001]));
-        record(ev, applyOption(options[i]), l, lnm, options[i].label);
+        record(ev, applyOption(options[i], options), l, lnm, { choice: options[i].label, asked: options.length > 1, picked: everyday && !auto && options.length > 1 });
         return;
       }
       // The option this person's nature leans to (styleWeight from the traits), when the lean is clear.
@@ -229,9 +252,10 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     const l = yearLuck(s.age);
     while (queue.length) {
       const ev = queue.shift();
+      if (ev.choice && !ev.core && choicesThisYear > 0) continue;
       if (!eligible(ev)) continue;
       const p0 = ev.p(s, ctx), fromLuck = luckTilt(ev);
-      if (rng() < tilt(p0, fromLuck + personalTilt(ev, s, name && name.effects))) {
+      if ((ev.core ? fate() : rng()) < tilt(p0, fromLuck + personalTilt(ev, s, name && name.effects))) {
         fire(ev, l, fromLuck);
         if (pending) return false;
       }
@@ -246,7 +270,7 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     const ill = s.health.serious ? R.seriousFatality(s.health.serious.type, s.age - s.health.serious.since, s.health.checkups, s.health.serious.since, s.sex) : 0;
     const q = Math.min(0.999, R.death(s.age, s.sex, s.year) * s.health.hr + ill);
     const lnm = l && s.age > 0 ? l.m.health.bad : 0;
-    if (s.age >= MAX_AGE || rng() < tilt(q, lnm)) {
+    if (s.age >= MAX_AGE || fate() < tilt(q, lnm)) {
       s.alive = false;
       closeSpell(s, "death");
       record(deathEvent, deathEvent.apply(s, ctx), l, lnm);
@@ -270,10 +294,13 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
       for (const k of s.kids) k.age += 1;
       if (s.guard > 0) s.guard -= 1;
       if (s.crisis > 0) s.crisis -= 1;
-      if (!s.employed && s.done.has("firstJob") && !s.retired) s.unemployedFor += 1;
+      if (s.retired) s.unemployedFor = 0;
+      else if (!s.employed && s.done.has("firstJob")) s.unemployedFor += 1;
+      for (const k of Object.keys(s.traits)) s.traits[k] += 0.05 * (s.traitBase[k] - s.traits[k]);
       const rate = s.flags.frugalUntil >= s.age ? 0.22 : 0.15;
       if (s.employed) s.savings += rate * s.income * (s.rel === "married" ? 1.5 : 1) - 0.04 * s.kids.filter(k => k.age < 22).length;
-      if (s.debt > 0) { const pay = Math.min(s.debt, 0.15); s.debt -= pay; s.savings -= pay; }
+      // Debt is paid from savings as far as they go; what cannot be paid this year stays owed.
+      if (s.debt > 0) { const pay = Math.min(s.debt, 0.15, Math.max(0, s.savings)); s.debt -= pay; s.savings -= pay; }
       s.savings = Math.max(0, s.savings);
     }
   }
@@ -286,7 +313,7 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
   function step() {
     if (!s.alive || pending) return [];
     const from = log.length;
-    if (!queue) queue = ALL_EVENTS.slice();
+    if (!queue) { queue = ALL_EVENTS.slice(); choicesThisYear = 0; }
     if (!runQueue()) return log.slice(from);
     queue = null;
     endYear();
@@ -300,7 +327,7 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     const from = log.length;
     const k = Math.max(0, Math.min(list.length - 1, i)), option = list[k];
     if (lean >= 0 && byPlayer) { s.lean.offered += 1; if (k === lean) s.lean.followed += 1; }
-    record(ev, applyOption(option), l, lnm, option.label);
+    record(ev, applyOption(option, list), l, lnm, { choice: option.label, asked: true });
     finishYear();
     return log.slice(from);
   }
@@ -311,18 +338,20 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
   // back, so the player can choose again.
   function chooseAction({ action, summary = "" }) {
     if (!pending) return { entries: [] };
-    const { ev, list, l, lnm } = pending;
+    const { ev, c, list, l, lnm } = pending;
     const own = list.find(o => o.id && o.id === action);
     let out;
-    if (own) out = applyOption(own);
-    else if (ACTIONS[action]) out = act(action, s, ctx, { situation: ev.id, domain: ev.domain, about: ev.about, summary });
+    if (own) out = applyOption(own, list);
+    else if (ACTIONS[action]) out = act(action, s, ctx, { situation: ev.id, domain: ev.domain, about: ev.about, summary, topic: topicOf(c) });
     else return { infeasible: "看不出要怎麼做，換個說法試試看。", entries: [] };
     if (out && out.infeasible) return { infeasible: out.infeasible, entries: [] };
+    // A storyline choice says how a written answer moves it on (work.js: the startup's second year, the exam).
+    if (!own && c.onFree) c.onFree(action, s, ctx);
     pending = null;
     s.written += 1;
     const from = log.length;
     const label = summary || (own ? own.label : ACTIONS[action].label);
-    record(ev, out, l, lnm, label, true);
+    record(ev, out, l, lnm, { choice: label, asked: true, free: true });
     finishYear();
     return { entries: log.slice(from) };
   }
@@ -336,9 +365,18 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
   return {
     state: s, log, kline,
     step, choose, chooseAction, autoChoose,
+    setMajorOnly(on) { majorOnly = !!on; },
     get pending() { return pending && { id: pending.id, prompt: pending.prompt, options: pending.options, why: pending.why, free: pending.free, lean: pending.lean }; },
     get done() { return !s.alive; },
   };
+}
+
+// What a choice is about, to open the story line of an answer the player wrote: the choice's own `topic`, else the
+// first sentence of its question when it has one before the question itself ("公司裁員，你被列在名單上").
+export function topicOf(c) {
+  if (c.topic) return c.topic;
+  const m = /^([^。？?！!]+)[。！!]/.exec(String(c.prompt || ""));
+  return m ? m[1].trim() : "";
 }
 
 // The protagonist in a few words, for the free-text interpreter: no names, no birth data.

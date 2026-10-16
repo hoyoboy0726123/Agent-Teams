@@ -49,9 +49,15 @@ export function jobFit(analysis, job, name = null) {
   return Math.max(0.2, f);
 }
 export const fitsPattern = (analysis, field) => (PATTERN_FIELDS[analysis.pattern] || []).includes(field);
+// Jobs a minor cannot take: driving needs a licence at 18, building sites and security work are closed to minors.
+const ADULT_ONLY = new Set(["貨運司機", "保全", "營造工地"]);
+export function jobsFor(s, list = JOBS[tier(s.edu)]) {
+  const open = s.age >= 18 ? list : list.filter(([t]) => !ADULT_ONLY.has(t));
+  return open.length ? open : list;
+}
 // A job for this person: likelier when it fits the chart.
 export function pickJob(s, ctx, list = JOBS[tier(s.edu)]) {
-  return ctx.rng.weighted(list.map(j => [j, jobFit(ctx.analysis, j, ctx.name)]));
+  return ctx.rng.weighted(jobsFor(s, list).map(j => [j, jobFit(ctx.analysis, j, ctx.name)]));
 }
 export const tier = edu => ({ none: "basic", 國小: "basic", 國中: "basic", 高中: "high", 高職: "high", 五專: "college", 科大: "college", 大學: "college", 碩士: "graduate", 博士: "graduate" })[edu] || "basic";
 
@@ -61,6 +67,7 @@ export const wage = (s, factor, ctx) => Math.max(0.35, factor * interp(ctx.R.PAY
 export function startJob(s, ctx, pick = null) {
   const [title, factor, field, element] = pick || pickJob(s, ctx);
   s.employed = true; s.job = { title, factor, field, element, since: s.age }; s.unemployedFor = 0;
+  s.done.add("firstJob");   // however the first job came, the "first job" choice is behind you
   s.income = wage(s, factor, ctx);
   if (s.home === "parents" && s.age >= 22 && ctx.rng.chance(0.4)) s.home = "rent";
   return title;
@@ -76,8 +83,8 @@ export function moveTo(s, ctx, options = null) {
 }
 export const yearsMarried = s => (s.since === null ? 0 : s.age - s.since);
 
-// Brothers and sisters already born, at least `minAge` years old.
-export const bornSiblings = (s, minAge = 0) => s.siblings.list.filter(x => x.born && s.age - x.bornAt >= minAge);
+// Brothers and sisters already born and still alive, at least `minAge` years old.
+export const bornSiblings = (s, minAge = 0) => s.siblings.list.filter(x => x.born && x.alive !== false && s.age - x.bornAt >= minAge);
 
 // Everyday details by era, for the wording.
 export function chatTool(year) {
@@ -87,7 +94,8 @@ export function chatTool(year) {
   if (year < 2011) return "MSN";
   return "LINE";
 }
-export function exam15Name(year) { return year < 2001 ? "高中聯考" : year < 2014 ? "國中基測" : "國中會考"; }
-export function exam18Name(year) { return year < 2002 ? "大學聯考" : "學測"; }
+// 北區高中聯招 from 1956, 基測 from 2001, 會考 from 2014; 大專聯考 from 1954, 學測 for the 2002 多元入學 on.
+export function exam15Name(year) { return year < 1956 ? "高中入學考試" : year < 2001 ? "高中聯考" : year < 2014 ? "國中基測" : "國中會考"; }
+export function exam18Name(year) { return year < 1954 ? "大學入學考試" : year < 2002 ? "大學聯考" : "學測"; }
 export const TRIP_PLACES = { home: ["墾丁", "花蓮", "台東", "日月潭", "阿里山", "澎湖", "綠島", "九份", "清境", "太魯閣"], abroad: ["日本", "韓國", "泰國", "香港", "新加坡", "峇里島", "歐洲", "美國", "越南", "北海道"] };
 export const tripPlace = (s, ctx) => (s.year >= 1979 && ctx.rng() < 0.5 ? ctx.rng.pick(TRIP_PLACES.abroad) : ctx.rng.pick(TRIP_PLACES.home));   // 1979: overseas tourism opens

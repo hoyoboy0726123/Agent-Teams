@@ -118,7 +118,7 @@ export const CHRONIC_HR = 1.3;
 // healthy baseline is the table minus those. A small Markov chain over the states the simulation uses (healthy,
 // or k years after a diagnosis; with or without chronic disease) solves, age by age, for the baseline that makes
 // the population's expected death probability equal the table.
-const CHECKUP_SHARE = 0.55;   // matches the auto policy for the 40-year health check choice in events.js
+const CHECKUP_SHARE = 0.55;   // matches the auto policy for the 40-year health check choice (checkups in story/core.js)
 function fatalityAt(sex, diagnosedAt, k) {
   const c = cancerIncidence(diagnosedAt, sex), v = vascularIncidence(diagnosedAt, sex), cancerShare = c / (c + v);
   const cancer = FATALITY.癌症[k] * interp(CANCER_AGE[sex], diagnosedAt) * (diagnosedAt >= 40 ? 1 - 0.25 * CHECKUP_SHARE : 1);
@@ -198,7 +198,8 @@ export function siblings(birthYear, rng) {
 // period uses today's timing.
 export const dating = (age, rel) => (rel === "single" ? interp([[17, 0.1], [22, 0.26], [30, 0.3], [40, 0.18], [55, 0.08], [70, 0.03]], age) : interp([[30, 0.2], [45, 0.12], [60, 0.05], [75, 0.02]], age));
 export const breakup = age => interp([[18, 0.4], [25, 0.3], [35, 0.25], [50, 0.2]], age);
-export const proposal = (age, sex, year, marriages) => interp(sex === "female" ? [[18, 0.025], [22, 0.13], [25, 0.26], [28, 0.34], [32, 0.28], [37, 0.18], [45, 0.09], [60, 0.04]] : [[20, 0.02], [24, 0.1], [27, 0.22], [30, 0.31], [34, 0.26], [39, 0.16], [48, 0.08], [60, 0.04]], age) * (marriages ? 0.6 : 1);
+// Fitted so the simulated first marriages match 2024: mean age 31.1 (women) and 33.1 (men), 42 % of men unmarried at 35–39.
+export const proposal = (age, sex, year, marriages) => interp(sex === "female" ? [[18, 0.035], [22, 0.18], [25, 0.31], [27, 0.35], [30, 0.29], [35, 0.18], [45, 0.09], [60, 0.04]] : [[20, 0.025], [24, 0.11], [27, 0.23], [30, 0.28], [34, 0.22], [39, 0.14], [48, 0.065], [60, 0.03]], age) * (marriages ? 0.6 : 1);
 
 // ---------- divorce ----------
 // 內政部 2024: 10.5 divorces per 1,000 married people a year; median length of marriage at divorce 8.3 years;
@@ -206,7 +207,8 @@ export const proposal = (age, sex, year, marriages) => interp(sex === "female" ?
 // test/calibration.test.js. Later and earlier years scale with the crude divorce rate (1996 1.67, 2003 2.87,
 // 2010 2.51, 2023 2.18, 2024 2.28, 2025 2.23 per 1,000); years before 1996 use 1996.
 const DIVORCE_TREND = [[1996, 1.67], [2003, 2.87], [2010, 2.51], [2023, 2.18], [2024, 2.28], [2025, 2.23]];
-const DIVORCE_BY_YEARS = [[0, 0.017], [2, 0.03], [5, 0.021], [9, 0.013], [15, 0.009], [25, 0.005], [40, 0.003]];
+// By years married; fitted with the crisis choices so a third of divorces come within five years and a quarter at 5–9.
+const DIVORCE_BY_YEARS = [[0, 0.016], [2, 0.028], [5, 0.024], [9, 0.015], [15, 0.009], [25, 0.005], [40, 0.003]];
 export const divorce = (years, year) => interp(DIVORCE_BY_YEARS, years) * interp(DIVORCE_TREND, yr(year)) / 2.28;
 export const crisis = years => interp([[0, 0.03], [3, 0.06], [10, 0.04], [25, 0.02]], years);
 

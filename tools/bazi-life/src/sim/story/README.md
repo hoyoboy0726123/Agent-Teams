@@ -49,6 +49,15 @@ choice: (s, ctx) => ({
 - `weight`：一般人選它的比重，同一個抉擇的選項加起來大約 1。可以是函式 `(s, ctx) => number`。
 - `when`：這個選項什麼時候才出現（例如要有兄弟姊妹）。
 - `prompt` 和每個結果的 `text` 要說清楚情境，讓只看那一行的人也看得懂。
+- 玩家自己寫的決定，故事那一行會用 `prompt` 的第一句開頭（「公司裁員，你被列在名單上。你決定……」）。`prompt` 沒有問句之前的那一句時，可以在 choice 回傳 `topic: "朋友找你合開早餐店"`。
+- 跨好幾年的故事線：玩家自己寫、沒有對應到按鈕時，按鈕的 `apply` 不會跑。在 choice 回傳 `onFree: (actionId, s, ctx) => …`，決定故事線怎麼往下走（例子見 `work.js` 的 `startupYear1`、`civilExam`）。
+
+## 節奏
+
+- `core.js` 和 `work.js` 的抉擇是人生大事（`index.js` 標成 `major`），一定會問。
+- 其他抉擇是日常小事：一年最多一個，那一年已經有抉擇時就先跳過，之後的年份還有機會。檔案越後面（`index.js` 的順序）越常被跳過。
+- 玩家打開「只問人生大事」時，日常小事依個性自動決定。所以日常小事的每個選項都要能自己成立，不能假設玩家一定看過問題。
+- 一局大約 40 個抉擇。新增會常出現的抉擇時，跑 `node scripts/variety.mjs` 看每一生的抉擇數。
 
 ## ctx 能用的東西
 
@@ -70,6 +79,8 @@ choice: (s, ctx) => ({
 - `{甲|乙|丙}` 隨機選一個，可以巢狀、可以空白（`{|很}`）。
 - `{name}` 帶入變數。常用的變數不用傳：`{city}`（現在住的縣市）、`{job}`、`{partner}`（另一半的名字）、`{ta}`（他／她）、`{kid}`（最小的孩子）、`{kids}`、`{friend}`（隨機一位朋友）、`{grand}`（阿公／阿嬤）、`{chat}`（那個年代的聊天方式）、`{trip}`（旅行地點）、`{age}`、`{year}`。
 - 只有用 `ctx.w()` 的句子才會展開模板。一般字串裡不要放 `{`、`}`。
+- 傳給 `ctx.w()` 的變數值是照原樣放進去的：變數值裡的 `{甲|乙}` 不會展開，要先用 `ctx.w()` 產生再傳。
+- `{friend}` 和 `{trip}` 在同一個事件裡（從問題到結果）是同一個人、同一個地方。
 - 每個事件至少 3 個模板，或一個模板至少 8 種組合。用年代（`s.year`）、地點、職業、家人狀態讓句子不一樣。
 
 ## 主角的狀態 `s`
@@ -79,13 +90,14 @@ choice: (s, ctx) => ({
 | `age`、`year`、`birthYear`、`sex`（male/female）、`county`、`birthCounty`、`abroad` | |
 | `edu`（none/國小/國中/高中/高職/五專/科大/大學/碩士/博士）、`studying`、`track` | 學歷 |
 | `employed`、`job`（`{title, factor, field, since}`）、`career`（0–5）、`income`（相對全國中位數）、`savings`、`debt`、`retired`、`unemployedFor` | 工作與金錢（單位是一年的中位數薪水） |
-| `rel`（single/dating/married/divorced/widowed）、`partner`（人物，有 `age`）、`exes`、`marriages`、`divorces`、`guard`、`crisis` | 感情 |
+| `rel`（single/dating/married/divorced/widowed）、`partner`（人物，有 `age`）、`exes`（分手、離婚的對象，也包括過世的配偶，那一位 `alive` 是 false）、`marriages`、`divorces`、`guard`、`crisis` | 感情 |
 | `kids`（人物陣列，有 `age`、`call`、`sex`）、`friends`（人物陣列）、`siblings.list`、`father`、`mother`（`{alive, age, name}`） | 家人朋友 |
 | `health`（`chronic`、`serious`、`hr`、`fitness`、`smoke`、`drink`、`stress`） | 健康 |
 | `traits`（drive、caution、warmth、health、curiosity，0–1） | 個性 |
-| `home`（parents/rent/own）、`flags`、`arcs`、`memory`、`done`（發生過的事件 id）、`last`（事件 id → 最後一次的年齡） | 其他 |
+| `abroad`（在國外時是國家名）、`leftAt`（出國那年的年齡） | 出國 |
+| `home`（parents/rent/own）、`flags`、`arcs`、`memory`、`done`（發生過的事件 id）、`last`（事件 id → 最後一次發生的年齡） | 其他 |
 
-`src/sim/world.js` 有工作清單、`startJob`、`moveTo`、`bornSiblings`、`chatTool`、`exam15Name` 等；`src/sim/words.js` 有 `siblingCall`（「哥哥志明」）；`src/sim/act.js` 有 `marry`、`endRelationship`、`ownHome`。
+`src/sim/world.js` 有工作清單、`jobsFor`（未成年不能做的工作會拿掉）、`startJob`、`moveTo`、`bornSiblings`、`chatTool`、`exam15Name` 等；`src/sim/words.js` 有 `siblingCall`（「哥哥志明」）；`src/sim/act.js` 有 `marry`、`endRelationship`、`ownHome`。
 
 ## 不能動到統計
 
@@ -94,6 +106,7 @@ choice: (s, ctx) => ({
 - 不直接結婚、離婚、生小孩、買房、退休、讓人死亡或得重病；這些交給 `core.js`。
 - 會改變工作（辭職、換工作）或健康（`hr`）的選項，影響要小（`hr` 每次最多乘 0.97 或 1.03），而且有好有壞。
 - 故事事件的機率沒有官方統計，寫在旁邊的註解說明是假設的。
+- 一般行動（`act.js`）有年齡下限：工作從 15 歲起，結婚、借錢、投資、買彩券、移民要滿 18 歲；小孩的「存錢」「進修」「照顧家人」是小孩版的意思。
 
 ## 語氣
 

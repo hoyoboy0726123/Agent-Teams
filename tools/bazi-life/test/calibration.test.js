@@ -37,7 +37,10 @@ function population(sex, n) {
 const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
 const near = (value, target, tol, label) => assert.ok(Math.abs(value - target) <= tol, `${label}: ${value.toFixed(3)} vs ${target} ± ${tol}`);
 
-const women = population("female", 1500), men = population("male", 1500);
+// 2,500 lives per sex: the means are fitted to the targets (rates.js), and at this size the seed-to-seed spread
+// (about 0.3 years on men's first-marriage age) stays well inside every tolerance, so adding a story event does not
+// flip the test by chance.
+const women = population("female", 2500), men = population("male", 2500);
 
 test("births: about 0.885 children per woman (2024 total fertility rate)", () => {
   near(women.kids / women.n, 0.885, 0.12, "children per woman");

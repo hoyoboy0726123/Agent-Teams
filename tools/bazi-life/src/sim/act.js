@@ -9,10 +9,32 @@ import { ACTIONS } from "./actions.js";
 import { startJob, otherJob, moveTo, wage, ABROAD, bornSiblings, yearsMarried } from "./world.js";
 import { siblingCall } from "./words.js";
 
-const lead = sit => (sit.summary ? `${sit.summary.replace(/[。.!！\s]+$/, "")}。` : "");
+// The situation in a few words, then the player's own words, so the line reads on its own in the story.
+const lead = sit => [sit.topic, sit.summary].filter(Boolean).map(x => `${x.replace(/[。，,.!！？?\s]+$/, "")}。`).join("");
 const no = infeasible => ({ infeasible });
-const work = sit => sit.domain === "career" || /layoff|burnout|job|work|boss|startup|career/i.test(sit.situation || "");
-const love = sit => sit.domain === "love" || /crisis|proposal|divorce|dating|affair|marri/i.test(sit.situation || "");
+// The youngest age for each action: work from 15 (勞動基準法), adult matters from 18 (marriage, contracts, lottery).
+const MIN_AGE = {
+  jobSearch: 15, jobHop: 15, sideJob: 15, quitJob: 15, careerSwitch: 18, civilService: 18, startup: 18, dispute: 18, workAbroad: 18, retire: 30,
+  invest: 18, buyHome: 18, sellAsset: 18, borrow: 18, lend: 18, insurance: 18, lottery: 18,
+  marry: 18, haveChild: 18, noChild: 18, affair: 18, hireCare: 18, shareCare: 18, moveHome: 18, emigrate: 18,
+  pursue: 12, vice: 13, studyAbroad: 12, volunteer: 10,
+};
+function tooYoung(id, s) {
+  if (!MIN_AGE[id] || s.age >= MIN_AGE[id]) return null;
+  if (MIN_AGE[id] === 15) return "還不到可以工作的年紀（15 歲），現在先好好長大。";
+  if (id === "retire") return "現在談退休還太早了。";
+  if (id === "pursue") return "年紀還小，先當好朋友吧。";
+  if (id === "studyAbroad") return "還太小，一個人出國讀書要等長大一點。";
+  if (s.age < 13) return "這是大人的事，等長大以後再說吧。";
+  return "還沒滿 18 歲，這件事要等成年以後。";
+}
+// A child or a teen still at school: some actions mean something smaller (補習 instead of 在職專班).
+const young = s => s.age < 18;
+// Where a choice belongs: its domain first, then the core event ids that are known to be about work or love.
+const WORK_IDS = ["layoff", "burnout", "firstJob", "startupOffer", "startupYear1", "civilExam"];
+const LOVE_IDS = ["crisis", "proposal", "a_temptation", "a_chores", "a_inlaws"];
+const work = sit => sit.domain === "career" || WORK_IDS.includes(sit.situation);
+const love = sit => sit.domain === "love" || LOVE_IDS.includes(sit.situation);
 
 // Marriages are kept as spells { from, to, end } for the statistics (test/calibration.test.js).
 export function closeSpell(s, end) {
@@ -32,7 +54,7 @@ export function endRelationship(s, ctx) {
   return null;
 }
 export function marry(s) {
-  s.rel = "married"; s.marriages += 1; s.since = s.age; s.crisis = 0;
+  s.rel = "married"; s.marriages += 1; s.since = s.age; s.crisis = 0; s.guard = 0;
   s.spells.push({ from: s.age, to: null, end: null });
   if (s.home === "parents") s.home = "rent";
 }
@@ -78,7 +100,12 @@ const HANDLERS = {
       s.flags[`retake_${sit.situation}`] = true; s.done.delete(sit.situation);
       return { text: lead(sit) + ctx.w("決定{重考|再拚一年}，{每天到補習班報到|把自己關在書桌前}。"), mood: -2 };
     }
+    if (young(s) || (s.studying && s.age < 25)) {
+      ctx.nudge("curiosity", 0.02);
+      return { text: lead(sit) + ctx.w("{報名了補習班，|每天{放學|下課}後多讀一個小時，|把不會的題目整理成一本筆記，}{成績慢慢進步了。|雖然累，但看得到進步。|讀出了一點興趣。}"), mood: 1 };
+    }
     if (s.age >= 70) return no("年紀大了，可以把它當興趣學。");
+    if (s.arcs.study) return no("你已經在進修了，先把它讀完吧。");
     const kind = ctx.rng.pick(["在職專班", "證照課程", "研究所", "語言課"]);
     ctx.arc.start("study", { kind, from: s.age }, ctx.rng.chance(0.5) ? 1 : 2);
     spend(s, 0.3); ctx.nudge("curiosity", 0.03);
@@ -89,7 +116,7 @@ const HANDLERS = {
     if (s.age >= 25 && s.savings < 1.5) return no("存款不夠出國讀書。");
     const where = ctx.rng.weighted([["美國", 3], ["英國", 1.5], ["日本", 2], ["澳洲", 1.5], ["加拿大", 1], ["德國", 0.8]]);
     if (s.age >= 25) spend(s, 1.5);
-    s.abroad = where; s.last.abroad = s.age; s.flags.studyAbroad = s.age;
+    s.abroad = where; s.leftAt = s.age; s.flags.studyAbroad = s.age;
     if (/exam15/.test(sit.situation || "")) { s.track = "高中"; s.studying = true; }
     return { text: lead(sit) + ctx.w("飛到{where}讀書，{第一個月每天都在想家|很快就交到各國的朋友}。", { where }), mood: 3, big: true };
   },
@@ -103,6 +130,7 @@ const HANDLERS = {
   startup(s, ctx, sit) {
     if (s.age < 18) return no("還太小，先存點經驗。");
     if (s.arcs.startup) return no("你已經在創業了。");
+    if (s.retired && s.age >= 75) return no("這個年紀開店太辛苦了，可以把它當成興趣做。");
     const kind = ctx.rng.pick(["咖啡店", "早午餐店", "網路商店", "工作室", "手搖飲加盟店", "小吃店", "設計公司"]);
     const money = Math.min(s.savings, 1.5);
     if (money < 0.5) s.debt += 1; else spend(s, money);
@@ -144,13 +172,16 @@ const HANDLERS = {
     if (s.age > 60) return no("這個年紀出國工作太辛苦了。");
     if (s.age < 18) return no("還太小了。");
     const where = /abroad/.test(sit.situation || "") && s.flags.offerAbroad ? s.flags.offerAbroad : ctx.rng.weighted(ABROAD);
-    s.abroad = where; s.last.abroad = s.age;
+    s.abroad = where; s.leftAt = s.age;
     if (s.employed) s.income *= 1.2; else startJob(s, ctx);
     return { text: lead(sit) + ctx.w("到{where}工作，{一切從頭開始。|住進一間小小的宿舍。|第一個月連超市都逛不習慣。}", { where }), mood: 3, big: true };
   },
   familyBusiness(s, ctx, sit) {
     if (!s.father.alive && !s.mother.alive) return no("爸媽都不在了，家裡沒有家業可以接。");
+    // A child, or a teen still at school, helps out at home; only a grown-up takes over the family trade.
+    if (s.age < 15 || (young(s) && s.studying)) return { text: lead(sit) + ctx.w("{放學後|假日}幫忙家裡{顧店|做事|下田}，{爸媽誇你長大了。|學會了算錢找錢。|累，但很有成就感。}"), mood: 1 };
     if (s.birthCounty) s.county = s.birthCounty;
+    s.done.add("firstJob");
     s.employed = true; s.unemployedFor = 0;
     const title = ctx.rng.pick(["家裡的店", "家裡的田", "家裡的小工廠"]);
     s.job = { title, factor: 0.75, field: "家業", since: s.age }; s.income = wage(s, 0.75, ctx);
@@ -171,6 +202,7 @@ const HANDLERS = {
 
   // ---------- money ----------
   save(s, ctx, sit) {
+    if (young(s)) return { text: lead(sit) + ctx.w("把{零用錢|紅包錢}{存進撲滿，|交給媽媽存起來，}{想買的東西先忍一忍。|看著存的錢慢慢變多。}"), mood: 0 };
     s.flags.frugalUntil = s.age + 3;
     return { text: lead(sit) + ctx.w("{開始記帳，|把每個月的開銷砍了一半，}{午餐自己帶便當。|能省就省。}"), mood: -1 };
   },
@@ -230,6 +262,10 @@ const HANDLERS = {
     return { text: lead(sit) + ctx.w("{坐下來好好談，|把心裡的話說出來，}{對方比你想的更願意聽。|雖然有點尷尬，說完舒服多了。}"), mood: 2 };
   },
   counsel(s, ctx, sit) {
+    if (young(s)) {
+      s.health.stress = Math.max(0, s.health.stress - 0.15);
+      return { text: lead(sit) + ctx.w("{去輔導室找輔導老師聊了幾次，|跟學校的輔導老師約了時間，}{心裡輕鬆多了。|知道有人願意聽你說。}"), mood: 2 };
+    }
     spend(s, 0.05);
     if (love(sit) && s.partner) { s.guard = Math.max(s.guard, 5); return { text: lead(sit) + ctx.w("{和{partner}一起去婚姻諮商，|每週一次去找諮商師，}{學會用新的方式吵架。|第一次聽懂{ta}在氣什麼。}"), mood: 1 }; }
     s.health.stress = Math.max(0, s.health.stress - 0.2);
@@ -258,6 +294,7 @@ const HANDLERS = {
   },
   pursue(s, ctx, sit) {
     if (s.rel === "married") { s.guard = Math.max(s.guard, 2); return { text: lead(sit) + ctx.w("{重新追了{partner}一次：|偷偷安排了一場約會，}{訂了你們第一次約會的餐廳。|買了{ta}一直想要的東西。}"), mood: 3 }; }
+    if (young(s) && s.rel !== "dating") return { text: lead(sit) + ctx.w("{鼓起勇氣，|下課的時候，}{傳了紙條給喜歡的人。|約喜歡的人一起去圖書館。}{心跳得好快。|對方笑了。}"), mood: 2 };
     s.flags.pursueUntil = s.age + 1;
     return { text: lead(sit) + ctx.w("{鼓起勇氣，|不再等緣分，}{主動約了喜歡的人。|開始多參加聚會、認識新朋友。}"), mood: 2 };
   },
@@ -273,9 +310,12 @@ const HANDLERS = {
     return { text: lead(sit) + ctx.w("{決定不生了，|兩個人說好，}{把日子過好就好。|陪好現在的家人。}"), mood: 1 };
   },
   care(s, ctx, sit) {
-    if (s.employed) s.income *= 0.92;
     ctx.nudge("warmth", 0.03);
-    const who = sit.about === "father" ? "爸爸" : sit.about === "mother" ? "媽媽" : /parent|care/i.test(sit.situation || "") ? (s.mother.alive ? "媽媽" : "爸爸") : null;
+    if (young(s)) return { text: lead(sit) + ctx.w("{放學就回家，|主動幫忙做家事，}{陪家人吃飯聊天。|爸媽說你變懂事了。}"), mood: 1 };
+    if (s.employed) s.income *= 0.92;
+    // Who needs care: the parent the choice is about, else an elderly parent who is still alive.
+    const who = sit.about === "father" && s.father.alive ? "爸爸" : sit.about === "mother" && s.mother.alive ? "媽媽"
+      : sit.situation === "parentCare" ? (s.mother.alive && s.mother.age >= 70 ? "媽媽" : s.father.alive ? "爸爸" : null) : null;
     return { text: lead(sit) + ctx.w(who ? "{減少工作，|搬回去住，}自己照顧{who}。{累，但每天都看得到{who}。|陪{who}看電視、散步、回診。}" : "{多花時間陪家人，|把重心放回家裡，}{家裡的笑聲多了。|日子慢了下來。}", { who: who || "" }), mood: 1 };
   },
   hireCare(s, ctx, sit) {
@@ -324,9 +364,11 @@ const HANDLERS = {
   rest(s, ctx, sit) {
     if (s.employed && /burnout/.test(sit.situation || "")) s.income *= 0.95;
     s.health.stress = Math.max(0, s.health.stress - 0.25);
+    if (young(s)) return { text: lead(sit) + ctx.w("{週末什麼都不做，|早點上床睡覺，}{好好睡了一覺。|把自己放空一天。}{精神好多了。|整個人輕鬆不少。}"), mood: 2 };
     return { text: lead(sit) + ctx.w("{請了長假，|什麼都不做，}{好好睡了一個月。|每天睡到自然醒。}{身體慢慢回來了。|整個人都鬆了。}"), mood: 3 };
   },
   travel(s, ctx, sit) {
+    if (young(s)) return { text: lead(sit) + ctx.w("{放假時|趁著連假，}{跟家人|全家}去{trip}玩了幾天，{回來時心情輕鬆多了。|拍了好多照片。}"), mood: 3 };
     spend(s, 0.15);
     if (love(sit) && s.partner) s.guard = Math.max(s.guard, 2);
     return { text: lead(sit) + ctx.w("{去{trip}待了幾天，|一個人去{trip}走走，|到{trip}玩了一趟，}{回來時心情輕鬆多了。|拍了好多照片。|好像把自己找回來了。}"), mood: 4 };
@@ -344,9 +386,14 @@ const HANDLERS = {
   },
   quitHabit(s, ctx, sit) {
     s.health.smoke = false; s.health.drink = false; s.health.hr = Math.max(0.8, s.health.hr * 0.97); ctx.nudge("health", 0.05);
+    if (young(s)) return { text: lead(sit) + ctx.w("{下定決心不再熬夜，|把{電動|手機遊戲}的時間減半，|改掉挑食的習慣，}{頭幾天很難熬，|一開始渾身不對勁，}{後來精神好多了。|爸媽都看到你的改變。}"), mood: 1 };
     return { text: lead(sit) + ctx.w("{下定決心改掉壞習慣，|把菸酒戒了、作息調正常，}{頭兩個星期很難熬，|一開始渾身不對勁，}{後來越來越有精神。|身體好像年輕了幾歲。}"), mood: 1 };
   },
   vice(s, ctx, sit) {
+    if (young(s)) {
+      s.health.smoke = true; s.health.hr *= 1.02;
+      return { text: lead(sit) + ctx.w("{跟同學學抽菸，|躲在廁所抽了第一根菸，}{嗆得一直咳。|被老師抓到，記了一支警告。|回家前拚命嚼口香糖。}"), mood: -1 };
+    }
     s.health.drink = true; s.health.hr *= 1.03;
     return { text: lead(sit) + ctx.w("{每天晚上喝兩杯才睡得著，|用菸酒把煩惱壓下去，}{隔天醒來，問題還在。|身體開始抗議。}"), mood: -1 };
   },
@@ -360,8 +407,9 @@ const HANDLERS = {
     return { text: lead(sit) + ctx.w("{去{醫院|圖書館|社福機構|淨灘活動}當志工，|每週去幫忙一個下午，}{認識了很多新朋友。|覺得自己還能幫上忙。}"), mood: 3 };
   },
   socialize(s, ctx, sit) {
-    const f = ctx.person({ role: "friend", sex: ctx.rng() < 0.5 ? "male" : "female", birthYear: s.birthYear + ctx.rng.int(5) - 2, how: "聚會" });
+    const f = ctx.person({ role: "friend", sex: ctx.rng() < 0.5 ? "male" : "female", birthYear: s.birthYear + (young(s) ? 0 : ctx.rng.int(5) - 2), how: young(s) ? "同學" : "聚會" });
     s.friends.push(f);
+    if (young(s)) return { text: lead(sit) + ctx.w("{下課主動找同學玩，|參加了社團，}認識了{f}，{很快就變成好朋友。|兩個人常常一起回家。}", { f: f.call }), mood: 3 };
     return { text: lead(sit) + ctx.w("{多參加聚會，|主動約人吃飯，}認識了{f}，{很快就變成可以聊心事的朋友。|兩個人一見如故。}", { f: f.call }), mood: 3 };
   },
   moveHome(s, ctx, sit) {
@@ -371,7 +419,7 @@ const HANDLERS = {
   emigrate(s, ctx, sit) {
     if (s.savings < 1.5 && !s.employed) return no("存款不夠移民。");
     const where = ctx.rng.weighted([["美國", 2], ["加拿大", 2], ["澳洲", 1.5], ["日本", 1], ["紐西蘭", 0.8], ["新加坡", 0.8]]);
-    s.abroad = where; s.last.abroad = s.age; s.flags.emigrated = true; spend(s, 1);
+    s.abroad = where; s.leftAt = s.age; s.flags.emigrated = true; spend(s, 1);
     return { text: lead(sit) + ctx.w("{辦好手續，|賣掉大部分家當，}移民到{where}。{在機場和家人抱了好久。|新的國家，新的開始。}", { where }), mood: 2, big: true };
   },
   spiritual(s, ctx, sit) {
@@ -384,7 +432,8 @@ const HANDLERS = {
 export function act(id, s, ctx, sit = {}) {
   const h = HANDLERS[id];
   if (!h) return { text: `${lead(sit)}你照自己的意思去做了。`, mood: 0 };
-  return h(s, ctx, sit);
+  const why = tooYoung(id, s);
+  return why ? no(why) : h(s, ctx, sit);
 }
 export const HANDLED = Object.keys(HANDLERS);
 export const UNHANDLED = Object.keys(ACTIONS).filter(id => !HANDLERS[id]);

@@ -100,6 +100,8 @@ details.family > summary small { font-weight: 400; color: var(--muted); }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .controls button { border: 1px solid var(--rule); background: var(--sheet); border-radius: 999px; padding: 4px 14px; font-size: 13px; }
 .controls button[aria-pressed="true"] { background: var(--indigo-wash); border-color: var(--indigo); color: var(--indigo); }
+.controls .major { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.controls .major input { width: 16px; height: 16px; accent-color: var(--indigo); }
 .born { font-size: 14px; color: var(--muted); }
 .feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .feed li { display: grid; grid-template-columns: 4.2em 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--wash); }
@@ -275,6 +277,7 @@ footer a { color: var(--indigo); }
         <button type="button" data-speed="3" aria-pressed="false">快一點</button>
         <button type="button" data-speed="10" aria-pressed="false">很快</button>
         <button type="button" id="c-skip">直接看結局</button>
+        <label class="major"><input type="checkbox" id="c-major"> 只問人生大事</label>
       </div>
     </div>
     <p class="born" id="born"></p>

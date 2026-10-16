@@ -9,9 +9,12 @@ export const SPECIAL = ["unknown", "self_harm", "harm"];
 
 //   situation  the choice's question            context  a few words about the protagonist (no names, no birth data)
 //   options    this choice's buttons [{id, label}]  text  what the player wrote
-export function interpretPrompt({ situation, context = "", options = [], text }) {
+//   compact    list the general actions by name only (about half the tokens, for a paid or metered model)
+export function interpretPrompt({ situation, context = "", options = [], text, compact = false }) {
   const buttons = options.map(o => `- ${o.id}：${o.label}`).join("\n");
-  const general = Object.entries(ACTIONS).map(([id, a]) => `- ${id}：${a.desc}`).join("\n");
+  const general = compact
+    ? Object.entries(ACTIONS).map(([id, a]) => `${id}（${a.label}）`).join("、")
+    : Object.entries(ACTIONS).map(([id, a]) => `- ${id}：${a.desc}`).join("\n");
   return `你是人生模擬遊戲「命盤人生」的判讀員。玩家遇到一個人生抉擇，沒有按現成的按鈕，而是自己寫下想怎麼做。請判斷玩家寫的話最接近下面哪一個行動。
 
 抉擇：${situation}
