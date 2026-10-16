@@ -94,6 +94,7 @@ details.family > summary small { font-weight: 400; color: var(--muted); }
 .status .age { font-family: var(--display); font-size: 26px; font-weight: 700; }
 .status .pill { font-size: 13px; color: var(--muted); }
 .status .pill b { font-family: var(--display); font-size: 16px; color: var(--ink); font-weight: 700; }
+.status .pill small { margin-left: 4px; font-size: 12px; color: var(--muted); }
 .mood { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
 .mood .track { height: 6px; border-radius: 3px; background: var(--wash); overflow: hidden; }
 .mood .track i { display: block; height: 100%; background: var(--indigo); border-radius: 3px; transition: width 0.3s; }
@@ -166,6 +167,34 @@ th:first-child, td:first-child { text-align: left; }
 .card .count em { font-style: normal; color: var(--seal); }
 .card ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; font-size: 14px; }
 .card .fine { font-size: 12px; color: var(--muted); border-top: 1px solid var(--wash); padding-top: 8px; }
+/* 八字命理詳批 */
+.report { display: grid; gap: 14px; margin-top: 8px; }
+.report-head h3 { margin: 0 0 4px; }
+.report .basics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 4px 16px; margin: 0; font-size: 14px; }
+.report .basics div { display: flex; gap: 8px; }
+.report .basics dt { color: var(--muted); min-width: 4.5em; }
+.report .basics dd { margin: 0; }
+.paipan { width: 100%; border-collapse: collapse; table-layout: fixed; background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; font-size: 13px; }
+.paipan th, .paipan td { border-bottom: 1px solid var(--wash); padding: 6px 4px; text-align: center; vertical-align: top; word-break: break-all; }
+.paipan thead th { background: var(--wash); font-weight: 600; }
+.paipan tbody th { width: 3.6em; color: var(--muted); font-weight: 500; text-align: left; padding-left: 8px; }
+.paipan .big { font-family: var(--display); font-size: 24px; font-weight: 700; line-height: 1.1; }
+.paipan .el-木 { color: #2f7d4f; } .paipan .el-火 { color: #c0392b; } .paipan .el-土 { color: #8a6d3b; } .paipan .el-金 { color: #a07800; } .paipan .el-水 { color: #2c6aa0; }
+.paipan .stack { display: grid; gap: 2px; }
+.paipan .stack small { color: var(--muted); }
+.paipan .star-吉 { color: var(--indigo); } .paipan .star-凶 { color: var(--seal); }
+.report details.sec { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 0 16px; }
+.report details.sec > summary { cursor: pointer; padding: 12px 0; font-weight: 600; font-size: 15px; list-style-position: outside; }
+.report details.sec[open] > summary { border-bottom: 1px solid var(--wash); margin-bottom: 8px; }
+.report details.sec p { margin: 0 0 10px; line-height: 1.75; }
+.report details.sec ul { margin: 0 0 12px; padding-left: 1.2em; display: grid; gap: 6px; line-height: 1.7; }
+.report .luck-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+.report .luck-table th, .report .luck-table td { border-bottom: 1px solid var(--wash); padding: 6px 4px; text-align: left; vertical-align: top; }
+.report .luck-table td:first-child { white-space: nowrap; font-family: var(--display); font-weight: 700; }
+.report .tone-吉 { color: var(--indigo); font-weight: 600; } .report .tone-凶 { color: var(--seal); font-weight: 600; } .report .tone-平 { color: var(--muted); }
+.report .fine { font-size: 12px; color: var(--muted); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .paipan .el-木 { color: #6fcf97; } :root:not([data-theme="light"]) .paipan .el-火 { color: #ff8a80; } :root:not([data-theme="light"]) .paipan .el-土 { color: #d7b77a; } :root:not([data-theme="light"]) .paipan .el-金 { color: #f2c94c; } :root:not([data-theme="light"]) .paipan .el-水 { color: #7fb3e6; } }
+:root[data-theme="dark"] .paipan .el-木 { color: #6fcf97; } :root[data-theme="dark"] .paipan .el-火 { color: #ff8a80; } :root[data-theme="dark"] .paipan .el-土 { color: #d7b77a; } :root[data-theme="dark"] .paipan .el-金 { color: #f2c94c; } :root[data-theme="dark"] .paipan .el-水 { color: #7fb3e6; }
 .hist { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; align-items: end; height: 70px; }
 .hist i { display: block; background: var(--indigo); border-radius: 2px 2px 0 0; min-height: 1px; }
 .hist-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
@@ -267,8 +296,8 @@ footer a { color: var(--indigo); }
       <div class="status-row">
         <span class="age" id="s-age">0 歲</span>
         <span class="pill num" id="s-year"></span>
-        <span class="pill">大運 <b id="s-decade">童限</b></span>
-        <span class="pill">流年 <b id="s-pillar"></b></span>
+        <span class="pill">大運 <b id="s-decade">童限</b><small id="s-decade-god"></small></span>
+        <span class="pill">流年 <b id="s-pillar"></b><small id="s-pillar-god"></small></span>
       </div>
       <div class="mood"><span>心情</span><span class="track"><i id="s-mood" style="width:60%"></i></span></div>
       <div class="controls">
@@ -312,6 +341,11 @@ footer a { color: var(--indigo); }
     <div class="runs" id="personal" hidden>
       <div><h3 id="personal-title">命盤、名字和家人</h3><p class="lede" id="personal-lede">命盤、姓名學和家人合盤，在這一生裡怎麼出現。</p></div>
       <div class="cards" id="personal-cards"></div>
+    </div>
+
+    <div class="report" id="report" hidden>
+      <div class="report-head"><h3>八字命理詳批</h3><p class="lede" id="report-lede"></p></div>
+      <div id="report-body"></div>
     </div>
 
     <div class="share" id="share"></div>

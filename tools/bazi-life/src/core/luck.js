@@ -11,6 +11,7 @@
 //             on each chart's lifetime average, so they move events in time without making them more common,
 //             and a population of random charts keeps the statistical base rates.
 import { pillarOf, groupOf, elementOf } from "./analysis.js";
+import { starContextOf, luckStars, taisui } from "./detail.js";
 
 export const DOMAINS = { career: "事業", wealth: "財富", love: "感情", health: "健康", study: "學業", family: "家庭", move: "遷移" };
 export const CHANNELS = ["good", "bad", "change"];
@@ -26,8 +27,9 @@ const stemsClash = (p, q) => p.yang === q.yang && (CONTROLS[p.stemEl] === q.stem
 const empty = () => Object.fromEntries(Object.keys(DOMAINS).map(d => [d, { good: 0, bad: 0, change: 0 }]));
 const ln = Math.log;
 
-// One year's raw effects, before centring. `natal` is the four (or three) pillar names.
-export function yearEffects(analysis, natal, decadeName, yearName, sex) {
+// One year's raw effects, before centring. `natal` is the four (or three) pillar names; `stars` the context for the
+// 神煞 tables (detail.js starContextOf), computed once per chart by lifeLuck.
+export function yearEffects(analysis, natal, decadeName, yearName, sex, stars = starContextOf(natal, sex)) {
   const dm = analysis.dayMaster.element, like = e => analysis.favor[e];
   const y = pillarOf(yearName), d = decadeName ? pillarOf(decadeName) : null;
   const [, monthP, dayP] = natal.map(pillarOf);
@@ -90,6 +92,22 @@ export function yearEffects(analysis, natal, decadeName, yearName, sex) {
     for (const k of ["family", "wealth", "health"]) { trig[k].good += ln(0.7); trig[k].bad += ln(1.4); }
     reasons.push({ domains: ["family", "wealth", "health"], text: yearName === natal[2] ? "流年和日柱相同（伏吟）：家庭、財務、健康容易有波折" : "流年和日柱天剋地沖：家庭、財務、健康容易有波折" });
   }
+  // 神煞 and 太歲 the year brings. Like the triggers above they are centred, so they move events in time only.
+  const has = new Set(luckStars(stars, yearName));
+  const luv = ["紅鸞", "天喜"].filter(x => has.has(x));
+  if (luv.length) { trig.love.change += ln(1.35); trig.love.good += ln(1.1); trig.family.good += ln(1.1); reasons.push({ domains: ["love", "family"], tags: ["spouse"], text: `流年逢${luv.join("、")}：喜慶與姻緣之星，容易有戀愛、婚嫁或添丁的喜事` }); }
+  if (has.has("桃花")) { trig.love.change += ln(1.2); reasons.push({ domains: ["love"], text: "流年逢桃花：異性緣變好，也要防感情糾紛" }); }
+  if (has.has("驛馬")) { trig.move.change += ln(1.4); reasons.push({ domains: ["move"], text: "流年逢驛馬：奔波、搬遷、出外的機會變多" }); }
+  if (has.has("文昌貴人")) { trig.study.good += ln(1.25); reasons.push({ domains: ["study"], text: "流年逢文昌：利於讀書、考試與寫作" }); }
+  if (has.has("天乙貴人")) { trig.career.good += ln(1.1); trig.wealth.good += ln(1.1); reasons.push({ domains: ["career", "wealth"], text: "流年逢天乙貴人：遇到困難容易有人幫忙" }); }
+  if (has.has("羊刃")) { trig.health.bad += ln(1.15); trig.wealth.bad += ln(1.1); reasons.push({ domains: ["health", "wealth"], text: "流年逢羊刃：衝勁強，也要防衝動、受傷與破財" }); }
+  const ts = taisui(stars.yearBranch, y.branch);
+  if (ts.kinds.length) {
+    for (const k of ["career", "move", "family"]) trig[k].change += ln(1.15);
+    reasons.push({ domains: ["career", "move", "family"], text: `${ts.kinds.join("、")}：這一年變動較多，傳統上會安太歲、凡事穩紮穩打` });
+  }
+  if (ts.spirit === "白虎" || ts.spirit === "病符") { trig.health.bad += ln(ts.spirit === "白虎" ? 1.15 : 1.1); reasons.push({ domains: ["health"], text: `流年犯${ts.spirit}：要多留意身體與安全` }); }
+  if (ts.spirit === "喪門" || ts.spirit === "吊客") { trig.family.bad += ln(1.15); reasons.push({ domains: ["family"], tags: ["father", "mother"], text: `流年犯${ts.spirit}：要多關心家中長輩` }); }
   let amplify = 1;
   if (decadeName && yearName === decadeName) { amplify = 1.75; reasons.push({ domains: Object.keys(DOMAINS), text: "歲運並臨：這一年的起伏會被放大" }); }
   return { L, favor, trig, amplify, reasons };
@@ -99,7 +117,8 @@ export function yearEffects(analysis, natal, decadeName, yearName, sex) {
 // `decadeAt(age)` gives the decade pillar name (or null before the first one); `yearAt(age)` the year pillar.
 export function lifeLuck(analysis, natal, sex, decadeAt, yearAt, span = 100) {
   const raw = [];
-  for (let age = 1; age <= span; age++) raw.push(yearEffects(analysis, natal, decadeAt(age), yearAt(age), sex));
+  const stars = starContextOf(natal, sex);
+  for (let age = 1; age <= span; age++) raw.push(yearEffects(analysis, natal, decadeAt(age), yearAt(age), sex, stars));
   const mean = empty();
   for (const r of raw) for (const k in mean) for (const c of CHANNELS) mean[k][c] += r.trig[k][c] / raw.length;
   return raw.map((r, i) => {

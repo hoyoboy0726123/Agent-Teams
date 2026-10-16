@@ -7,7 +7,9 @@
 //
 // Pillars are named by role: year, month, day, hour (the hour may be missing when the birth time is unknown). Luck
 // pillars use the roles decade (大運) and flow (流年).
+import { SixtyCycle } from "tyme4ts";
 import { pillarOf, tenGod, groupOf, ELEMENTS } from "./analysis.js";
+import { zh } from "./zh.js";
 
 export const STEMS = "甲乙丙丁戊己庚辛壬癸";
 export const BRANCHES = "子丑寅卯辰巳午未申酉戌亥";
@@ -316,6 +318,16 @@ export function starContext(chart) {
   };
 }
 
+// The same context from the pillar names alone (the luck model has no chart object).
+export function starContextOf(names, sex) {
+  const ps = names.map(pillarOf), sc = n => SixtyCycle.fromName(n);
+  const voidOf = n => sc(n).getExtraEarthBranches().map(b => b.getName()).join("");
+  return {
+    yearStem: ps[0].stem, dayStem: ps[2].stem, yearBranch: ps[0].branch, dayBranch: ps[2].branch, monthBranch: ps[1].branch,
+    sex, yearNayin: zh(sc(names[0]).getSound().getName()), dayVoid: voidOf(names[2]), yearVoid: voidOf(names[0]),
+  };
+}
+
 const ORDER = Object.keys(STARS);
 const sorted = set => [...set].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
 
@@ -334,10 +346,10 @@ export function natalStars(chart) {
   return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, sorted(v)]));
 }
 
-// The stars a luck pillar brings (大運 or 流年).
-export function luckStars(chart, pillarName) {
+// The stars a luck pillar brings (大運 or 流年). `from` is a chart, or a context from starContextOf.
+export function luckStars(from, pillarName) {
   const p = pillarOf(pillarName);
-  return sorted(starsOf(p.stem, p.branch, starContext(chart), "luck"));
+  return sorted(starsOf(p.stem, p.branch, from.pillars ? starContext(from) : from, "luck"));
 }
 
 // ---------- 太歲 ----------

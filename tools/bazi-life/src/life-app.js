@@ -11,6 +11,7 @@ import { randomName } from "./sim/random-name.js";
 import { describeEffects, LEVEL_NAME } from "./core/name.js";
 import { checkFamily, familyTilts, describeFamilyTilts, isSibling } from "./core/family.js";
 import { describeViews } from "./core/analysis.js";
+import { luckGods } from "./core/detail.js";
 import { safetyCheck, matchIntent } from "./sim/intent.js";
 import { interpretPrompt, readInterpretation } from "./sim/interpret.js";
 import { ACTIONS } from "./sim/actions.js";
@@ -221,8 +222,13 @@ function updateStatus() {
   const s = run.life.state, l = luckAt(run.prep, s.age);
   $("#s-age").textContent = `${s.age} 歲`;
   $("#s-year").textContent = `${s.year} 年`;
-  $("#s-decade").textContent = s.age >= 1 && l && l.decade ? l.decade : "童限";
+  // The ten gods of the decade and the year for this day master (stem・branch), as professional charts print them.
+  const gods = name => { const g = luckGods(run.chart.dayMaster.name, name); return `${g.stem}・${g.branch}`; };
+  const decade = l && l.decade ? l.decade : null;
+  $("#s-decade").textContent = decade || "童限";
+  $("#s-decade-god").textContent = decade ? gods(decade) : "";
   $("#s-pillar").textContent = l ? l.year : "";
+  $("#s-pillar-god").textContent = l ? gods(l.year) : "";
   $("#s-mood").style.width = `${Math.round(s.happiness)}%`;
 }
 
