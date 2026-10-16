@@ -1,0 +1,160 @@
+// 命盤解讀：日主強弱與五行喜忌。
+//
+// The schools disagree, sometimes completely, so each one is computed on its own and kept:
+//   扶抑  support a weak day master, drain a strong one (strength scored from stems and hidden stems)
+//   調候  balance the season: winter births want fire, summer births want water (simplified)
+//   格局  the structure set by the month branch, with its classic likes and dislikes (simplified 子平真詮)
+// They are then blended with weights (扶抑 first by default). Where they disagree the blend moves toward
+// neutral on its own, and the page can say how many schools hold each view.
+import { SixtyCycle, HeavenStem } from "tyme4ts";
+import { zh } from "./zh.js";
+
+export const ELEMENTS = ["木", "火", "土", "金", "水"];
+export const GROUPS = ["比劫", "食傷", "財", "官殺", "印"];
+export const SCHOOLS = ["扶抑", "調候", "格局"];
+const GENERATES = { 木: "火", 火: "土", 土: "金", 金: "水", 水: "木" };
+const CONTROLS = { 木: "土", 土: "水", 水: "火", 火: "金", 金: "木" };
+const SEASON = { 寅: "春", 卯: "春", 辰: "春", 巳: "夏", 午: "夏", 未: "夏", 申: "秋", 酉: "秋", 戌: "秋", 亥: "冬", 子: "冬", 丑: "冬" };
+
+export const HIDDEN_WEIGHTS = { "5-2-1": [1, 2, 5], "12-6-3": [3, 6, 12] };   // indexed by type: residual, middle, main
+export const SCHOOL_WEIGHTS = {
+  blend: { 扶抑: 0.5, 調候: 0.25, 格局: 0.25 },
+  扶抑: { 扶抑: 1, 調候: 0, 格局: 0 },
+  調候: { 扶抑: 0, 調候: 1, 格局: 0 },
+  格局: { 扶抑: 0, 調候: 0, 格局: 1 },
+};
+
+// The ten-god group an element plays for a day master of element `dm`.
+export function groupOf(dm, e) {
+  if (e === dm) return "比劫";
+  if (GENERATES[dm] === e) return "食傷";
+  if (CONTROLS[dm] === e) return "財";
+  if (CONTROLS[e] === dm) return "官殺";
+  return "印";
+}
+export const elementOf = (dm, group) => ELEMENTS.find(e => groupOf(dm, e) === group);
+
+const pillars = new Map();
+export function pillarOf(name) {
+  let p = pillars.get(name);
+  if (!p) {
+    const sc = SixtyCycle.fromName(name), stem = sc.getHeavenStem(), branch = sc.getEarthBranch();
+    p = {
+      name, stem: stem.getName(), branch: branch.getName(), stemEl: stem.getElement().getName(), branchEl: branch.getElement().getName(),
+      yang: stem.getYinYang() === 1,
+      hidden: branch.getHideHeavenStems().slice().sort((a, b) => b.getType() - a.getType())
+        .map(h => ({ stem: h.getHeavenStem().getName(), el: h.getHeavenStem().getElement().getName(), type: h.getType() })),
+    };
+    pillars.set(name, p);
+  }
+  return p;
+}
+export const tenGod = (dayStem, stem) => zh(HeavenStem.fromName(dayStem).getTenStar(HeavenStem.fromName(stem)).getName());
+
+// Strength of each element. Every stem but the day stem counts 1; every branch counts 1, split over its hidden
+// stems by type; the month branch (月令) counts `month` times.
+export function elementScores(names, { hidden = "5-2-1", month = 2 } = {}) {
+  const w = HIDDEN_WEIGHTS[hidden];
+  const score = Object.fromEntries(ELEMENTS.map(e => [e, 0]));
+  names.forEach((name, i) => {
+    const p = pillarOf(name);
+    if (i !== 2) score[p.stemEl] += 1;
+    const total = p.hidden.reduce((s, h) => s + w[h.type], 0);
+    for (const h of p.hidden) score[h.el] += (w[h.type] / total) * (i === 1 ? month : 1);
+  });
+  return score;
+}
+
+const groupVotes = (dm, votes) => Object.fromEntries(ELEMENTS.map(e => [e, votes[groupOf(dm, e)] || 0]));
+
+function fuyi(dm, support, rooted) {
+  if (support < 0.12 && !rooted) return { verdict: "從弱", note: "日主極弱又沒有根，順從旺的一方", votes: { 比劫: -1, 印: -1, 食傷: 0.5, 財: 1, 官殺: 1 } };
+  if (support > 0.88) return { verdict: "專旺", note: "日主極旺，順著它的氣勢", votes: { 比劫: 1, 印: 0.5, 食傷: 0.5, 財: -0.5, 官殺: -1 } };
+  // Two of the five elements support the day master, so a typical chart scores about 0.40. The cut-offs split
+  // random charts roughly 38 % weak, 25 % balanced, 37 % strong.
+  if (support >= 0.45) return { verdict: "身強", note: "日主偏強，喜歡被洩、被耗、被剋", votes: { 比劫: -1, 印: -1, 食傷: 1, 財: 1, 官殺: 1 } };
+  if (support <= 0.35) return { verdict: "身弱", note: "日主偏弱，喜歡被生、被幫", votes: { 比劫: 1, 印: 1, 食傷: -1, 財: -1, 官殺: -1 } };
+  const lean = support > 0.4 ? 1 : -1;
+  return { verdict: "中和", note: "日主強弱適中，只有輕微偏好", votes: { 比劫: -0.5 * lean, 印: -0.5 * lean, 食傷: 0.5 * lean, 財: 0.5 * lean, 官殺: 0.5 * lean } };
+}
+
+function tiaohou(monthBranch) {
+  const season = SEASON[monthBranch];
+  if (season === "冬") return { verdict: "冬生", note: "生在冬天，命局偏寒，喜火暖局", votes: { 火: 1, 水: -1 } };
+  if (season === "夏") return { verdict: "夏生", note: "生在夏天，命局偏燥，喜水潤局", votes: { 水: 1, 火: -1 } };
+  return { verdict: `${season}生`, note: "生在春秋，寒暖適中，調候不特別偏好", votes: {}, abstain: true };
+}
+
+// Likes and dislikes per structure, by ten-god group (simplified from 子平真詮).
+const PATTERNS = {
+  正官: { 財: 1, 印: 1, 食傷: -1 },
+  七殺: { 食傷: 1, 印: 1, 財: -1 },
+  正財: { 食傷: 1, 官殺: 1, 比劫: -1 },
+  偏財: { 食傷: 1, 官殺: 1, 比劫: -1 },
+  正印: { 官殺: 1, 財: -1 },
+  偏印: { 官殺: 1, 財: -1 },
+  食神: { 財: 1, 印: -1 },
+  傷官: { 財: 1, 印: 0.5, 官殺: -1 },
+  比肩: { 官殺: 1, 財: 0.5, 食傷: 0.5, 比劫: -1, 印: -0.5 },
+  劫財: { 官殺: 1, 財: 0.5, 食傷: 0.5, 比劫: -1, 印: -0.5 },
+};
+const PATTERN_NAMES = { 比肩: "建祿格", 劫財: "月刃格" };
+function geju(dayStem, monthPillar) {
+  const main = pillarOf(monthPillar).hidden[0].stem;
+  const god = tenGod(dayStem, main);
+  return { verdict: PATTERN_NAMES[god] || `${god}格`, note: `月令本氣是${main}，對日主來說是${god}`, votes: PATTERNS[god] };
+}
+
+export function analyse(names, { hidden = "5-2-1", month = 2, school = "blend" } = {}) {
+  const day = pillarOf(names[2]), dm = day.stemEl, monthBranch = pillarOf(names[1]).branch;
+  const scores = elementScores(names, { hidden, month });
+  const total = ELEMENTS.reduce((s, e) => s + scores[e], 0);
+  const supportEl = [dm, elementOf(dm, "印")];
+  const support = (scores[supportEl[0]] + scores[supportEl[1]]) / total;
+  const rooted = names.some(n => pillarOf(n).hidden.some(h => h.el === dm));
+
+  const f = fuyi(dm, support, rooted), t = tiaohou(monthBranch), g = geju(day.stem, names[1]);
+  const schools = {
+    扶抑: { ...f, element: groupVotes(dm, f.votes) },
+    調候: { ...t, element: Object.fromEntries(ELEMENTS.map(e => [e, t.votes[e] || 0])) },
+    格局: { ...g, element: groupVotes(dm, g.votes) },
+  };
+  const weights = SCHOOL_WEIGHTS[school];
+  const favor = {}, views = {};
+  for (const e of ELEMENTS) {
+    let sum = 0, wsum = 0;
+    for (const s of SCHOOLS) {
+      if (!weights[s] || schools[s].abstain) continue;
+      sum += weights[s] * schools[s].element[e];
+      wsum += weights[s];
+    }
+    favor[e] = wsum ? Math.round(sum / wsum * 100) / 100 : 0;
+    const voting = SCHOOLS.filter(s => !schools[s].abstain);
+    views[e] = { likes: voting.filter(s => schools[s].element[e] > 0), dislikes: voting.filter(s => schools[s].element[e] < 0), voting: voting.length };
+  }
+  const byFavor = ELEMENTS.slice().sort((a, b) => favor[b] - favor[a]);
+  return {
+    dayMaster: { stem: day.stem, element: dm, yang: day.yang },
+    scores: Object.fromEntries(ELEMENTS.map(e => [e, Math.round(scores[e] * 100) / 100])),
+    support: Math.round(support * 1000) / 1000,
+    rooted,
+    strength: f.verdict,
+    pattern: g.verdict,
+    season: t.verdict,
+    schools,
+    favor,
+    views,
+    useful: byFavor.filter(e => favor[e] >= 0.25),
+    avoid: byFavor.filter(e => favor[e] <= -0.25).reverse(),
+    groups: Object.fromEntries(GROUPS.map(gr => [gr, elementOf(dm, gr)])),
+  };
+}
+
+// "3 派中有 2 派認為喜火" style lines for each element with a clear view.
+export function describeViews(a) {
+  return ELEMENTS.flatMap(e => {
+    const v = a.views[e];
+    const side = a.favor[e] > 0 ? ["喜", v.likes] : a.favor[e] < 0 ? ["忌", v.dislikes] : null;
+    return side && side[1].length ? [`${v.voting} 派中有 ${side[1].length} 派認為${side[0]}${e}（${side[1].join("、")}）`] : [];
+  });
+}

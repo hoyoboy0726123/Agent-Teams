@@ -1,0 +1,247 @@
+<title>命盤人生</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: one column that turns from a birth form into a life, read year by year like a 命書 page,
+   ending in the life K-line and the counts from 100 reruns. */
+:root {
+  --paper: #eef1f0; --sheet: #fbfcfc; --ink: #1c2330; --muted: #5b6774; --rule: #c8d0d3; --wash: #e3e8e9;
+  --indigo: #284a80; --indigo-wash: #dfe6f2; --seal: #b5332a; --seal-wash: #f6e1de;
+  --up: #c0412c; --down: #2c7a4b; --band: rgba(28, 35, 48, 0.1);
+  --wood: #2c7a4b; --fire: #c0412c; --earth: #8a5d33; --metal: #a6801a; --water: #2a61a5;
+  --display: "LXGW WenKai TC", "Kaiti TC", "BiauKai", "DFKai-SB", "STKaiti", serif;
+  --body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #11151b; --sheet: #181e26; --ink: #e5e9ed; --muted: #9ba7b3; --rule: #2d3742; --wash: #222a34;
+  --indigo: #93b2ea; --indigo-wash: #1f2c42; --seal: #ec6a57; --seal-wash: #3a2220;
+  --up: #d9583f; --down: #4b9a6c; --band: rgba(229, 233, 237, 0.12);
+  --wood: #6cc28c; --fire: #f2806a; --earth: #cf9f6b; --metal: #e2c35c; --water: #7eabea; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --paper: #11151b; --sheet: #181e26; --ink: #e5e9ed; --muted: #9ba7b3; --rule: #2d3742; --wash: #222a34;
+  --indigo: #93b2ea; --indigo-wash: #1f2c42; --seal: #ec6a57; --seal-wash: #3a2220;
+  --up: #d9583f; --down: #4b9a6c; --band: rgba(229, 233, 237, 0.12);
+  --wood: #6cc28c; --fire: #f2806a; --earth: #cf9f6b; --metal: #e2c35c; --water: #7eabea; color-scheme: dark;
+}
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.7; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--paper); }
+.wrap { max-width: 860px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; }
+h1 { font-size: 40px; line-height: 1.15; letter-spacing: 0.06em; }
+h2 { font-size: 26px; line-height: 1.3; }
+h3 { font-size: 19px; }
+p { margin: 0; }
+.eyebrow { font-size: 12px; letter-spacing: 0.12em; color: var(--muted); }
+.lede { color: var(--muted); max-width: 60ch; }
+.notice { font-size: 13px; color: var(--muted); border-left: 3px solid var(--rule); padding-left: 10px; max-width: 70ch; }
+.data-note { font-size: 13px; color: var(--seal); background: var(--seal-wash); border-radius: 6px; padding: 6px 10px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+header { display: grid; gap: 10px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+
+/* setup */
+.panel { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; display: grid; gap: 16px; }
+.tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--rule); }
+.tabs button { border: 0; background: none; padding: 8px 12px; font-size: 15px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--seal); font-weight: 500; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px 16px; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field > span, .field > .name, legend { font-size: 13px; font-weight: 500; color: var(--muted); }
+input[type="date"], input[type="time"], select { width: 100%; box-sizing: border-box; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; min-height: 40px; }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; min-width: 0; }
+.inline { display: flex; gap: 14px; align-items: center; min-height: 40px; }
+.inline label, .check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; }
+.primary { justify-self: start; background: var(--seal); color: #fff; border: 0; border-radius: 8px; padding: 10px 22px; font-size: 16px; font-weight: 500; }
+.primary:hover { filter: brightness(1.08); }
+.secondary { background: transparent; border: 1px solid var(--rule); border-radius: 8px; padding: 9px 18px; }
+.secondary:hover { border-color: var(--indigo); color: var(--indigo); }
+.error { color: var(--seal); font-size: 14px; }
+
+/* playing */
+#play { display: grid; gap: 14px; }
+.status { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--paper); padding-block: 8px; display: grid; gap: 8px; border-bottom: 1px solid var(--rule); }
+.status-row { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
+.status .age { font-family: var(--display); font-size: 26px; font-weight: 700; }
+.status .pill { font-size: 13px; color: var(--muted); }
+.status .pill b { font-family: var(--display); font-size: 16px; color: var(--ink); font-weight: 700; }
+.mood { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+.mood .track { height: 6px; border-radius: 3px; background: var(--wash); overflow: hidden; }
+.mood .track i { display: block; height: 100%; background: var(--indigo); border-radius: 3px; transition: width 0.3s; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.controls button { border: 1px solid var(--rule); background: var(--sheet); border-radius: 999px; padding: 4px 14px; font-size: 13px; }
+.controls button[aria-pressed="true"] { background: var(--indigo-wash); border-color: var(--indigo); color: var(--indigo); }
+.born { font-size: 14px; color: var(--muted); }
+.feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.feed li { display: grid; grid-template-columns: 4.2em 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--wash); }
+.feed .when { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--muted); }
+.feed .when small { display: block; font-family: var(--mono); font-size: 11px; font-weight: 400; }
+.feed .lines { display: grid; gap: 4px; min-width: 0; }
+.feed .big { font-weight: 500; }
+.feed .why { font-size: 12px; color: var(--indigo); }
+.feed .chose { font-size: 12px; color: var(--muted); }
+.choice { background: var(--sheet); border: 2px solid var(--indigo); border-radius: 10px; padding: 16px; display: grid; gap: 12px; }
+.choice .q { font-family: var(--display); font-size: 19px; font-weight: 700; }
+.choice .why { font-size: 13px; color: var(--indigo); }
+.options { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.options button { text-align: left; background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; }
+.options button:hover { border-color: var(--indigo); }
+.options b { font-size: 15px; }
+.options small { font-size: 12px; color: var(--muted); }
+
+/* the end */
+#end { display: grid; gap: 26px; }
+.end-head { display: grid; gap: 8px; }
+.end-head p { color: var(--muted); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 20px; margin: 0; }
+.facts div { display: grid; gap: 2px; min-width: 0; }
+.facts dt { font-size: 12px; color: var(--muted); letter-spacing: 0.06em; }
+.facts dd { margin: 0; }
+.chartbox { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 14px; display: grid; gap: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.key-up { width: 8px; height: 12px; background: var(--up); border-radius: 1px; }
+.key-down { width: 8px; height: 12px; box-sizing: border-box; border: 1.5px solid var(--down); border-radius: 1px; }
+.key-band { width: 18px; height: 10px; background: var(--band); border-radius: 2px; }
+.key-median { width: 18px; height: 2px; background: var(--muted); }
+.plot { position: relative; }
+.plot svg { display: block; width: 100%; height: auto; }
+.tip { position: absolute; pointer-events: none; background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5; max-width: 240px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12); }
+.tip b { font-family: var(--display); font-size: 14px; }
+details.table summary { cursor: pointer; font-size: 13px; color: var(--indigo); }
+.table-wrap { overflow-x: auto; max-height: 320px; overflow-y: auto; }
+table { border-collapse: collapse; font-size: 12px; width: 100%; }
+th, td { padding: 4px 8px; border-bottom: 1px solid var(--wash); text-align: right; font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+.runs { display: grid; gap: 14px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.card { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card .count { font-family: var(--display); font-size: 22px; font-weight: 700; line-height: 1.35; }
+.card .count em { font-style: normal; color: var(--seal); }
+.card ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; font-size: 14px; }
+.card .fine { font-size: 12px; color: var(--muted); border-top: 1px solid var(--wash); padding-top: 8px; }
+.hist { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; align-items: end; height: 70px; }
+.hist i { display: block; background: var(--indigo); border-radius: 2px 2px 0 0; min-height: 1px; }
+.hist-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+.help { font-size: 13px; color: var(--ink); background: var(--indigo-wash); border-radius: 6px; padding: 8px 10px; }
+.share { justify-self: center; width: min(100%, 360px); box-sizing: border-box; background: var(--sheet); border: 1px solid var(--rule); border-radius: 14px; padding: 20px; display: grid; gap: 10px; }
+.share .brand { font-family: var(--display); font-size: 14px; color: var(--seal); letter-spacing: 0.2em; }
+.share .big { font-family: var(--display); font-size: 30px; font-weight: 700; line-height: 1.25; }
+.share .sub { font-size: 13px; color: var(--muted); }
+.share svg { width: 100%; height: 60px; }
+.share .foot { font-size: 11px; color: var(--muted); border-top: 1px solid var(--wash); padding-top: 8px; }
+.again { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+footer { display: grid; gap: 8px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+footer p { max-width: 70ch; }
+footer a { color: var(--indigo); }
+@media (prefers-reduced-motion: reduce) { .mood .track i { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">第 1 步預覽・人生模擬</span>
+    <h1>命盤人生</h1>
+    <p class="lede">輸入生辰，依照八字的大運和流年走完一生。每件事發生的機率以台灣統計為基礎，命盤只讓機率傾斜，人生的方向由你選擇。</p>
+    <p class="notice">這是依傳統命理規則和台灣統計產生的模擬故事，不是預言。命理推演僅供參考，不能當作醫療、法律或重大決定的依據。</p>
+    <p class="data-note" id="data-note" hidden>測試版：壽命和疾病的年齡曲線，是依官方總數擬合的；之後會換成官方的完整統計表。</p>
+  </header>
+
+  <section class="panel" id="setup">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-me" aria-selected="true" aria-controls="form-me">我的命盤人生</button>
+      <button type="button" role="tab" id="tab-random" aria-selected="false" aria-controls="form-random">隨機投胎</button>
+    </div>
+    <form id="form-me" autocomplete="off">
+      <div class="fields">
+        <label class="field"><span>出生日期（國曆）</span><input type="date" id="f-date" min="1900-01-01" max="2100-12-31" value="1988-02-15"></label>
+        <div class="field">
+          <label class="name" for="f-time">出生時間</label>
+          <input type="time" id="f-time" value="23:30">
+          <label class="check" for="f-nohour"><input type="checkbox" id="f-nohour"> 時辰不詳</label>
+        </div>
+        <fieldset>
+          <legend>性別</legend>
+          <div class="inline">
+            <label for="sex-m"><input type="radio" name="sex" id="sex-m" value="male" checked> 男</label>
+            <label for="sex-f"><input type="radio" name="sex" id="sex-f" value="female"> 女</label>
+          </div>
+        </fieldset>
+        <label class="field"><span>出生地</span><select id="f-place"></select></label>
+      </div>
+      <button type="submit" class="primary">開始這一生</button>
+    </form>
+    <div id="form-random" hidden>
+      <div style="display:grid; gap:14px;">
+        <p>隨機抽一個 1950–2025 年間在台灣出生的人，用他的命盤過完一生。</p>
+        <button type="button" class="primary" id="go-random">投胎</button>
+      </div>
+    </div>
+    <p class="error" id="error" hidden></p>
+  </section>
+
+  <section id="play" hidden aria-label="人生">
+    <div class="status">
+      <div class="status-row">
+        <span class="age" id="s-age">0 歲</span>
+        <span class="pill num" id="s-year"></span>
+        <span class="pill">大運 <b id="s-decade">童限</b></span>
+        <span class="pill">流年 <b id="s-pillar"></b></span>
+      </div>
+      <div class="mood"><span>心情</span><span class="track"><i id="s-mood" style="width:60%"></i></span></div>
+      <div class="controls">
+        <button type="button" id="c-pause">暫停</button>
+        <button type="button" data-speed="1" aria-pressed="true">慢慢看</button>
+        <button type="button" data-speed="3" aria-pressed="false">快一點</button>
+        <button type="button" data-speed="10" aria-pressed="false">很快</button>
+        <button type="button" id="c-skip">直接看結局</button>
+      </div>
+    </div>
+    <p class="born" id="born"></p>
+    <ol class="feed" id="feed"></ol>
+    <div class="choice" id="choice" hidden></div>
+  </section>
+
+  <section id="end" hidden aria-label="結局">
+    <div class="end-head">
+      <h2 id="end-title"></h2>
+      <p id="end-sub"></p>
+    </div>
+    <dl class="facts" id="end-facts"></dl>
+
+    <div class="chartbox">
+      <h3>人生 K 線</h3>
+      <div class="legend">
+        <span><i class="key-up"></i>實心紅：這一年心情上升</span>
+        <span><i class="key-down"></i>空心綠：這一年心情下降</span>
+        <span><i class="key-band"></i>同盤 100 次人生的中間 80%</span>
+        <span><i class="key-median"></i>100 次的中位數</span>
+      </div>
+      <div class="plot" id="plot"><div class="tip" id="tip" hidden></div></div>
+      <details class="table"><summary>看每一年的數字</summary><div class="table-wrap" id="kline-table"></div></details>
+    </div>
+
+    <div class="runs">
+      <div><h3>同盤重跑 100 次</h3><p class="lede">同一張命盤再過 100 次人生。每一次的抉擇和運氣都不同，下面是這 100 次裡發生的次數。</p></div>
+      <div class="cards" id="cards"></div>
+    </div>
+
+    <div class="share" id="share"></div>
+    <div class="again">
+      <button type="button" class="primary" id="again-same">同一張命盤，再活一次</button>
+      <button type="button" class="secondary" id="again-new">換一個人</button>
+    </div>
+  </section>
+
+  <footer>
+    <p>年柱、月柱用出生的精確時刻比對節氣，日柱、時柱用出生地的真太陽時。每一年，大運和流年會讓各領域事件的機率傾斜，倍率限制在 0.5 到 2 倍之間；扶抑、調候、格局三派的看法分開計算後再合併。</p>
+    <p>壽命以內政部 114 年簡易生命表的平均餘命為基準（男 77.93 歲、女 84.75 歲）。所有計算都在你的瀏覽器裡完成，輸入的資料不會上傳。</p>
+    <p><a id="chart-link" href="__CHART_URL__">看完整命盤（排盤引擎）</a></p>
+  </footer>
+</div>
+
+<script id="app">/*__APP__*/</script>
