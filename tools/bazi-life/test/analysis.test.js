@@ -20,14 +20,17 @@ test("element scores: stems count 1, branches split by hidden stems, month branc
   assert.equal(+s.火.toFixed(3), 4 / 8);
 });
 
-test("1988 example: strong metal, 正財格, spring birth so 調候 abstains", () => {
+test("1988 example: strong metal, 正財格; 調候 by 窮通寶鑑 (辛金寅月用己壬庚)", () => {
   const a = analyse(EXAMPLE);
   assert.equal(a.strength, "身強");
   assert.equal(a.pattern, "正財格");
-  assert.equal(a.schools.調候.abstain, true);
+  assert.deepEqual(a.schools.調候.stems, ["己", "壬", "庚"]);
+  assert.equal(a.schools.調候.element.土, 1);
+  assert.match(a.schools.調候.note, /窮通寶鑑/);
   assert.deepEqual(a.useful.sort(), ["木", "水", "火"].sort());
   assert.deepEqual(a.avoid.sort(), ["土", "金"].sort());
-  assert.ok(describeViews(a).some(l => l === "2 派中有 2 派認為喜火（扶抑、格局）"));
+  assert.ok(describeViews(a).some(l => l === "3 派中有 2 派認為喜火（扶抑、格局）"));
+  assert.ok(describeViews(a).some(l => l === "3 派中有 3 派認為喜水（扶抑、調候、格局）"));
 });
 
 test("winter and summer births: 調候 votes for fire or water", () => {

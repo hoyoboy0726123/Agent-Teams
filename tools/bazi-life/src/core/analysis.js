@@ -2,12 +2,14 @@
 //
 // The schools disagree, sometimes completely, so each one is computed on its own and kept:
 //   扶抑  support a weak day master, drain a strong one (strength scored from stems and hidden stems)
-//   調候  balance the season: winter births want fire, summer births want water (simplified)
+//   調候  balance the season by 窮通寶鑑: the stems each day master needs in its birth month (core/tiaohou.js); winter
+//         births also dislike more water, summer births more fire
 //   格局  the structure set by the month branch, with its classic likes and dislikes (simplified 子平真詮)
 // They are then blended with weights (扶抑 first by default). Where they disagree the blend moves toward
 // neutral on its own, and the page can say how many schools hold each view.
 import { SixtyCycle, HeavenStem } from "tyme4ts";
 import { zh } from "./zh.js";
+import { tiaohouStems } from "./tiaohou.js";
 
 export const ELEMENTS = ["木", "火", "土", "金", "水"];
 export const GROUPS = ["比劫", "食傷", "財", "官殺", "印"];
@@ -78,11 +80,17 @@ function fuyi(dm, support, rooted) {
   return { verdict: "中和", note: "日主強弱適中，只有輕微偏好", votes: { 比劫: -0.5 * lean, 印: -0.5 * lean, 食傷: 0.5 * lean, 財: 0.5 * lean, 官殺: 0.5 * lean } };
 }
 
-function tiaohou(monthBranch) {
-  const season = SEASON[monthBranch];
-  if (season === "冬") return { verdict: "冬生", note: "生在冬天，命局偏寒，喜火暖局", votes: { 火: 1, 水: -1 } };
-  if (season === "夏") return { verdict: "夏生", note: "生在夏天，命局偏燥，喜水潤局", votes: { 水: 1, 火: -1 } };
-  return { verdict: `${season}生`, note: "生在春秋，寒暖適中，調候不特別偏好", votes: {}, abstain: true };
+// The 窮通寶鑑 stems vote in order (1, 0.6, 0.35, then 0.2); a cold winter also votes against water and a hot summer
+// against fire, unless the book itself calls for that element.
+const STEM_ELEMENT = { 甲: "木", 乙: "木", 丙: "火", 丁: "火", 戊: "土", 己: "土", 庚: "金", 辛: "金", 壬: "水", 癸: "水" };
+function tiaohou(dayStem, monthBranch) {
+  const season = SEASON[monthBranch], stems = tiaohouStems(dayStem, monthBranch), votes = {};
+  stems.forEach((st, i) => { const e = STEM_ELEMENT[st]; votes[e] = Math.max(votes[e] || 0, [1, 0.6, 0.35][i] ?? 0.2); });
+  const cold = season === "冬" && !votes.水, hot = season === "夏" && !votes.火;
+  if (cold) votes.水 = -1;
+  if (hot) votes.火 = -1;
+  const climate = season === "冬" ? "生在冬天，命局偏寒，" : season === "夏" ? "生在夏天，命局偏燥，" : "";
+  return { verdict: `${season}生`, note: `${climate}依《窮通寶鑑》，${dayStem}${STEM_ELEMENT[dayStem]}日主生於${monthBranch}月，調候用${stems.join("、")}`, votes, stems };
 }
 
 // Likes and dislikes per structure, by ten-god group (simplified from 子平真詮).
@@ -113,7 +121,7 @@ export function analyse(names, { hidden = "5-2-1", month = 2, school = "blend" }
   const support = (scores[supportEl[0]] + scores[supportEl[1]]) / total;
   const rooted = names.some(n => pillarOf(n).hidden.some(h => h.el === dm));
 
-  const f = fuyi(dm, support, rooted), t = tiaohou(monthBranch), g = geju(day.stem, names[1]);
+  const f = fuyi(dm, support, rooted), t = tiaohou(day.stem, monthBranch), g = geju(day.stem, names[1]);
   const schools = {
     扶抑: { ...f, element: groupVotes(dm, f.votes) },
     調候: { ...t, element: Object.fromEntries(ELEMENTS.map(e => [e, t.votes[e] || 0])) },
