@@ -5,8 +5,9 @@
 - **第 0 步：排盤引擎（完成）。** 輸入出生時間和地點，先把時間校正到正確的時刻，再排出四柱、藏干、十神、納音、大運和流年。每一步怎麼換算都會列出來，可以逐項核對。
 - **第 1 步：人生模擬（進行中）。** 依大運、流年一年一年走完一生，中間有抉擇。結束時畫出人生 K 線，並把同一張命盤重跑 100 次，結果用「100 次裡有幾次」呈現。
 
-預覽：
-- 排盤引擎（Claude Artifact）：https://claude.ai/artifact/3a3ezBHmLKeKBxGaNveAV2
+預覽（Claude Artifact）：
+- 人生模擬：https://claude.ai/artifact/CPrHN4Vz922V1L9HVUBs3C
+- 排盤引擎：https://claude.ai/artifact/3a3ezBHmLKeKBxGaNveAV2
 - 研究摘要與開發規畫：https://claude.ai/code/artifact/9dc96cc1-73a1-46db-a40e-3dac666a6987
 
 這個資料夾是獨立專案，沒有和 `tools/pet-life` 共用任何程式。
@@ -78,6 +79,7 @@ npm install
 npm test
 npm run build
 PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/page.e2e.mjs
+PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e.mjs
 ```
 
 改完 `src/` 之後要跑 `npm run build`，再把 `public/index.html` 一起提交。
