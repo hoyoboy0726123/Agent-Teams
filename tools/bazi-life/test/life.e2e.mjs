@@ -24,6 +24,19 @@ await page.click('[data-speed="10"]');
 await page.waitForSelector("#choice:not([hidden])", { timeout: 20000 });
 check("a choice appears and pauses the life", await page.isVisible("#choice .options button"));
 const before = await page.textContent("#feed");
+check("a choice offers at least three options and a box to write your own", (await page.$$("#choice .options button")).length >= 3 && await page.isVisible("#free-text"));
+await page.fill("#free-text", "我不想活了");
+await page.click("#free-go");
+await page.waitForSelector("#free-out .help");
+check("writing about self-harm shows help lines and keeps the choice open", /1925/.test(await page.textContent("#free-out")) && await page.isVisible("#choice"));
+await page.fill("#free-text", "先跟家人好好商量看看");
+await page.click("#free-go");
+await page.waitForSelector("#free-out [data-free-action]");
+check("without Claude, a written choice gets the closest options to confirm", (await page.$$("#free-out [data-free-action]")).length >= 1);
+await page.click("#free-out [data-free-action]");
+await page.waitForTimeout(400);
+check("a written choice continues the story in your own words", /你自己的決定：你決定「先跟家人好好商量看看」/.test(await page.textContent("#feed")));
+await page.waitForSelector("#choice:not([hidden])", { timeout: 20000 });
 await page.click("#choice [data-option='0']");
 await page.waitForTimeout(400);
 check("choosing continues the story", (await page.textContent("#feed")).length > before.length && /你的選擇/.test(await page.textContent("#feed")));
@@ -36,9 +49,10 @@ const cards = await page.textContent("#cards");
 check("lifespan card counts out of 100 and shows the 1925 line", /100 次人生裡/.test(cards) && /1925/.test(cards));
 check("health and marriage cards carry their notices", /不是看命盤/.test(cards) && /抉擇/.test(cards));
 check("share card carries the notice", /模擬故事，不是預言/.test(await page.textContent("#share")));
+check("the chart-and-life card shows the day master and the jobs' elements", /命盤與這一生/.test(await page.textContent("#personal")) && /日主/.test(await page.textContent("#personal")));
 await page.hover("#plot svg", { position: { x: 300, y: 120 } });
 check("hovering the K-line shows a tooltip", await page.isVisible("#tip"));
-check("without a name or family the name and family section stays hidden", !(await page.isVisible("#personal")));
+check("without a name or family only the chart card shows", (await page.$$("#personal-cards .card")).length === 1);
 if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/life-desktop-light.png`, fullPage: true });
 
 await page.click("#again-same");
@@ -96,6 +110,32 @@ check("random birth announces who you became, with a name", /你投胎成為 \d{
 await page.click("#c-skip");
 await page.waitForSelector("#end:not([hidden])", { timeout: 20000 });
 check("a random life gets a name card", /姓名：/.test(await page.textContent("#personal")));
+
+// The Claude path, with a stand-in for the artifact's sample capability that answers like Claude would.
+const ai = watch(await browser.newPage({ viewport: { width: 1000, height: 1200 } }));
+await ai.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+await ai.addInitScript(() => {
+  window.__prompts = [];
+  const sample = async () => ({ text: "" });
+  sample.json = async prompt => { window.__prompts.push(prompt); return { action: "travel", summary: "你決定帶家人去花蓮走走", confidence: 0.9 }; };
+  window.claude = { use: async name => (name === "sample" ? sample : null) };
+});
+await ai.goto(url);
+await ai.click("#form-me button[type=submit]");
+await ai.waitForSelector("#play:not([hidden])");
+await ai.click('[data-speed="10"]');
+await ai.waitForSelector("#choice:not([hidden])", { timeout: 20000 });
+check("with Claude available, the note says the sentence goes to Claude", /交給 Claude 判讀/.test(await ai.textContent("#free-note")));
+await ai.fill("#free-text", "帶家人去花蓮走走，散散心");
+await ai.click("#free-go");
+await ai.waitForSelector("#free-out [data-free-action]");
+check("Claude's reading is shown for confirmation with the rule it follows", /你決定帶家人去花蓮走走/.test(await ai.textContent("#free-out")) && /照「去旅行」的規則計算/.test(await ai.textContent("#free-out")));
+const sent = await ai.evaluate(() => window.__prompts[0] || "");
+check("the prompt carries the situation but no name or birth date", /帶家人去花蓮走走，散散心/.test(sent) && !/1988|2 月 15|陳/.test(sent));
+await ai.click("#free-out [data-free-action]");
+await ai.waitForTimeout(400);
+check("the confirmed reading continues the story", /你自己的決定：你決定帶家人去花蓮走走/.test(await ai.textContent("#feed")));
+await ai.close();
 
 const phone = watch(await browser.newPage({ viewport: { width: 400, height: 900 }, colorScheme: "dark", deviceScaleFactor: 2 }));
 await phone.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());

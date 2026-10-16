@@ -109,7 +109,7 @@ details.family > summary small { font-weight: 400; color: var(--muted); }
 .feed .big { font-weight: 500; }
 .feed .why { font-size: 12px; color: var(--indigo); }
 .feed .chose { font-size: 12px; color: var(--muted); }
-.choice { background: var(--sheet); border: 2px solid var(--indigo); border-radius: 10px; padding: 16px; display: grid; gap: 12px; }
+.choice { background: var(--sheet); border: 2px solid var(--indigo); border-radius: 10px; padding: 16px; display: grid; gap: 12px; scroll-margin-top: 150px; }
 .choice .q { font-family: var(--display); font-size: 19px; font-weight: 700; }
 .choice .why { font-size: 13px; color: var(--indigo); }
 .options { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
@@ -117,6 +117,21 @@ details.family > summary small { font-weight: 400; color: var(--muted); }
 .options button:hover { border-color: var(--indigo); }
 .options b { font-size: 15px; }
 .options small { font-size: 12px; color: var(--muted); }
+.options .lean { justify-self: start; margin-top: 4px; font-size: 11px; color: var(--seal); background: var(--seal-wash); border-radius: 999px; padding: 0 8px; }
+.lean-note { font-size: 12px; color: var(--muted); }
+.free { display: grid; gap: 8px; border-top: 1px dashed var(--rule); padding-top: 12px; }
+.free label { font-size: 13px; font-weight: 500; color: var(--muted); }
+.free-row { display: flex; gap: 8px; }
+.free-row input { flex: 1; min-width: 0; background: var(--paper); }
+.free-row button { flex: 0 0 auto; background: var(--indigo); color: var(--sheet); border: 0; border-radius: 8px; padding: 0 16px; min-height: 40px; font-weight: 500; }
+.free-row button:disabled, .free-row input:disabled { opacity: 0.6; }
+.free-note { font-size: 12px; color: var(--muted); }
+.free-out { display: grid; gap: 8px; font-size: 14px; }
+.free-out:empty { display: none; }
+.free-out .muted { color: var(--muted); }
+.suggest { display: flex; flex-wrap: wrap; gap: 6px; }
+.suggest button { border: 1px solid var(--indigo); color: var(--indigo); background: var(--indigo-wash); border-radius: 999px; padding: 5px 14px; font-size: 14px; }
+.suggest button.plain { border-color: var(--rule); color: var(--muted); background: transparent; }
 
 /* the end */
 #end { display: grid; gap: 26px; }
@@ -292,7 +307,7 @@ footer a { color: var(--indigo); }
     </div>
 
     <div class="runs" id="personal" hidden>
-      <div><h3>名字和家人</h3><p class="lede">姓名學和家人合盤，在這次模擬裡讓機率傾斜了多少。</p></div>
+      <div><h3 id="personal-title">命盤、名字和家人</h3><p class="lede" id="personal-lede">命盤、姓名學和家人合盤，在這一生裡怎麼出現。</p></div>
       <div class="cards" id="personal-cards"></div>
     </div>
 

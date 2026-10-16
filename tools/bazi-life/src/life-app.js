@@ -5,11 +5,16 @@ import { prepare } from "./sim/setup.js";
 import { createLife } from "./sim/life.js";
 import { rerun } from "./sim/monte.js";
 import { PROVISIONAL } from "./sim/rates.js";
-import { COUNTIES } from "./sim/events.js";
+import { COUNTIES } from "./sim/world.js";
 import { makeRng } from "./sim/rng.js";
 import { randomName } from "./sim/random-name.js";
 import { describeEffects, LEVEL_NAME } from "./core/name.js";
 import { checkFamily, familyTilts, describeFamilyTilts, isSibling } from "./core/family.js";
+import { describeViews } from "./core/analysis.js";
+import { safetyCheck, matchIntent } from "./sim/intent.js";
+import { interpretPrompt, readInterpretation } from "./sim/interpret.js";
+import { ACTIONS } from "./sim/actions.js";
+import { trait } from "./sim/words.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -18,6 +23,10 @@ const EDU = { none: "沒有上學", 國小: "國小", 國中: "國中", 高中: 
 
 let run = null;   // { input, extra: { name, family }, chart, prep, life, seed, born }
 let timer = null, speed = 1, paused = false;
+// Claude reads what the player writes, when this view can use it (the artifact's sample capability). Elsewhere, or
+// once the viewer declines, the page matches the words itself and asks the player to pick.
+let sampler = null, claudeOff = false, leanNoted = false;
+if (window.claude && typeof window.claude.use === "function") window.claude.use("sample").then(fn => { sampler = fn || null; showFreeNote(); }).catch(() => {});
 
 function setup() {
   $("#data-note").hidden = !PROVISIONAL;
@@ -34,7 +43,14 @@ function setup() {
     if (!paused) schedule();
   });
   $("#c-skip").addEventListener("click", skipToEnd);
-  $("#choice").addEventListener("click", e => { const b = e.target.closest("[data-option]"); if (b) choose(Number(b.dataset.option)); });
+  $("#choice").addEventListener("click", e => {
+    const b = e.target.closest("[data-option]");
+    if (b) return choose(Number(b.dataset.option));
+    const pick = e.target.closest("[data-free-action]");
+    if (pick) return applyFree(pick.dataset.freeAction, pick.dataset.summary);
+    if (e.target.closest("[data-free-cancel]")) { $("#free-out").innerHTML = ""; $("#free-text").focus(); }
+  });
+  $("#choice").addEventListener("submit", e => { e.preventDefault(); const t = $("#free-text"); if (t && t.value.trim()) interpretFree(t.value.trim()); });
   $("#add-sibling").addEventListener("click", addSibling);
   $("#sibling-list").addEventListener("click", e => { const b = e.target.closest(".remove"); if (b) b.closest(".member").remove(); });
   $("#f-only").addEventListener("change", () => {
@@ -173,7 +189,7 @@ function skipToEnd() {
   finish();
 }
 
-const lineOf = e => `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">你的選擇：${esc(e.choice)}</span>` : ""}${e.reason ? `<span class="why">${e.reasonFrom === "family" ? "合盤" : "命盤"}：${esc(e.reason)}</span>` : ""}`;
+const lineOf = e => `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">${e.free ? "你自己的決定" : "你的選擇"}：${esc(e.choice)}</span>` : ""}${e.reason ? `<span class="why">${e.reasonFrom === "family" ? "合盤" : "命盤"}：${esc(e.reason)}</span>` : ""}`;
 
 function render(entries) {
   if (!entries.length) return;
@@ -207,10 +223,91 @@ function showChoice() {
   const l = run.prep.luck[Math.max(0, run.life.state.age - 1)];
   const why = p.why ? `<p class="why">${p.why.from === "family" ? "合盤" : "這一年的命盤"}：${esc(p.why.text)}</p>`
     : l && l.reasons.length ? `<p class="why">這一年的命盤：${esc(l.reasons[0].text)}</p>` : "";
-  box.innerHTML = `<p class="q">${esc(p.prompt)}</p>${why}<div class="options">${p.options.map((o, i) => `<button type="button" data-option="${i}"><b>${esc(o.label)}</b>${o.hint ? `<small>${esc(o.hint)}</small>` : ""}</button>`).join("")}</div>`;
+  const dm = run.prep.analysis.dayMaster, nature = (trait(run.prep.analysis) || "").split("，").pop();
+  const leanNote = p.lean >= 0 && !leanNoted ? `<p class="lean-note">標著「個性傾向」的選項，是從你的${esc(dm.stem + dm.element)}日主（${esc(nature)}）和這一生做過的選擇推算的。選哪一個都可以。</p>` : "";
+  if (p.lean >= 0) leanNoted = true;
+  box.innerHTML = `<p class="q">${esc(p.prompt)}</p>${why}<div class="options">${p.options.map((o, i) => `<button type="button" data-option="${i}"><b>${esc(o.label)}</b>${o.hint ? `<small>${esc(o.hint)}</small>` : ""}${o.lean ? `<span class="lean">個性傾向</span>` : ""}</button>`).join("")}</div>${leanNote}`
+    + (p.free ? `<form class="free" id="free-form" autocomplete="off">
+      <label for="free-text">或者，寫下你自己的決定</label>
+      <div class="free-row"><input type="text" id="free-text" maxlength="80" placeholder="例如：先跟家人商量看看"><button type="submit" id="free-go">這樣做</button></div>
+      <p class="free-note" id="free-note"></p>
+      <div class="free-out" id="free-out" aria-live="polite"></div>
+    </form>` : "");
+  showFreeNote();
   box.hidden = false;
   box.scrollIntoView({ block: "nearest", behavior: "smooth" });
   box.querySelector("button").focus({ preventScroll: true });
+}
+
+function showFreeNote() {
+  const note = $("#free-note");
+  if (!note) return;
+  note.textContent = sampler && !claudeOff
+    ? "你寫的這句話會交給 Claude 判讀（只附上年齡、工作、感情狀態，不送姓名和生日），結果一樣照模擬規則計算。"
+    : "會在你的瀏覽器裡找出最接近的選擇給你確認，不會上傳。";
+}
+
+const freeOut = html => { const out = $("#free-out"); if (out) out.innerHTML = html; };
+const SAFETY_TEXT = {
+  self_harm: `<div class="help">如果你現在真的有這樣的感覺，請找人說說：1925 安心專線（24 小時）、1995 生命線、1980 張老師。<br>故事裡，我們換一個選擇好嗎？</div>`,
+  harm: `<p>這個選擇會傷害別人或違法，故事不會往這個方向走。換個方式寫寫看？</p>`,
+};
+
+// What the player wrote → an action. Safety words first (never simulated), then Claude when allowed, else the
+// local matcher's closest guesses for the player to pick. Nothing applies until the player confirms.
+async function interpretFree(text) {
+  const p = run.life.pending;
+  if (!p || !p.free) return;
+  const safety = safetyCheck(text);
+  if (safety !== "ok") return freeOut(SAFETY_TEXT[safety]);
+  const go = $("#free-go"), box = $("#free-text");
+  if (sampler && !claudeOff) {
+    freeOut(`<p class="muted">Claude 正在理解你的決定…</p>`);
+    go.disabled = true; box.disabled = true;
+    try {
+      const reply = await sampler.json(interpretPrompt({ ...p.free, text }), { modelTier: "quick" });
+      const r = readInterpretation(reply, { options: p.free.options });
+      if (r.action === "self_harm" || r.action === "harm") return freeOut(SAFETY_TEXT[r.action]);
+      if (r.action !== "unknown") return confirmFree(r.action, r.summary || `你決定「${text}」`);
+    } catch (e) {
+      if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"].includes(e && e.code)) { claudeOff = true; showFreeNote(); }
+    } finally {
+      go.disabled = false; box.disabled = false;
+    }
+  }
+  suggestFree(text);
+}
+
+// Up to three closest actions, preferring this choice's own option when one does the same thing.
+function suggestFree(text) {
+  const p = run.life.pending, picks = [];
+  for (const r of matchIntent(text)) {
+    const own = p.options.find(o => o.id && o.act === r.id);
+    const id = own ? own.id : r.id;
+    if (!picks.some(x => x.id === id)) picks.push({ id, label: own ? own.label : ACTIONS[r.id].label });
+    if (picks.length === 3) break;
+  }
+  const summary = `你決定「${text}」`;
+  if (!picks.length) return freeOut(`<p>看不太出來要怎麼做。換個說法寫寫看，或選上面的選項。</p>`);
+  freeOut(`<p>你的意思比較接近哪一個？</p><div class="suggest">${picks.map(x => `<button type="button" data-free-action="${esc(x.id)}" data-summary="${esc(summary)}">${esc(x.label)}</button>`).join("")}<button type="button" class="plain" data-free-cancel>都不是</button></div>`);
+}
+
+function confirmFree(action, summary) {
+  const p = run.life.pending;
+  const own = p.options.find(o => o.id === action);
+  const rule = own ? own.label : ACTIONS[action] ? ACTIONS[action].label : "";
+  freeOut(`<p><b>${esc(summary)}</b>${rule ? `<br><small>照「${esc(rule)}」的規則計算</small>` : ""}</p><div class="suggest"><button type="button" data-free-action="${esc(action)}" data-summary="${esc(summary)}">確定</button><button type="button" class="plain" data-free-cancel>改一下</button></div>`);
+}
+
+function applyFree(action, summary) {
+  const r = run.life.chooseAction({ action, summary });
+  if (r.infeasible) return freeOut(`<p>這個現在做不到：${esc(r.infeasible)}</p>`);
+  $("#choice").hidden = true;
+  render(r.entries);
+  updateStatus();
+  if (run.life.pending) return showChoice();
+  if (run.life.done) return finish();
+  schedule();
 }
 
 // ---------- the end ----------
@@ -230,6 +327,7 @@ function finish() {
     ["子女", s.kids.length ? `${s.kids.length} 個孩子` : "沒有孩子"],
     ["房子", s.home === "own" ? "有自己的房子" : "租屋"],
     ["心情最好的一年", `${peak.age} 歲（${peak.year} 年）`],
+    ...(s.written ? [["自己寫的決定", `${s.written} 次`]] : []),
   ];
   $("#end-facts").innerHTML = facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("");
   $("#end").hidden = false;
@@ -380,11 +478,34 @@ function familyCard() {
     <p class="fine">合盤只看生肖、日柱和五行的關係，讓機率傾斜最多 ±15%，不影響壽命和重病。家人之間怎麼相處，還是要靠彼此。</p></div>`;
 }
 
+// How the chart showed in this life: jobs and their elements, the choices that followed the person's nature.
+function chartCard() {
+  const { prep, life } = run, a = prep.analysis, s = life.state;
+  const dm = `${a.dayMaster.stem}${a.dayMaster.element}`, nature = (trait(a) || "").split("，").pop();
+  const jobs = s.jobsHeld.map(j => `${esc(j.title)}（${j.element || "？"}${a.useful.includes(j.element) ? "・喜用" : ""}）`);
+  const fit = s.jobsHeld.filter(j => a.useful.includes(j.element)).length;
+  const peak = life.kline.reduce((x, y) => (y.close > x.close ? y : x), life.kline[0]);
+  const top = prep.luck.slice(0, Math.max(1, s.age)).slice().sort((x, y) => y.score - x.score).slice(0, 5).sort((x, y) => x.age - y.age);
+  const inTop = top.some(y => Math.abs(y.age - peak.age) <= 1);
+  const view = describeViews(a).find(v => a.useful[0] && v.includes(`喜${a.useful[0]}`)) || "";
+  return `<div class="card"><h3>命盤與這一生</h3>
+    <p class="count">${esc(dm)}日主，<em>${esc(nature)}</em></p>
+    <p>命盤${a.useful.length ? `喜${esc(a.useful.join("、"))}` : "喜忌不明顯"}${a.avoid.length ? `，忌${esc(a.avoid.join("、"))}` : ""}，格局是${esc(a.pattern)}。${view ? `${esc(view)}。` : ""}</p>
+    ${jobs.length ? `<p>做過的工作：${jobs.join("、")}。${fit ? `其中 ${fit} 份屬於你的喜用五行。` : "沒有一份屬於你的喜用五行。"}</p>` : ""}
+    ${s.lean.offered ? `<p>${s.lean.offered} 次抉擇裡有明顯的個性傾向，你有 ${s.lean.followed} 次選了它。</p>` : ""}
+    ${s.written ? `<p>你自己寫了 ${s.written} 個決定。</p>` : ""}
+    <p>流年最好的幾年：${top.map(y => `${y.age} 歲（${esc(y.year)}）`).join("、")}。${inTop ? `心情最好的 ${peak.age} 歲，正好落在其中。` : `心情最好的一年是 ${peak.age} 歲。`}</p>
+    <p class="fine">五行行業、格局與職業的對應採用傳統命理的說法；個性傾向從日主出發，也會被這一生的選擇改變。僅供參考。</p></div>`;
+}
+
 function drawPersonal() {
-  const cards = [];
+  const cards = [chartCard()];
   if (run.extra.name) cards.push(nameCard());
   if (run.prep.family) cards.push(familyCard());
-  $("#personal").hidden = !cards.length;
+  const more = cards.length > 1;
+  $("#personal-title").textContent = more ? "命盤、名字和家人" : "命盤在這一生裡";
+  $("#personal-lede").textContent = more ? "命盤、姓名學和家人合盤，在這一生裡怎麼出現。" : "命盤的喜忌、格局和個性，在這一生裡怎麼出現。";
+  $("#personal").hidden = false;
   $("#personal-cards").innerHTML = cards.join("");
 }
 

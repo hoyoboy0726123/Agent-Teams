@@ -43,9 +43,10 @@ test("300 lives: no broken text and no contradictory events", () => {
     const life = runLife({ chart, analysis, luck, seed: 1000 + i });
     for (const e of life.log) assert.ok(e.text && !/[{}]|undefined|null|NaN/.test(e.text), `${e.id}: ${e.text}`);
     const ids = new Set(life.log.map(e => e.id));
-    assert.ok(!(ids.has("startupResult") && ids.has("startupFail")), "startup both succeeded and failed");
-    const married = life.log.filter(e => e.id === "proposal" && e.choice === "結婚").length;
-    assert.equal(married, life.state.marriages);
+    assert.equal(life.state.spells.length, life.state.marriages);
+    assert.ok(life.state.spells.every(x => x.to !== null || x === life.state.spells[life.state.spells.length - 1]), "only the last marriage can be open");
+    const ids2 = life.log.map(e => e.id);
+    assert.ok(ids2.filter(id => id === "startupYear2").length <= ids2.filter(id => id === "startupYear1").length, "every startup outcome follows its first year");
   }
 });
 

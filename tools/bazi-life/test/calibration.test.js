@@ -20,21 +20,16 @@ function population(sex, n) {
   for (let i = 0; i < n; i++) {
     const { log, state: s } = runLife({ chart, analysis, luck: neutral, seed: 31000 + i });
     out.kids += s.kids.length;
-    const first = log.find(e => e.id === "proposal" && e.choice === "結婚");
-    if (first) out.first.push(first.age);
-    if (s.age >= 37) { out.at37++; if (!first || first.age > 37) out.never++; }
-    let since = null;
-    for (const e of log) {
-      if (e.id === "proposal" && e.choice === "結婚") since = e.age;
-      else if (["divorce", "widowed", "death"].includes(e.id) && since !== null) {
-        out.marriedYears += e.age - since;
-        if (e.id === "divorce") out.durations.push(e.age - since);
-        since = null;
-      }
+    const first = s.spells.length ? s.spells[0].from : null;
+    if (first !== null) out.first.push(first);
+    if (s.age >= 37) { out.at37++; if (first === null || first > 37) out.never++; }
+    for (const spell of s.spells) {
+      out.marriedYears += (spell.to ?? s.age) - spell.from;
+      if (spell.end === "divorce") out.durations.push(spell.to - spell.from);
     }
     const r = log.find(e => e.id === "retire");
     if (r) out.retire.push(r.age);
-    if (s.age >= 50) { out.alive50++; if (log.some(e => e.id === "buyHome" && e.choice === "買房子" && e.age <= 50)) out.own++; }
+    if (s.age >= 50) { out.alive50++; if (s.ownedAt !== undefined && s.ownedAt <= 50) out.own++; }
     if (["大學", "科大", "碩士", "博士"].includes(s.edu)) out.uni++;
   }
   return out;
