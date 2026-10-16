@@ -45,7 +45,7 @@ const items = list => (list && list.length ? `<ul>${list.map(i => `<li>${i.label
 const section = (title, inner, open = false) => (inner ? `<details class="sec"${open ? " open" : ""}><summary>${esc(title)}</summary>${inner}</details>` : "");
 
 export function reportHTML(chart, parts) {
-  const { natal, decades = [], years = [], events = [], name = null } = parts;
+  const { natal, decades = [], years = [], events = [], name = null, yearsTitle = "近十年流年" } = parts;
   const basics = natal && natal.basics ? `<dl class="basics">${natal.basics.map(b => `<div><dt>${esc(b.label)}</dt><dd>${esc(b.value)}</dd></div>`).join("")}</dl>` : "";
   const sections = natal ? natal.sections.map((s, i) => section(s.title, para(s.paragraphs) + items(s.items), i === 0)).join("") : "";
   const decadeRows = decades.map(d => `<tr><td>${esc(d.name)}</td><td>${esc(d.startAge)}–${esc(d.endAge)} 歲<br><small>${esc(d.startYear)}–${esc(d.endYear)}</small></td><td>${esc(d.gods ? `${d.gods.stem}・${d.gods.branch}` : "")}</td><td class="tone-${esc(d.tone)}">${esc(d.tone || "")}</td><td>${esc(d.text || d.headline || "")}</td></tr>`).join("");
@@ -61,8 +61,8 @@ export function reportHTML(chart, parts) {
     section("神煞說明", starLegend(chart)),
     sections,
     section("大運詳批", decadeTable),
-    section("這一生的大事與流年", lifeList),
-    section("近十年流年", yearTable),
+    section("這一生的大事與命理", lifeList),
+    section(yearsTitle, yearTable),
     nameBlock,
     section("開運建議", advice),
     `<p class="fine">${esc((natal && natal.disclaimer) || "以上是傳統八字與姓名學的說法，用來認識自己、做為參考，不是預言；健康問題請以醫師診斷為準。")}</p>`,

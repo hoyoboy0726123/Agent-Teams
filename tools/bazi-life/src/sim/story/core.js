@@ -354,12 +354,14 @@ export const CORE = [
     },
   },
   {
-    id: "divorce", domain: "love", channel: "bad", tags: ["spouse"], when: s => s.rel === "married",
+    // Not in the wedding year itself: in a story told year by year, a wedding and a divorce in the same year read as a slip.
+    id: "divorce", domain: "love", channel: "bad", tags: ["spouse"], when: s => s.rel === "married" && yearsMarried(s) >= 1,
     p: (s, ctx) => ctx.R.divorce(yearsMarried(s), s.year) * (s.guard > 0 ? 0.4 : 1) * (s.crisis > 0 ? 2.5 : 1) * (s.flags.askedDivorce >= s.age - 1 ? 3 : 1),
     apply: (s, ctx) => {
       const name = s.partner ? s.partner.call : "另一半", n = Math.max(1, yearsMarried(s));
+      const last = s.kids.some(k => k.alive !== false) ? "{孩子問你為什麼，你想了很久才回答。|搬出去的那天，你把鑰匙放在桌上。}" : "搬出去的那天，你把鑰匙放在桌上。";
       endRelationship(s, ctx);
-      return { text: ctx.w(["和{name}離婚了。簽字那天，兩個人都很平靜。", "和{name}走了 {n} 年，還是決定分開。", "和{name}離婚了，{孩子問你為什麼，你想了很久才回答。|搬出去的那天，你把鑰匙放在桌上。}"], { name, n }), mood: -12, big: true };
+      return { text: ctx.w(["和{name}離婚了。簽字那天，兩個人都很平靜。", "和{name}走了 {n} 年，還是決定分開。", `和{name}離婚了，${last}`], { name, n }), mood: -12, big: true };
     },
   },
   {

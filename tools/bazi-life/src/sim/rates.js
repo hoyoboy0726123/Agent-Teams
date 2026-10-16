@@ -207,8 +207,9 @@ export const proposal = (age, sex, year, marriages) => interp(sex === "female" ?
 // test/calibration.test.js. Later and earlier years scale with the crude divorce rate (1996 1.67, 2003 2.87,
 // 2010 2.51, 2023 2.18, 2024 2.28, 2025 2.23 per 1,000); years before 1996 use 1996.
 const DIVORCE_TREND = [[1996, 1.67], [2003, 2.87], [2010, 2.51], [2023, 2.18], [2024, 2.28], [2025, 2.23]];
-// By years married; fitted with the crisis choices so a third of divorces come within five years and a quarter at 5–9.
-const DIVORCE_BY_YEARS = [[0, 0.016], [2, 0.028], [5, 0.024], [9, 0.015], [15, 0.009], [25, 0.005], [40, 0.003]];
+// By years married, from the first year after the wedding (story/core.js has no divorce in the wedding year itself);
+// fitted with the crisis choices so a third of divorces come within five years and a quarter at 5–9.
+const DIVORCE_BY_YEARS = [[1, 0.032], [2, 0.036], [5, 0.024], [9, 0.014], [15, 0.0085], [25, 0.005], [40, 0.003]];
 export const divorce = (years, year) => interp(DIVORCE_BY_YEARS, years) * interp(DIVORCE_TREND, yr(year)) / 2.28;
 export const crisis = years => interp([[0, 0.03], [3, 0.06], [10, 0.04], [25, 0.02]], years);
 

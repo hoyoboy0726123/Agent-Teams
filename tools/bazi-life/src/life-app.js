@@ -12,6 +12,12 @@ import { describeEffects, LEVEL_NAME } from "./core/name.js";
 import { checkFamily, familyTilts, describeFamilyTilts, isSibling } from "./core/family.js";
 import { describeViews } from "./core/analysis.js";
 import { luckGods } from "./core/detail.js";
+import { natalReading } from "./core/reading-natal.js";
+import { yearReading, decadeReading, eventReason } from "./core/reading-year.js";
+import { nameReading } from "./core/name-reading.js";
+import { reportHTML } from "./report.js";
+import { kindOf, TURNING, explainable } from "./sim/reason-kinds.js";
+import { ALL_EVENTS } from "./sim/story/index.js";
 import { safetyCheck, matchIntent } from "./sim/intent.js";
 import { interpretPrompt, readInterpretation } from "./sim/interpret.js";
 import { ACTIONS } from "./sim/actions.js";
@@ -20,6 +26,7 @@ import { trait } from "./sim/words.js";
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const SPEED_MS = { 1: 900, 3: 320, 10: 90 };
+const EVENT_BY_ID = new Map(ALL_EVENTS.map(e => [e.id, e]));
 // The year's luck when the person is `age` (years since birth; setup.js keys prep.luck that way).
 const luckAt = (prep, age) => prep.luck[Math.max(0, Math.min(prep.luck.length - 1, age))];
 const EDU = { none: "沒有上學", 國小: "國小", 國中: "國中", 高中: "高中", 高職: "高職", 五專: "五專", 科大: "科技大學", 大學: "大學", 碩士: "碩士", 博士: "博士" };
@@ -199,7 +206,30 @@ function skipToEnd() {
   finish();
 }
 
-const lineOf = e => `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">${e.free ? "你自己的決定" : e.picked ? "依你的個性" : "你的選擇"}：${esc(e.choice)}</span>` : ""}${e.reason ? `<span class="why">${e.reasonFrom === "family" ? "合盤" : "命盤"}：${esc(e.reason)}</span>` : ""}`;
+// The professional reading of the year the person is `age`, computed once per life and age.
+function readingAt(age) {
+  const cache = (run.readings ||= new Map());
+  if (!cache.has(age)) cache.set(age, yearReading(run.chart, run.prep.analysis, age));
+  return cache.get(age);
+}
+// The 命理 explanation of an event: its own kind (reason-kinds.js), or, for a story event, the year's reading of its
+// domain when that reading clearly points the same way as the event. Deaths are never explained.
+function chartReason(id, age, channel = null) {
+  if (!explainable(id)) return null;
+  const r = readingAt(age), kind = kindOf(id), ev = EVENT_BY_ID.get(id), ch = channel || (ev && ev.channel) || null;
+  if (kind) {
+    // The channel says which way the event went (a 學業 setback is not explained by 文昌).
+    const x = eventReason(kind, r, { sex: run.chart.input.sex, channel: ch });
+    return x ? { short: x.short, why: TURNING.has(id) ? x.why : null } : null;
+  }
+  const d = ev && ev.domain && r.domains[ev.domain];
+  if (!d || !d.text || !ch) return null;
+  const clear = ch === "good" ? d.level >= 2 : ch === "bad" ? d.level <= -2 : Math.abs(d.level) >= 2;
+  return clear ? { short: `${r.pillar}年：${d.text}`, why: null } : null;
+}
+const reasonLine = (r, tag = "span") => (r ? `<${tag} class="why">命理：${esc(r.short)}</${tag}>${r.why ? `<details class="why-more"><summary>為什麼在這個歲數</summary><p>${esc(r.why)}</p></details>` : ""}` : "");
+const lineOf = e => `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">${e.free ? "你自己的決定" : e.picked ? "依你的個性" : "你的選擇"}：${esc(e.choice)}</span>` : ""}`
+  + (e.reason && e.reasonFrom === "family" ? `<span class="why">合盤：${esc(e.reason)}</span>` : "") + reasonLine(chartReason(e.id, e.age, e.channel));
 
 function render(entries) {
   if (!entries.length) return;
@@ -235,9 +265,7 @@ function updateStatus() {
 function showChoice() {
   stop();
   const p = run.life.pending, box = $("#choice");
-  const l = luckAt(run.prep, run.life.state.age);
-  const why = p.why ? `<p class="why">${p.why.from === "family" ? "合盤" : "這一年的命盤"}：${esc(p.why.text)}</p>`
-    : l && l.reasons.length ? `<p class="why">這一年的命盤：${esc(l.reasons[0].text)}</p>` : "";
+  const why = reasonLine(chartReason(p.id, run.life.state.age), "p") + (p.why && p.why.from === "family" ? `<p class="why">合盤：${esc(p.why.text)}</p>` : "");
   const dm = run.prep.analysis.dayMaster, nature = (trait(run.prep.analysis) || "").split("，").pop();
   const leanNote = p.lean >= 0 && !leanNoted ? `<p class="lean-note">標著「個性傾向」的選項，是從你的${esc(dm.stem + dm.element)}日主（${esc(nature)}）和這一生做過的選擇推算的。選哪一個都可以。</p>` : "";
   if (p.lean >= 0) leanNoted = true;
@@ -350,6 +378,7 @@ function finish() {
   drawTable();
   drawCards();
   drawPersonal();
+  drawReport();
   drawShare(peak);
   $("#end").scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -511,6 +540,25 @@ function chartCard() {
     ${s.written ? `<p>你自己寫了 ${s.written} 個決定。</p>` : ""}
     <p>流年最好的幾年：${top.map(y => `${y.age} 歲（${esc(y.year)}）`).join("、")}。${inTop ? `心情最好的 ${peak.age} 歲，正好落在其中。` : `心情最好的一年是 ${peak.age} 歲。`}</p>
     <p class="fine">五行行業、格局與職業的對應採用傳統命理的說法；個性傾向從日主出發，也會被這一生的選擇改變。僅供參考。</p></div>`;
+}
+
+// 八字命理詳批: the professional chart and readings for this birth and name, plus how this life's turning points
+// sat in their years.
+function drawReport() {
+  const { chart, prep, life } = run, a = prep.analysis;
+  const natal = natalReading(chart, a, { name: prep.name ? prep.name.full : null });
+  const decades = chart.luck.decades.map((_, i) => decadeReading(chart, a, i));
+  const now = new Date().getFullYear(), birth = chart.input.date.y;
+  const from = birth <= now ? now - birth : 18;
+  const years = Array.from({ length: 10 }, (_, k) => readingAt(from + k));
+  const seen = new Set();
+  const events = life.log.filter(e => TURNING.has(e.id) && explainable(e.id) && !seen.has(`${e.id}|${e.age}`) && seen.add(`${e.id}|${e.age}`))
+    .slice(0, 14).map(e => ({ entry: e, reason: chartReason(e.id, e.age, e.channel) }));
+  const name = prep.name ? nameReading(prep.name, a) : null;
+  const yearsTitle = birth <= now ? `近十年流年（${now}–${now + 9}）` : `成年後十年的流年（${birth + 18}–${birth + 27}）`;
+  $("#report-body").innerHTML = reportHTML(chart, { natal, decades, years, events, name, yearsTitle });
+  $("#report-lede").textContent = `依${prep.name ? `「${prep.name.full}」的姓名與` : ""}出生時刻（真太陽時）排出的命盤，用傳統子平八字${prep.name ? "與姓名學" : ""}的方法逐項分析。傳統命理的說法，僅供參考。`;
+  $("#report").hidden = false;
 }
 
 function drawPersonal() {

@@ -50,6 +50,11 @@ check("lifespan card counts out of 100 and shows the 1925 line", /100 次人生�
 check("health and marriage cards carry their notices", /不是看命盤/.test(cards) && /抉擇/.test(cards));
 check("share card carries the notice", /模擬故事，不是預言/.test(await page.textContent("#share")));
 check("the chart-and-life card shows the day master and the jobs' elements", /命盤與這一生/.test(await page.textContent("#personal")) && /日主/.test(await page.textContent("#personal")));
+// 八字命理詳批: the professional chart table and the report sections.
+const report = await page.textContent("#report");
+check("the professional report has the 10-row chart table", await page.isVisible("#report") && (await page.$$("#report .paipan tbody tr")).length === 10, `${(await page.$$("#report .paipan tbody tr")).length} rows`);
+check("the report covers strength, pattern, personality, family, career, money, marriage, health, decades and years", ["日主強弱", "格局", "性格", "六親", "事業", "財運", "婚姻", "健康", "大運", "流年"].every(w => report.includes(w)), report.slice(0, 80));
+check("the report carries its notice", /僅供參考/.test(report));
 await page.hover("#plot svg", { position: { x: 300, y: 120 } });
 check("hovering the K-line shows a tooltip", await page.isVisible("#tip"));
 check("without a name or family only the chart card shows", (await page.$$("#personal-cards .card")).length === 1);
