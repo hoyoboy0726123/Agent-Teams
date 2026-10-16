@@ -38,49 +38,71 @@ export function starLegend(chart) {
 }
 
 // ---------- the whole report ----------
-// parts: { natal: natalReading(), decades: [decadeReading()], years: [yearReading()] (the next ten years),
-//          events: [{ entry, reason }] (the turning points of this life with their explanation), name: nameReading() | null }
+// parts: { natal: natalReading(), decades: [decadeReading()], years: [yearReading()] (ten years), yearsTitle,
+//          events: [{ entry, reason }] (the turning points of this life with their explanation), name: nameReading() | null,
+//          overall: overallReading() | null }
+// Order: the chart, the natal readings, the 大運, the turning points, the 流年, the name, the 綜合論斷 and, last, the
+// 開運建議 (the natal reading's own advice section).
 const para = list => (list || []).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join("");
 const items = list => (list && list.length ? `<ul>${list.map(i => `<li>${i.label ? `<b>${esc(i.label)}</b>：` : ""}${esc(i.text)}</li>`).join("")}</ul>` : "");
 const section = (title, inner, open = false) => (inner ? `<details class="sec"${open ? " open" : ""}><summary>${esc(title)}</summary>${inner}</details>` : "");
+// A row of a 大運 or 流年 table. On a phone the rows become cards: the first four cells on one line, the text below.
+const luckRow = (name, when, sub, gods, tone, text) => `<tr><td class="lt-name">${esc(name)}</td><td class="lt-when">${esc(when)}<small>${esc(sub)}</small></td><td class="lt-gods">${esc(gods)}</td><td class="lt-tone tone-${esc(tone)}">${esc(tone)}</td><td class="lt-text">${esc(text)}</td></tr>`;
+const godsOf = x => (x.gods ? `${x.gods.stem}・${x.gods.branch}` : "");
 
 export function reportHTML(chart, parts) {
-  const { natal, decades = [], years = [], events = [], name = null, yearsTitle = "近十年流年" } = parts;
+  const { natal, decades = [], years = [], events = [], name = null, overall = null, yearsTitle = "近十年流年" } = parts;
   const basics = natal && natal.basics ? `<dl class="basics">${natal.basics.map(b => `<div><dt>${esc(b.label)}</dt><dd>${esc(b.value)}</dd></div>`).join("")}</dl>` : "";
-  const sections = natal ? natal.sections.map((s, i) => section(s.title, para(s.paragraphs) + items(s.items), i === 0)).join("") : "";
-  const decadeRows = decades.map(d => `<tr><td>${esc(d.name)}</td><td>${esc(d.startAge)}–${esc(d.endAge)} 歲<br><small>${esc(d.startYear)}–${esc(d.endYear)}</small></td><td>${esc(d.gods ? `${d.gods.stem}・${d.gods.branch}` : "")}</td><td class="tone-${esc(d.tone)}">${esc(d.tone || "")}</td><td>${esc(d.text || d.headline || "")}</td></tr>`).join("");
+  const natalSections = natal ? natal.sections : [];
+  const sectionHTML = (s, open) => section(s.title, para(s.paragraphs) + items(s.items), open);
+  const body = natalSections.filter(s => s.id !== "advice").map((s, i) => sectionHTML(s, i === 0)).join("");
+  const adviceSection = natalSections.find(s => s.id === "advice");
+  const decadeRows = decades.map(d => luckRow(d.name, `${d.startAge}–${d.endAge} 歲`, `${d.startYear}–${d.endYear}`, godsOf(d), d.tone || "", d.text || d.headline || "")).join("");
   const decadeTable = decades.length ? `<table class="luck-table"><thead><tr><th>大運</th><th>虛歲／年份</th><th>十神</th><th>吉凶</th><th>重點</th></tr></thead><tbody>${decadeRows}</tbody></table><p class="fine">大運的歲數是虛歲（出生那年算 1 歲），起運 ${esc(chart.luck.start.years)} 年 ${esc(chart.luck.start.months)} 個月，${esc(chart.luck.start.date)} 交運。</p>` : "";
-  const yearRows = years.map(y => `<tr><td>${esc(y.pillar)}</td><td>${esc(y.year)}<br><small>${esc(y.age)} 歲</small></td><td>${esc(y.gods ? `${y.gods.stem}・${y.gods.branch}` : "")}</td><td class="tone-${esc(y.favor && y.favor.tone)}">${esc(y.favor && y.favor.tone || "")}</td><td>${esc(y.headline || "")}</td></tr>`).join("");
-  const yearTable = years.length ? `<table class="luck-table"><thead><tr><th>流年</th><th>年份</th><th>十神</th><th>吉凶</th><th>重點</th></tr></thead><tbody>${yearRows}</tbody></table>` : "";
+  const yearRows = years.map(y => luckRow(y.pillar, String(y.year), `${y.age} 歲`, godsOf(y), (y.favor && y.favor.tone) || "", y.headline || "")).join("");
+  const yearTable = years.length ? `<table class="luck-table"><thead><tr><th>流年</th><th>年份</th><th>十神</th><th>吉凶</th><th>重點</th></tr></thead><tbody>${yearRows}</tbody></table><p class="fine">流年的歲數是足歲；吉凶綜合流年與當時大運的喜忌，以及這一年和命盤的刑沖合害。</p>` : "";
   const lifeList = events.length ? `<ul>${events.map(({ entry, reason }) => `<li><b>${esc(entry.age)} 歲（${esc(entry.year)}）</b>${esc(entry.text)}${reason ? `<br><span class="why">${esc(reason.why || reason.short)}</span>` : ""}</li>`).join("")}</ul>` : "";
-  const nameBlock = name ? nameHTML(name) : "";
-  const advice = natal && natal.advice ? items(Object.entries(natal.advice).filter(([, v]) => v && (Array.isArray(v) ? v.length : true)).map(([k, v]) => ({ label: ADVICE[k] || k, text: Array.isArray(v) ? v.join("、") : String(v) }))) : "";
+  const overallBlock = overall ? section("綜合論斷", items(overall.items) + para([overall.closing]), true) : "";
+  // Without the natal advice section (older readings), the advice fields as a list.
+  const advice = adviceSection ? sectionHTML(adviceSection, false)
+    : natal && natal.advice ? section("開運建議", items(Object.entries(natal.advice).filter(([, v]) => v && (Array.isArray(v) ? v.length : true)).map(([k, v]) => ({ label: ADVICE[k] || k, text: Array.isArray(v) ? v.join("、") : String(v) })))) : "";
   return [
     basics,
     paipanTable(chart),
     section("神煞說明", starLegend(chart)),
-    sections,
+    body,
     section("大運詳批", decadeTable),
     section("這一生的大事與命理", lifeList),
     section(yearsTitle, yearTable),
-    nameBlock,
-    section("開運建議", advice),
+    name ? nameHTML(name) : "",
+    overallBlock,
+    advice,
     `<p class="fine">${esc((natal && natal.disclaimer) || "以上是傳統八字與姓名學的說法，用來認識自己、做為參考，不是預言；健康問題請以醫師診斷為準。")}</p>`,
   ].join("");
 }
-const ADVICE = { colors: "顏色", directions: "方位", numbers: "數字", industries: "行業", habits: "生活習慣", zodiac: "相合的生肖" };
+const ADVICE = { elements: "喜用五行", colors: "顏色", directions: "方位", numbers: "數字", industries: "行業", habits: "生活習慣", zodiac: "相合的生肖" };
 
+// 姓名詳批: the score, the strokes, the five grids with how each is counted, 三才, 三運, the characters' elements against
+// the chart, and the notes and credit of the texts.
 function nameHTML(n) {
-  const grids = (n.grids || []).map(g => `<li><b>${esc(g.key)} ${esc(g.value)}（${esc(g.element)}・${esc(g.level)}）</b>${g.poem ? `「${esc(g.poem)}」` : ""}${esc(g.text || "")}${g.note ? `<br><small>${esc(g.note)}</small>` : ""}</li>`).join("");
-  const yun = n.yunshi ? Object.entries(n.yunshi).map(([k, v]) => v && `<li><b>${esc(k)}（${esc(v.level || "")}）</b>${esc(v.text || "")}</li>`).filter(Boolean).join("") : "";
+  if (!n || n.error) return "";
+  const score = Number.isFinite(n.score)
+    ? `<div class="name-score"><div class="num"><b>${esc(n.score)}</b>分</div><div><div class="label">${esc(n.scoreLabel)}</div><div class="parts">${(n.scoreParts || []).map(p => `${esc(p.part)} ${esc(p.points)} 分（占 ${esc(p.weight)}%）`).join("・")}</div></div></div>`
+    : "";
+  const grids = (n.grids || []).map(g => `<li><b>${esc(g.key)} ${esc(g.value)}（${esc(g.element)}・${esc(g.level)}）</b><small class="formula">${esc(g.formula)}；${esc(g.role)}</small>${g.poem ? `「${esc(g.poem)}」` : ""}${esc(g.text || "")}${g.note ? `<br><small>${esc(g.note)}</small>` : ""}</li>`).join("");
+  const sancai = n.sancai ? `<p><b>${esc(n.sancai.elements)}（${esc(n.sancai.level)}）</b>${esc(n.sancai.relation || "")}${esc(n.sancai.text || "")}${n.sancai.note ? `<br><small>${esc(n.sancai.note)}</small>` : ""}</p>` : "";
+  const yun = n.yunshi ? Object.entries(n.yunshi).filter(([, v]) => v).map(([k, v]) => `<li><b>${esc(k)}（${esc(v.level || "")}）</b>${esc(v.relation || "")}${esc(v.text || "")}${v.note ? `<br><small>${esc(v.note)}</small>` : ""}</li>`).join("") : "";
   const inner = [
+    score,
     n.summary ? `<p>${esc(n.summary)}</p>` : "",
-    grids ? `<ul>${grids}</ul>` : "",
-    n.sancai ? `<p><b>三才 ${esc(n.sancai.elements)}（${esc(n.sancai.level)}）</b>${esc(n.sancai.text || "")}</p>` : "",
-    yun ? `<ul>${yun}</ul>` : "",
-    n.elements && n.elements.text ? `<p>${esc(n.elements.text)}</p>` : "",
+    n.strokes ? `<p class="fine">康熙筆畫：${esc(n.strokes)}</p>` : "",
+    grids ? `<h4>五格數理</h4><ul>${grids}</ul>` : "",
+    sancai ? `<h4>三才配置</h4>${sancai}` : "",
+    yun ? `<h4>三運</h4><ul>${yun}</ul>` : "",
+    n.elements && n.elements.text ? `<h4>用字五行與八字</h4><p>${esc(n.elements.text)}</p>` : "",
     n.disputed ? `<p class="fine">${esc(n.disputed)}</p>` : "",
     (n.notes || []).map(x => `<p class="fine">${esc(x)}</p>`).join(""),
+    n.credit ? `<p class="fine">${esc(n.credit)}</p>` : "",
   ].join("");
   return section("姓名詳批", inner);
 }

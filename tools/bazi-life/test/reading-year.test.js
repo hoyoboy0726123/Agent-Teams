@@ -58,6 +58,10 @@ test("200 random charts, every age 0–90: clean text, levels in −2..2, a head
         assert.ok(v.text.length > 8 && v.text.endsWith("。"), `${where} ${d}: ${v.text}`);
       }
       assert.ok(r.headline.startsWith(`${r.pillar}年`) && r.headline.length <= 70, `${where}: ${r.headline}`);
+      // The headline's verdict on the year (before the first ；) agrees with its tone, which also weighs the decade.
+      const verdict = r.headline.split("；")[0];
+      if (r.favor.tone !== "吉") assert.ok(!verdict.includes("整體順勢"), `${where} ${r.favor.tone}: ${r.headline}`);
+      if (r.favor.tone !== "凶") assert.ok(!verdict.includes("宜守不宜攻"), `${where} ${r.favor.tone}: ${r.headline}`);
       assert.ok(r.points.length >= 3 && r.points.length <= 8, `${where}: ${r.points.length} points`);
       assert.ok(r.points.every(p => p.length > 8), where);
       assert.ok(yearTag(r).startsWith(`流年${r.pillar}（`), yearTag(r));

@@ -55,6 +55,8 @@ const report = await page.textContent("#report");
 check("the professional report has the 10-row chart table", await page.isVisible("#report") && (await page.$$("#report .paipan tbody tr")).length === 10, `${(await page.$$("#report .paipan tbody tr")).length} rows`);
 check("the report covers strength, pattern, personality, family, career, money, marriage, health, decades and years", ["日主強弱", "格局", "性格", "六親", "事業", "財運", "婚姻", "健康", "大運", "流年"].every(w => report.includes(w)), report.slice(0, 80));
 check("the report carries its notice", /僅供參考/.test(report));
+const sectionTitles = await page.$$eval("#report details.sec > summary", els => els.map(e => e.textContent));
+check("the report ends with 綜合論斷 and then 開運建議, once", sectionTitles.filter(t => t === "開運建議").length === 1 && sectionTitles.at(-1) === "開運建議" && sectionTitles.at(-2) === "綜合論斷", sectionTitles.join(" / "));
 await page.hover("#plot svg", { position: { x: 300, y: 120 } });
 check("hovering the K-line shows a tooltip", await page.isVisible("#tip"));
 check("without a name or family only the chart card shows", (await page.$$("#personal-cards .card")).length === 1);

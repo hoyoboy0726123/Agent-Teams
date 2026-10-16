@@ -1543,7 +1543,7 @@ function buildYear(c, age) {
     stars: stars.filter(x => STAR_YEAR[x]).map(x => ({ name: x, nature: STAR_YEAR[x].tone, text: sigs.find(z => z.id === `star.${x}`).text })),
     taisui: ts.taisui,
     domains: domainsOf(c, W, sigs, L + nudge),
-    headline: headlineOf(c, W, sigs),
+    headline: headlineOf(c, W, sigs, tone, dec),
     points: pointsOf(sigs),
     signals: sigs,
   };
@@ -1565,15 +1565,35 @@ function pointsOf(sigs) {
   return list;
 }
 
-function headlineOf(c, W, sigs) {
-  const P = W.P, gs = P.gods.stem, gb = P.gods.branch, Gs = GOD_GROUP[gs], Gb = GOD_GROUP[gb];
+// tone is the year's overall tone, which also weighs the decade (0.4): when the decade turns the year's own lean, the
+// headline says so, so that a 喜用 year in a 忌 decade does not read 整體順勢 next to 平.
+function headlineOf(c, W, sigs, tone, dec) {
+  const P = W.P, D = W.D, gs = P.gods.stem, gb = P.gods.branch, Gs = GOD_GROUP[gs], Gb = GOD_GROUP[gb];
   const godBit = W.stage === "child" ? (Gs === Gb ? `${GROUP_WORD[Gs]}干支同現` : `${GROUP_WORD[Gs]}、${GROUP_WORD[Gb]}並見`)
     : gs === gb ? `${gs}干支同現` : `${gs}透干、${gb}坐支`;
   const fv = sigs.find(s => s.id === "favor");
-  const top = sigs.filter(s => !s.context && s.kind !== "god" && s.point !== false && s.weight >= 6).sort((a, b) => b.weight - a.weight)[0];
-  const lead = `${P.name}年${godBit}，${fv.headline}`;
+  let top = sigs.filter(s => !s.context && s.kind !== "god" && s.point !== false && s.weight >= 6).sort((a, b) => b.weight - a.weight)[0];
+  const dscore = D ? (fav(c, D.stemEl) + fav(c, D.branchEl)) / 2 : 0;
+  const entering = top && top.id === "decade.enter";
+  // The year's own lean against its overall tone: the decade (when it is clearly 喜 or 忌) or, failing that, the year's
+  // contacts explain the difference.
+  const own = fv.tone === "中" ? "平" : fv.tone;
+  let favorBit = fv.headline, turned = false;
+  if (own !== tone) {
+    turned = true;
+    const badDecade = dec && dscore <= -0.25, goodDecade = dec && dscore >= 0.25;
+    if (badDecade && own === "吉") favorBit = `${fv.short}，但${entering ? `今年交入${dec.name}忌運` : `${dec.name}大運為忌`}，順中有阻`;
+    else if (badDecade && own === "平" && tone === "凶") favorBit = `${fv.headline}，又逢${dec.name}忌運`;
+    else if (goodDecade && own === "凶") favorBit = `${fv.short}，幸有${entering ? `新交的${dec.name}大運` : `${dec.name}大運`}扶持，阻力減輕`;
+    else if (goodDecade && own === "平" && tone === "吉") favorBit = `${fv.headline}，得${dec.name}大運扶持`;
+    else if (own === "吉") favorBit = `${fv.short}，${tone === "平" ? "整體平穩" : "但沖剋較重，宜穩"}`;
+    else if (own === "凶") favorBit = `${fv.short}，${tone === "平" ? "但整體阻力不大" : "但整體仍有助力"}`;
+    else turned = false;
+  }
+  if (entering && favorBit.includes("交")) top = null;
+  const lead = `${P.name}年${godBit}，${favorBit}`;
   if (!top) return end(lead);
-  const turn = (top.tone === "凶" && fv.tone === "吉") || (top.tone === "吉" && fv.tone === "凶") ? "；但" : "；";
+  const turn = !turned && ((top.tone === "凶" && fv.tone === "吉") || (top.tone === "吉" && fv.tone === "凶")) ? "；但" : "；";
   const line = `${lead}${turn}${top.headline || top.short}`;
   return end(line.length > 64 ? lead : line);
 }

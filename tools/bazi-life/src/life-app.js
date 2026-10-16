@@ -15,6 +15,7 @@ import { luckGods } from "./core/detail.js";
 import { natalReading } from "./core/reading-natal.js";
 import { yearReading, decadeReading, eventReason } from "./core/reading-year.js";
 import { nameReading } from "./core/name-reading.js";
+import { overallReading } from "./core/reading-overall.js";
 import { reportHTML } from "./report.js";
 import { kindOf, TURNING, explainable } from "./sim/reason-kinds.js";
 import { ALL_EVENTS } from "./sim/story/index.js";
@@ -555,8 +556,9 @@ function drawReport() {
   const events = life.log.filter(e => TURNING.has(e.id) && explainable(e.id) && !seen.has(`${e.id}|${e.age}`) && seen.add(`${e.id}|${e.age}`))
     .slice(0, 14).map(e => ({ entry: e, reason: chartReason(e.id, e.age, e.channel) }));
   const name = prep.name ? nameReading(prep.name, a) : null;
+  const overall = overallReading(a, { decades, name });
   const yearsTitle = birth <= now ? `近十年流年（${now}–${now + 9}）` : `成年後十年的流年（${birth + 18}–${birth + 27}）`;
-  $("#report-body").innerHTML = reportHTML(chart, { natal, decades, years, events, name, yearsTitle });
+  $("#report-body").innerHTML = reportHTML(chart, { natal, decades, years, events, name, overall, yearsTitle });
   $("#report-lede").textContent = `依${prep.name ? `「${prep.name.full}」的姓名與` : ""}出生時刻（真太陽時）排出的命盤，用傳統子平八字${prep.name ? "與姓名學" : ""}的方法逐項分析。傳統命理的說法，僅供參考。`;
   $("#report").hidden = false;
 }

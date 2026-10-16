@@ -116,6 +116,7 @@ details.family > summary small { font-weight: 400; color: var(--muted); }
 .choice .q { font-family: var(--display); font-size: 19px; font-weight: 700; }
 .choice .why { font-size: 13px; color: var(--indigo); }
 .why-more { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.report .why { font-size: 13px; color: var(--muted); }
 .why-more > summary { cursor: pointer; color: var(--indigo); width: fit-content; }
 .why-more p { margin: 4px 0 0; line-height: 1.7; }
 .choice .why-more { font-size: 13px; }
@@ -195,6 +196,25 @@ th:first-child, td:first-child { text-align: left; }
 .report .luck-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
 .report .luck-table th, .report .luck-table td { border-bottom: 1px solid var(--wash); padding: 6px 4px; text-align: left; vertical-align: top; }
 .report .luck-table td:first-child { white-space: nowrap; font-family: var(--display); font-weight: 700; }
+.report .luck-table th, .report .luck-table .lt-when, .report .luck-table .lt-tone { white-space: nowrap; }
+.report .luck-table .lt-when small { display: block; color: var(--muted); }
+.report .luck-table .lt-gods { white-space: nowrap; }
+@media (max-width: 600px) {
+  .report .luck-table thead { display: none; }
+  .report .luck-table, .report .luck-table tbody { display: block; }
+  .report .luck-table tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--wash); }
+  .report .luck-table td { border: 0; padding: 0; }
+  .report .luck-table td:first-child { font-size: 16px; }
+  .report .luck-table .lt-when small { display: inline; margin-left: 6px; }
+  .report .luck-table .lt-text { flex-basis: 100%; line-height: 1.7; }
+}
+.report details.sec h4 { margin: 14px 0 6px; font-size: 14px; }
+.report .formula { display: block; color: var(--muted); font-size: 12px; }
+.report .name-score { display: flex; align-items: center; gap: 14px; margin: 4px 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--wash); }
+.report .name-score .num { font-size: 14px; white-space: nowrap; }
+.report .name-score .num b { font-family: var(--display); font-size: 34px; line-height: 1; margin-right: 2px; color: var(--indigo); }
+.report .name-score .label { font-weight: 600; font-size: 14px; }
+.report .name-score .parts { font-size: 12px; color: var(--muted); }
 .report .tone-吉 { color: var(--indigo); font-weight: 600; } .report .tone-凶 { color: var(--seal); font-weight: 600; } .report .tone-平 { color: var(--muted); }
 .report .fine { font-size: 12px; color: var(--muted); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .paipan .el-木 { color: #6fcf97; } :root:not([data-theme="light"]) .paipan .el-火 { color: #ff8a80; } :root:not([data-theme="light"]) .paipan .el-土 { color: #d7b77a; } :root:not([data-theme="light"]) .paipan .el-金 { color: #f2c94c; } :root:not([data-theme="light"]) .paipan .el-水 { color: #7fb3e6; } }
