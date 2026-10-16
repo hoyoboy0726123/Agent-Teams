@@ -62,7 +62,11 @@ export function yearEffects(analysis, natal, decadeName, yearName, sex) {
     reasons.push({ domains: ["career"], text: "食傷星透出：表現欲強、想法多" });
     if (sex === "female") { trig.family.change += ln(1.2); reasons.push({ domains: ["family"], tags: ["children"], text: "食傷星透出：女命的食傷是子女星，和孩子的緣分被引動" }); }
   }
-  if (groups.has("比劫")) { trig.wealth.bad += ln(1.15); reasons.push({ domains: ["wealth"], text: "比劫星透出：競爭多，花錢也多" }); }
+  if (groups.has("比劫")) {
+    trig.wealth.bad += ln(1.15); trig.family.change += ln(1.15);
+    reasons.push({ domains: ["wealth"], text: "比劫星透出：競爭多，花錢也多" });
+    reasons.push({ domains: ["family"], tags: ["siblings"], text: "比劫星透出：比劫是兄弟姊妹星，和兄弟姊妹的互動變多" });
+  }
 
   if (clashes(y.branch, dayP.branch)) {
     trig.love.change += ln(1.5); trig.move.change += ln(1.5); trig.health.bad += ln(1.3);

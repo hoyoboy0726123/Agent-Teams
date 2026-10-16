@@ -38,6 +38,7 @@ check("health and marriage cards carry their notices", /不是看命盤/.test(ca
 check("share card carries the notice", /模擬故事，不是預言/.test(await page.textContent("#share")));
 await page.hover("#plot svg", { position: { x: 300, y: 120 } });
 check("hovering the K-line shows a tooltip", await page.isVisible("#tip"));
+check("without a name or family the name and family section stays hidden", !(await page.isVisible("#personal")));
 if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/life-desktop-light.png`, fullPage: true });
 
 await page.click("#again-same");
@@ -46,17 +47,64 @@ await page.click("#c-skip").catch(() => {});
 await page.waitForSelector("#end:not([hidden])", { timeout: 20000 });
 check("living again with the same chart works", /這一次，你活到/.test(await page.textContent("#end-title")));
 
+// name and family
 await page.click("#again-new");
+await page.fill("#f-name", "陳怡君");
+await page.check("#sex-f");
+await page.click("#family > summary");
+const fillMember = async (sel, name, date, time = "") => {
+  await page.fill(`${sel} .m-name`, name);
+  await page.fill(`${sel} .m-date`, date);
+  if (time) await page.fill(`${sel} .m-time`, time);
+};
+await fillMember('.member[data-role="father"]', "陳大明", "1990-05-03", "08:00");
+await page.click("#form-me button[type=submit]");
+check("family dates are checked before starting", /爸爸的出生年份要比你早/.test(await page.textContent("#error")) && await page.isVisible("#setup"));
+await fillMember('.member[data-role="father"]', "陳大明", "1958-05-03", "08:00");
+await fillMember('.member[data-role="mother"]', "林美華", "1961-09-21");
+await page.click("#add-sibling");
+await page.click("#add-sibling");
+await page.selectOption("#sibling-list .member:nth-child(1) .m-rel", "olderBrother");
+await fillMember("#sibling-list .member:nth-child(1)", "陳志明", "1985-01-09");
+await page.selectOption("#sibling-list .member:nth-child(2) .m-rel", "youngerSister");
+await fillMember("#sibling-list .member:nth-child(2)", "小美", "1992-07-01");
+await page.click("#add-sibling");
+await page.click("#sibling-list .member:nth-child(3) .remove");
+check("siblings can be added and removed", (await page.$$("#sibling-list .member")).length === 2);
+await page.click("#form-me button[type=submit]");
+await page.waitForSelector("#play:not([hidden])");
+await page.click("#c-skip");
+await page.waitForSelector("#end:not([hidden])", { timeout: 20000 });
+const story = await page.textContent("#feed");
+check("the story uses the name and the family", /名叫陳怡君。爸爸是陳大明，媽媽是林美華。上面已經有哥哥志明。/.test(story));
+check("the younger sister is born at 4 with her name", /妹妹小美/.test(await page.textContent('#feed li[data-age="4"]')));
+const personal = await page.textContent("#personal");
+check("the name card shows the five grids and 三才", await page.isVisible("#personal") && /姓名：陳怡君/.test(personal) && /總格/.test(personal) && /三才「金土土」大吉/.test(personal));
+check("the family card shows each relation and the 100-run counts", /爸爸（陳大明）/.test(personal) && /(互補|需要磨合|平穩)/.test(personal) && /100 次人生裡，有 \d+ 次和爸爸吵過架/.test(personal));
+check("the share card leaves the family out", !/陳大明|林美華|小美/.test(await page.textContent("#share")));
+if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/life-family-light.png`, fullPage: true });
+
+await page.click("#again-new");
+await page.check("#f-only");
+check("an only child hides the sibling rows", !(await page.isVisible("#sibling-list")) && !(await page.isVisible("#add-sibling")));
+await page.uncheck("#f-only");
+
 await page.click("#tab-random");
 await page.click("#go-random");
 await page.waitForSelector("#play:not([hidden])");
-check("random birth announces who you became", /你投胎成為 \d{4} 年/.test(await page.textContent("#born")));
+check("random birth announces who you became, with a name", /你投胎成為 \d{4} 年.+名叫.{2,4}。/.test(await page.textContent("#born")));
 await page.click("#c-skip");
 await page.waitForSelector("#end:not([hidden])", { timeout: 20000 });
+check("a random life gets a name card", /姓名：/.test(await page.textContent("#personal")));
 
 const phone = watch(await browser.newPage({ viewport: { width: 400, height: 900 }, colorScheme: "dark", deviceScaleFactor: 2 }));
 await phone.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
 await phone.goto(url);
+await phone.click("#family > summary");
+await phone.click("#add-sibling");
+const formWidth = await phone.evaluate(() => document.documentElement.scrollWidth);
+check("the family form fits at phone width", formWidth <= 400, `scrollWidth ${formWidth}`);
+if (process.env.SHOTS) await phone.screenshot({ path: `${process.env.SHOTS}/life-form-phone-dark.png`, fullPage: true });
 await phone.click("#form-me button[type=submit]");
 await phone.waitForSelector("#play:not([hidden])");
 await phone.click("#c-skip");

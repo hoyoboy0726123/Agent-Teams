@@ -6,14 +6,17 @@ import { createLife } from "./sim/life.js";
 import { rerun } from "./sim/monte.js";
 import { PROVISIONAL } from "./sim/rates.js";
 import { COUNTIES } from "./sim/events.js";
-import { makeRng, hashSeed } from "./sim/rng.js";
+import { makeRng } from "./sim/rng.js";
+import { randomName } from "./sim/random-name.js";
+import { describeEffects, LEVEL_NAME } from "./core/name.js";
+import { checkFamily, familyTilts, describeFamilyTilts, isSibling } from "./core/family.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const SPEED_MS = { 1: 900, 3: 320, 10: 90 };
 const EDU = { none: "沒有上學", 國小: "國小", 國中: "國中", 高中: "高中", 高職: "高職", 五專: "五專", 科大: "科技大學", 大學: "大學", 碩士: "碩士", 博士: "博士" };
 
-let run = null;   // { input, chart, prep, life, seed, born }
+let run = null;   // { input, extra: { name, family }, chart, prep, life, seed, born }
 let timer = null, speed = 1, paused = false;
 
 function setup() {
@@ -32,7 +35,13 @@ function setup() {
   });
   $("#c-skip").addEventListener("click", skipToEnd);
   $("#choice").addEventListener("click", e => { const b = e.target.closest("[data-option]"); if (b) choose(Number(b.dataset.option)); });
-  $("#again-same").addEventListener("click", () => begin(run.input, run.born));
+  $("#add-sibling").addEventListener("click", addSibling);
+  $("#sibling-list").addEventListener("click", e => { const b = e.target.closest(".remove"); if (b) b.closest(".member").remove(); });
+  $("#f-only").addEventListener("change", () => {
+    const only = $("#f-only").checked;
+    $("#sibling-list").hidden = only; $("#add-sibling").hidden = only;
+  });
+  $("#again-same").addEventListener("click", () => begin(run.input, run.born, run.extra));
   $("#again-new").addEventListener("click", () => { stop(); $("#end").hidden = true; $("#play").hidden = true; $("#setup").hidden = false; $("#setup").scrollIntoView({ behavior: "smooth", block: "start" }); });
   window.addEventListener("resize", () => { if (run && run.summary && !$("#end").hidden) drawKline(); });
 }
@@ -46,6 +55,42 @@ function selectTab(tab) {
 
 function showError(text) { const e = $("#error"); e.textContent = text; e.hidden = !text; }
 
+const SIBLINGS = [["olderBrother", "哥哥"], ["olderSister", "姊姊"], ["youngerBrother", "弟弟"], ["youngerSister", "妹妹"]];
+function addSibling() {
+  const list = $("#sibling-list");
+  if (list.children.length >= 8) return;
+  const row = document.createElement("div");
+  row.className = "member";
+  row.innerHTML = `<select class="m-rel" aria-label="關係">${SIBLINGS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>
+    <input type="text" class="m-name" maxlength="8" placeholder="姓名" aria-label="姓名">
+    <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="出生日期"><input type="time" class="m-time" aria-label="出生時間（選填）"></span>
+    <button type="button" class="remove" aria-label="移除這位兄弟姊妹">移除</button>`;
+  list.appendChild(row);
+  row.querySelector(".m-rel").focus();
+}
+
+const cleanName = v => String(v || "").replace(/\s+/g, "");
+function readMember(el) {
+  const name = cleanName(el.querySelector(".m-name").value);
+  const [y, m, d] = (el.querySelector(".m-date").value || "").split("-").map(Number);
+  const [h, mi] = (el.querySelector(".m-time").value || "").split(":").map(Number);
+  return { name, date: y ? { y, m, d } : null, time: y && Number.isFinite(h) ? { h, mi: mi || 0 } : null };
+}
+
+// The optional family section, or null when nothing was filled in.
+function readFamily() {
+  const out = { siblings: [], onlyChild: $("#f-only").checked };
+  for (const el of document.querySelectorAll(".member[data-role]")) {
+    const m = readMember(el);
+    if (m.name || m.date) out[el.dataset.role] = m;
+  }
+  if (!out.onlyChild) for (const el of document.querySelectorAll("#sibling-list .member")) {
+    const m = readMember(el);
+    if (m.name || m.date) out.siblings.push({ relation: el.querySelector(".m-rel").value, ...m });
+  }
+  return out.father || out.mother || out.siblings.length || out.onlyChild ? out : null;
+}
+
 function startFromForm() {
   const [y, m, d] = ($("#f-date").value || "").split("-").map(Number);
   if (!y) return showError("請輸入出生日期。");
@@ -53,9 +98,14 @@ function startFromForm() {
   const noHour = $("#f-nohour").checked;
   const [h, mi] = ($("#f-time").value || "").split(":").map(Number);
   if (!noHour && !Number.isFinite(h)) return showError("請輸入出生時間，或勾選「時辰不詳」。");
+  const family = readFamily();
+  const members = family ? [family.father, family.mother, ...family.siblings].filter(Boolean) : [];
+  if (members.some(x => x.date && (x.date.y < 1900 || x.date.y > 2100))) return showError("家人的出生年份請在 1900 到 2100 年之間。");
+  const problems = checkFamily(family, { y, m, d });
+  if (problems.length) { $("#family").open = true; return showError(problems.join(" ")); }
   showError("");
   const input = { date: { y, m, d }, time: noHour ? null : { h, mi: mi || 0 }, place: findPlace($("#f-place").value), sex: $("#sex-f").checked ? "female" : "male" };
-  begin(input, null);
+  begin(input, null, { name: cleanName($("#f-name").value), family });
 }
 
 function startRandom() {
@@ -64,18 +114,20 @@ function startRandom() {
   const county = rng.weighted(COUNTIES), place = PLACE_GROUPS.find(g => g.group === `臺灣・${county}`).places[0];
   const sex = rng() < 0.5 ? "male" : "female";
   const input = { date: { y, m, d }, time: { h: rng.int(24), mi: rng.int(60) }, place, sex };
+  const name = randomName(rng, y, sex);
   const pad = n => String(n).padStart(2, "0");
-  begin(input, `你投胎成為 ${y} 年 ${m} 月 ${d} 日 ${pad(input.time.h)}:${pad(input.time.mi)}，在${county}出生的${sex === "female" ? "女孩" : "男孩"}。`);
+  begin(input, `你投胎成為 ${y} 年 ${m} 月 ${d} 日 ${pad(input.time.h)}:${pad(input.time.mi)}，在${county}出生的${sex === "female" ? "女孩" : "男孩"}，名叫${name}。`, { name });
 }
 
-function begin(input, born) {
+function begin(input, born, extra = {}) {
   stop();
-  let chart;
-  try { chart = computeChart({ ...input, options: { solar: "true" } }); }
+  let chart, prep;
+  try { chart = computeChart({ ...input, options: { solar: "true" } }); prep = prepare(chart, { name: extra.name || "", family: extra.family || null }); }
   catch (e) { console.error(e); return showError("這個日期或地點沒辦法排盤，請再檢查一次。"); }
-  const prep = prepare(chart);
+  // A name without Kangxi strokes still appears in the story; it just isn't scored.
+  const name = prep.name || (extra.name ? { full: extra.name, effects: null } : null);
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-  run = { input, chart, prep, seed, born, life: createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed }), summary: null };
+  run = { input, extra, chart, prep, name, seed, born, life: createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed, name, family: prep.family }), summary: null };
   $("#setup").hidden = true; $("#end").hidden = true; $("#play").hidden = false;
   $("#feed").innerHTML = ""; $("#choice").hidden = true;
   $("#born").textContent = born || `${input.date.y} 年 ${input.date.m} 月 ${input.date.d} 日在${input.place.name}出生。`;
@@ -121,7 +173,7 @@ function skipToEnd() {
   finish();
 }
 
-const lineOf = e => `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">你的選擇：${esc(e.choice)}</span>` : ""}${e.reason ? `<span class="why">命盤：${esc(e.reason)}</span>` : ""}`;
+const lineOf = e => `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">你的選擇：${esc(e.choice)}</span>` : ""}${e.reason ? `<span class="why">${e.reasonFrom === "family" ? "合盤" : "命盤"}：${esc(e.reason)}</span>` : ""}`;
 
 function render(entries) {
   if (!entries.length) return;
@@ -153,7 +205,8 @@ function showChoice() {
   stop();
   const p = run.life.pending, box = $("#choice");
   const l = run.prep.luck[Math.max(0, run.life.state.age - 1)];
-  const why = l && l.reasons.length ? `<p class="why">這一年的命盤：${esc(l.reasons[0].text)}</p>` : "";
+  const why = p.why ? `<p class="why">${p.why.from === "family" ? "合盤" : "這一年的命盤"}：${esc(p.why.text)}</p>`
+    : l && l.reasons.length ? `<p class="why">這一年的命盤：${esc(l.reasons[0].text)}</p>` : "";
   box.innerHTML = `<p class="q">${esc(p.prompt)}</p>${why}<div class="options">${p.options.map((o, i) => `<button type="button" data-option="${i}"><b>${esc(o.label)}</b>${o.hint ? `<small>${esc(o.hint)}</small>` : ""}</button>`).join("")}</div>`;
   box.hidden = false;
   box.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -165,11 +218,12 @@ function finish() {
   stop();
   const { life, chart, prep, input } = run;
   const s = life.state;
-  run.summary = rerun({ chart, analysis: prep.analysis, luck: prep.luck, runs: 100, key: `${chart.pillars.map(p => p.name).join("")}|${input.sex}|${input.date.y}` });
+  run.summary = rerun({ chart, analysis: prep.analysis, luck: prep.luck, runs: 100, key: `${chart.pillars.map(p => p.name).join("")}|${input.sex}|${input.date.y}`, name: run.name, family: prep.family });
   $("#end-title").textContent = `這一次，你活到 ${s.age} 歲。`;
   $("#end-sub").textContent = `這只是同一張命盤的其中一種人生。下面的 100 次重跑，才看得出哪些事情比較常發生。`;
   const peak = life.kline.reduce((a, b) => (b.close > a.close ? b : a), life.kline[0]);
   const facts = [
+    ...(s.name ? [["姓名", s.name]] : []),
     ["學歷", EDU[s.edu] || s.edu],
     ["工作", s.retired ? `退休（最後是${s.job ? s.job.title : "上班族"}）` : s.job ? s.job.title : "沒有固定工作"],
     ["婚姻", s.marriages ? `${s.marriages} 次婚姻${s.divorces ? `，離婚 ${s.divorces} 次` : ""}` : "沒有結婚"],
@@ -182,6 +236,7 @@ function finish() {
   drawKline();
   drawTable();
   drawCards();
+  drawPersonal();
   drawShare(peak);
   $("#end").scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -270,6 +325,67 @@ function drawCards() {
       <p class="fine">關卡年是命盤上不利的年份，不代表一定會出事。</p></div>`,
   ];
   $("#cards").innerHTML = cards.join("");
+}
+
+// ---------- name and family ----------
+const LEVEL_CLASS = { 1: "lv-good", 0: "", "-1": "lv-bad" };
+const SCORED = ["人格", "地格", "外格", "總格"];
+
+function nameCard() {
+  const { prep, extra } = run, n = prep.name;
+  if (!n) return `<div class="card"><h3>姓名：${esc(extra.name)}</h3><p>${esc(prep.nameError || "沒有辦法分析這個名字。")}這次沒有計算姓名學，名字還是會出現在故事裡。</p></div>`;
+  const good = SCORED.filter(k => n.grids[k].level > 0).length;
+  const rows = ["天格", ...SCORED].map(k => {
+    const g = n.grids[k], scored = k !== "天格";
+    const level = scored
+      ? `<span class="${LEVEL_CLASS[g.level]}">${LEVEL_NAME[g.level]}</span>${g.agree ? "" : `<br><small class="muted">兩個數理表：${g.tables.join("、")}</small>`}${g.readings > 1 ? `<br><small class="muted">${g.readings} 種筆畫算法裡 ${g.good} 種是吉</small>` : ""}`
+      : `<span class="muted">不計分</span>`;
+    return `<tr><td>${k}</td><td class="n">${g.value}</td><td>${g.element}</td><td>${level}</td><td class="muted">${esc(g.role)}</td></tr>`;
+  }).join("");
+  const strokes = n.chars.map(c => `${c.ch} ${c.strokes.all.join(" 或 ")} 畫`).join("、");
+  const given = n.chars.slice([...n.surname].length), useful = prep.analysis.useful;
+  const hit = [...new Set(given.filter(c => useful.includes(c.number)).map(c => c.number))];
+  const missed = [...new Set(given.filter(c => prep.analysis.avoid.includes(c.number)).map(c => c.number))];
+  const verdict = hit.length ? `補到了喜用的${hit.join("、")}` : missed.length ? `名字的${missed.join("、")}是你比較忌的五行` : "沒有特別補到喜用";
+  const supplement = `<p>名字補八字：${given.map(c => `${esc(c.ch)} ${c.strokes.primary} 畫屬${c.number}`).join("、")}。你的喜用是${useful.length ? useful.join("、") : "（不明顯）"}，${verdict}。</p>`;
+  const effects = describeEffects(n.effects);
+  return `<div class="card"><h3>姓名：${esc(n.full)}</h3>
+    <p class="count">計分的四格裡有 <em>${good} 格是吉</em>，三才「${n.sancai.elements}」${n.sancai.name}</p>
+    <p>康熙筆畫：${esc(strokes)}</p>
+    <div class="table-wrap"><table class="grids"><thead><tr><th>格</th><th>數</th><th>五行</th><th>吉凶</th><th>代表</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${supplement}
+    ${effects.length ? `<p>在這次模擬裡，名字讓：</p><ul>${effects.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "<p>這個名字在模擬裡沒有明顯的傾斜。</p>"}
+    <p class="fine">姓名學的流派很多，筆畫算法和 81 數理表都有不同版本。這裡用康熙筆畫，兩個數理表看法不同時算半吉；天格是祖先傳下來的姓，多數流派不論吉凶。名字的影響最多 ±5%，而且不會影響壽命和重病。</p></div>`;
+}
+
+function familyCard() {
+  const { prep, summary } = run, family = prep.family;
+  const toneClass = t => (t === "互補" ? "tone-good" : t === "需要磨合" ? "tone-bad" : "tone-even");
+  const items = family.members.map(m => {
+    const who = `${m.label}${m.name ? `（${esc(m.name)}）` : ""}`;
+    if (!m.bond) return `<li><b>${who}</b><small>沒有填生日，只用名字出現在故事裡</small></li>`;
+    const notes = m.bond.notes.length ? m.bond.notes.map(x => esc(x.text)).join("；") : "沒有明顯的合、沖或生剋";
+    return `<li><b>${who}<span class="tone ${toneClass(m.bond.tone)}">${m.bond.tone}</span></b><small>${notes}</small></li>`;
+  });
+  if (family.onlyChild) items.push(`<li><b>獨生子女</b><small>故事裡不會有兄弟姊妹</small></li>`);
+  const lines = describeFamilyTilts(familyTilts(family));
+  const f = summary.family, has = r => family.members.some(m => m.relation === r), counts = [];
+  if (has("father")) counts.push(`有 ${f.fatherClash} 次和爸爸吵過架`);
+  if (has("mother")) counts.push(`有 ${f.motherClash} 次和媽媽吵過架`);
+  if (family.members.some(m => isSibling(m.relation))) counts.push(`有 ${f.siblingRivalry} 次小時候和兄弟姊妹吵過架`, `有 ${f.siblingHelp} 次得到兄弟姊妹幫忙`);
+  return `<div class="card"><h3>家人合盤</h3>
+    <ul class="bonds">${items.join("")}</ul>
+    ${lines.length ? `<p>在這次模擬裡，家人的命盤讓：</p><ul>${lines.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "<p>沒有填生日的家人，所以沒有合盤的傾斜。</p>"}
+    ${counts.length ? `<p>100 次人生裡，${counts.join("，")}。</p>` : ""}
+    <p class="fine">合盤只看生肖、日柱和五行的關係，讓機率傾斜最多 ±15%，不影響壽命和重病。家人之間怎麼相處，還是要靠彼此。</p></div>`;
+}
+
+function drawPersonal() {
+  const cards = [];
+  if (run.extra.name) cards.push(nameCard());
+  if (run.prep.family) cards.push(familyCard());
+  $("#personal").hidden = !cards.length;
+  $("#personal-cards").innerHTML = cards.join("");
 }
 
 function drawShare(peak) {

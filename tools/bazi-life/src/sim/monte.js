@@ -16,9 +16,9 @@ function quantile(sorted, p) {
   return sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor(p * sorted.length)))];
 }
 
-export function rerun({ chart, analysis, luck, sex = chart.input.sex, runs = 100, key = "" }) {
+export function rerun({ chart, analysis, luck, sex = chart.input.sex, runs = 100, key = "", name = null, family = null }) {
   const lives = [];
-  for (let i = 0; i < runs; i++) lives.push(runLife({ chart, analysis, luck, sex, seed: hashSeed(`${key}#${i}`) }));
+  for (let i = 0; i < runs; i++) lives.push(runLife({ chart, analysis, luck, sex, seed: hashSeed(`${key}#${i}`), name, family }));
   const count = fn => lives.filter(fn).length;
   const ages = lives.map(l => l.state.age).sort((a, b) => a - b);
 
@@ -58,6 +58,13 @@ export function rerun({ chart, analysis, luck, sex = chart.input.sex, runs = 100
     university: count(l => ["大學", "科大", "碩士", "博士"].includes(l.state.edu)),
     homeOwner: count(l => l.state.home === "own"),
     abroad: count(l => l.log.some(e => e.id === "abroad" && /到.+工作/.test(e.text))),
+    family: {
+      fatherClash: count(l => l.log.some(e => e.id === "fatherClash")),
+      motherClash: count(l => l.log.some(e => e.id === "motherClash")),
+      siblingRivalry: count(l => l.log.some(e => e.id === "siblingRivalry")),
+      siblingHelp: count(l => l.log.some(e => e.id === "siblingHelp")),
+      parentsDivorce: count(l => l.log.some(e => e.id === "parentsDivorce")),
+    },
     band,
     hurdles,
   };

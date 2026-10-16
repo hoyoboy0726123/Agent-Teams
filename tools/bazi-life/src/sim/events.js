@@ -6,9 +6,16 @@
 //   p(s, ctx)         base probability for this year, from rates.js (Taiwan statistics)
 //   apply(s, ctx)     what happens: changes the state and returns { text, mood, big }
 //   choice(s, ctx)    instead of apply: a decision with options; auto mode picks by each option's weight
+//   about             an event between you and one family member ("father", "mother", "siblings"): their chart
+//                     tilts it (family.js)
+//   grave             a death or a serious illness: only the yearly luck tilts it, never the name or family charts
 // Events run in this order every year, so a milestone (school, a first job) comes before what follows from it.
-import { analyseText } from "./words.js";
+//
+// Story events with no official statistic behind them (a quarrel with a parent, help from a sibling, a crush) use
+// assumed rates and change only the mood or small amounts of savings, so the calibrated outcomes stay as they are.
+import { analyseText, siblingCall, listWords } from "./words.js";
 import { interp } from "./rates.js";
+import { RELATIONS } from "../core/family.js";
 
 // Pick a wording this life has not used yet, so repeated events read differently.
 function say(ctx, list, vars = {}) {
@@ -19,6 +26,7 @@ function say(ctx, list, vars = {}) {
   return text.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
 }
 const kidWord = rng => rng.pick(["兒子", "女兒"]);
+const bornSiblings = (s, minAge = 0) => s.siblings.list.filter(x => x.born && s.age - x.bornAt >= minAge);
 
 export const COUNTIES = [
   ["新北市", 404], ["臺中市", 286], ["高雄市", 272], ["臺北市", 248], ["桃園市", 233], ["臺南市", 185], ["彰化縣", 122],
@@ -51,6 +59,26 @@ const moveTo = (s, ctx) => {
 };
 const yearsMarried = s => (s.since === null ? 0 : s.age - s.since);
 
+// A quarrel with one parent, as a choice. Teenagers quarrel about school and going out, adults about work and love.
+function parentClash(who) {
+  const label = RELATIONS[who], they = who === "father" ? "他" : "她";
+  return {
+    id: `${who}Clash`, domain: "family", channel: "bad", tags: [who], about: who, ages: [13, 30], cooldown: 4, when: s => s[who].alive,
+    p: () => 0.03,
+    choice: (s, ctx) => {
+      const topic = ctx.rng.pick(s.age <= 18 ? ["成績", "滑手機", "晚回家", "交朋友"] : s.rel === "dating" ? ["交往的對象", "什麼時候結婚"] : s.rel === "married" ? ["過年要回哪一邊", "孩子的事"] : ["工作", "搬出去住", "花錢的方式"]);
+      return {
+        prompt: `你和${label}為了${topic}吵了一架，兩個人都在氣頭上。要怎麼辦？`,
+        options: [
+          { label: "先去道歉", hint: "退一步", weight: 0.3, apply: () => ({ text: `和${label}為了${topic}吵架。你先開口道歉，${label}嘴上沒說什麼，晚餐卻多夾了一塊肉給你。`, mood: 1 }) },
+          { label: "找時間好好談", hint: "說出自己的想法", weight: 0.45, apply: () => ({ text: `和${label}為了${topic}吵架。過了幾天兩個人好好談了一次，你才知道${they}其實是擔心你。`, mood: 2 }) },
+          { label: "冷戰", hint: "先不理對方", weight: 0.25, apply: () => ({ text: `和${label}為了${topic}吵架，冷戰了好幾個星期。`, mood: -4 }) },
+        ],
+      };
+    },
+  };
+}
+
 export const EVENTS = [
   // ---------- birth and childhood ----------
   {
@@ -58,9 +86,25 @@ export const EVENTS = [
     apply: (s, ctx) => ({ text: analyseText(ctx.analysis, ctx.chart, s), mood: 0, big: true }),
   },
   {
-    id: "sibling", domain: "family", channel: "good", tags: ["siblings"], ages: [1, 12], when: s => s.siblings.younger > 0,
+    id: "sibling", domain: "family", channel: "good", tags: ["siblings"], ages: [1, 12], when: s => s.siblings.unborn > 0,
     p: () => 0.32,
-    apply: (s, ctx) => { s.siblings.younger -= 1; s.siblings.born = (s.siblings.born || 0) + 1; return { text: say(ctx, ["{x}出生了，家裡更熱鬧了。", "你多了一個{x}，你偷偷覺得自己長大了。"], { x: ctx.rng.pick(["弟弟", "妹妹"]) }), mood: 3 }; },
+    apply: (s, ctx) => {
+      const relation = ctx.rng() < 0.5 ? "youngerBrother" : "youngerSister";
+      s.siblings.unborn -= 1;
+      s.siblings.list.push({ relation, label: RELATIONS[relation], name: "", older: false, bornAt: s.age, born: true });
+      return { text: say(ctx, ["{x}出生了，家裡更熱鬧了。", "你多了一個{x}，你偷偷覺得自己長大了。"], { x: RELATIONS[relation] }), mood: 3 };
+    },
+  },
+  {
+    // A younger brother or sister from the family input, born in the year of their birth date.
+    id: "knownSibling", when: s => s.siblings.list.some(x => !x.born && x.bornAt === s.age), p: () => 1,
+    apply: (s, ctx) => {
+      const now = s.siblings.list.filter(x => !x.born && x.bornAt === s.age);
+      for (const x of now) x.born = true;
+      const who = listWords(now.map(siblingCall));
+      if (s.age === 0) return { text: `同一年，${who}也出生了。`, mood: 2 };
+      return { text: now.length > 1 ? `${who}出生了，家裡一下子熱鬧起來。` : say(ctx, ["{x}出生了，家裡更熱鬧了。", "你多了一個{x}，你偷偷覺得自己長大了。"], { x: who }), mood: 3 };
+    },
   },
   {
     id: "kindergarten", once: true, ages: [4, 4], p: (s, ctx) => ctx.R.kindergarten(s.year),
@@ -71,7 +115,7 @@ export const EVENTS = [
     apply: (s, ctx) => { s.edu = "國小"; s.studying = true; s.track = "國小"; return { text: say(ctx, ["上國小了，揹著新書包走進校門。", "上國小一年級，最期待的是下課鐘聲。"]), mood: 2 }; },
   },
   {
-    id: "childIllness", domain: "health", channel: "bad", ages: [0, 12], cooldown: 4, p: () => 0.006,
+    id: "childIllness", domain: "health", channel: "bad", grave: true, ages: [0, 12], cooldown: 4, p: () => 0.006,
     apply: (s, ctx) => ({ text: say(ctx, ["生了一場大病，住院兩個星期，爸媽輪流守在床邊，後來康復了。", "得了嚴重的肺炎，住院一陣子才好。"]), mood: -6 }),
   },
   {
@@ -82,6 +126,14 @@ export const EVENTS = [
     id: "parentsDivorce", once: true, domain: "family", channel: "bad", tags: ["father", "mother"], ages: [2, 17], when: s => s.father.alive && s.mother.alive,
     p: (s, ctx) => ctx.R.divorce(s.age + 3, s.year) * 0.8,
     apply: (s, ctx) => { s.flags.parentsSplit = true; return { text: say(ctx, ["爸媽離婚了，你跟著其中一方生活，兩邊都還是很疼你。", "爸媽決定分開，家裡安靜了很多。"]), mood: -10 }; },
+  },
+  {
+    id: "siblingRivalry", domain: "family", channel: "bad", tags: ["siblings"], about: "siblings", ages: [5, 17], cooldown: 3,
+    when: s => bornSiblings(s, 3).length > 0, p: () => 0.07,
+    apply: (s, ctx) => {
+      const x = siblingCall(ctx.rng.pick(bornSiblings(s, 3)));
+      return { text: say(ctx, ["和{x}為了搶遙控器大吵一架，兩個人一起被罰站。", "和{x}冷戰了三天，最後還是一起偷吃冰箱裡的布丁。", "總覺得爸媽比較疼{x}，偷偷生了好幾天悶氣。"], { x }), mood: -2 };
+    },
   },
 
   // ---------- school ----------
@@ -278,7 +330,7 @@ export const EVENTS = [
     apply: (s, ctx) => { s.rel = "divorced"; s.divorces += 1; s.partnerAge = null; s.since = null; return { text: say(ctx, ["離婚了。簽字那天，兩個人都很平靜。", "走了 {n} 年，還是決定分開。"], { n: Math.max(1, yearsMarried(s)) }), mood: -12, big: true }; },
   },
   {
-    id: "widowed", domain: "family", channel: "bad", tags: ["spouse"], when: s => s.rel === "married" && s.partnerAge !== null,
+    id: "widowed", domain: "family", channel: "bad", tags: ["spouse"], grave: true, when: s => s.rel === "married" && s.partnerAge !== null,
     p: (s, ctx) => ctx.R.deathRaw(s.partnerAge, s.sex === "male" ? "female" : "male", s.year),
     apply: (s, ctx) => { s.rel = "widowed"; s.partnerAge = null; s.since = null; return { text: say(ctx, ["另一半先走了。家裡少了一個人，好安靜。", "牽了大半輩子的手放開了，你學著一個人生活。"]), mood: -16, big: true }; },
   },
@@ -304,6 +356,8 @@ export const EVENTS = [
     id: "kidMilestone", ages: [25, 90], cooldown: 6, when: s => s.kids.some(k => k === 6 || k === 18 || k === 22), p: () => 0.6,
     apply: (s, ctx) => { const k = s.kids.find(x => x === 6 || x === 18 || x === 22); return { text: k === 6 ? "孩子上國小了，你在校門口看了好久。" : k === 18 ? "孩子考上大學，搬出去住了。" : "孩子大學畢業，開始工作了。", mood: 4 }; },
   },
+  parentClash("father"),
+  parentClash("mother"),
   {
     id: "parentCare", domain: "family", channel: "bad", tags: ["father", "mother"], cooldown: 6, when: s => (s.father.alive && s.father.age >= 70) || (s.mother.alive && s.mother.age >= 70), p: () => 0.05,
     choice: (s, ctx) => {
@@ -312,17 +366,44 @@ export const EVENTS = [
         { label: "自己照顧", hint: "累，但安心", weight: 0.4, apply: s2 => { s2.income *= 0.92; return { text: `${who}年紀大了需要照顧。你減少工作，自己照顧，累，但每天都看得到。`, mood: -4 }; } },
         { label: "請看護", hint: "花錢，但專業", weight: 0.4, apply: s2 => { s2.savings = Math.max(0, s2.savings - 0.6); return { text: `${who}年紀大了需要照顧。你請了看護，每個週末回去陪。`, mood: -2 }; } },
       ];
-      if (s.siblings.older + (s.siblings.born || 0) > 0) options.push({ label: "兄弟姊妹輪流", hint: "大家一起分擔", weight: 0.4, apply: () => ({ text: `${who}年紀大了需要照顧，你和兄弟姊妹排班輪流。`, mood: -2 }) });
+      const adults = bornSiblings(s, 18), with_ = adults.length === 1 ? siblingCall(adults[0]) : "兄弟姊妹";
+      if (adults.length) options.push({ label: `和${with_}輪流`, hint: "大家一起分擔", weight: 0.4, apply: () => ({ text: `${who}年紀大了需要照顧，你和${with_}排班輪流。`, mood: -2 }) });
       return { prompt: `${who}年紀大了，需要人照顧。要怎麼安排？`, options };
     },
   },
   {
-    id: "fatherDeath", domain: "family", channel: "bad", tags: ["father"], when: s => s.father.alive, p: (s, ctx) => ctx.R.deathRaw(s.father.age, "male", s.year),
+    id: "fatherDeath", domain: "family", channel: "bad", tags: ["father"], grave: true, when: s => s.father.alive, p: (s, ctx) => ctx.R.deathRaw(s.father.age, "male", s.year),
     apply: (s, ctx) => { s.father.alive = false; s.savings += s.age >= 25 ? ctx.rng.between(0, 1.5) : 0; return { text: say(ctx, ["爸爸走了，享年 {a} 歲。你才發現自己好多話還沒跟他說。", "爸爸在 {a} 歲那年離開。"], { a: s.father.age }), mood: -14, big: true }; },
   },
   {
-    id: "motherDeath", domain: "family", channel: "bad", tags: ["mother"], when: s => s.mother.alive, p: (s, ctx) => ctx.R.deathRaw(s.mother.age, "female", s.year),
+    id: "motherDeath", domain: "family", channel: "bad", tags: ["mother"], grave: true, when: s => s.mother.alive, p: (s, ctx) => ctx.R.deathRaw(s.mother.age, "female", s.year),
     apply: (s, ctx) => { s.mother.alive = false; s.savings += s.age >= 25 ? ctx.rng.between(0, 1.5) : 0; return { text: say(ctx, ["媽媽走了，享年 {a} 歲。再也吃不到她煮的菜了。", "媽媽在 {a} 歲那年離開。"], { a: s.mother.age }), mood: -15, big: true }; },
+  },
+  {
+    id: "inheritance", once: true, domain: "family", channel: "bad", tags: ["siblings"], about: "siblings",
+    when: s => !s.father.alive && !s.mother.alive && s.age >= 25 && Math.max(s.last.fatherDeath ?? -9, s.last.motherDeath ?? -9) >= s.age - 1 && bornSiblings(s, 18).length > 0,
+    p: () => 0.25,
+    choice: (s, ctx) => {
+      const sibs = bornSiblings(s, 18), x = sibs.length <= 3 ? sibs.map(siblingCall).join("、") : "兄弟姊妹";
+      return {
+        prompt: `爸媽都走了，留下一間老房子。你和${x}對怎麼分有不同的想法。要怎麼做？`,
+        options: [
+          { label: "照法律平分", hint: "公平，各拿各的", weight: 0.5, apply: s2 => { s2.savings += 0.6; return { text: `爸媽留下的老房子，你和${x}照法律平分。雖然捨不得，大家都沒有意見。`, mood: -1 }; } },
+          { label: "讓給對方", hint: "錢少一點，感情留著", weight: 0.25, apply: () => ({ text: `爸媽留下的老房子，你讓給了${x}。大家說好，以後過年都回老家吃飯。`, mood: 1 }) },
+          { label: "爭取自己的份", hint: "可能傷感情", weight: 0.25, apply: s2 => { s2.savings += 1.2; s2.flags.estranged = true; return { text: `為了爸媽留下的老房子，你和${x}鬧得很僵，從此很少聯絡。`, mood: -7 }; } },
+        ],
+      };
+    },
+  },
+  {
+    id: "siblingHelp", domain: "family", channel: "good", tags: ["siblings"], about: "siblings", ages: [18, 90], cooldown: 5,
+    when: s => !s.flags.estranged && bornSiblings(s, 18).length > 0, p: s => (s.unemployedFor || s.health.serious ? 0.25 : 0.04),
+    apply: (s, ctx) => {
+      const x = siblingCall(ctx.rng.pick(bornSiblings(s, 18)));
+      if (s.health.serious) return { text: `生病的這段時間，${x}常常跑來醫院陪你，還幫你打理家裡的事。`, mood: 4 };
+      if (s.unemployedFor) return { text: `沒有工作的那段時間，${x}二話不說借你一筆錢，還幫你打聽工作機會。`, mood: 4 };
+      return { text: say(ctx, ["過年和{x}一起圍爐，聊起小時候的糗事，笑到停不下來。", "{x}約你一起出國玩了一趟。", "搬家那天，{x}請假來幫你搬了一整天。", "心情低落的時候，{x}陪你聊到半夜。"], { x }), mood: 3 };
+    },
   },
   {
     id: "grandchild", ages: [45, 100], cooldown: 4, when: s => s.kids.some(k => k >= 26), p: () => 0.12,
@@ -365,7 +446,7 @@ export const EVENTS = [
     }),
   },
   {
-    id: "serious", domain: "health", channel: "bad", ages: [1, 110], when: s => !s.health.serious, p: (s, ctx) => ctx.R.serious(s.age, s.sex),
+    id: "serious", domain: "health", channel: "bad", grave: true, ages: [1, 110], when: s => !s.health.serious, p: (s, ctx) => ctx.R.serious(s.age, s.sex),
     apply: (s, ctx) => {
       const type = ctx.R.seriousType(s.age, s.sex, ctx.rng);
       s.health.serious = { type, since: s.age }; s.health.everSerious = (s.health.everSerious || 0) + 1;
@@ -417,7 +498,7 @@ export const EVENTS = [
 
 // Not in the yearly list: life.js checks death at the end of each year.
 export const deathEvent = {
-  id: "death", domain: "health", channel: "bad", big: true,
+  id: "death", domain: "health", channel: "bad", grave: true, big: true,
   apply: (s, ctx) => {
     const age = s.age;
     let text;
@@ -429,10 +510,8 @@ export const deathEvent = {
   },
 };
 
-// The probability of a "good" or "bad" outcome inside a choice, tilted by this year's luck.
+// The probability of a "good" or "bad" outcome inside a choice, tilted like an event of that domain this year.
 function ctxTilt(ctx, s, domain, channel, p) {
-  const l = ctx.luckAt(s.age);
-  const lnm = l ? l.m[domain][channel] : 0;
-  const z = Math.log(p / (1 - p)) + lnm;
+  const z = Math.log(p / (1 - p)) + ctx.tiltOf({ domain, channel });
   return 1 / (1 + Math.exp(-z));
 }
