@@ -70,3 +70,17 @@ test("100 runs give counts out of 100 and a K-line band", () => {
   assert.ok(r.band.length > 60 && r.band.every(b => b.p10 <= b.p50 && b.p50 <= b.p90));
   assert.equal(r.hurdles.length, 4);
 });
+
+test("each simulated year uses its own 流年: luck[age] is the pillar of birth year + age", async () => {
+  const { SixtyCycleYear } = await import("tyme4ts");
+  for (const [y, sex] of [[1988, "male"], [2015, "female"], [1953, "male"]]) {
+    const c = chartOf(y, 3, 8, 9, 30, sex), p = prepare(c);
+    for (const age of [0, 1, 30, 60, 99]) {
+      assert.equal(p.luck[age].age, age);
+      assert.equal(p.luck[age].xu, age + 1);   // 虛歲
+      assert.equal(p.luck[age].year, SixtyCycleYear.fromYear(y + age).getSixtyCycle().getName(), `${y} + ${age}`);
+    }
+  }
+  const life = runLife({ chart, analysis, luck, seed: 7 });
+  for (const k of life.kline) assert.equal(k.luck, luck[k.age].score, `age ${k.age}`);
+});

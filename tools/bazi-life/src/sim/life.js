@@ -100,7 +100,8 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
   // Pacing: the choices asked this year. The core ones always come; a story choice waits for a year without one.
   let choicesThisYear = 0;
 
-  const yearLuck = age => luck[Math.max(0, Math.min(luck.length - 1, age - 1))];
+  // luck[age]: the year the person is `age` (setup.js keys it by years since birth).
+  const yearLuck = age => luck[Math.max(0, Math.min(luck.length - 1, age))];
   // An event's ln-odds tilt this year: the chart's yearly luck, then the name and the family charts.
   const luckTilt = ev => {
     const l = yearLuck(s.age);

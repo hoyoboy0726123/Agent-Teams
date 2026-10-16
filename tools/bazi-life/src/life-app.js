@@ -19,6 +19,8 @@ import { trait } from "./sim/words.js";
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const SPEED_MS = { 1: 900, 3: 320, 10: 90 };
+// The year's luck when the person is `age` (years since birth; setup.js keys prep.luck that way).
+const luckAt = (prep, age) => prep.luck[Math.max(0, Math.min(prep.luck.length - 1, age))];
 const EDU = { none: "沒有上學", 國小: "國小", 國中: "國中", 高中: "高中", 高職: "高職", 五專: "五專", 科大: "科技大學", 大學: "大學", 碩士: "碩士", 博士: "博士" };
 
 let run = null;   // { input, extra: { name, family }, chart, prep, life, seed, born }
@@ -216,7 +218,7 @@ function render(entries) {
 }
 
 function updateStatus() {
-  const s = run.life.state, l = run.prep.luck[Math.max(0, s.age - 1)];
+  const s = run.life.state, l = luckAt(run.prep, s.age);
   $("#s-age").textContent = `${s.age} 歲`;
   $("#s-year").textContent = `${s.year} 年`;
   $("#s-decade").textContent = s.age >= 1 && l && l.decade ? l.decade : "童限";
@@ -227,7 +229,7 @@ function updateStatus() {
 function showChoice() {
   stop();
   const p = run.life.pending, box = $("#choice");
-  const l = run.prep.luck[Math.max(0, run.life.state.age - 1)];
+  const l = luckAt(run.prep, run.life.state.age);
   const why = p.why ? `<p class="why">${p.why.from === "family" ? "合盤" : "這一年的命盤"}：${esc(p.why.text)}</p>`
     : l && l.reasons.length ? `<p class="why">這一年的命盤：${esc(l.reasons[0].text)}</p>` : "";
   const dm = run.prep.analysis.dayMaster, nature = (trait(run.prep.analysis) || "").split("，").pop();
@@ -374,7 +376,7 @@ function drawKline() {
   const move = ev => {
     const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * (W / r.width);
     const age = Math.max(0, Math.min(maxAge, Math.round((px - L) / step)));
-    const k = byAge.get(age), b = band.find(z => z.age === age), l = prep.luck[Math.max(0, age - 1)];
+    const k = byAge.get(age), b = band.find(z => z.age === age), l = luckAt(prep, age);
     if (!k && !b) { tip.hidden = true; cross.setAttribute("visibility", "hidden"); return; }
     cross.setAttribute("x1", x(age)); cross.setAttribute("x2", x(age)); cross.setAttribute("visibility", "visible");
     tip.innerHTML = `<b>${age} 歲</b>${k ? `（${k.year} 年）` : ""}${l ? `・流年 ${esc(l.year)}` : ""}`
@@ -392,7 +394,7 @@ function drawKline() {
 
 function drawTable() {
   const { life, prep } = run;
-  $("#kline-table").innerHTML = `<table><thead><tr><th>年齡</th><th>年份</th><th>流年</th><th>開</th><th>收</th><th>高</th><th>低</th></tr></thead><tbody>${life.kline.map(k => `<tr><td>${k.age} 歲</td><td>${k.year}</td><td>${esc((prep.luck[Math.max(0, k.age - 1)] || {}).year || "")}</td><td>${k.open}</td><td>${k.close}</td><td>${k.high}</td><td>${k.low}</td></tr>`).join("")}</tbody></table>`;
+  $("#kline-table").innerHTML = `<table><thead><tr><th>年齡</th><th>年份</th><th>流年</th><th>開</th><th>收</th><th>高</th><th>低</th></tr></thead><tbody>${life.kline.map(k => `<tr><td>${k.age} 歲</td><td>${k.year}</td><td>${esc((luckAt(prep, k.age) || {}).year || "")}</td><td>${k.open}</td><td>${k.close}</td><td>${k.high}</td><td>${k.low}</td></tr>`).join("")}</tbody></table>`;
 }
 
 function hurdleList(h, withBody) {
@@ -492,7 +494,7 @@ function chartCard() {
   const jobs = s.jobsHeld.map(j => `${esc(j.title)}（${j.element || "？"}${a.useful.includes(j.element) ? "・喜用" : ""}）`);
   const fit = s.jobsHeld.filter(j => a.useful.includes(j.element)).length;
   const peak = life.kline.reduce((x, y) => (y.close > x.close ? y : x), life.kline[0]);
-  const top = prep.luck.slice(0, Math.max(1, s.age)).slice().sort((x, y) => y.score - x.score).slice(0, 5).sort((x, y) => x.age - y.age);
+  const top = prep.luck.slice(0, s.age + 1).slice().sort((x, y) => y.score - x.score).slice(0, 5).sort((x, y) => x.age - y.age);
   const inTop = top.some(y => Math.abs(y.age - peak.age) <= 1);
   const view = describeViews(a).find(v => a.useful[0] && v.includes(`喜${a.useful[0]}`)) || "";
   return `<div class="card"><h3>命盤與這一生</h3>
