@@ -1,0 +1,19 @@
+{
+  "name": "bazi-life",
+  "version": "0.1.0",
+  "private": true,
+  "description": "命盤人生：精準排盤引擎（第 0 步）",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "tyme4ts": "1.5.2"
+  },
+  "devDependencies": {
+    "astronomy-engine": "2.1.19",
+    "esbuild": "0.28.2"
+  }
+}

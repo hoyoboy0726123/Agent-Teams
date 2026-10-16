@@ -1,0 +1,215 @@
+<title>命盤人生排盤</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: an almanac sheet. The form strip on top, the four pillars set like a printed 命書 grid,
+   then the correction trail read like an instrument, then the luck cycles as a timeline. */
+:root {
+  --paper: #eef1f0; --sheet: #fbfcfc; --ink: #1c2330; --muted: #5b6774; --rule: #c8d0d3; --wash: #e3e8e9;
+  --indigo: #284a80; --indigo-wash: #dfe6f2; --seal: #b5332a; --seal-wash: #f6e1de;
+  --wood: #2c7a4b; --fire: #c0412c; --earth: #8a5d33; --metal: #a6801a; --water: #2a61a5;
+  --display: "LXGW WenKai TC", "Kaiti TC", "BiauKai", "DFKai-SB", "STKaiti", serif;
+  --body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #11151b; --sheet: #181e26; --ink: #e5e9ed; --muted: #9ba7b3; --rule: #2d3742; --wash: #222a34;
+  --indigo: #93b2ea; --indigo-wash: #1f2c42; --seal: #ec6a57; --seal-wash: #3a2220;
+  --wood: #6cc28c; --fire: #f2806a; --earth: #cf9f6b; --metal: #e2c35c; --water: #7eabea; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --paper: #11151b; --sheet: #181e26; --ink: #e5e9ed; --muted: #9ba7b3; --rule: #2d3742; --wash: #222a34;
+  --indigo: #93b2ea; --indigo-wash: #1f2c42; --seal: #ec6a57; --seal-wash: #3a2220;
+  --wood: #6cc28c; --fire: #f2806a; --earth: #cf9f6b; --metal: #e2c35c; --water: #7eabea; color-scheme: dark;
+}
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.65; }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; }
+h1 { font-size: 36px; line-height: 1.2; letter-spacing: 0.04em; }
+h2 { font-size: 22px; }
+p { margin: 0; }
+.eyebrow { font-size: 12px; letter-spacing: 0.12em; color: var(--muted); }
+.lede { color: var(--muted); max-width: 62ch; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.el-wood { color: var(--wood); } .el-fire { color: var(--fire); } .el-earth { color: var(--earth); } .el-metal { color: var(--metal); } .el-water { color: var(--water); }
+header { display: grid; gap: 8px; }
+.notice { font-size: 13px; color: var(--muted); border-left: 3px solid var(--rule); padding-left: 10px; }
+
+/* form */
+form { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; display: grid; gap: 16px; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 16px; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field > span, .field > .name, legend { font-size: 13px; font-weight: 500; color: var(--muted); }
+.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; }
+.stack { display: grid; gap: 28px; }
+input, select, button { font: inherit; color: inherit; }
+input[type="date"], input[type="time"], input[type="number"], select {
+  width: 100%; box-sizing: border-box; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; min-height: 40px;
+}
+input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+.inline { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; min-height: 40px; }
+.inline label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; min-width: 0; }
+details.advanced summary { cursor: pointer; font-size: 14px; color: var(--indigo); }
+details.advanced[open] summary { margin-bottom: 12px; }
+.examples { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.examples > span { font-size: 13px; color: var(--muted); }
+.chip { border: 1px solid var(--rule); background: var(--paper); border-radius: 999px; padding: 4px 12px; font-size: 13px; cursor: pointer; }
+.chip:hover { border-color: var(--indigo); }
+.chip[aria-pressed="true"] { background: var(--indigo-wash); border-color: var(--indigo); color: var(--indigo); }
+.error { color: var(--seal); font-size: 14px; }
+
+/* sections */
+section { display: grid; gap: 14px; min-width: 0; }
+.section-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.section-head p { font-size: 13px; color: var(--muted); }
+.warnings { display: grid; gap: 8px; }
+.warn { background: var(--indigo-wash); border-radius: 8px; padding: 10px 14px; font-size: 14px; display: grid; gap: 8px; }
+.warn.strong { background: var(--seal-wash); }
+.warn .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.warn button { border: 1px solid var(--indigo); background: transparent; color: var(--indigo); border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 13px; }
+.warn button[aria-pressed="true"] { background: var(--indigo); color: var(--sheet); }
+
+/* the four pillars */
+.chart { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; overflow-x: auto; }
+.grid { display: grid; grid-template-columns: 3.4em repeat(4, minmax(64px, 1fr)); min-width: 330px; }
+.grid > div { padding: 8px 4px; text-align: center; border-bottom: 1px solid var(--wash); min-width: 0; }
+.grid > .lab { font-size: 12px; color: var(--muted); text-align: left; padding-left: 12px; display: flex; align-items: center; letter-spacing: 0.06em; }
+.grid > .head { font-family: var(--display); font-size: 15px; color: var(--muted); border-bottom-color: var(--rule); }
+.grid > .day { background: color-mix(in srgb, var(--seal-wash) 45%, transparent); }
+.grid .god { font-size: 13px; }
+.grid .big { font-family: var(--display); font-size: 40px; line-height: 1.15; font-weight: 700; }
+.grid .seal { display: inline-block; border: 2px solid var(--seal); border-radius: 4px; padding: 0 6px; }
+.grid .hidden { display: grid; gap: 2px; font-size: 13px; line-height: 1.35; }
+.grid .hidden b { font-family: var(--display); font-size: 17px; font-weight: 700; }
+.grid .hidden small { color: var(--muted); font-size: 11px; }
+.grid .small { font-size: 13px; }
+.grid .unknown { color: var(--muted); font-size: 13px; display: flex; align-items: center; justify-content: center; }
+.grid > div:nth-last-child(-n+5) { border-bottom: 0; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 22px; }
+.fact { display: grid; gap: 2px; min-width: 0; }
+.fact dt { font-size: 12px; color: var(--muted); letter-spacing: 0.06em; }
+.fact dd { margin: 0; }
+.bars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; align-items: end; height: 64px; }
+.bar { display: grid; gap: 2px; justify-items: center; align-self: end; }
+.bar i { display: block; width: 100%; max-width: 30px; border-radius: 3px 3px 0 0; background: currentColor; }
+.bar span { font-family: var(--display); font-size: 14px; }
+
+/* correction trail */
+.trail { list-style: none; margin: 0; padding: 0; display: grid; border-left: 2px solid var(--rule); margin-left: 6px; }
+.trail li { position: relative; padding: 6px 0 12px 18px; display: grid; gap: 2px; min-width: 0; }
+.trail li::before { content: ""; position: absolute; left: -7px; top: 13px; width: 12px; height: 12px; border-radius: 50%; background: var(--sheet); border: 2px solid var(--muted); box-sizing: border-box; }
+.trail li.key::before { border-color: var(--indigo); background: var(--indigo); }
+.trail .k { font-size: 13px; color: var(--muted); }
+.trail .v { font-family: var(--mono); font-size: 15px; overflow-wrap: anywhere; }
+.trail .why { font-size: 13px; color: var(--muted); }
+.total { font-size: 14px; }
+
+/* edges */
+.window { display: grid; gap: 6px; }
+.track { position: relative; height: 10px; border-radius: 5px; background: var(--wash); }
+.track i { position: absolute; top: -5px; width: 4px; height: 20px; margin-left: -2px; border-radius: 2px; background: var(--seal); }
+.ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.edge-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.edge-list li { font-size: 14px; }
+.tag { display: inline-block; font-size: 12px; border-radius: 4px; padding: 0 6px; margin-right: 6px; background: var(--wash); color: var(--muted); }
+.tag.hot { background: var(--seal-wash); color: var(--seal); }
+
+/* luck */
+.decades { position: relative; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+.decade { flex: 0 0 auto; width: 88px; display: grid; gap: 2px; justify-items: center; text-align: center; padding: 10px 6px; border: 1px solid var(--rule); border-radius: 8px; background: var(--sheet); cursor: pointer; scroll-snap-align: start; }
+.decade[aria-pressed="true"] { border-color: var(--indigo); box-shadow: inset 0 0 0 1px var(--indigo); }
+.decade .ages { font-size: 12px; color: var(--muted); }
+.decade .gz { font-family: var(--display); font-size: 26px; font-weight: 700; line-height: 1.2; }
+.decade .gods { font-size: 12px; }
+.decade .now { font-size: 11px; color: var(--seal); }
+.years { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 6px; }
+.year { background: var(--sheet); border: 1px solid var(--wash); border-radius: 6px; padding: 6px 8px; display: grid; gap: 0; }
+.year.now { border-color: var(--seal); }
+.year .y { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.year .gz { font-family: var(--display); font-size: 20px; font-weight: 700; }
+.year .meta { font-size: 12px; color: var(--muted); }
+footer { display: grid; gap: 8px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+footer p { max-width: 70ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">排盤引擎・第 0 步預覽</span>
+    <h1>命盤人生</h1>
+    <p class="lede">輸入出生時間和地點，先把時間校正到正確的時刻，再排出四柱、大運和流年。每一步怎麼換算的都列在下面，可以逐項核對。</p>
+    <p class="notice">這一步只排命盤，還沒有人生模擬，也不做預測。命理推演僅供參考，不能當作醫療、法律或重大決定的依據。</p>
+  </header>
+
+  <form id="form" autocomplete="off">
+    <div class="examples" id="examples"><span>範例：</span></div>
+    <div class="fields">
+      <label class="field"><span>出生日期（國曆）</span><input type="date" id="f-date" min="1900-01-01" max="2100-12-31" required></label>
+      <div class="field">
+        <label class="name" for="f-time">出生時間（出生證明上的時間）</label>
+        <input type="time" id="f-time">
+        <label class="check" for="f-nohour"><input type="checkbox" id="f-nohour"> 時辰不詳</label>
+      </div>
+      <fieldset>
+        <legend>性別（決定大運順行或逆行）</legend>
+        <div class="inline">
+          <label for="sex-m"><input type="radio" name="sex" id="sex-m" value="male" checked> 男</label>
+          <label for="sex-f"><input type="radio" name="sex" id="sex-f" value="female"> 女</label>
+        </div>
+      </fieldset>
+      <label class="field"><span>出生地</span><select id="f-place"></select></label>
+    </div>
+    <div class="fields" id="custom" hidden>
+      <label class="field"><span>經度（東經為正）</span><input type="number" id="f-lon" step="0.01" min="-180" max="180" value="121.56"></label>
+      <label class="field"><span>緯度（北緯為正）</span><input type="number" id="f-lat" step="0.01" min="-90" max="90" value="25.04"></label>
+      <label class="field"><span>時區</span><select id="f-tz"></select></label>
+    </div>
+    <details class="advanced">
+      <summary>進階設定：時間校正、子時、起運算法</summary>
+      <div class="fields">
+        <label class="field"><span>日柱和時柱用的時間</span><select id="f-solar"></select></label>
+        <label class="field"><span>子時規則</span><select id="f-zi"></select></label>
+        <label class="field"><span>起運算法</span><select id="f-yun"></select></label>
+      </div>
+    </details>
+    <p class="error" id="error" hidden></p>
+  </form>
+
+  <div id="result" class="stack" hidden>
+      <div class="warnings" id="warnings"></div>
+
+      <section>
+        <div class="section-head"><h2>四柱</h2><p id="pillar-sub"></p></div>
+        <div class="chart"><div class="grid" id="pillars"></div></div>
+        <dl class="facts" id="facts"></dl>
+      </section>
+
+      <section>
+        <div class="section-head"><h2>時間校正過程</h2><p>從你輸入的時間，一步步換算到排盤用的時刻</p></div>
+        <ol class="trail" id="trail"></ol>
+        <p class="total" id="total"></p>
+      </section>
+
+      <section>
+        <div class="section-head"><h2>交界檢查</h2><p>出生時間如果有誤差，哪一柱會先變</p></div>
+        <div class="window" id="window"></div>
+        <ul class="edge-list" id="edges"></ul>
+      </section>
+
+      <section>
+        <div class="section-head"><h2>大運與流年</h2><p id="luck-sub"></p></div>
+        <div class="decades" id="decades" role="group" aria-label="大運"></div>
+        <div class="years" id="years"></div>
+      </section>
+  </div>
+
+  <footer>
+    <p>年柱、月柱和起運，用出生的精確時刻比對節氣（壽星天文曆演算法，tyme4ts）；日柱和時柱用出生地的真太陽時。歷史上的時區變動，例如臺灣 1937–1945 年的 UTC+9 和歷年的日光節約時間，依 IANA 時區資料自動換算。</p>
+    <p>年齡是虛歲，流年以立春換年。所有計算都在你的瀏覽器裡完成，輸入的資料不會上傳。</p>
+  </footer>
+</div>
+
+<script id="app">/*__APP__*/</script>
