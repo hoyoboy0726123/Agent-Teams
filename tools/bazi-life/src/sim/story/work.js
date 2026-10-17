@@ -93,7 +93,7 @@ export const WORK = [
         options: [
           { id: "startup.go", ...btn("go", "辭職創業", "全力衝，風險大"), act: "startup", style: "risk", weight: 0.22, apply: (s2, c) => { s2.savings -= 1.2; s2.employed = false; s2.unemployedFor = 0; c.arc.start("startup", { kind, partner: true }, 1); return { text: c.w(`你和${who}${sc.verb || "合開了一間"}${kind}，辭掉了${title}的工作。${sc.goEnd}`), mood: 4, big: true }; } },
           { id: "startup.side", ...btn("side", "下班時間先試做", "穩一點"), act: "sideJob", style: "safe", weight: 0.18, apply: (s2, c) => { s2.savings -= 0.4; c.arc.start("startup", { kind, side: true }, 1); return { text: c.w(`你沒有辭職，${sc.side}`, { kind }), mood: 1 }; } },
-          { id: "startup.invest", ...btn("invest", "出錢不出力", "當股東就好"), act: "invest", style: "safe", weight: 0.1, apply: (s2, c) => { s2.savings -= 0.6; s2.flags.stake = { kind, at: s2.age }; return { text: sc.stake || `你出了一筆錢當${who}那間${kind}的股東，自己繼續上班。`, mood: 1 }; } },
+          { id: "startup.invest", ...btn("invest", "出錢不出力", "當股東就好"), act: "invest", style: "safe", weight: 0.1, apply: (s2, c) => { s2.savings -= 0.6; s2.flags.stake = { kind, at: s2.age, who }; return { text: sc.stake || `你出了一筆錢當${who}那間${kind}的股東，自己繼續上班。`, mood: 1 }; } },
           { id: "startup.learn", ...btn("learn", "先去上創業課", "準備好再說"), act: "study", style: "learn", weight: 0.05, apply: (s2, c) => { c.arc.start("study", { kind: "創業課程", from: s2.age }, 1); return { text: `你想先把財務和行銷學起來，報名了創業課程，${sc.later || `${who}的${kind}先由${ta}自己開。`}`, mood: 0 }; } },
           { id: "startup.stay", ...btn("stay", "繼續上班", "穩穩的比較安心"), act: "wait", style: "safe", weight: 0.45, apply: (s2, c) => ({ text: c.w(`${who}找你${sc.ask}，你想了很久，還是決定繼續上班。${sc.stayEnd}`, { kind }), mood: 0 }) },
         ],
@@ -140,9 +140,9 @@ export const WORK = [
   {
     id: "stakeResult", once: true, domain: "wealth", channel: "change", when: s => s.flags.stake && s.age - s.flags.stake.at >= 3, p: () => 0.5,
     apply: (s, ctx) => {
-      const k = s.flags.stake.kind;
-      if (ctx.roll("wealth", "good", 0.4)) { s.savings += 1.5; return { text: `當初投資朋友的${k}賺錢了，分紅比本金還多。`, mood: 6 }; }
-      return { text: `朋友的${k}收掉了，你投的錢拿不回來，還好友情還在。`, mood: -4 };
+      const k = s.flags.stake.kind, who = s.flags.stake.who || "朋友";
+      if (ctx.roll("wealth", "good", 0.4)) { s.savings += 1.5; return { text: `當初投資${who}的${k}賺錢了，分紅比本金還多。`, mood: 6 }; }
+      return { text: `${who}的${k}收掉了，你投的錢拿不回來，還好交情還在。`, mood: -4 };
     },
   },
 
