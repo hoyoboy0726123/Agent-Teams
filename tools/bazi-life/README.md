@@ -8,6 +8,8 @@
   - 人生大事（交往、結婚、離婚、生病、升遷、失業……）旁邊會有一行「命理」，點開「為什麼在這個歲數」可以看這一年的大運、流年怎麼引動它。
   - 結束時出一份「八字命理詳批」：排盤表、神煞、本命詳批、大運、流年、這一生的大事與命理、姓名詳批、綜合論斷、開運建議。
 
+網站（Cloudflare）：https://bazi-life.mingpan.workers.dev
+
 預覽（Claude Artifact）：
 - 人生模擬：https://claude.ai/artifact/CPrHN4Vz922V1L9HVUBs3C
 - 排盤引擎：https://claude.ai/artifact/3a3ezBHmLKeKBxGaNveAV2
@@ -237,7 +239,11 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 
 ### 部署到 Cloudflare
 
-一個 Worker 同時放兩個網頁（`public/`，靜態檔案不經過 Worker 程式）和判讀 API（`/api/interpret`）。設定在 `wrangler.jsonc`。
+網站：**https://bazi-life.mingpan.workers.dev**（Cloudflare 帳號 Agent-Teams）。首頁是「命盤人生」，排盤引擎在 `/index.html`。
+
+一個 Worker（`worker/index.js`、`worker/app.js`）同時放兩個網頁和判讀 API（`/api/interpret`），設定在 `wrangler.jsonc`。兩個網頁是建置好的 `public/*.html`，當成文字模組包進 Worker（壓縮後約 612 KB，免費方案上限 3 MB），沒有用 Workers 的靜態資源：上傳靜態資源要用 Cloudflare 另外發的一次性金鑰，Claude Code 雲端環境的代理會把它換成帳號的 API 金鑰，上傳就會失敗。
+
+在自己的電腦部署：
 
 ```bash
 cd tools/bazi-life
@@ -245,7 +251,12 @@ npm install
 npm run deploy        # = npm run build，再 npx wrangler deploy（第一次會開瀏覽器登入 Cloudflare）
 ```
 
-部署後網址是 `https://bazi-life.<你的子網域>.workers.dev/life.html`（排盤引擎在 `/`）。也可以在 Cloudflare 後台替這個 Worker 加上自己的網域。
+在 Claude Code 雲端工作階段部署：環境的「網路密鑰」放一把 Cloudflare API 金鑰（範本 Edit Cloudflare Workers，只給 Agent-Teams 帳號；允許的網站 `api.cloudflare.com`），代理會在送往 Cloudflare 的請求加上金鑰，工作階段裡看不到它。wrangler 需要有一個 `CLOUDFLARE_API_TOKEN`，給任意字串即可，代理會換成真的金鑰：
+
+```bash
+npm run build
+CLOUDFLARE_API_TOKEN=proxy-injected CLOUDFLARE_ACCOUNT_ID=a535bb4f35cdac784e0806f0c58b4944 WRANGLER_SEND_METRICS=false npx wrangler deploy
+```
 
 - **Workers AI**：Gemma 4 26B（`@cf/google/gemma-4-26b-a4b-it`，關閉思考）。免費方案每個帳號每天 10,000 neurons，台灣時間早上 8 點重置；每句約 1,070 個 token 進、22 個 token 出，約 10 neurons，一天大約 950 句。用完會回錯誤、不會收費，頁面改用本機比對。付費方案每月 5 美元，超過免費額度的部分每句約 0.0001 美元。
 - **精簡版提示詞**：`wrangler.jsonc` 的 `PROMPT` 改成 `"compact"`，每句約 6 neurons、一天約 1,500 句，準確度從 99.4% 降到 97.5%（`free-text-heldout.json`）。
@@ -276,7 +287,7 @@ npm run deploy        # = npm run build，再 npx wrangler deploy（第一次會
 | `src/sim/grammar.js` | 句子模板 |
 | `src/sim/actions.js`、`src/sim/act.js` | 行動的清單與結果（按鈕和自己寫的選擇共用） |
 | `src/sim/intent.js`、`src/sim/interpret.js` | 判讀玩家自己寫的選擇：本機比對與安全檢查、給 Workers AI 的提示詞與回覆檢查 |
-| `worker/index.js`、`wrangler.jsonc` | Cloudflare Worker：放網頁，並在 `/api/interpret` 用 Workers AI 判讀玩家寫的選擇 |
+| `worker/index.js`、`worker/app.js`、`wrangler.jsonc` | Cloudflare Worker：放網頁（`index.js` 把建置好的網頁交給 `app.js`），並在 `/api/interpret` 用 Workers AI 判讀玩家寫的選擇 |
 | `src/sim/life.js` | 模擬引擎 |
 | `src/sim/monte.js` | 同盤重跑 100 次 |
 | `src/sim/setup.js` | 從命盤到模擬需要的資料 |

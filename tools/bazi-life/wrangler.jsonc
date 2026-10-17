@@ -1,15 +1,11 @@
-// 命盤人生 on Cloudflare: the two pages in public/ as static assets, and the Worker (worker/index.js) only for /api/*.
-// Deploy from this folder: npm run build && npx wrangler deploy
+// 命盤人生 on Cloudflare: one Worker (worker/index.js) serves the two pages in public/, built into it as text, and
+// /api/interpret. Deploy from this folder: npm run deploy (builds the pages, then npx wrangler deploy).
 {
   "name": "bazi-life",
   "main": "worker/index.js",
   "compatibility_date": "2026-10-01",
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS",
-    // Static files are served without running the Worker; only the API runs it.
-    "run_worker_first": ["/api/*"]
-  },
+  // The built pages are imported as text modules.
+  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }],
   // Workers AI (Gemma 4 26B). The free plan has 10,000 neurons a day, about 950 readings; past that the call fails
   // and the page reads the words itself.
   "ai": { "binding": "AI" },

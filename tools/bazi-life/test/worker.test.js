@@ -1,10 +1,11 @@
-// The Cloudflare Worker (worker/index.js) with stand-ins for its bindings: the page's request becomes the prompt,
+// The Cloudflare Worker (worker/app.js) with stand-ins for its bindings: the page's request becomes the prompt,
 // the model's reply is checked, and every failure answers with an error status so the page reads the words itself.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import worker, { MODEL, readRequest, textOf } from "../worker/index.js";
+import { makeApp, MODEL, readRequest, textOf } from "../worker/app.js";
 
 const SITE = "https://bazi-life.example.workers.dev";
+const worker = makeApp({ "/": "<p>命盤人生</p>", "/life.html": "<p>命盤人生</p>", "/index.html": "<p>排盤</p>" });
 const CHOICE = {
   situation: "和曉雯為了錢越來越常吵架，婚姻出現危機。要怎麼面對？",
   context: "34 歲・男性・業務・已婚",
@@ -16,14 +17,13 @@ const post = (body, headers = {}) => new Request(`${SITE}/api/interpret`, {
   headers: { "content-type": "application/json", origin: SITE, "cf-connecting-ip": "203.0.113.7", ...headers },
   body: typeof body === "string" ? body : JSON.stringify(body),
 });
-// env with a model that answers `reply` (a value, or a function of the input), a limiter and the assets.
+// env with a model that answers `reply` (a value, or a function of the input) and a limiter.
 function env(reply, { allow = true } = {}) {
   const calls = [], limited = [];
   return {
     calls, limited,
     AI: { run: async (model, input) => { calls.push({ model, input }); if (reply instanceof Error) throw reply; return typeof reply === "function" ? reply(input) : reply; } },
     INTERPRET_LIMIT: { limit: async ({ key }) => { limited.push(key); return { success: allow }; } },
-    ASSETS: { fetch: async req => new Response(`asset ${new URL(req.url).pathname}`) },
   };
 }
 const openai = content => ({ choices: [{ message: { role: "assistant", content } }] });
@@ -89,10 +89,18 @@ test("failures answer with an error status, so the page falls back to reading th
   assert.equal(e.calls.length, 0);
 });
 
-test("the pages are served from the assets, and other API paths are not found", async () => {
+test("the pages are served as HTML by path; other paths and API paths are not found", async () => {
   const e = env(null);
-  assert.equal(await (await worker.fetch(new Request(`${SITE}/life.html`), e)).text(), "asset /life.html");
-  assert.equal((await worker.fetch(new Request(`${SITE}/api/other`), e)).status, 404);
+  const home = await worker.fetch(new Request(`${SITE}/`), e);
+  assert.equal(home.status, 200);
+  assert.match(home.headers.get("content-type"), /^text\/html; charset=utf-8/);
+  assert.equal(await home.text(), "<p>命盤人生</p>");
+  assert.equal(await (await worker.fetch(new Request(`${SITE}/index.html`), e)).text(), "<p>排盤</p>");
+  const head = await worker.fetch(new Request(`${SITE}/life.html`, { method: "HEAD" }), e);
+  assert.equal(head.status, 200);
+  assert.equal(await head.text(), "");
+  assert.equal((await worker.fetch(new Request(`${SITE}/life.html`, { method: "POST" }), e)).status, 405);
+  for (const path of ["/nope", "/toString", "/__proto__", "/api/other"]) assert.equal((await worker.fetch(new Request(`${SITE}${path}`), e)).status, 404, path);
 });
 
 test("the request is trimmed to what the prompt needs", () => {
