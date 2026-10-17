@@ -236,6 +236,7 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 | Gemma 4 26B（關閉思考，透過 Gemini API 測） | 99.2% | 99.4% |
 | Gemma 4 26B，精簡版提示詞（`interpretPrompt({ compact: true })`） | — | 97.5% |
 | 本機比對（不用 AI） | 62.1%（前三個 66.7%；30% 猜不出來） | 86.5%（用它調過詞庫） |
+| 正式網站的 Workers AI（2026-10-17 抽查，每個抉擇 2 句） | 18/18，每句約 1 秒 | — |
 
 ### 部署到 Cloudflare
 
@@ -351,7 +352,8 @@ node scripts/make-name-texts.mjs <shunshi-naming 的 data 資料夾>
 
 ## 還沒做的
 
+- 第 0 步的門檻：拿幾個生日和壽星萬年曆網頁版抽查四柱。
 - 第 1 步的門檻：換成官方完整統計表；請命理顧問看過規則與詳批的文字。
-- 部署到 Cloudflare 之後，用真的 Workers AI 抽查幾句判讀（`test/fixtures/free-text-fresh.json`）。
-- 第 2 步：準爸媽模式，包括候選名字比較與時辰比較。
+- 第 2 步：準爸媽模式，包括候選名字比較（3–5 個名字並排，同一張命盤各跑多次）與時辰比較（暫定只比較滿 39 週後的時段，附醫療提醒）。
+- 研究文件「商業模式與分享設計」裡的其他功能：伴侶合盤、AI 一生回顧信、每年的流年更新、名字 PK 卡、邀請家人解鎖合盤、網頁收款。
 - 出生地目前到縣市與主要鄉鎮。經度差 0.01° 只影響 2.4 秒，所以對時柱影響很小。
