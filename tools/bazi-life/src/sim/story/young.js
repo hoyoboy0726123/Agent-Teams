@@ -359,7 +359,7 @@ export const YOUNG = [
     // 翹課：早上的課爬不起來、熬夜、打工排太多。大學生活的小事，最多是一門課被當。
     id: "y_skipClass", once: true, domain: "study", channel: "bad", ages: [18, 24],
     // Not for 夜間部 students: their classes are in the evening.
-    when: s => undergrad(s) && !s.flags.nightSchool && typeof s.flags.uniAt === "number" && uniYear(s) <= 3, p: () => 0.3,
+    when: s => undergrad(s) && !s.flags.nightSchool && typeof s.flags.uniAt === "number" && uniYear(s) <= 3, p: () => 0.45,
     choice: (s, ctx) => {
       const y = s.year, dept = deptOf(s, ctx), alarm = y >= 2003 ? "手機" : "鬧鐘", notes = y >= 1985 ? "共筆" : "筆記";
       const course = ctx.rng.pick(["大一英文", "通識課", ...(/電|機|化|土木|物理|數學|資|材料|工程|生科/.test(dept) ? ["微積分", "普通物理"] : ["大一國文"])]);
