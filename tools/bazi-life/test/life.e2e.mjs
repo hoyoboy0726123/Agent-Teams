@@ -22,11 +22,33 @@ async function fresh(opts, { welcomed = true } = {}) {
   await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   return p;
 }
+// A pixel canvas has been drawn on (the sky and the place fill it).
+const painted = (p, sel) => p.$eval(sel, c => { const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n > c.width * c.height * 0.9; });
+// The first choice of a life. A life that ends before it (rare: the seed is random) is lived again.
+async function firstChoice(p) {
+  for (let k = 0; k < 4; k++) {
+    await p.waitForSelector("#choice:not([hidden]), #end:not([hidden])", { timeout: 20000 });
+    if (await p.isVisible("#choice")) return;
+    await p.waitForSelector("#story:not([hidden])", { timeout: 5000 }).catch(() => {});
+    if (await p.isVisible("#story")) await p.click("#story .skip");
+    await p.click("#again-same");
+    await p.waitForSelector("#play:not([hidden])");
+  }
+  throw new Error("four lives ended before their first choice");
+}
+// The ending opens 人生回顧 over the results; checks of the results close it first.
+async function ended(p, timeout) {
+  await p.waitForSelector("#end:not([hidden])", { timeout });
+  await p.waitForSelector("#story:not([hidden])", { timeout: 5000 }).catch(() => {});
+  if (await p.isVisible("#story")) await p.click("#story .skip");
+}
 const page = await fresh({ viewport: { width: 1100, height: 1300 } }, { welcomed: false });
 await page.goto(url);
 const welcome = await page.textContent("#welcome");
 check("a first visit opens on 歡迎: how to play, what is fun, and that the data stays on the phone", await page.isVisible("#welcome") && await page.isHidden("#form-me") && /怎麼玩/.test(welcome) && /好玩的地方/.test(welcome) && /不會上傳到網站後台/.test(welcome) && /沒有帳號、沒有資料庫/.test(welcome));
 await page.click('[data-goto="me"]');
+await page.waitForTimeout(250);
+check("the welcome page walks through a life in pixels", await painted(page, "#welcome-scene") && (await page.$$("#welcome-stages span")).length === 6);
 check("開始我的人生 opens the birth form", await page.isVisible("#form-me") && await page.getAttribute("#tab-me", "aria-selected") === "true" && await page.isHidden("#welcome"));
 await page.reload();
 check("after that, the page opens on 我的人生", await page.isVisible("#form-me") && await page.isHidden("#welcome"));
@@ -35,8 +57,9 @@ check("setup form is shown first", await page.isVisible("#form-me") && !(await p
 await page.click("#form-me button[type=submit]");
 await page.waitForSelector("#play:not([hidden])");
 await page.click('[data-speed="10"]');
-await page.waitForSelector("#choice:not([hidden])", { timeout: 20000 });
+await firstChoice(page);
 check("a choice appears and pauses the life", await page.isVisible("#choice .options button"));
+check("the life is drawn as a pixel scene with the place and the year's weather", await painted(page, "#scene") && /・(晴天|多雲|陰天|下雨)・流年/.test(await page.textContent("#scene-cap")), await page.textContent("#scene-cap"));
 const before = await page.textContent("#feed");
 check("a choice offers at least three options and a box to write your own", (await page.$$("#choice .options button")).length >= 3 && await page.isVisible("#free-text"));
 await page.fill("#free-text", "我不想活了");
@@ -57,6 +80,15 @@ await page.waitForTimeout(400);
 check("choosing continues the story", (await page.textContent("#feed")).length > before.length && /你的選擇/.test(await page.textContent("#feed")));
 await page.click("#c-skip");
 await page.waitForSelector("#end:not([hidden])", { timeout: 20000 });
+await page.waitForSelector("#story:not([hidden])");
+await page.waitForTimeout(250);
+const firstSlide = (await page.textContent("#story .slide")).trim();
+check("the ending opens 人生回顧 with the birth first, as a pixel picture", /^0 歲/.test(firstSlide) && await painted(page, "#story canvas"), firstSlide.slice(0, 30));
+let slides = 1;
+while (!(await page.isVisible("#story .go")) && slides < 12) { await page.click("#story .slide"); slides++; }
+check("tapping goes through the moments to the last picture", await page.isVisible("#story .go") && /你走完了 \d+ 歲的一生/.test(await page.textContent("#story")), `${slides} slides`);
+await page.click("#story .go");
+check("the last button closes 人生回顧 and shows the results", await page.isHidden("#story") && await page.isVisible("#end"));
 const title = await page.textContent("#end-title");
 check("the ending says how long this life lasted", /這一次，你活到 \d+ 歲/.test(title), title);
 // The seed is random, so a life can end young: then there is a candle for each year it lasted.
@@ -82,7 +114,7 @@ if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/life-
 await page.click("#again-same");
 await page.waitForSelector("#play:not([hidden])");
 await page.click("#c-skip").catch(() => {});
-await page.waitForSelector("#end:not([hidden])", { timeout: 20000 });
+await ended(page, 20000);
 check("living again with the same chart works", /這一次，你活到/.test(await page.textContent("#end-title")));
 
 // name and family
@@ -112,7 +144,7 @@ check("siblings can be added and removed", (await page.$$("#sibling-list .member
 await page.click("#form-me button[type=submit]");
 await page.waitForSelector("#play:not([hidden])");
 await page.click("#c-skip");
-await page.waitForSelector("#end:not([hidden])", { timeout: 20000 });
+await ended(page, 20000);
 const story = await page.textContent("#feed");
 check("the story uses the name and the family", /名叫陳怡君。爸爸是陳大明，媽媽是林美華。上面已經有哥哥志明。/.test(story));
 check("the younger sister is born at 4 with her name", /妹妹小美/.test(await page.textContent('#feed li[data-age="4"]')));
@@ -132,7 +164,7 @@ await page.click("#go-random");
 await page.waitForSelector("#play:not([hidden])");
 check("random birth announces who you became, with a name", /你投胎成為 \d{4} 年.+名叫.{2,4}。/.test(await page.textContent("#born")));
 await page.click("#c-skip");
-await page.waitForSelector("#end:not([hidden])", { timeout: 45000 });
+await ended(page, 45000);
 check("a random life gets a name card", /姓名：/.test(await page.textContent("#personal")));
 
 // 只問人生大事: everyday choices follow the personality and say so; the big ones are still asked.
@@ -147,7 +179,7 @@ for (let i = 0; i < 60 && !(await page.isVisible("#end")); i++) {
   await page.waitForSelector("#choice:not([hidden]), #end:not([hidden])", { timeout: 45000 });
   if (await page.isVisible("#choice .options button")) { asked++; await page.click("#choice .options button"); }
 }
-await page.waitForSelector("#end:not([hidden])", { timeout: 20000 });
+await ended(page, 20000);
 const majorFeed = await page.textContent("#feed");
 check("with 只問人生大事 the big decisions are asked and the rest follow the personality", asked >= 3 && /依你的個性：/.test(majorFeed), `${asked} asked`);
 await page.uncheck("#c-major");
@@ -170,7 +202,7 @@ async function servedPage(answer, before = null) {
   await p.click("#form-me button[type=submit]");
   await p.waitForSelector("#play:not([hidden])");
   await p.click('[data-speed="10"]');
-  await p.waitForSelector("#choice:not([hidden])", { timeout: 20000 });
+  await firstChoice(p);
   return { p, sent };
 }
 const ok = { status: 200, contentType: "application/json", body: JSON.stringify({ action: "travel", summary: "你決定帶家人去花蓮走走", confidence: 0.9 }) };
@@ -228,9 +260,9 @@ await couple.click("#c-skip");
 for (let i = 0; i < 200 && !(await couple.isVisible("#end")); i++) {
   await couple.waitForSelector("#choice:not([hidden]), #end:not([hidden])", { timeout: 45000 });
   if (await couple.isVisible("#choice .options button")) await couple.click("#choice .options button");
-  await couple.click("#c-skip").catch(() => {});
+  await couple.click("#c-skip", { timeout: 3000 }).catch(() => {});
 }
-await couple.waitForSelector("#end:not([hidden])", { timeout: 45000 });
+await ended(couple, 45000);
 const coupleCard = await couple.textContent("#personal");
 const wedCount = Number((/次和王小美在一起，其中 (\d+) 次結婚/.exec(coupleCard) || [])[1]);
 check("the family card shows the partner's bond and the 100-run counts; with a wedding year nearly every run marries", /伴侶（王小美）/.test(coupleCard) && wedCount >= 90, `married ${wedCount}`);
@@ -260,6 +292,7 @@ await baby.waitForSelector("#baby-advice .advice", { timeout: 60000 });
 await baby.waitForSelector(".slot-card .rank", { timeout: 60000 });
 const babyCards = await baby.$$eval(".name-card", els => els.map(e => e.textContent.replace(/\s+/g, "")));
 check("both names get a score and their 100 lives", babyCards.length === 2 && babyCards.every(t => /\d+分/.test(t) && /結婚\d+次/.test(t) && /離婚\d+次/.test(t)), babyCards.map(t => t.slice(0, 12)).join(" | "));
+check("the comparison opens with the baby-to-be in a pixel crib", await painted(baby, "#baby-scene"));
 check("the advice compares the names and says names matter little", /差別最多 \d+ 次/.test(await baby.textContent("#baby-advice")) && /±5%/.test(await baby.textContent("#baby-advice")));
 check("the slot comparison carries the medical note and leaves out lifespan", /醫師的醫療判斷/.test(await baby.textContent("#baby-slots")) && /不比較壽命和健康/.test(await baby.textContent("#baby-slots")));
 check("the baby's report is shown for a name", (await baby.$$("#baby-report .paipan tbody tr")).length === 10 && /林怡君/.test(await baby.textContent("#baby-report h3")));
@@ -281,8 +314,10 @@ check("the family form fits at phone width", formWidth <= 400, `scrollWidth ${fo
 if (process.env.SHOTS) await phone.screenshot({ path: `${process.env.SHOTS}/life-form-phone-dark.png`, fullPage: true });
 await phone.click("#form-me button[type=submit]");
 await phone.waitForSelector("#play:not([hidden])");
+const statusHeight = await phone.$eval(".status", el => el.getBoundingClientRect().height);
+check("on a phone the scene and the status bar take under 40% of the screen", statusHeight < 360, `${Math.round(statusHeight)}px of 900`);
 await phone.click("#c-skip");
-await phone.waitForSelector("#end:not([hidden])", { timeout: 20000 });
+await ended(phone, 20000);
 const width = await phone.evaluate(() => document.documentElement.scrollWidth);
 check("no sideways scrolling at phone width", width <= 400, `scrollWidth ${width}`);
 if (process.env.SHOTS) await phone.screenshot({ path: `${process.env.SHOTS}/life-phone-dark.png`, fullPage: true });

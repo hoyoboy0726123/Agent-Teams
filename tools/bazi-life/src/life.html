@@ -72,6 +72,33 @@ fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; min-width:
 .secondary:hover { border-color: var(--indigo); color: var(--indigo); }
 .error { color: var(--seal); font-size: 14px; }
 #setup form { display: grid; gap: 16px; }
+/* Pixel scenes (pixel.js): drawn at 128×44 and scaled up without smoothing. */
+.pixel { display: block; width: 100%; height: auto; aspect-ratio: 128 / 44; image-rendering: pixelated; border-radius: 8px; background: #1c2026; }
+figure { margin: 0; }
+.scene { display: grid; gap: 2px; max-width: 520px; }
+.scene-cap { font-size: 12px; color: var(--muted); min-height: 1.4em; }
+.welcome-scene { display: grid; gap: 6px; }
+.baby-scene { max-width: 520px; }
+.stages { display: flex; flex-wrap: wrap; gap: 2px 6px; font-size: 13px; color: var(--muted); }
+.stages span + span::before { content: "→"; margin-right: 6px; color: var(--rule); font-weight: 400; }
+.stages span.on { color: var(--seal); font-weight: 700; }
+body.story-open { overflow: hidden; }
+.story { position: fixed; inset: 0; z-index: 40; background: #0f1417; color: #ede8de; display: grid; place-items: center; text-align: center; padding: calc(64px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(56px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); cursor: pointer; overflow-y: auto; }
+.story:focus { outline: none; }
+.story .skip { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); border: 1px solid #3a4448; background: none; color: #ede8de; border-radius: 999px; padding: 6px 16px; font-size: 14px; cursor: pointer; }
+.story .hint { position: absolute; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); left: 0; right: 0; color: #7d8a8c; font-size: 13px; }
+.slide { width: 100%; max-width: 560px; display: grid; gap: 8px; animation: fade 0.6s ease-out; }
+@keyframes fade { from { opacity: 0; } }
+.slide canvas { width: 100%; height: auto; aspect-ratio: 128 / 44; image-rendering: pixelated; border-radius: 8px; }
+.slide .ag { margin-top: 10px; color: #9aa6a8; letter-spacing: 0.2em; font-family: var(--mono); font-size: 13px; }
+.slide .tx { font-family: var(--display); font-size: 20px; line-height: 1.6; }
+.slide h2 { margin-top: 14px; font-size: clamp(28px, 8vw, 40px); color: #ede8de; }
+.slide .soft { color: #9aa6a8; font-size: 15px; }
+.slide .dots { display: flex; gap: 3px; margin-top: 12px; }
+.slide .dots i { flex: 1; height: 4px; background: #2b3538; border-radius: 2px; }
+.slide .dots i.on { background: #ec6a57; }
+.slide .go { justify-self: center; margin-top: 18px; border: 0; background: #ec6a57; color: #160a08; font-size: 17px; font-weight: 700; padding: 12px 26px; border-radius: 8px; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .slide { animation: none; } }
 /* 歡迎: how to play, what is fun, and where the data stays. */
 .welcome { display: grid; gap: 22px; }
 .welcome-intro { display: grid; gap: 6px; }
@@ -124,24 +151,33 @@ details.family > summary small { font-weight: 400; color: var(--muted); }
 .status .pill { font-size: 13px; color: var(--muted); }
 .status .pill b { font-family: var(--display); font-size: 16px; color: var(--ink); font-weight: 700; }
 .status .pill small { margin-left: 4px; font-size: 12px; color: var(--muted); }
-.mood { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+.mood { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 10px; align-items: center; font-size: 12px; color: var(--muted); }
 .mood .track { height: 6px; border-radius: 3px; background: var(--wash); overflow: hidden; }
 .mood .track i { display: block; height: 100%; background: var(--indigo); border-radius: 3px; transition: width 0.3s; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .controls button { border: 1px solid var(--rule); background: var(--sheet); border-radius: 999px; padding: 4px 14px; font-size: 13px; }
 .controls button[aria-pressed="true"] { background: var(--indigo-wash); border-color: var(--indigo); color: var(--indigo); }
-.controls .major { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
-.controls .major input { width: 16px; height: 16px; accent-color: var(--indigo); }
+.major { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.major input { width: 16px; height: 16px; accent-color: var(--indigo); }
+/* Phones: a shorter status bar, so the scene and the choices both fit. */
+@media (max-width: 600px) {
+  .status { gap: 6px; padding-block: 6px; }
+  .status-row { gap: 2px 12px; }
+  .status .age { font-size: 21px; }
+  .status .pill small { display: none; }
+  .controls { gap: 6px; }
+  .controls button { padding: 4px 10px; }
+}
 .born { font-size: 14px; color: var(--muted); }
 .feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.feed li { display: grid; grid-template-columns: 4.2em 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--wash); }
+.feed li { scroll-margin-top: var(--sticky, 150px); display: grid; grid-template-columns: 4.2em 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--wash); }
 .feed .when { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--muted); }
 .feed .when small { display: block; font-family: var(--mono); font-size: 11px; font-weight: 400; }
 .feed .lines { display: grid; gap: 4px; min-width: 0; }
 .feed .big { font-weight: 500; }
 .feed .why { font-size: 12px; color: var(--indigo); }
 .feed .chose { font-size: 12px; color: var(--muted); }
-.choice { background: var(--sheet); border: 2px solid var(--indigo); border-radius: 10px; padding: 16px; display: grid; gap: 12px; scroll-margin-top: 150px; }
+.choice { background: var(--sheet); border: 2px solid var(--indigo); border-radius: 10px; padding: 16px; display: grid; gap: 12px; scroll-margin-top: var(--sticky, 150px); }
 .choice .q { font-family: var(--display); font-size: 19px; font-weight: 700; }
 .choice .why { font-size: 13px; color: var(--indigo); }
 .why-more { font-size: 12px; color: var(--muted); margin-top: 2px; }
@@ -341,6 +377,10 @@ footer a { color: var(--indigo); }
       <button type="button" role="tab" id="tab-baby" aria-selected="false" aria-controls="form-baby">準爸媽</button>
     </div>
     <div id="welcome" class="welcome" role="tabpanel" aria-labelledby="tab-welcome">
+      <figure class="welcome-scene">
+        <canvas class="pixel" id="welcome-scene" width="128" height="44" aria-hidden="true"></canvas>
+        <figcaption class="stages" id="welcome-stages"></figcaption>
+      </figure>
       <div class="welcome-intro">
         <h2>歡迎來到命盤人生</h2>
         <p>輸入一個生日，看看這張八字命盤會走出怎樣的一生。可以替自己、家人、另一半，甚至還沒出生的寶寶，各過一次人生。</p>
@@ -499,6 +539,7 @@ footer a { color: var(--indigo); }
 
   <section class="panel" id="baby" hidden aria-label="準爸媽模式的比較">
     <div class="report-head"><h2>寶寶的名字比較</h2><p class="lede" id="baby-lede"></p></div>
+    <canvas class="pixel baby-scene" id="baby-scene" width="128" height="44" aria-hidden="true"></canvas>
     <div id="baby-chart"></div>
     <p class="fine" id="baby-progress" aria-live="polite"></p>
     <div class="name-cards" id="baby-names"></div>
@@ -510,20 +551,23 @@ footer a { color: var(--indigo); }
 
   <section id="play" hidden aria-label="人生">
     <div class="status">
+      <figure class="scene">
+        <canvas class="pixel" id="scene" width="128" height="44" aria-hidden="true"></canvas>
+        <figcaption class="scene-cap" id="scene-cap"></figcaption>
+      </figure>
       <div class="status-row">
         <span class="age" id="s-age">0 歲</span>
         <span class="pill num" id="s-year"></span>
         <span class="pill">大運 <b id="s-decade">童限</b><small id="s-decade-god"></small></span>
         <span class="pill">流年 <b id="s-pillar"></b><small id="s-pillar-god"></small></span>
       </div>
-      <div class="mood"><span>心情</span><span class="track"><i id="s-mood" style="width:60%"></i></span></div>
+      <div class="mood"><span>心情</span><span class="track"><i id="s-mood" style="width:60%"></i></span><label class="major"><input type="checkbox" id="c-major"> 只問人生大事</label></div>
       <div class="controls">
         <button type="button" id="c-pause">暫停</button>
         <button type="button" data-speed="1" aria-pressed="true">慢慢看</button>
         <button type="button" data-speed="3" aria-pressed="false">快一點</button>
         <button type="button" data-speed="10" aria-pressed="false">很快</button>
         <button type="button" id="c-skip">直接看結局</button>
-        <label class="major"><input type="checkbox" id="c-major"> 只問人生大事</label>
       </div>
     </div>
     <p class="born" id="born"></p>
@@ -533,7 +577,7 @@ footer a { color: var(--indigo); }
 
   <section id="end" hidden aria-label="結局">
     <div class="end-head">
-      <h2 id="end-title"></h2>
+      <h2 id="end-title" tabindex="-1"></h2>
       <p id="end-sub"></p>
     </div>
     <dl class="facts" id="end-facts"></dl>
@@ -574,9 +618,10 @@ footer a { color: var(--indigo); }
 
   <footer>
     <p>年柱、月柱用出生的精確時刻比對節氣，日柱、時柱用出生地的真太陽時。每一年，大運和流年會讓各領域事件的機率傾斜，倍率限制在 0.5 到 2 倍之間；扶抑、調候、格局三派的看法分開計算後再合併。</p>
-    <p>壽命以內政部 114 年簡易生命表的平均餘命為基準（男 77.93 歲、女 84.75 歲）。所有計算都在你的瀏覽器裡完成，輸入的資料不會上傳。</p>
+    <p>壽命以內政部 114 年簡易生命表的平均餘命為基準（男 77.93 歲、女 84.75 歲）。所有計算都在你的瀏覽器裡完成，輸入的生日、名字和家人資料不會上傳；只有「寫下你自己的決定」那一句會交給 AI 判讀，名字會先換成稱呼，判讀完不保存。</p>
     <p><a id="chart-link" href="__CHART_URL__">看完整命盤（排盤引擎）</a></p>
   </footer>
 </div>
+<div class="story" id="story" hidden role="dialog" aria-modal="true" aria-label="人生回顧" tabindex="-1"></div>
 
 <script id="app">/*__APP__*/</script>

@@ -26,6 +26,7 @@ import { nameSwaps, withoutNames } from "./sim/privacy.js";
 import { ACTIONS } from "./sim/actions.js";
 import { trait } from "./sim/words.js";
 import { initBaby } from "./baby-app.js";
+import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -55,6 +56,10 @@ function setup() {
   try { welcomed = localStorage.getItem("bazi-life.welcomed") === "1"; } catch {}
   selectTab(welcomed ? "me" : "welcome");
   initBaby({ begin, showError });
+  initPixels();
+  // The sticky status bar (with the pixel scene) is as tall as the screen makes it; scrolling to a choice leaves room for it.
+  const status = $(".status");
+  if (status && typeof ResizeObserver === "function") new ResizeObserver(() => document.documentElement.style.setProperty("--sticky", `${Math.ceil(status.getBoundingClientRect().height) + 8}px`)).observe(status);
   $("#f-nohour").addEventListener("change", () => { $("#f-time").disabled = $("#f-nohour").checked; });
   const partnerSex = $(".member[data-role=partner] .m-sex");
   partnerSex.addEventListener("change", () => { partnerSex.dataset.picked = "1"; });
@@ -185,6 +190,7 @@ function begin(input, born, extra = {}) {
   const name = prep.name || (extra.name ? { full: extra.name, effects: null } : null);
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
   run = { input, extra, chart, prep, name, seed, born, life: createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed, name, family: prep.family, majorOnly: $("#c-major").checked }), summary: null };
+  startScene(seed, run.life.state, age => luckAt(prep, age));
   $("#setup").hidden = true; $("#baby").hidden = true; $("#end").hidden = true; $("#play").hidden = false;
   $("#feed").innerHTML = ""; $("#choice").hidden = true;
   $("#born").textContent = born || `${input.date.y} 年 ${input.date.m} 月 ${input.date.d} 日在${input.place.name}出生。`;
@@ -205,6 +211,7 @@ function tick() {
   const entries = life.step();
   render(entries);
   updateStatus();
+  showStep(life.state, age => luckAt(run.prep, age), entries);
   if (life.pending) return showChoice();
   if (life.done) return finish();
   schedule();
@@ -215,6 +222,7 @@ function choose(i) {
   $("#choice").hidden = true;
   render(entries);
   updateStatus();
+  showStep(run.life.state, age => luckAt(run.prep, age), entries);
   if (run.life.pending) return showChoice();
   if (run.life.done) return finish();
   schedule();
@@ -224,9 +232,14 @@ function skipToEnd() {
   stop();
   const life = run.life, all = [];
   let guard = 0;
-  while (!life.done && guard++ < 5000) all.push(...(life.pending ? life.autoChoose() : life.step()));
+  while (!life.done && guard++ < 5000) {
+    const entries = life.pending ? life.autoChoose() : life.step();
+    collectStep(life.state, age => luckAt(run.prep, age), entries);
+    all.push(...entries);
+  }
   $("#choice").hidden = true;
   render(all);
+  showStep(life.state, age => luckAt(run.prep, age), []);
   finish();
 }
 
@@ -381,6 +394,7 @@ function applyFree(action, summary) {
   $("#choice").hidden = true;
   render(r.entries);
   updateStatus();
+  showStep(run.life.state, age => luckAt(run.prep, age), r.entries);
   if (run.life.pending) return showChoice();
   if (run.life.done) return finish();
   schedule();
@@ -413,7 +427,8 @@ function finish() {
   drawPersonal();
   drawReport();
   drawShare(peak);
-  $("#end").scrollIntoView({ behavior: "smooth", block: "start" });
+  $("#end").scrollIntoView({ block: "start" });
+  openStory(s, age => luckAt(prep, age), () => { $("#end").scrollIntoView({ block: "start" }); $("#end-title").focus({ preventScroll: true }); });
 }
 
 function drawKline() {

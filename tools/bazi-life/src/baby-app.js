@@ -7,6 +7,7 @@ import { yearReading, decadeReading } from "./core/reading-year.js";
 import { overallReading } from "./core/reading-overall.js";
 import { reportHTML } from "./report.js";
 import { babyCharts, nameCandidates, runSlice, statsOf, gestation, slotRange, checkSlot, slotEntry, rankSlots, MAX_NAMES, MAX_SLOTS, RUNS, EARLIEST_WEEKS } from "./sim/compare.js";
+import { showNursery } from "./pixel-app.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -107,6 +108,7 @@ async function compare() {
   const names = nameCandidates(form.surname, form.givens, analysis).map(c => ({ ...c, stats: null }));
   state = { form, charts, analysis, key, names, slots: [], reportFor: null, reportSex: charts[0].sex };
   $("#baby").hidden = false;
+  showNursery($("#baby-scene"), form.birth.sex);
   $("#baby-lede").textContent = `${dateText(form.birth.date)}${form.birth.time ? ` ${pad(form.birth.time.h)}:${pad(form.birth.time.mi)}` : "（時辰還不知道）"}在${form.birth.place.name}出生的${SEX[form.birth.sex] || "寶寶（性別還不知道）"}。每個名字都用同一張命盤、同樣的 ${RUNS} 次人生來比，差別只來自名字。`;
   $("#baby-chart").innerHTML = chartBlock(charts);
   $("#baby-parents").innerHTML = parentsBlock(charts[0].prep.family);
