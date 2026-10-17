@@ -10,6 +10,7 @@ import { babyCharts, nameCandidates, runSlice, statsOf, gestation, slotRange, ch
 import { showNursery } from "./pixel-app.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
 import { initTimeField, readTimeField, syncTimeField, timeFieldIds } from "./time-field.js";
+import { initMemberHours, syncMemberHours, memberHourValue, setMemberHour, readMemberHour } from "./member-time.js";
 import { timeText } from "./core/shichen.js";
 
 const $ = s => document.querySelector(s);
@@ -29,6 +30,7 @@ export function initBaby(h) {
   hooks = h;
   $("#b-place").innerHTML = PLACE_GROUPS.map(g => `<optgroup label="${esc(g.group)}">${g.places.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("");
   initTimeField("b");
+  initMemberHours($("#b-parents"));
   defaults();
   $("#add-slot").addEventListener("click", () => { addSlot(); saveSoon(); });
   $("#slot-list").addEventListener("click", e => { const b = e.target.closest(".remove"); if (b) { b.closest(".slot").remove(); saveSoon(); } });
@@ -65,6 +67,7 @@ function defaults() {
   const today = new Date(), soon = new Date(today.getTime() + 120 * 86400000);
   $("#b-date").value = `${soon.getFullYear()}-${pad(soon.getMonth() + 1)}-${pad(soon.getDate())}`;
   syncTimeField("b");
+  syncMemberHours($("#b-parents"));
   $("#slot-list").innerHTML = "";
   addSlot(); addSlot();
 }
@@ -74,7 +77,7 @@ const DRAFT = draftStore("bazi-life.baby");
 const FIELDS = ["b-surname", "b-sex-m", "b-sex-f", "b-sex-u", "b-date", ...timeFieldIds("b"), "b-place", "b-parents", "b-slots", "b-due"];
 function save() {
   const parents = {};
-  for (const el of document.querySelectorAll("#b-parents .member[data-brole]")) parents[el.dataset.brole] = { name: el.querySelector(".m-name").value, date: el.querySelector(".m-date").value, time: el.querySelector(".m-time").value };
+  for (const el of document.querySelectorAll("#b-parents .member[data-brole]")) parents[el.dataset.brole] = { name: el.querySelector(".m-name").value, date: el.querySelector(".m-date").value, ...memberHourValue(el) };
   DRAFT.save({ v: 1, fields: readIds(FIELDS), givens: [...document.querySelectorAll(".b-given")].map(i => i.value), parents, slots: [...document.querySelectorAll("#slot-list .s-when")].map(i => i.value) });
 }
 const saveSoon = later(save);
@@ -85,7 +88,7 @@ function restore() {
   [...document.querySelectorAll(".b-given")].forEach((input, i) => { input.value = (d.givens && d.givens[i]) || ""; });
   for (const el of document.querySelectorAll("#b-parents .member[data-brole]")) {
     const m = d.parents && d.parents[el.dataset.brole];
-    if (m) { el.querySelector(".m-name").value = m.name || ""; el.querySelector(".m-date").value = m.date || ""; el.querySelector(".m-time").value = m.time || ""; }
+    if (m) { el.querySelector(".m-name").value = m.name || ""; el.querySelector(".m-date").value = m.date || ""; setMemberHour(el, m); }
   }
   if (Array.isArray(d.slots)) {
     $("#slot-list").innerHTML = "";
@@ -106,9 +109,8 @@ function clearForm() {
 const clean = v => String(v || "").replace(/\s+/g, "");
 const parseDate = v => { const [y, m, d] = String(v || "").split("-").map(Number); return y ? { y, m, d } : null; };
 function readMember(el) {
-  const [h, mi] = (el.querySelector(".m-time").value || "").split(":").map(Number);
   const date = parseDate(el.querySelector(".m-date").value);
-  return { name: clean(el.querySelector(".m-name").value), date, time: date && Number.isFinite(h) ? { h, mi: mi || 0 } : null };
+  return { name: clean(el.querySelector(".m-name").value), date, time: date ? readMemberHour(el) : null };
 }
 
 // The form, checked; an error message string when something is missing.

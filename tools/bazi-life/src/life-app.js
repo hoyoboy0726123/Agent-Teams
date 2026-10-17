@@ -29,6 +29,7 @@ import { initBaby } from "./baby-app.js";
 import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
 import { initTimeField, readTimeField, syncTimeField, timeFieldIds } from "./time-field.js";
+import { initMemberHours, syncMemberHours, memberHourHTML, memberHourValue, setMemberHour, readMemberHour } from "./member-time.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -60,6 +61,7 @@ function setup() {
   const lastTab = TAB_DRAFT.load();
   selectTab(TABS.includes(lastTab) ? lastTab : welcomed ? "me" : "welcome");
   initTimeField("f");
+  initMemberHours($("#form-me"));
   initBaby({ begin, showError });
   restoreForm();
   for (const type of ["input", "change"]) $("#form-me").addEventListener(type, saveFormSoon);
@@ -124,8 +126,8 @@ function selectTab(tab) {
 // 填到一半的表單 stays through a reload (draft.js: this tab only, gone when it is closed).
 const FORM_DRAFT = draftStore("bazi-life.form"), TAB_DRAFT = draftStore("bazi-life.tab");
 const ME_FIELDS = ["f-name", "f-date", ...timeFieldIds("f"), "sex-m", "sex-f", "f-place", "family", "f-met", "f-wed", "f-only"];
-const memberValues = el => ({ name: el.querySelector(".m-name").value, date: el.querySelector(".m-date").value, time: el.querySelector(".m-time").value });
-function setMember(el, m) { el.querySelector(".m-name").value = m.name || ""; el.querySelector(".m-date").value = m.date || ""; el.querySelector(".m-time").value = m.time || ""; }
+const memberValues = el => ({ name: el.querySelector(".m-name").value, date: el.querySelector(".m-date").value, ...memberHourValue(el) });
+function setMember(el, m) { el.querySelector(".m-name").value = m.name || ""; el.querySelector(".m-date").value = m.date || ""; setMemberHour(el, m); }
 function saveForm() {
   const members = {};
   for (const el of document.querySelectorAll("#form-me .member[data-role]")) {
@@ -157,6 +159,7 @@ function restoreForm() {
 // The parts of the form that follow other fields.
 function applyFormState() {
   syncTimeField("f");
+  syncMemberHours($("#form-me"));
   const only = $("#f-only").checked;
   $("#sibling-list").hidden = only; $("#add-sibling").hidden = only;
 }
@@ -183,7 +186,7 @@ function addSibling(focus = true) {
   row.className = "member";
   row.innerHTML = `<select class="m-rel" aria-label="關係">${SIBLINGS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>
     <input type="text" class="m-name" maxlength="8" placeholder="姓名" aria-label="姓名">
-    <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="出生日期"><input type="time" class="m-time" aria-label="出生時間（選填）"></span>
+    <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="出生日期">${memberHourHTML("這位兄弟姊妹")}</span>
     <button type="button" class="remove" aria-label="移除這位兄弟姊妹">移除</button>`;
   list.appendChild(row);
   if (focus) row.querySelector(".m-rel").focus();
@@ -194,8 +197,7 @@ const cleanName = v => String(v || "").replace(/\s+/g, "");
 function readMember(el) {
   const name = cleanName(el.querySelector(".m-name").value);
   const [y, m, d] = (el.querySelector(".m-date").value || "").split("-").map(Number);
-  const [h, mi] = (el.querySelector(".m-time").value || "").split(":").map(Number);
-  return { name, date: y ? { y, m, d } : null, time: y && Number.isFinite(h) ? { h, mi: mi || 0 } : null };
+  return { name, date: y ? { y, m, d } : null, time: y ? readMemberHour(el) : null };
 }
 
 // The optional family section, or null when nothing was filled in.

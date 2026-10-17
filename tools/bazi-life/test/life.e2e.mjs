@@ -125,7 +125,7 @@ await page.click("#family > summary");
 const fillMember = async (sel, name, date, time = "") => {
   await page.fill(`${sel} .m-name`, name);
   await page.fill(`${sel} .m-date`, date);
-  if (time) await page.fill(`${sel} .m-time`, time);
+  if (time) { await page.selectOption(`${sel} .m-hour`, "clock"); await page.fill(`${sel} .m-time`, time); }
 };
 await fillMember('.member[data-role="father"]', "陳大明", "1990-05-03", "08:00");
 await page.click("#form-me button[type=submit]");
@@ -258,6 +258,12 @@ check("the partner's sex follows yours until it is picked", await couple.inputVa
 await couple.click("#sex-m");
 await couple.fill(".member[data-role=partner] .m-name", "王小美");
 await couple.fill(".member[data-role=partner] .m-date", "1990-05-20");
+const partnerHour = ".member[data-role=partner] .m-hour", partnerTime = ".member[data-role=partner] .m-time";
+check("a family birth time starts as 時辰不詳, with 填確切時間 and the 13 時辰 in the list", await couple.inputValue(partnerHour) === "" && (await couple.$$(`${partnerHour} option`)).length === 15 && await couple.isHidden(partnerTime));
+await couple.selectOption(partnerHour, "clock");
+const clockShown = await couple.isVisible(partnerTime);
+await couple.selectOption(partnerHour, "wu");
+check("填確切時間 opens a time box; picking 午時 closes it again", clockShown && await couple.isHidden(partnerTime));
 await couple.fill("#f-met", "2014");
 await couple.fill("#f-wed", "2012");
 await couple.click("#form-me button[type=submit]");
@@ -277,6 +283,7 @@ const wedCount = Number((/次和王小美在一起，其中 (\d+) 次結婚/.exe
 check("the family card shows the partner's bond and the 100-run counts; with a wedding year nearly every run marries", /伴侶（王小美）/.test(coupleCard) && wedCount >= 90, `married ${wedCount}`);
 const coupleSections = await couple.$$eval("#report details.sec > summary", els => els.map(e => e.textContent));
 check("the report has a 伴侶合盤 section", coupleSections.includes("伴侶合盤"), coupleSections.join(" / "));
+check("the partner's 午時 is used: the 伴侶合盤 reads all eight characters", !/王小美的時辰不詳/.test(await couple.textContent("#report")));
 await couple.close();
 
 // 準爸媽模式: two names compared over the same 100 lives, a slot before 39 weeks refused, then a life with a name.
@@ -289,6 +296,10 @@ const givenInputs = await baby.$$(".b-given");
 await givenInputs[0].fill("怡君");
 await givenInputs[1].fill("沐希");
 await baby.fill("#b-date", "2027-03-15");
+await baby.click("#b-parents > summary");
+await baby.fill(".member[data-brole=father] .m-date", "1992-08-08");
+await baby.selectOption(".member[data-brole=father] .m-hour", "wu");
+check("the parents on 準爸媽 can pick a 時辰 too", (await baby.$$(".member[data-brole=mother] .m-hour option")).length === 15 && await baby.isHidden(".member[data-brole=father] .m-time"));
 await baby.click("label[for=b-nohour]");
 await baby.click("label:has(#b-tmode-shichen)");
 await baby.selectOption("#b-shichen", "hai");
@@ -323,12 +334,16 @@ await draft.fill(".member[data-role=partner] .m-name", "王小美");
 await draft.fill("#f-wed", "2016");
 await draft.click("#add-sibling");
 await draft.fill("#sibling-list .member:last-child .m-name", "陳小華");
+await draft.selectOption(".member[data-role=father] .m-hour", "wu");
+await draft.selectOption("#sibling-list .member:last-child .m-hour", "clock");
+await draft.fill("#sibling-list .member:last-child .m-time", "06:15");
 await draft.click("#tab-baby");
 await draft.fill("#b-surname", "林");
 await (await draft.$$(".b-given"))[1].fill("沐希");
 await draft.reload();
 check("after a reload the open tab and the 準爸媽 form come back", await draft.getAttribute("#tab-baby", "aria-selected") === "true" && await draft.inputValue("#b-surname") === "林" && await (await draft.$$(".b-given"))[1].inputValue() === "沐希");
 await draft.click("#tab-me");
+check("after a reload the family's 時辰 and exact times come back", await draft.inputValue(".member[data-role=father] .m-hour") === "wu" && await draft.inputValue("#sibling-list .member:last-child .m-hour") === "clock" && await draft.inputValue("#sibling-list .member:last-child .m-time") === "06:15" && await draft.isVisible("#sibling-list .member:last-child .m-time") && await draft.isHidden(".member[data-role=father] .m-time"));
 check("after a reload the birth form, the partner and the siblings come back", await draft.inputValue("#f-name") === "陳志明" && await draft.inputValue(".member[data-role=partner] .m-name") === "王小美" && await draft.inputValue("#f-wed") === "2016" && await draft.inputValue("#sibling-list .member:last-child .m-name") === "陳小華" && await draft.evaluate(() => document.querySelector("#family").open));
 const stores = await draft.evaluate(() => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) }));
 check("the half-filled forms are kept in this tab only, with nothing personal in long-term storage", stores.local.every(k => ["bazi-life.welcomed", "bazi-life.majorOnly"].includes(k)) && stores.session.includes("bazi-life.form"), JSON.stringify(stores));
@@ -344,6 +359,8 @@ await sc.goto(url);
 check("the birth time starts as a clock time, with 時辰 one tap away", await sc.isChecked("#f-tmode-clock") && await sc.isVisible("#f-time") && await sc.isHidden("#f-shichen"));
 await sc.click("label:has(#f-tmode-shichen)");
 check("the 時辰 list has 13 choices, 子時 before dawn and late at night", (await sc.$$("#f-shichen option")).length === 13 && await sc.isVisible("#f-shichen") && await sc.isHidden("#f-time"));
+await sc.addStyleTag({ content: 'input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: none; display: flex; align-items: center; }' });
+check("with the iPhone date-box style, the hidden time boxes stay hidden", await sc.isHidden("#f-time") && await sc.$eval(".member[data-role=father] .m-time", el => getComputedStyle(el).display) === "none");
 await sc.selectOption("#f-shichen", "chen");
 await sc.reload();
 check("a 時辰 picked instead of a clock time comes back after a reload", await sc.isChecked("#f-tmode-shichen") && await sc.inputValue("#f-shichen") === "chen" && await sc.isHidden("#f-time"));

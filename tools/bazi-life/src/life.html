@@ -44,6 +44,7 @@ p { margin: 0; }
 header { display: grid; gap: 10px; }
 button { font: inherit; color: inherit; cursor: pointer; }
 input, select { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
 
 /* setup */
@@ -133,16 +134,18 @@ details.family > summary small { font-weight: 400; color: var(--muted); }
 .family-body .fine { font-size: 13px; color: var(--muted); }
 /* One row per person on wide screens; on phones the date and time go below the name. Every row keeps a column for
    the remove button so the fields line up. */
-.member { display: grid; grid-template-columns: 5.5em minmax(0, 1fr) minmax(0, 2.2fr) 4.5em; grid-template-areas: "who name when remove"; gap: 8px; align-items: center; }
+.member { display: grid; grid-template-columns: 5.5em minmax(0, 1fr) minmax(0, 2.2fr) 4.5em; grid-template-areas: "who name when remove"; gap: 8px; align-items: start; }
 .member .who, .member .m-rel { grid-area: who; }
 .member .m-name { grid-area: name; }
 .member .when { grid-area: when; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 8px; }
-.member .who { font-size: 14px; font-weight: 500; }
-.member input[type="text"], .member input[type="date"], .member input[type="time"] { background: var(--sheet); }
+.member .who { font-size: 14px; font-weight: 500; min-height: 40px; display: flex; align-items: center; }
+.member input[type="text"], .member input[type="date"], .member input[type="time"], .member .m-hour { background: var(--sheet); }
+.member .m-time { grid-column: 2; }
 .member .m-sex { grid-area: remove; min-height: 40px; }
 .member .remove { grid-area: remove; border: 1px solid var(--rule); background: var(--sheet); border-radius: 6px; min-height: 40px; padding: 0 8px; color: var(--muted); }
 @media (max-width: 600px) {
   .member { grid-template-columns: 5.5em minmax(0, 1fr) 4.5em; grid-template-areas: "who name remove" "when when when"; padding-bottom: 12px; border-bottom: 1px solid var(--wash); }
+  .member .when { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 .member .remove:hover { color: var(--seal); border-color: var(--seal); }
 .sibling-list { display: grid; gap: 12px; }
@@ -452,21 +455,21 @@ footer a { color: var(--indigo); }
       <details class="family" id="family">
         <summary>家人（選填） <small>爸爸、媽媽、伴侶、兄弟姊妹</small></summary>
         <div class="family-body">
-          <p class="fine">填了生日的家人會和你合盤，讓童年、學業和彼此相處的事件機率傾斜（最多 ±15%）；只填名字的家人，會用名字出現在故事裡。出生時間不知道可以空著，出生地當作和你一樣。</p>
+          <p class="fine">填了生日的家人會和你合盤，讓童年、學業和彼此相處的事件機率傾斜（最多 ±15%）；只填名字的家人，會用名字出現在故事裡。出生時間可以直接選時辰（例如午時）或填確切時間，不知道就選「時辰不詳」；出生地當作和你一樣。</p>
           <div class="member" data-role="father">
             <span class="who">爸爸</span>
             <input type="text" class="m-name" maxlength="8" placeholder="姓名" aria-label="爸爸的姓名">
-            <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="爸爸的出生日期"><input type="time" class="m-time" aria-label="爸爸的出生時間（選填）"></span>
+            <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="爸爸的出生日期"><select class="m-hour" aria-label="爸爸的出生時辰"></select><input type="time" class="m-time" aria-label="爸爸的出生時間" hidden></span>
           </div>
           <div class="member" data-role="mother">
             <span class="who">媽媽</span>
             <input type="text" class="m-name" maxlength="8" placeholder="姓名" aria-label="媽媽的姓名">
-            <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="媽媽的出生日期"><input type="time" class="m-time" aria-label="媽媽的出生時間（選填）"></span>
+            <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="媽媽的出生日期"><select class="m-hour" aria-label="媽媽的出生時辰"></select><input type="time" class="m-time" aria-label="媽媽的出生時間" hidden></span>
           </div>
           <div class="member partner" data-role="partner">
             <span class="who">伴侶</span>
             <input type="text" class="m-name" maxlength="8" placeholder="姓名" aria-label="伴侶的姓名">
-            <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="伴侶的出生日期"><input type="time" class="m-time" aria-label="伴侶的出生時間（選填）"></span>
+            <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="伴侶的出生日期"><select class="m-hour" aria-label="伴侶的出生時辰"></select><input type="time" class="m-time" aria-label="伴侶的出生時間" hidden></span>
             <select class="m-sex" aria-label="伴侶的性別"><option value="female">女</option><option value="male">男</option></select>
           </div>
           <div class="partner-years">
@@ -528,16 +531,16 @@ footer a { color: var(--indigo); }
       <details class="family" id="b-parents">
         <summary>爸爸、媽媽（選填） <small>親子合盤</small></summary>
         <div class="family-body">
-          <p class="fine">填了生日的爸媽會和寶寶合盤，讓寶寶童年的家庭事件、學業和彼此相處的事件機率傾斜（最多 ±15%）。出生時間不知道可以空著，出生地當作和寶寶一樣。</p>
+          <p class="fine">填了生日的爸媽會和寶寶合盤，讓寶寶童年的家庭事件、學業和彼此相處的事件機率傾斜（最多 ±15%）。出生時間可以直接選時辰（例如午時）或填確切時間，不知道就選「時辰不詳」；出生地當作和寶寶一樣。</p>
           <div class="member" data-brole="father">
             <span class="who">爸爸</span>
             <input type="text" class="m-name" maxlength="8" placeholder="姓名" aria-label="爸爸的姓名">
-            <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="爸爸的出生日期"><input type="time" class="m-time" aria-label="爸爸的出生時間（選填）"></span>
+            <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="爸爸的出生日期"><select class="m-hour" aria-label="爸爸的出生時辰"></select><input type="time" class="m-time" aria-label="爸爸的出生時間" hidden></span>
           </div>
           <div class="member" data-brole="mother">
             <span class="who">媽媽</span>
             <input type="text" class="m-name" maxlength="8" placeholder="姓名" aria-label="媽媽的姓名">
-            <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="媽媽的出生日期"><input type="time" class="m-time" aria-label="媽媽的出生時間（選填）"></span>
+            <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="媽媽的出生日期"><select class="m-hour" aria-label="媽媽的出生時辰"></select><input type="time" class="m-time" aria-label="媽媽的出生時間" hidden></span>
           </div>
           <p class="privacy">資料只在這個網頁裡計算，不會上傳，也不會保存。</p>
         </div>

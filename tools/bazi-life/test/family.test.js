@@ -6,6 +6,7 @@ import { analyse } from "../src/core/analysis.js";
 import { relate, buildFamily, checkFamily, familyTilts } from "../src/core/family.js";
 import { prepare } from "../src/sim/setup.js";
 import { runLife } from "../src/sim/life.js";
+import { shichenTime } from "../src/core/shichen.js";
 
 const me = (pillars) => ({ pillars, analysis: analyse(pillars) });
 const ME = me(["戊辰", "甲寅", "辛丑", "戊子"]);   // 1988-02-15 23:30 Taipei: 龍, 辛 day master, 丑 day branch
@@ -77,4 +78,12 @@ test("a life with family input: names at birth, parents' real ages, and the youn
     const life = runLife({ chart, analysis: only.analysis, luck: only.luck, seed: 900 + i, family: only.family });
     assert.ok(!life.log.some(e => /sibling|Sibling|inheritance/.test(e.id)), "an only child has no sibling events");
   }
+});
+
+test("a family member's 時辰 is their hour pillar as it is, and an exact time is still corrected to solar time", () => {
+  const urumqi = findPlace("烏魯木齊（北京時間）"), date = { y: 2000, m: 6, d: 21 };
+  const fam = t => buildFamily({ partner: { name: "王小美", date, time: t } }, { ...ME, sex: "male" }, urumqi).members[0].chart;
+  assert.equal(fam(shichenTime("wu")).pillars[3][1], "午");
+  assert.equal(fam({ h: 12, mi: 0 }).pillars[3][1], "巳", "12:00 on Beijing time is 巳時 in Ürümqi solar time");
+  assert.equal(fam(null).pillars.length, 3, "時辰不詳 leaves three pillars");
 });

@@ -56,6 +56,7 @@ input[type="date"], input[type="time"], input[type="number"], select {
 /* iPhone Safari draws date and time boxes natively and then ignores box-sizing, so they stuck out of the card.
    The query below matches iOS only, so other browsers keep their own date boxes. */
 input[type="date"], input[type="time"] { min-width: 0; max-width: 100%; }
+[hidden] { display: none !important; }
 @supports (-webkit-touch-callout: none) {
   input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: none; display: flex; align-items: center; }
 }
