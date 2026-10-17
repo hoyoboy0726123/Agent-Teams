@@ -82,6 +82,185 @@ const KIND = { stock: "股票", fund: "基金", etf: "ETF", crypto: "加密貨�
 // A Latin word inside Chinese text gets spaces around it (買的 ETF 放了), but not next to punctuation or the line start.
 const pad = (w, left = true, right = true) => (/^[A-Za-z]/.test(w) ? `${left ? " " : ""}${w}${right ? " " : ""}` : w);
 
+// ---------- scenes ----------
+// One situation for a choice, so the same question reads differently from life to life. `list` holds the scenes
+// that fit now (null for one that does not), each with a weight `w` (higher for one made for this moment of life,
+// default 1); a scene this life has not had for the question comes first (s.flags["<id>:scenes"] keeps the told
+// ones). The question, the buttons and every answer are written from the scene that comes back.
+function pickScene(s, ctx, id, list) {
+  const ok = list.filter(Boolean), key = `${id}:scenes`, told = s.flags[key] || (s.flags[key] = []);
+  const fresh = ok.filter(x => !told.includes(x.key));
+  const sc = ctx.rng.weighted((fresh.length ? fresh : ok).map(x => [x, x.w ?? 1]));
+  told.push(sc.key);
+  return sc;
+}
+
+// h_tooth: where and how the toothache comes. `lead` restates it at the start of every answer; each answer is
+// [label, hint, what happens], and the 看牙醫 line goes on from 你… after the visit.
+function toothScenes(s) {
+  const nhi = s.year >= 1995, card = nhi ? "，掛號時遞上健保卡" : "";
+  const hint = nhi ? "健保有給付" : "要花一筆錢";
+  const fixed = "{醫生說蛀到神經了，要做根管治療，|醫生說補一補就好，|醫生順便幫你洗了牙，}{前後跑了三趟診所，|打了麻藥，}{總算不痛了。|半邊臉麻了一下午。}";
+  const late = "{醫生說再晚一點就要拔掉了。|只好多跑了好幾趟診所。}";
+  const pill = ["先吃止痛藥", "撐過這幾天", "你先吞了兩顆止痛藥，{痛是壓下來了，|撐過了這個星期的事，}{但過一陣子又開始痛。|最後還是乖乖去看了牙醫。}"];
+  const home = ["用老方法撐著", "含冰塊、鹽水漱口", "你照{阿嬤|媽媽}教的老方法，{含著冰塊、用鹽水漱口，|在臉頰上敷了冰毛巾，}{撐了好幾天，最後還是得去看牙醫。|勉強睡了一晚，痛總算慢慢退了。}"];
+  const wait = ["忍到不行再說", "怕看牙醫", `你一直忍著，{忍了兩個星期，|拖了一個月，}最後痛到睡不著才去看牙醫，${late}`];
+  const dentist = ["馬上看牙醫", hint, `你馬上去看牙醫${card}，${fixed}`];
+  return [
+    s.age >= 17 && s.age <= 30 && {
+      key: "wisdom", w: 2, lead: "長智齒，牙齦腫了起來，",
+      prompt: "{最裡面的牙齦|右下角的牙齦}腫了起來，原來是{一顆智齒|一顆歪著長的智齒}在作怪，{連張嘴都會痛。|吃飯只能用另一邊咬。}要怎麼辦？",
+      dentist: ["馬上去拔智齒", hint, `你馬上去看牙醫${card}，醫生說這顆智齒乾脆拔掉，{打了麻藥，喀一聲就拔起來了。|你咬著棉花回家，腫了兩天才消。}`],
+      wait: ["忍到消腫再說", "怕拔牙", `你一直忍著，{忍了兩個星期，|拖了一個月，}最後腫到張不開嘴才去看牙醫，{醫生說已經發炎了，要先消腫才能拔。|只好多跑了好幾趟診所。}`],
+      pill, home: ["用老方法消腫", "含冰塊、鹽水漱口", home[2]],
+    },
+    { key: "ache", lead: "牙痛了好幾天，", prompt: "{吃冰的時候|半夜|咬到一顆小石頭之後}，{右邊|左下}的牙齒{一陣一陣地抽痛|痛到半邊臉都腫起來}。要怎麼辦？", dentist, wait, pill, home },
+    { key: "soup", lead: "一顆牙一碰到熱的就痛，", prompt: "喝熱湯時，一顆牙突然{痛得你叫出聲|像被針刺了一下}，{之後越來越常痛。|晚上痛到睡不著。}要怎麼辦？", dentist, wait: ["先不吃熱的，忍著", "怕看牙醫", wait[2]], pill, home },
+    { key: "cavity", lead: "一顆牙蛀了一個洞，", prompt: "{嘴巴裡|門牙後面}有一顆牙{黑了一塊|缺了一角}，{一碰到甜的就痛。|吃東西都要小心。}要怎麼辦？", dentist: ["去把蛀牙補起來", hint, dentist[2]], wait: ["能拖就拖", "怕聽到鑽牙的聲音", wait[2]], pill, home },
+    s.studying && s.age <= 18 && {
+      key: "exam", w: 2, lead: "考試前牙痛，", prompt: "{段考|期末考}前一個星期，一顆蛀牙開始抽痛，{寫考卷時一直分心|晚上痛到讀不下書}。要怎麼辦？",
+      dentist: ["請假去看牙醫", hint, `你跟學校請了半天假去看牙醫${card}，{醫生說蛀到神經了，要做根管治療，|醫生說補一補就好，}{回到教室，同學問你臉怎麼腫了一邊。|總算可以專心準備考試了。}`],
+      wait: ["考完再說", "怕耽誤讀書", `你咬著牙說考完再說，{寫考卷時一直用舌頭頂著那顆牙，|考完最後一科才去看牙醫，}${late}`],
+      pill: ["先吃止痛藥", "撐過考試再說", "你先吞了兩顆止痛藥，{撐過了那個星期的考試，|痛是壓下來了，}{但考完又開始痛。|最後還是乖乖去看了牙醫。}"],
+      home: ["用老方法撐著", "含冰塊、鹽水漱口", "你照{阿嬤|媽媽}教的老方法，{含著冰塊讀書，|用鹽水漱口，}{撐過了考試，最後還是得去看牙醫。|勉強睡了一晚，痛總算慢慢退了。}"],
+    },
+    s.age >= 20 && !s.abroad && {
+      key: "away", lead: "出門在外牙痛，", prompt: `${s.employed ? "出差到外縣市" : "去外縣市玩"}的第二天，一顆牙開始抽痛，{臉頰腫了一圈|連喝水都痛}。要怎麼辦？`,
+      dentist: ["在當地找牙醫", nhi ? "健保卡帶在身上" : "要花一筆錢", `你在附近找了一間牙醫診所${nhi ? "，還好健保卡就在皮夾裡" : ""}，{醫生先幫你把發炎的神經處理掉，要你回家再接著治療，|醫生說補一補就好，}{總算不痛了。|半邊臉麻了一下午。}`],
+      wait: ["撐到回家再說", "人生地不熟", "你決定撐到回家再說，{一路上都用另一邊咬東西，|晚上痛到睡不著，}一回家就去看牙醫，{醫生說再晚一點就要拔掉了。|結果多跑了好幾趟診所。}"],
+      pill: ["先去藥局買止痛藥", "撐過這幾天", "你先去藥局買了止痛藥，{痛是壓下來了，|撐完了這一趟，}{但回家後又開始痛。|最後還是乖乖去看了牙醫。}"],
+      home: ["跟旅館要冰塊含著", "老方法撐一下", "你跟旅館櫃檯要了一袋冰塊，{含著冰塊、用鹽水漱口，|在臉頰上敷了冰毛巾，}{撐了好幾天，回家還是得去看牙醫。|勉強睡了一晚，痛總算慢慢退了。}"],
+    },
+    !s.abroad && {
+      key: "newyear", lead: "過年咬裂了一顆牙，", prompt: "除夕夜吃年夜飯時，你咬到{一塊排骨的骨頭|一顆硬糖}，一顆牙{裂了|斷了一角}，{附近的診所都休到初五|附近的牙醫都放年假}。要怎麼辦？",
+      dentist: ["找過年有開的牙醫", hint, `你${s.year >= 2000 ? "上網" : "打了好幾通電話"}找到一間過年也有開的牙醫診所${card}，{醫生說裂到神經了，要做根管治療，|醫生先幫你把裂掉的地方補起來，}{總算能好好吃年菜了。|半邊臉麻了一下午。}`],
+      wait: ["撐到初五開診", "過年不想跑醫院", "你決定撐到初五，{整個年假都只用另一邊咬，|年菜一口都不敢多吃，}診所一開門就去看牙醫，{醫生說再晚一點就要拔掉了。|結果多跑了好幾趟診所。}"],
+      pill: ["先吃止痛藥", "撐過年假再說", "你先吞了兩顆止痛藥，{撐過了拜年，|痛是壓下來了，}{但過完年又開始痛。|最後還是乖乖去看了牙醫。}"],
+      home: ["用老方法撐著", "含冰塊、鹽水漱口", "你照{阿嬤|媽媽}教的老方法，{含著冰塊、用鹽水漱口，|在臉頰上敷了冰毛巾，}{撐過了年假，開工後還是得去看牙醫。|勉強睡了一晚，痛總算慢慢退了。}"],
+    },
+    s.age >= 35 && {
+      key: "gum", lead: "牙齦一直流血，", prompt: "刷牙時牙齦一直流血，{有一顆牙還開始搖|嘴巴常常有怪味}，咬硬一點的東西就痠痛。要怎麼辦？",
+      dentist: [s.year >= 2010 ? "去做牙周病治療" : "馬上看牙醫", hint, `你去看了牙醫${card}，{醫生說是牙周病，幫你把牙結石刮乾淨，|醫生教你用牙線和牙間刷，${s.year >= 2010 ? "還排了一整個療程的牙周治療，" : "還幫你洗了牙，"}}{前後跑了三趟診所，|刮完牙結石，牙縫空了一大圈，}{牙齦總算不再流血了。|你從此每天晚上都用牙線。}`],
+      wait: ["等它自己好", "應該是火氣大", `你以為是火氣大，{喝了好幾天的青草茶，|一直拖著沒去看，}最後牙齒搖到不能咬才去看牙醫，{醫生說再晚一點就保不住了。|只好多跑了好幾趟診所。}`],
+      pill: ["先吃消炎止痛藥", "撐過這幾天", "你先吃了消炎止痛藥，{血是少了一點，|痛是壓下來了，}{但過一陣子又開始流血。|最後還是乖乖去看了牙醫。}"],
+      home: ["換軟毛牙刷、鹽水漱口", "老方法顧牙齦", "你換了一支軟毛牙刷，{每天用鹽水漱口，|照{阿嬤|媽媽}說的多吃青菜、少吃炸的，}{撐了好幾個星期，最後還是得去看牙醫。|血好像少了一點，但那顆牙還是有點搖。}"],
+    },
+    s.age >= 55 && {
+      key: "denture", w: 2, lead: "牙齦被假牙磨得發痛，", prompt: "{以前做的假牙|戴了好多年的活動假牙}越來越鬆，底下的牙齦{磨破了一塊|腫了起來}，咬東西就痛。要怎麼辦？",
+      dentist: ["回去找牙醫調整", "早點弄好比較省事", `你回去找做假牙的牙醫${card}，{醫生把假牙磨了幾下，又調了調鬆緊，|醫生說牙齦萎縮了，先幫你把假牙墊高一點，}{總算能好好咬東西了。|回家第一餐，你吃了一大碗滷肉飯。}`],
+      wait: ["先拿下來不戴", "等不痛再說", "你乾脆把假牙拿下來，{好幾天只能喝粥，|吃飯都用牙齦慢慢磨，}最後痛到睡不著才去看牙醫，{醫生說牙齦發炎了，要先治療才能重新調整。|只好多跑了好幾趟診所。}"],
+      pill: ["先吃止痛藥", "撐過這幾天", "你先吞了兩顆止痛藥，{痛是壓下來了，|撐過了這個星期，}{但假牙一戴上又開始痛。|最後還是乖乖去看了牙醫。}"],
+      home: ["用鹽水漱口撐著", "讓牙齦休息幾天", "你每天用溫鹽水漱口，{晚上把假牙泡在杯子裡讓牙齦休息，|吃飯改吃軟一點的東西，}{撐了好幾天，最後還是得去看牙醫。|牙齦總算慢慢消腫了。}"],
+    },
+  ];
+}
+
+// h_knee: where the knee gives out. `lead` restates it at the start of every answer; each answer is
+// [label, hint, what happens]. The 葡萄糖胺 line before 2000 is a 藥膏 one.
+function kneeScenes(s) {
+  const pills = s.year >= 2000
+    ? ["買葡萄糖胺來吃", "聽說有保養效果", "你每天配早餐吃一顆葡萄糖胺，{好像有好一點，又好像沒有。|家人說那沒什麼用，你還是照吃。|吃了一年，錢花了不少。}"]
+    : ["買藥膏來擦", "聽說有保養效果", "你每天晚上擦{電台推薦的|朋友介紹的}藥膏，{房間裡都是藥膏的味道。|好像有好一點，又好像沒有。}"];
+  const rehab = ["去復健、練大腿肌肉", "醫生說肌肉是最好的護膝", "你照醫生說的去復健，{每天坐在椅子上抬腿，|跟著復健師練大腿的肌肉，}{半年後，上下樓梯輕鬆多了。|又能走到公園去了。}"];
+  const swim = ["改去游泳、騎腳踏車", "對膝蓋比較好", "你改去{游泳|水中走路|騎腳踏車}，{膝蓋的負擔小了，|在泳池認識了一群老朋友，}{整個人也有精神多了。|每天早上都期待出門。}"];
+  const swimBad = "你試著去游泳，{但冬天水太冷，去了幾次就停了。|游了幾次，總覺得不習慣。}";
+  const inject = ["自費打玻尿酸", "要花一筆錢", "你自費打了{三劑|一個療程的}玻尿酸，{走路順多了，|醫生說效果大概能撐一年，}{心想這筆錢花得值得。|但想到價錢，心裡還是有點痛。}"];
+  const weaker = "{腿越來越沒力，膝蓋反而更痛了。|體重慢慢往上跑，家人很擔心。}";
+  const sit = ["少出門，能坐就坐", "反正年紀大了", `你乾脆少出門，{整天坐在家裡看電視，|連去市場都請人幫忙買，}${weaker}`];
+  const base = { pills, rehab, swim, swimBad, inject, sit };
+  return [
+    { ...base, key: "stairs", lead: "膝蓋痛了一陣子，", prompt: "{爬樓梯|蹲下去撿東西|爬山下坡}的時候，膝蓋{卡卡的|一陣一陣地痛}，醫生說是{退化性關節炎|關節磨損}。要怎麼辦？" },
+    { ...base, sit: ["早上就別出門了", "反正年紀大了", sit[2]], key: "morning", lead: "膝蓋一到早上就不聽使喚，", prompt: "早上起床，膝蓋{僵硬得要慢慢揉開|腫了一圈}，{走到巷口的市場都要休息兩次。|連最愛的散步都走不遠了。}要怎麼辦？" },
+    { ...base, sit: ["一變天就待在家", "反正年紀大了", sit[2]], key: "weather", lead: "膝蓋一變天就不舒服，", prompt: "天氣一變，膝蓋就{痠痛|發出喀喀的聲音}，{你成了家裡的氣象台。|上下樓梯都要扶著欄杆。}要怎麼辦？" },
+    s.age <= 80 && {
+      ...base, key: "hike", lead: "爬山爬到膝蓋痛，", prompt: "跟{登山隊|健走團}去爬山，下坡時膝蓋{一軟|痛得要人扶}，醫生說是退化性關節炎。要怎麼辦？",
+      rehab: ["去復健，練好再爬", "醫生說肌肉是最好的護膝", "你照醫生說的去復健，{每天坐在椅子上抬腿，|跟著復健師練大腿的肌肉，}{半年後，又跟著登山隊出門了，只是下坡改用登山杖。|上下樓梯輕鬆多了。}"],
+      swim: ["改去游泳，不爬山了", "對膝蓋比較好", "你把登山鞋收起來，改去{游泳|水中走路}，{膝蓋的負擔小了，|在泳池認識了一群老朋友，}{整個人也有精神多了。|每天早上都期待出門。}"],
+      sit: ["以後不爬了，在家休息", "反正年紀大了", `你從此不爬山了，{整天坐在家裡看電視，|${s.year >= 2012 ? "連登山隊的 LINE 群組都退了，" : "登山隊的聚會也不去了，"}}${weaker}`],
+    },
+    !s.abroad && {
+      ...base, key: "walkup", lead: "爬公寓樓梯爬到膝蓋痛，", prompt: "你住的{四|五}樓公寓沒有電梯，每天提著菜爬上樓，膝蓋{越來越痛|一到三樓就開始抗議}。要怎麼辦？",
+      sit: ["少出門，能不爬就不爬", "反正年紀大了", `你乾脆少出門，{菜請鄰居順便帶，|整天待在樓上看電視，}{腿越來越沒力，膝蓋反而更痛了。|爬一次樓梯要休息三次，家人很擔心。}`],
+    },
+    s.flags.grandkids > 0 && {
+      ...base, key: "grandkid", w: 2, lead: "顧孫子顧到膝蓋痛，", prompt: "{抱著孫子上下樓梯|蹲下去幫孫子穿鞋}的時候，膝蓋{一陣一陣地痛|喀的響了一聲}，醫生說是退化性關節炎。要怎麼辦？",
+      rehab: ["去復健、練大腿肌肉", "還想再抱孫子", "你照醫生說的去復健，{每天坐在椅子上抬腿，|跟著復健師練大腿的肌肉，}{半年後，又能抱著孫子去公園了。|上下樓梯輕鬆多了。}"],
+      sit: ["孫子不抱了，能坐就坐", "反正年紀大了", `你只好跟孫子說{grand}抱不動了，{整天坐在沙發上，|連去市場都請人幫忙買，}${weaker}`],
+    },
+    !s.abroad && {
+      ...base, key: "pilgrim", lead: "走了一天，膝蓋腫了起來，", prompt: "跟著廟裡的進香團走了一整天，回家膝蓋腫得像{饅頭|麵龜}，醫生說是退化性關節炎。要怎麼辦？",
+      sit: ["明年不跟了，在家休息", "反正年紀大了", `你跟廟裡說明年不跟了，{整天坐在家裡看電視，|連去市場都請人幫忙買，}${weaker}`],
+    },
+    {
+      ...base, key: "dance", lead: "跳舞時膝蓋痛了起來，", prompt: "在公園跳{土風舞|元極舞|國標舞}時一個轉身，膝蓋{痛了一下就腫起來|卡住了，好一陣子才伸直}，醫生說是關節退化。要怎麼辦？",
+      rehab: ["去復健、練大腿肌肉", "練好了再回去跳", "你照醫生說的去復健，{每天坐在椅子上抬腿，|跟著復健師練大腿的肌肉，}{半年後，又回到公園跳舞了，只是轉身慢了一點。|上下樓梯輕鬆多了。}"],
+      sit: ["舞不跳了，能坐就坐", "反正年紀大了", `你乾脆不去公園了，{整天坐在家裡看電視，|舞伴打電話來，你也推說不舒服，}${weaker}`],
+    },
+  ];
+}
+
+// h_gym: why the gym comes up. `open` restates it at the start of every answer; a scene can tell its own endings.
+// {friend} is the same friend from the question to the answer.
+function gymScenes(s, ctx) {
+  const role = s.sex === "male" ? "伴郎" : "伴娘", dress = s.sex === "male" ? "西裝" : "禮服";
+  const near = s.employed && ctx.rng() < 0.5 ? "公司對面" : "家樓下";
+  const after = s.employed ? "下班" : "傍晚";
+  const no = "教練推銷課程，你笑著說再考慮看看，{走出門就把傳單收進回收桶。|回家煮了一碗泡麵犒賞自己。}";
+  const labels = { coach: ["簽下私人教練課", "有人盯比較有效"], monthly: ["只辦月費自己練", "便宜很多"], home: ["在家跟著影片練", "一毛錢都不用花"], buddy: ["和朋友互相督促", "揪團一起練"], no: ["婉拒，健身不適合我", "錢留著"] };
+  return [
+    { key: "friend", open: "和{friend}去健身房體驗完，", labels, no, prompt: "{friend}找你去{新開的健身房|二十四小時的健身房}體驗，結束後教練拿出平板，說{一次買三十堂比較划算|今天簽約就送兩個月}，一套課程要好幾萬塊。要怎麼辦？" },
+    { key: "bodyfat", open: "量完體脂以後，", no, prompt: "健身房的體驗課上完，教練幫你量了體脂，{說你的肌肉量偏低，|說你的體態很有潛力，}拿出一張私人教練課的價目表。要怎麼辦？",
+      labels: { ...labels, coach: ["照教練說的買課", "有人盯比較有效"], home: ["回家自己練", "一毛錢都不用花"] } },
+    { key: "trend", open: "看大家都在健身，", labels, no, prompt: "身邊的人都在健身，{社群上滿滿是別人的腹肌照，|同事午休都在聊重訓，}你也去健身房體驗了一次，教練開始推銷課程。要怎麼辦？" },
+    s.employed && s.job && !["自營", "家業"].includes(s.job.field) && {
+      key: "checkup", open: "為了健檢報告上的紅字，", prompt: "公司的健檢報告出來，{體脂肪|腰圍|三酸甘油酯}多了一個紅字，公司附近的健身房剛好在發體驗券。要怎麼辦？",
+      labels: { ...labels, monthly: ["拿體驗券去辦月費", "便宜很多"], buddy: ["找同事一起練", "揪團一起練"], no: ["報告收起來就好", "錢留著"] },
+      buddyOk: "你找了幾個同事約好一起練，{每天在群組裡打卡，|午休一起去快走，}{誰偷懶就請喝飲料。|隔年的健檢，大家的紅字都少了一個。}",
+      buddyBad: "你找了幾個同事約好一起練，{結果大家互相陪著偷懶。|練了一個月，群組就安靜了。}",
+      no: "你看了看體驗券，{還是把它夾回健檢報告裡。|決定每天多走一站路就好。}",
+    },
+    s.rel !== "married" && s.age <= 40 && {
+      key: "wedding", open: "為了{friend}的婚禮，", prompt: `{friend}的婚禮找你當${role}，還有三個月，你想在那之前瘦一圈。要怎麼辦？`,
+      labels: { coach: ["找教練密集訓練", "三個月要看到效果"], monthly: ["辦月費自己練", "便宜很多"], home: ["在家跟著影片練", "一毛錢都不用花"], buddy: [`拉其他${role}一起練`, "揪團一起練"], no: ["算了，穿寬一點的", "錢留著包紅包"] },
+      coachOk: `你找了教練密集訓練，{每週三次被操到腿軟，|教練連你吃什麼都要管，}{婚禮那天，${dress}穿起來剛剛好。|拍照時大家都說你瘦了一圈。}`,
+      coachBad: `你找了教練，{上了十堂就開始找理由請假，|教練換了人，你也就不去了，}{婚禮那天，只好把${dress}的釦子偷偷鬆開一顆。|剩下的課到期都沒上完。}`,
+      monthlyOk: `你辦了健身房的月費自己練，{每天${after}去跑步機上跑半小時，|跟著網路影片學動作，}{婚禮那天，${dress}穿起來剛剛好。|三個月瘦了好幾公斤。}`,
+      homeOk: `你在客廳鋪了一張瑜伽墊，{每天跟著影片練二十分鐘，|跳完一套就滿身大汗，}{婚禮那天，${dress}穿起來剛剛好。|三個月都沒有中斷。}`,
+      buddyOk: `你拉了其他${role}一起練，{每天在群組裡打卡，|每週一起去練三次，}{婚禮那天，大家都說你們是最上相的${role}團。|誰偷懶就請喝飲料。}`,
+      buddyBad: `你拉了其他${role}一起練，{結果大家互相陪著偷懶。|練了一個月，群組就安靜了。}`,
+      no: "你想了想，{決定穿寬一點的衣服就好。|說三個月也瘦不了多少，錢留著包紅包。}",
+    },
+    {
+      key: "run", open: "為了那場路跑，", prompt: "{friend}幫你報名了{十公里|半程馬拉松}的路跑，你現在連三公里都跑不完。要怎麼辦？",
+      labels: { coach: ["請教練排課表", "有人盯比較有效"], monthly: ["辦月費練跑步機", "便宜很多"], home: ["照網路課表自己練", "一毛錢都不用花"], buddy: ["跟朋友約好一起練跑", "揪團一起練"], no: ["跟朋友說你不跑了", "健身不適合我"] },
+      coachOk: "你請教練排了一份課表，{每週練三次，|從三公里慢慢加到十公里，}{路跑那天，你跑完了全程。|衝過終點時，你差點哭出來。}",
+      coachBad: "你請了教練，{上了幾堂就開始找理由請假，|教練換了人，你也就不去了，}{路跑那天只跑了一半就走回終點。|剩下的課到期都沒上完。}",
+      monthlyOk: `你辦了健身房的月費，{每天${after}在跑步機上跑半小時，|週末再到河堤跑長距離，}{路跑那天，你跑完了全程。|成績比你想的還好。}`,
+      monthlyBad: "你辦了健身房的月費，{去了幾次就懶得去了，|月費照扣，人都沒去，}{路跑那天只跑了一半就走回終點。|最後還是棄賽了。}",
+      homeOk: "你照網路上的課表，{每天傍晚去河堤跑，|從走跑交替開始練，}{路跑那天，你跑完了全程。|跑完以後，你又報了下一場。}",
+      homeBad: "你說要照網路上的課表自己練，{跑了三天就碰上下雨，|跑了一個星期就膝蓋痠，}{路跑那天只跑了一半就走回終點。|最後還是棄賽了。}",
+      buddyOk: "你和{friend}約好每天一起練跑，{誰偷懶就請喝飲料，|在群組裡互相打卡，}{路跑那天，兩個人一起衝過終點。|一年後兩個人都瘦了一圈。}",
+      buddyBad: "你和{friend}約好一起練跑，{結果兩個人互相陪著偷懶，|練了一個月，群組就安靜了，}{路跑那天兩個人一起用走的走完。|最後兩個人都棄賽了。}",
+      no: "你跟{friend}說自己還是不跑了，{報名費就當作捐出去。|路跑那天，你在終點幫大家拍照。}",
+    },
+    {
+      key: "newyear", open: "為了新年新希望，", prompt: "新年新希望寫了「今年要{瘦五公斤|練出腹肌}」，健身房一月的入會費打八折。要怎麼辦？",
+      labels: { ...labels, monthly: ["趁打折辦月費", "便宜很多"], buddy: ["找朋友互相督促", "揪團一起練"], no: ["新年新希望留到明年", "錢留著"] },
+      no: "你在入會單前猶豫了很久，{還是把筆放下了。|決定把錢留著，新年新希望改成多走路。}",
+    },
+    {
+      key: "nearby", open: `${near}的健身房開幕，`, prompt: `${near}開了一間二十四小時的健身房，開幕優惠只到這個週末。要怎麼辦？`,
+      labels: { ...labels, monthly: ["趁開幕辦月費", "便宜很多"], no: ["優惠就讓它過去", "錢留著"] },
+      no: "你在門口看了看價目表，{還是走了過去。|心想等下一次優惠再說。}",
+    },
+    s.year >= 2015 && {
+      key: "app", open: "被手機提醒了好幾天，", prompt: "手機的運動 App 一直提醒你今天走不到三千步，附近的健身房正好在推年度方案。要怎麼辦？",
+      labels: { ...labels, no: ["把提醒關掉", "錢留著"] },
+      no: "你把運動 App 的提醒關掉了，{年度方案的傳單也收進了回收桶。|說明天開始多走一點路就好。}",
+    },
+  ];
+}
+
 export const HEALTH = [
   // ---------- habits ----------
   {
@@ -502,51 +681,50 @@ export const HEALTH = [
     },
   },
   {
-    // 健身熱潮：教練課推銷
+    // 健身熱潮：教練課推銷。這一次為什麼走進健身房，見 gymScenes。
     id: "h_gym", domain: "wealth", channel: "change", ages: [20, 55], once: true, when: s => s.year >= 2012 && (s.employed || s.savings >= 0.3), p: () => 0.03,
     choice: (s, ctx) => {
       const lasts = p => { if (ctx.rng() >= p) return false; hr(s, 0.97); s.health.fitness = Math.min(1, s.health.fitness + 0.15); return true; };
+      const sc = pickScene(s, ctx, "h_gym", gymScenes(s, ctx)), open = ctx.w(sc.open), L = sc.labels;
+      // The scene's own ending when it has one, else the usual one; both begin with the scene (`open`).
+      const say = (key, usual) => ctx.w(`${open}${sc[key] || usual}`);
       return {
-        prompt: ctx.w([
-          "{friend}找你去{新開的健身房|二十四小時的健身房}體驗，結束後教練拿出平板：「{一次買三十堂比較划算喔！|今天簽約送你兩個月！}」一套課程要好幾萬塊。要怎麼辦？",
-          "健身房的體驗課上完，教練幫你量了體脂，{說你的肌肉量偏低，|說你的體態很有潛力，}拿出一張私人教練課的價目表。要怎麼辦？",
-          "身邊的人都在健身，{社群上滿滿是別人的腹肌照，|同事午休都在聊重訓，}你也去健身房體驗了一次，教練開始推銷課程。要怎麼辦？",
-        ]),
+        prompt: ctx.w(sc.prompt),
         options: [
           {
-            id: "h_gym.coach", label: "簽下私人教練課", hint: "有人盯比較有效", act: "invest", style: "risk", weight: 0.25,
+            id: "h_gym.coach", label: L.coach[0], hint: L.coach[1], act: "invest", style: "risk", weight: 0.25,
             apply: () => {
               pay(s, ctx.rng.between(0.06, 0.1));
-              if (ctx.rng() < 0.07) return { text: ctx.w("簽了私人教練課，上了沒幾堂，{健身房就無預警關門，|門口貼了一張停業公告，}剩下的課程費用{一直拿不回來。|只能跟其他會員一起去消保官那裡申訴。}"), mood: -5 };
+              if (ctx.rng() < 0.07) return { text: ctx.w(`${open}你簽了私人教練課，上了沒幾堂，{健身房就無預警關門，|門口貼了一張停業公告，}剩下的課程費用{一直拿不回來。|只能跟其他會員一起去消保官那裡申訴。}`), mood: -5 };
               return lasts(0.55)
-                ? { text: ctx.w("簽了私人教練課，{每週兩次被教練操到腿軟，|教練連你吃什麼都要管，}{一年後深蹲的重量比體重還重。|體脂降了好幾趴，衣服都要重買。}"), mood: 3 }
-                : { text: ctx.w("簽了私人教練課，{上了十堂就開始找理由請假，|教練換了人，你也就不去了，}{剩下的課到期都沒上完。|課程卡收在抽屜最裡面。}"), mood: -2 };
+                ? { text: say("coachOk", "你簽了私人教練課，{每週兩次被教練操到腿軟，|教練連你吃什麼都要管，}{一年後深蹲的重量比體重還重。|體脂降了好幾趴，衣服都要重買。}"), mood: 3 }
+                : { text: say("coachBad", "你簽了私人教練課，{上了十堂就開始找理由請假，|教練換了人，你也就不去了，}{剩下的課到期都沒上完。|課程卡收在抽屜最裡面。}"), mood: -2 };
             },
           },
           {
-            id: "h_gym.monthly", label: "只辦月費自己練", hint: "便宜很多", act: "exercise", style: "safe", weight: 0.3,
+            id: "h_gym.monthly", label: L.monthly[0], hint: L.monthly[1], act: "exercise", style: "safe", weight: 0.3,
             apply: () => {
               pay(s, 0.015);
               return lasts(0.35)
-                ? { text: ctx.w("只辦了健身房的月費自己練，{跟著網路影片學動作，|下班就去跑步機上跑半小時，}{半年後體力好了很多。|練出了一點手臂的線條。}"), mood: 2 }
-                : { text: ctx.w("只辦了健身房的月費自己練，{去了幾次，人太多就懶得去了。|月費照扣，人都沒去。}"), mood: -1 };
+                ? { text: say("monthlyOk", `你只辦了健身房的月費自己練，{跟著網路影片學動作，|${s.employed ? "下班" : "每天傍晚"}就去跑步機上跑半小時，}{半年後體力好了很多。|練出了一點手臂的線條。}`), mood: 2 }
+                : { text: say("monthlyBad", "你只辦了健身房的月費自己練，{去了幾次，人太多就懶得去了。|月費照扣，人都沒去。}"), mood: -1 };
             },
           },
           {
-            id: "h_gym.home", label: "在家跟著影片練", hint: "一毛錢都不用花", act: "study", style: "learn", weight: 0.15,
+            id: "h_gym.home", label: L.home[0], hint: L.home[1], act: "study", style: "learn", weight: 0.15,
             apply: () => lasts(0.3)
-              ? { text: ctx.w("沒有買課程，你在客廳鋪了一張瑜伽墊，{每天跟著影片練二十分鐘，|跳完一套就滿身大汗，}{一年都沒有中斷。|樓下鄰居大概很困擾。}"), mood: 2 }
-              : { text: ctx.w("沒有買課程，你在家跟著影片練，{練了三天，瑜伽墊就變成貓的床。|一個星期後，影片清單只剩下「稍後觀看」。}"), mood: 0 },
+              ? { text: say("homeOk", "你沒有買課程，在客廳鋪了一張瑜伽墊，{每天跟著影片練二十分鐘，|跳完一套就滿身大汗，}{一年都沒有中斷。|樓下鄰居大概很困擾。}"), mood: 2 }
+              : { text: say("homeBad", "你沒有買課程，在家跟著影片練，{練了三天，瑜伽墊就變成貓的床。|一個星期後，影片清單只剩下「稍後觀看」。}"), mood: 0 },
           },
           {
-            id: "h_gym.buddy", label: "和朋友互相督促", hint: "揪團一起練", act: "socialize", style: "social", weight: 0.15,
+            id: "h_gym.buddy", label: L.buddy[0], hint: L.buddy[1], act: "socialize", style: "social", weight: 0.15,
             apply: () => lasts(0.45)
-              ? { text: ctx.w("沒有買課程，你和{friend}約好互相督促，{每天在群組裡打卡，|每週一起去練三次，}{誰偷懶就請喝飲料。|一年後兩個人都瘦了一圈。}"), mood: 3 }
-              : { text: ctx.w("沒有買課程，你和{friend}約好一起練，{結果兩個人互相陪著偷懶。|練了一個月，群組就安靜了。}"), mood: 0 },
+              ? { text: say("buddyOk", "你沒有買課程，和{friend}約好互相督促，{每天在群組裡打卡，|每週一起去練三次，}{誰偷懶就請喝飲料。|一年後兩個人都瘦了一圈。}"), mood: 3 }
+              : { text: say("buddyBad", "你沒有買課程，和{friend}約好一起練，{結果兩個人互相陪著偷懶。|練了一個月，群組就安靜了。}"), mood: 0 },
           },
           {
-            id: "h_gym.no", label: "婉拒，健身不適合我", hint: "錢留著", act: "avoid", style: "self", weight: 0.15,
-            apply: () => ({ text: ctx.w("健身房的教練推銷課程，你笑著說再考慮看看，{走出門就把傳單收進回收桶。|回家煮了一碗泡麵犒賞自己。}"), mood: 0 }),
+            id: "h_gym.no", label: L.no[0], hint: L.no[1], act: "avoid", style: "self", weight: 0.15,
+            apply: () => ({ text: ctx.w(`${open}${sc.no}`), mood: 0 }),
           },
         ],
       };
@@ -621,41 +799,18 @@ export const HEALTH = [
 
   // ---------- minor illness (never serious) ----------
   {
-    // 牙痛
+    // 牙痛：在哪裡、怎麼痛起來的，見 toothScenes。
     id: "h_tooth", domain: "health", channel: "bad", ages: [13, 90], cooldown: 10, max: 2, p: () => 0.02,
     choice: (s, ctx) => {
-      const wisdom = s.age >= 17 && s.age <= 30 && ctx.rng() < 0.4;
       const cost = s.year >= 1995 ? 0.003 : s.age >= 18 ? 0.02 : 0;   // before 全民健保 a dentist was paid in full
-      const lead = wisdom ? "長智齒，牙齦腫了起來，" : "牙痛了好幾天，";
+      const sc = pickScene(s, ctx, "h_tooth", toothScenes(s)), { lead, dentist, wait, pill, home } = sc;
       return {
-        prompt: wisdom
-          ? ctx.w("{最裡面的牙齦|右下角的牙齦}腫了起來，原來是{一顆智齒|一顆歪著長的智齒}在作怪，{連張嘴都會痛。|吃飯只能用另一邊咬。}要怎麼辦？")
-          : ctx.w([
-            "{吃冰的時候|半夜|咬到一顆小石頭之後}，{右邊|左下}的牙齒{一陣一陣地抽痛|痛到半邊臉都腫起來}。要怎麼辦？",
-            "喝熱湯時，一顆牙突然{痛得你叫出聲|像被針刺了一下}，{之後越來越常痛。|晚上痛到睡不著。}要怎麼辦？",
-            "{嘴巴裡|門牙後面}有一顆牙{黑了一塊|缺了一角}，{一碰到甜的就痛。|吃東西都要小心。}要怎麼辦？",
-          ]),
+        prompt: ctx.w(sc.prompt),
         options: [
-          {
-            id: "h_tooth.dentist", label: "馬上看牙醫", hint: s.year >= 1995 ? "健保有給付" : "要花一筆錢", act: "seeDoctor", style: "health", weight: 0.4,
-            apply: () => {
-              pay(s, cost);
-              const visit = `${lead}你馬上去看牙醫${s.year >= 1995 ? "，掛號時遞上健保卡" : ""}，`;
-              return { text: ctx.w(wisdom ? `${visit}醫生說這顆智齒乾脆拔掉，{打了麻藥，喀一聲就拔起來了。|你咬著棉花回家，腫了兩天才消。}` : `${visit}{醫生說蛀到神經了，要做根管治療，|醫生說補一補就好，|醫生順便幫你洗了牙，}{前後跑了三趟診所，|打了麻藥，}{總算不痛了。|半邊臉麻了一下午。}`), mood: 0 };
-            },
-          },
-          {
-            id: "h_tooth.wait", label: "忍到不行再說", hint: "怕看牙醫", act: "pushThrough", style: "risk", weight: 0.25,
-            apply: () => { pay(s, cost * 2); return { text: ctx.w(`${lead}你一直忍著，{忍了兩個星期，|拖了一個月，}最後痛到睡不著才去看牙醫，{醫生說再晚一點就要拔掉了。|只好多跑了好幾趟診所。}`), mood: -3 }; },
-          },
-          {
-            id: "h_tooth.pill", label: "先吃止痛藥", hint: "撐過這幾天", act: "wait", style: "safe", weight: 0.2,
-            apply: () => ({ text: ctx.w(`${lead}你先吞了兩顆止痛藥，{痛是壓下來了，|撐過了這個星期的事，}{但過一陣子又開始痛。|最後還是乖乖去看了牙醫。}`), mood: -1 }),
-          },
-          {
-            id: "h_tooth.home", label: "用老方法撐著", hint: "含冰塊、鹽水漱口", act: "avoid", style: "family", weight: 0.15,
-            apply: () => ({ text: ctx.w(`${lead}你照{阿嬤|媽媽}教的老方法，{含著冰塊、用鹽水漱口，|在臉頰上敷了冰毛巾，}{撐了好幾天，最後還是得去看牙醫。|勉強睡了一晚，痛總算慢慢退了。}`), mood: -2 }),
-          },
+          { id: "h_tooth.dentist", label: dentist[0], hint: dentist[1], act: "seeDoctor", style: "health", weight: 0.4, apply: () => { pay(s, cost); return { text: ctx.w(`${lead}${dentist[2]}`), mood: 0 }; } },
+          { id: "h_tooth.wait", label: wait[0], hint: wait[1], act: "pushThrough", style: "risk", weight: 0.25, apply: () => { pay(s, cost * 2); return { text: ctx.w(`${lead}${wait[2]}`), mood: -3 }; } },
+          { id: "h_tooth.pill", label: pill[0], hint: pill[1], act: "wait", style: "safe", weight: 0.2, apply: () => ({ text: ctx.w(`${lead}${pill[2]}`), mood: -1 }) },
+          { id: "h_tooth.home", label: home[0], hint: home[1], act: "avoid", style: "family", weight: 0.15, apply: () => ({ text: ctx.w(`${lead}${home[2]}`), mood: -2 }) },
         ],
       };
     },
@@ -785,40 +940,24 @@ export const HEALTH = [
     }),
   },
   {
-    // 膝蓋退化
+    // 膝蓋退化：在哪裡痛起來的，見 kneeScenes。
     id: "h_knee", domain: "health", channel: "bad", ages: [55, 90], cooldown: 8, max: 2, p: () => 0.03,
     choice: (s, ctx) => {
-      const lead = "膝蓋痛了一陣子，";
+      const sc = pickScene(s, ctx, "h_knee", kneeScenes(s)), { lead, rehab, pills, swim, inject, sit } = sc;
       return {
-        prompt: ctx.w([
-          "{爬樓梯|蹲下去撿東西|爬山下坡}的時候，膝蓋{卡卡的|一陣一陣地痛}，醫生說是{退化性關節炎|關節磨損}。要怎麼辦？",
-          "早上起床，膝蓋{僵硬得要慢慢揉開|腫了一圈}，{走到巷口的市場都要休息兩次。|連最愛的散步都走不遠了。}要怎麼辦？",
-          "天氣一變，膝蓋就{痠痛|發出喀喀的聲音}，{你成了家裡的氣象台。|上下樓梯都要扶著欄杆。}要怎麼辦？",
-        ]),
+        prompt: ctx.w(sc.prompt),
         options: [
+          { id: "h_knee.rehab", label: rehab[0], hint: rehab[1], act: "seeDoctor", style: "health", weight: 0.3, apply: () => ({ text: ctx.w(`${lead}${rehab[2]}`), mood: 1 }) },
+          { id: "h_knee.pills", label: pills[0], hint: pills[1], act: "save", style: "safe", weight: 0.25, apply: () => { pay(s, 0.02); return { text: ctx.w(`${lead}${pills[2]}`), mood: 0 }; } },
           {
-            id: "h_knee.rehab", label: "去復健、練大腿肌肉", hint: "醫生說肌肉是最好的護膝", act: "seeDoctor", style: "health", weight: 0.3,
-            apply: () => ({ text: ctx.w(`${lead}你照醫生說的去復健，{每天坐在椅子上抬腿，|跟著復健師練大腿的肌肉，}{半年後，上下樓梯輕鬆多了。|又能走到公園去了。}`), mood: 1 }),
-          },
-          {
-            id: "h_knee.pills", label: s.year >= 2000 ? "買葡萄糖胺來吃" : "買藥膏來擦", hint: "聽說有保養效果", act: "save", style: "safe", weight: 0.25,
-            apply: () => { pay(s, 0.02); return { text: ctx.w(s.year >= 2000 ? `${lead}你每天配早餐吃一顆葡萄糖胺，{好像有好一點，又好像沒有。|家人說那沒什麼用，你還是照吃。|吃了一年，錢花了不少。}` : `${lead}你每天晚上擦{電台推薦的|朋友介紹的}藥膏，{房間裡都是藥膏的味道。|好像有好一點，又好像沒有。}`), mood: 0 }; },
-          },
-          {
-            id: "h_knee.swim", label: "改去游泳、騎腳踏車", hint: "對膝蓋比較好", act: "exercise", style: "learn", weight: 0.15,
+            id: "h_knee.swim", label: swim[0], hint: swim[1], act: "exercise", style: "learn", weight: 0.15,
             apply: () => {
-              if (ctx.rng() < 0.5) { hr(s, 0.98); return { text: ctx.w(`${lead}你改去{游泳|水中走路|騎腳踏車}，{膝蓋的負擔小了，|在泳池認識了一群老朋友，}{整個人也有精神多了。|每天早上都期待出門。}`), mood: 3 }; }
-              return { text: ctx.w(`${lead}你試著去游泳，{但冬天水太冷，去了幾次就停了。|游了幾次，總覺得不習慣。}`), mood: 0 };
+              if (ctx.rng() < 0.5) { hr(s, 0.98); return { text: ctx.w(`${lead}${swim[2]}`), mood: 3 }; }
+              return { text: ctx.w(`${lead}${sc.swimBad}`), mood: 0 };
             },
           },
-          {
-            id: "h_knee.inject", label: "自費打玻尿酸", hint: "要花一筆錢", act: "seeDoctor", style: "self", weight: 0.1, when: s2 => s2.year >= 2005,
-            apply: () => { pay(s, ctx.rng.between(0.03, 0.05)); return { text: ctx.w(`${lead}你自費打了{三劑|一個療程的}玻尿酸，{走路順多了，|醫生說效果大概能撐一年，}{心想這筆錢花得值得。|但想到價錢，心裡還是有點痛。}`), mood: 1 }; },
-          },
-          {
-            id: "h_knee.sit", label: "少出門，能坐就坐", hint: "反正年紀大了", act: "rest", style: "risk", weight: 0.2,
-            apply: () => { hr(s, 1.03); return { text: ctx.w(`${lead}你乾脆少出門，{整天坐在家裡看電視，|連去市場都請人幫忙買，}{腿越來越沒力，膝蓋反而更痛了。|體重慢慢往上跑，家人很擔心。}`), mood: -2 }; },
-          },
+          { id: "h_knee.inject", label: inject[0], hint: inject[1], act: "seeDoctor", style: "self", weight: 0.1, when: s2 => s2.year >= 2005, apply: () => { pay(s, ctx.rng.between(0.03, 0.05)); return { text: ctx.w(`${lead}${inject[2]}`), mood: 1 }; } },
+          { id: "h_knee.sit", label: sit[0], hint: sit[1], act: "rest", style: "risk", weight: 0.2, apply: () => { hr(s, 1.03); return { text: ctx.w(`${lead}${sit[2]}`), mood: -2 }; } },
         ],
       };
     },

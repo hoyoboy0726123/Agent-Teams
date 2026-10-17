@@ -1,26 +1,35 @@
-// 青少年（12–18 歲）：補習、選組、社團、叛逆、初戀、告白、畢業旅行、追星、第一支手機、沉迷、考試壓力……
+// 青少年（12–18 歲）：補習、選組、社團、叛逆、初戀、告白、畢業旅行、追星、第一支手機、沉迷、考試壓力、
+// 段考作弊、被誤會、當幹部、筆友和網友、比賽、服儀、排擠、照顧弟妹……
 //
 // 機率都是假設：這些事沒有官方統計，每個事件一年的機率大多在 0.04–0.15，再用 once / max / cooldown 限制次數，
-// 讓一段青春期平均有五、六件故事，其中四、五件要做選擇。選組（高中生每人都要選）是唯一必定發生的。
+// 讓一段青春期平均有六、七件故事，其中三件左右要做選擇。選組（高中生每人都要選）是唯一必定發生的，排在最前面。
+// 常見的抉擇有好幾種情境（sceneOf）：先看年代、年級、家裡的情形挑出合適的，再隨機選一個，問題、按鈕和結果都從
+// 同一個情境寫出來，重玩時同一個抉擇會換一個樣子出現。
 // 這裡不改學歷和升學路線（會考、學測在 core.js），也不碰交往狀態：青春期的戀愛只留在故事和記憶裡，
 // 不會改變 core.js 依統計校準的交往、初婚年齡。
 //
-// The probabilities are assumptions (no statistics exist for these events), set so the teenage years hold five or
-// six of them, four or five of them choices; 選組 is the one every 高中 student meets. Nothing here changes the
-// school track or s.rel, so the calibrated schooling, dating and marriage figures stay as they are.
+// The probabilities are assumptions (no statistics exist for these events), set so the teenage years hold six or
+// seven of them, about three of them choices; 選組 is the one every 高中 student meets, so it comes first. The
+// frequent choices come in several scenes (sceneOf), and the prompt, the buttons and the results are written from the
+// same scene. Nothing here changes the school track or s.rel, so the calibrated schooling, dating and marriage figures
+// stay as they are.
 //
 // Left for later modules:
 //   s.flags.major        "自然組" | "社會組" (高中 students), with s.flags.majorWhy (self, interest, parents, friend, test;
 //                        unknown when the player answered in their own words)
 //   s.flags.club, s.flags.cram, s.flags.parttime, s.flags.careerView, s.flags.firstLove ({ name, together, way })
+//   s.flags.cadre        the class or club job you took on (班長, 風紀股長, 社長, 隊長, 總召, 畢冊總編輯, 學生會長)
 //   memory kinds "crush" ({ name, call, sex }: the first love) and "admirer" (someone who confessed to you)
-import { exam15Name, exam18Name } from "../world.js";
+import { exam15Name, exam18Name, COUNTIES, bornSiblings } from "../world.js";
 import { pronoun } from "../people.js";
-import { bestFriend, friendName, makeFriend, grownUp, snackOf, pad } from "./child.js";
+import { siblingCall } from "../words.js";
+import { bestFriend, friendName, makeFriend, grownUp, liveWith, youngerSibs, homeMoney, snackOf, pad } from "./child.js";
 
 // ---------- helpers ----------
 const inSchool = s => s.studying && !s.abroad && ["國中", "高中", "高職", "五專"].includes(s.track);
 const senior = s => s.studying && !s.abroad && ["高中", "高職", "五專"].includes(s.track);
+// From the last year of primary school on: the questions about classmates and class jobs start at 12.
+const pupil = s => s.studying && !s.abroad && ["國小", "國中", "高中", "高職", "五專"].includes(s.track);
 // The next big exam: 會考 (or its earlier names) in junior high, 學測 in senior high, 統測 (from 2001) in vocational.
 const nextExam = s => (s.track === "國中" ? exam15Name(s.year + Math.max(1, 15 - s.age)) : exam18Name(s.year + 1, s.track));
 // What music played on: the radio, then a 隨身聽 (cassette, CD or MP3), then the phone.
@@ -28,6 +37,22 @@ const player = y => (y < 1980 ? "收音機" : y < 2011 ? "隨身聽" : "手機")
 // How a teenager got a message to a friend.
 const sendTo = y => (y < 1990 ? "寫了一張紙條給" : y < 2000 ? "打電話給" : y < 2005 ? "傳簡訊給" : y < 2011 ? "在 MSN 上敲" : "傳 LINE 給");
 const comfortFood = ctx => ctx.rng.pick(["牛肉麵", "滷肉飯", "綠豆湯", "鹹酥雞"]);
+// One situation for a question, out of those that fit this life (a scene with w: 0 does not), then at random.
+const sceneOf = (ctx, list) => ctx.rng.weighted(list.filter(x => (x.w ?? 1) > 0).map(x => [x, x.w ?? 1]));
+// Someone in class for one scene; they join s.friends only if the story makes you friends (befriend).
+const classmate = (s, ctx, same = 0.6) => ctx.person({ role: "friend", sex: ctx.rng() < same ? s.sex : s.sex === "male" ? "female" : "male", birthYear: s.birthYear, how: "同學" });
+function befriend(s, ctx, p) {
+  if (!s.friends.includes(p)) s.friends.push(p);
+  if (!bestFriend(s)) { s.flags.bff = p.id; p.bond = 0.7; ctx.remember("bestFriend", p.call, { name: p.call, call: p.call, sex: p.sex }); }
+  return p;
+}
+// Who checks hair and uniforms: 訓導主任 (生教組長 once 訓導處 became 學務處 in 1999) up to junior high, 教官 in senior
+// high until they left the schools in 2023; and the office you are sent to.
+const officerOf = s => (["國小", "國中"].includes(s.track) ? (s.year < 1999 ? "訓導主任" : "生教組長") : s.year < 2023 ? "教官" : "學務主任");
+const officeOf = s => (["國小", "國中"].includes(s.track) ? (s.year < 1999 ? "訓導處" : "學務處") : s.year < 2023 ? "教官室" : "學務處");
+// Younger brothers and sisters of primary school age (4 to 11), the ones a teenager is asked to look after.
+const littleSibs = s => youngerSibs(s, 4).filter(x => s.age - x.bornAt <= 11);
+const stressBy = (s, d) => { s.health.stress = Math.max(0, Math.min(1, s.health.stress + d)); };
 
 // Who teenagers were fans of, by year. Names only where the dates are sure (鄧麗君 from the late 1960s, 校園民歌
 // 1977–85, 小虎隊 1988–92, 四大天王 from 1992, 張惠妹 from 1996, 五月天 from 1999, 周杰倫 from 2000, S.H.E and F4
@@ -62,34 +87,22 @@ function hookOf(y, ctx) {
 
 export const TEEN = [
   {
-    // 補習
-    id: "t_cram", domain: "study", channel: "change", once: true, ages: [13, 17], when: inSchool, p: () => 0.12,
-    choice: (s, ctx) => {
-      const y = s.year, who = grownUp(s, ctx);
-      const where = y < 1980 ? "數學老師家" : s.county === "臺北市" ? "南陽街的補習班" : "火車站附近的補習班";
-      const why = ctx.rng.pick(["段考成績單發下來", "班上一半的同學都去補習了", ...(s.track === "五專" ? [] : [`離${nextExam(s)}越來越近`])]);
-      const lead = `${why}，${who}問你要不要去補習`;
-      const set = (s2, k) => { s2.flags.cram = k; };
-      return {
-        prompt: `${lead}。要怎麼辦？`,
-        options: [
-          { id: "t_cram.math", label: "補數理", hint: "數學和理化", act: "study", style: "learn", weight: 0.25, apply: (s2, c) => { set(s2, "math"); return { text: c.w(`${lead}。你去${where}補數學和理化，{每天放學${y >= 1990 ? "在樓下買一份雞排" : "塞一個麵包"}就進教室，|${y >= 2000 ? "教室擠了上百個人，你坐在只看得到螢幕的最後一排，" : "小小的教室擠了好幾十個人，"}}{成績慢慢追上來了。|最喜歡那個會講笑話的老師。}`), mood: 1 }; } },
-          { id: "t_cram.english", label: "補英文", hint: "背單字、練聽力", act: "study", style: "learn", weight: 0.15, apply: (s2, c) => { set(s2, "english"); return { text: c.w(`${lead}。你去補英文，{每天背五十個單字，|上課一直${y >= 1985 ? "聽英文歌學發音" : "跟著老師念課文"}，}{第一次聽懂了外國電影裡的一句台詞。|單字本被你翻到脫頁。}`), mood: 1 }; } },
-          { id: "t_cram.all", label: "補全科", hint: "一次全部顧到", act: "pushThrough", style: "safe", weight: 0.2, apply: (s2, c) => { set(s2, "all"); s2.health.stress = Math.min(1, s2.health.stress + 0.05); return { text: c.w(`${lead}。你補全科，{每天晚上十點才下課，|週末也被考卷塞滿，}{回家的公車上總是睡著。|書包重得像磚頭。}`), mood: -2 }; } },
-          { id: "t_cram.none", label: "不補，自己讀", hint: "把時間留給自己", act: "wait", style: "self", weight: 0.2, apply: (s2, c) => { set(s2, "none"); return { text: c.w(`${lead}。你決定不補習，{放學就回家自己讀，|把不會的題目留到隔天問老師，}{成績普普通通，但睡得很飽。|多出來的時間拿去打球。}`), mood: 1 }; } },
-          { id: "t_cram.online", label: "上線上課程", hint: "在家看影片學", act: "study", style: "learn", weight: 0.12, when: () => y >= 2015, apply: (s2, c) => { set(s2, "online"); return { text: c.w(`${lead}。你買了線上課程，{在家用平板看老師的影片，|不懂的地方就按暫停重看，}{省下不少通勤的時間。|有幾天看著看著就睡著了。}`), mood: 1 }; } },
-          { id: "t_cram.tutor", label: "請家教", hint: "一對一比較清楚", act: "study", style: "social", weight: 0.08, apply: (s2, c) => { set(s2, "tutor"); return { text: c.w(`${lead}。${who}請了一位大學生來家裡當家教，{每週兩次坐在客廳的餐桌上，|講解得很清楚，|講話很有趣，}{你第一次覺得數學沒那麼可怕。|你們常常聊到忘了時間。}`), mood: 2 }; } },
-        ],
-      };
-    },
-  },
-  {
-    // 高一下學期選組：每個高中生都要選，記在 s.flags.major
+    // 高一下學期選組：每個高中生都要選，記在 s.flags.major。排在最前面，同一年別的青春期抉擇不會把它擠掉。
+    // 情境：選組單、下課的討論、家人在問、數學考壞了、畢業的學長姊回校分享（1980 年起）、死黨問你（高二要重新分班）。
     id: "t_major", domain: "study", channel: "change", once: true, ages: [15, 18], p: () => 1,
     when: s => s.studying && !s.abroad && s.track === "高中" && s.age === (s.flags.trackAt ?? 15) + 1,
     choice: (s, ctx) => {
-      const who = grownUp(s, ctx), f = bestFriend(s);
-      const lead = `高一下學期要選組了，${ctx.rng.pick([`${s.year >= 1975 ? "輔導老師" : "導師"}發下了選組單`, "下課時大家都在討論要選哪一組", `${who}已經在問你的打算`])}`;
+      const y = s.year, who = grownUp(s, ctx), f = bestFriend(s);
+      const sc = sceneOf(ctx, [
+        { lead: `${y >= 1975 ? "輔導老師" : "導師"}發下了選組單` },
+        { lead: "下課時大家都在討論要選哪一組" },
+        { lead: `${who}已經在問你的打算` },
+        { lead: `這次段考的數學你只考了${ctx.rng.pick(["三十八", "四十一", "二十九"])}分`, sci: ["還是選自然組", "數學再拚就追得上", "還是選了自然組"], soc: ["改選社會組", "國文和歷史比較拿手", "改選了社會組"] },
+        { lead: "學校請畢業的學長姊回來分享，自然組和社會組的人各說各的好", w: y >= 1980 ? 1 : 0, sci: ["自然組", "學長說理工的出路廣", "選了自然組"], soc: ["社會組", "學姊說文法商一樣精采", "選了社會組"] },
+        { lead: `${f ? f.call : "死黨"}一直問你要選哪一組，說高二要照組別重新分班`, w: f ? 1 : 0 },
+      ]);
+      const sci = sc.sci || ["自然組", "理工、醫藥、生科", "選了自然組"], soc = sc.soc || ["社會組", "文、法、商、傳播", "選了社會組"];
+      const lead = `高一下學期要選組了，${sc.lead}`;
       const set = (s2, major, how) => { s2.flags.major = major; s2.flags.majorWhy = how; return major; };
       // About six in ten 高中 students end up in 自然組 (an assumption close to recent years).
       const draw = (c, science) => (c.rng() < science ? "自然組" : "社會組");
@@ -98,9 +111,9 @@ export const TEEN = [
       return {
         prompt: `${lead}。要選哪一組？`,
         options: [
-          { id: "t_major.science", label: "自然組", hint: "理工、醫藥、生科", act: "study", style: "safe", weight: 0.35, apply: (s2, c) => { set(s2, "自然組", "self"); return { text: c.w(`${lead}。你選了自然組，{物理和化學課本疊起來比磚頭還厚。|第一次段考，數學難到全班都在哀號。|你開始覺得實驗課是一週最好玩的時間。}`), mood: 1 }; } },
-          { id: "t_major.social", label: "社會組", hint: "文、法、商、傳播", act: "study", style: "learn", weight: 0.25, apply: (s2, c) => { set(s2, "社會組", "self"); return { text: c.w(`${lead}。你選了社會組，{開始背歷史年表和地理圖，|國文課變成你最期待的一堂，}{有親戚說社會組以後不好找工作，你笑笑沒回答。|你發現自己很會寫作文。}`), mood: 1 }; } },
-          { id: "t_major.heart", label: "跟著興趣走", hint: "選自己喜歡的", act: "insist", style: "self", weight: 0.15, apply: (s2, c) => { const m = set(s2, draw(c, ["art", "piano", "calligraphy"].includes(s2.flags.talent) ? 0.3 : 0.55), "interest"); return { text: c.w(`${lead}。你想了很久，照著自己的興趣選了${m}，{雖然有人說你選錯了，|就算那不是你分數最好的科目，}{你覺得每天上課都很有意思。|你知道自己為什麼坐在這裡。}`), mood: 2 }; } },
+          { id: "t_major.science", label: sci[0], hint: sci[1], act: "study", style: "safe", weight: 0.35, apply: (s2, c) => { set(s2, "自然組", "self"); return { text: c.w(`${lead}。你${sci[2]}，{物理和化學課本疊起來比磚頭還厚。|第一次段考，數學難到全班都在哀號。|你開始覺得實驗課是一週最好玩的時間。}`), mood: 1 }; } },
+          { id: "t_major.social", label: soc[0], hint: soc[1], act: "study", style: "learn", weight: 0.25, apply: (s2, c) => { set(s2, "社會組", "self"); return { text: c.w(`${lead}。你${soc[2]}，{開始背歷史年表和地理圖，|國文課變成你最期待的一堂，}{有親戚說社會組以後不好找工作，你笑笑沒回答。|你發現自己很會寫作文。}`), mood: 1 }; } },
+          { id: "t_major.heart", label: "跟著興趣走", hint: "選自己喜歡的", act: "insist", style: "self", weight: 0.15, apply: (s2, c) => { const m = set(s2, draw(c, ["art", "piano", "calligraphy"].includes(s2.flags.talent) ? 0.3 : 0.55), "interest"); const why = !sc.sci || sc.sci[0] !== "還是選自然組" ? "{雖然有人說你選錯了，|就算那不是你分數最好的科目，}" : m === "自然組" ? "{雖然數學考成這樣，|就算大家都勸你再想想，}" : "{你早就知道自己喜歡的是文科，|數學考不好反而讓你下定了決心，}"; return { text: c.w(`${lead}。你想了很久，照著自己的興趣選了${m}，${why}{你覺得每天上課都很有意思。|你知道自己為什麼坐在這裡。}`), mood: 2 }; } },
           { id: "t_major.parents", label: `聽${who}的`, hint: "家人比較有經驗", act: "talk", style: "family", weight: 0.1, apply: (s2, c) => { const m = set(s2, draw(c, 0.8), "parents"); return { text: c.w(`${lead}。你聽了${who}的建議，選了${m}。{${who}說${m === "自然組" ? "這樣以後比較好找工作" : "你的國文一直比數學好"}。|${who}鬆了一口氣，你也是。}{你心裡還是有點不確定。|你決定先試試看。}`), mood: 0 }; } },
           { id: "t_major.friend", label: f ? `跟${f.call}選同一組` : "跟死黨選同一組", hint: "至少有人作伴", act: "socialize", style: "social", weight: 0.08, when: () => !!f, apply: (s2, c) => { const m = set(s2, draw(c, 0.55), "friend"); return { text: c.w(`${lead}。你和${f.call}說好一起選${m}，{結果被分到同一班，兩個人高興得跳起來。|結果被分到不同班，下課還是黏在一起。}`), mood: 2 }; } },
           { id: "t_major.test", label: "先做性向測驗", hint: "問問輔導老師", act: "counsel", style: "learn", weight: 0.07, when: () => s.year >= 1975, apply: (s2, c) => { const m = set(s2, draw(c, 0.55), "test"); return { text: c.w(`${lead}。你去找輔導老師做了性向測驗，{結果說你適合${m}，|老師陪你看了好多科系的介紹，}{你就照著選了${m}。|最後選了${m}，心裡比較踏實。}`), mood: 1 }; } },
@@ -109,23 +122,167 @@ export const TEEN = [
     },
   },
   {
-    // 社團
+    // 補習。情境：段考成績單、同學都去補、校門口的試聽券（1975 年起）、親戚考上第一志願、老師家的輔導班（1985 年以前）、
+    // 家裡手頭緊、五專的專業科目跟不上。
+    id: "t_cram", domain: "study", channel: "change", once: true, ages: [13, 17], when: inSchool, p: () => 0.12,
+    choice: (s, ctx) => {
+      const y = s.year, who = grownUp(s, ctx), five = s.track === "五專", tight = homeMoney(s, ctx) === "tight";
+      const where = y < 1980 ? "數學老師家" : s.county === "臺北市" ? "南陽街的補習班" : "火車站附近的補習班";
+      const cousin = ctx.rng.pick(["表哥", "表姊", "堂哥", "堂姊"]), cta = cousin.endsWith("哥") ? "他" : "她", subj = ctx.rng.pick(["微積分", "專業科目"]);
+      const fee = y < 1970 ? "一百多塊" : y < 1980 ? "五百多塊" : y < 1990 ? "兩千多塊" : y < 2005 ? "四千多塊" : "六千多塊";
+      const sc = sceneOf(ctx, [
+        { key: "report", w: five ? 1 : 2, lead: `${ctx.rng.pick(["段考成績單發下來", ...(five ? [] : [`離${nextExam(s)}越來越近`])])}，${who}問你要不要去補習`, ask: "要怎麼辦？" },
+        { key: "peers", w: five ? 0 : 2, lead: "班上一半的同學放學都去補習了，下課聊的全是補習班老師的笑話", ask: "你也要去補嗎？" },
+        { key: "flyer", w: y >= 1975 && !five ? 1.5 : 0, lead: "放學時，補習班的人在校門口發傳單，塞給你一張免費試聽券", ask: "要去試試看嗎？" },
+        { key: "cousin", w: five ? 0 : 1.5, lead: `${cousin}考上了第一志願，${who}特地去打聽${cta}當年補的是哪一間`, ask: "你也要去補嗎？" },
+        { key: "teacher", w: y < 1985 && !five ? 2 : 0, lead: "數學老師說放學後在家裡開了輔導班，班上一半的同學都去了", ask: "你也要去嗎？" },
+        { key: "cost", w: tight && !five ? 2.5 : 0, lead: `你想去補習，可是一個月的補習費要${fee}，${who}${y < 1978 ? "打著算盤" : "拿著計算機"}算了好久`, ask: "要怎麼辦？" },
+        { key: "five", w: five ? 3 : 0, lead: `五專的${subj}越來越難，期中考全班有一半不及格`, ask: "要去補習嗎？" },
+      ]);
+      const k = sc.key, lead = sc.lead, of = m => m[k] || m.report;
+      // Each option in each scene: [button, hint, what happened after the scene's first sentence].
+      const math = {
+        report: ["補數理", "數學和理化", `你去${where}補數學和理化，{每天放學${y >= 1990 ? "在樓下買一份雞排" : "塞一個麵包"}就進教室，|${y >= 2000 ? "教室擠了上百個人，你坐在只看得到螢幕的最後一排，" : "小小的教室擠了好幾十個人，"}}{成績慢慢追上來了。|最喜歡那個會講笑話的老師。}`],
+        peers: ["跟同學去補數理", "大家都在那一班", `你跟著同學去${where}補數學和理化，{每天放學一群人${y >= 1990 ? "分一份雞排" : "邊走邊啃麵包"}，再一起衝進教室，|你們搶著坐在同一排，}{成績慢慢追上來了。|你終於聽懂了下課大家在笑什麼。}`],
+        flyer: ["去試聽數理班", "聽聽名師怎麼教", `你去試聽了數理班，{台上的老師一邊解題一邊講笑話，|老師三兩下就把你卡了一整個禮拜的題目解開，}{你當天就回家請${who}幫你報名。|後來每週去報到三次，成績慢慢追上來了。}`],
+        cousin: [`去${cousin}補過的那一間`, "數學和理化", `你去了${cousin}當年補過的那一間，{${cousin}把當年的筆記全送給了你，|老師聽說你是${cousin}的親戚，特別照顧你，}{每週三天放學就去報到。|成績慢慢追上來了。}`],
+        teacher: ["去老師家補", "跟同學一起去", "你也去了數學老師家，{十幾個人擠在客廳的長桌上寫考卷，|師母還煮了一鍋綠豆湯給大家喝，}{成績慢慢追上來了。|你最怕老師家門口那隻會叫的狗。}"],
+        cost: ["還是去補數理", `${who}說錢的事不用你擔心`, `${who}說錢的事不用你擔心，你去${where}補了數學和理化，{每次繳費的信封都被你壓得平平整整，|上課從來不敢打瞌睡，}{成績慢慢追上來了。|你暗暗發誓要把這筆錢讀回來。}`],
+        five: [`去補${subj}`, "從頭打好基礎", `你去${y < 1980 ? "一位老師家" : "補習班"}補${subj}，{跟一群要考插大的學長姊擠在同一間教室，|${subj === "微積分" ? "老師從高中數學開始幫你複習" : "老師拿考古題一題一題帶你寫"}，}{期末考終於及格了。|你第一次覺得${subj}好像有點道理。}`],
+      };
+      const english = {
+        report: ["補英文", "背單字、練聽力", `你去補英文，{每天背五十個單字，|上課一直${y >= 1985 ? "聽英文歌學發音" : "跟著老師念課文"}，}{第一次聽懂了外國電影裡的一句台詞。|單字本被你翻到脫頁。}`],
+        peers: ["去補英文", "先顧最弱的一科", "你沒跟大家去同一間，自己去補了英文，{每天背五十個單字，|每週考一次聽力，}{第一次聽懂了外國電影裡的一句台詞。|單字本被你翻到脫頁。}"],
+        flyer: ["去試聽英文班", y >= 1995 ? "聽說有外籍老師" : "聽說老師很會教文法", `你去試聽了英文班，{老師用${y >= 1985 ? "英文歌" : "順口溜"}教文法，|一堂課就背了三十個單字，}{你決定留下來。|後來單字本被你翻到脫頁。}`],
+        cousin: ["去補英文", "先顧最弱的一科", `你覺得自己最弱的是英文，就去補了英文，{${cousin}教你用${y >= 1985 ? "便利貼" : "小卡片"}背單字，|每天背五十個單字，}{第一次覺得英文沒那麼可怕。|單字本被你翻到脫頁。}`],
+        teacher: ["改去補英文", "數學自己讀", "你沒去老師家，改去補了英文，{每天跟著收音機的英語教學節目念課文，|單字本被你翻到脫頁，}{第一次聽懂了外國電影裡的一句台詞。|英文成績慢慢爬上來了。}"],
+        cost: ["只補英文就好", "一科就好，省一點", "你跟家裡說只補英文就好，{每天背五十個單字，|數學就自己硬啃，}{第一次聽懂了外國電影裡的一句台詞。|單字本被你翻到脫頁。}"],
+        five: ["補英文", "以後插大用得到", `你去補了英文，{每天背五十個單字，|每週考一次聽力，}{${subj}還是很難，但英文成了你最穩的一科。|單字本被你翻到脫頁。}`],
+      };
+      const all = {
+        report: ["補全科", "一次全部顧到", "你補全科，{每天晚上十點才下課，|週末也被考卷塞滿，}{回家的公車上總是睡著。|書包重得像磚頭。}"],
+        peers: ["補全科，跟上大家", "怕被拋在後面", "你怕落後，一口氣報了全科，{每天晚上十點才下課，|週末也被考卷塞滿，}{回家的公車上總是睡著。|和同學見面的地方從教室換成了補習班。}"],
+        flyer: ["報全科衝刺班", "一次全部顧到", "試聽完你就報了全科班，{每天晚上十點才下課，|週末也被考卷塞滿，}{書包裡的講義越疊越厚。|回家的公車上總是睡著。}"],
+        cousin: [`照${cousin}的路補全科`, "一次全部顧到", `你照著${cousin}的路補了全科，{每天晚上十點才下課，|週末也被考卷塞滿，}{${who}說這樣才安心。|回家的公車上總是睡著。}`],
+        teacher: ["數學英文都補", "一次全部顧到", "你去老師家補數學，週末再去補英文，{每天回到家都快十點了，|週末也被考卷塞滿，}{書包重得像磚頭。|回家的路上總是在打瞌睡。}"],
+        cost: ["咬牙補全科", "一次全部顧到", `${who}多接了一份工，讓你補了全科，{每天晚上十點才下課，|週末也被考卷塞滿，}{回家的公車上總是睡著。|你連喝一杯飲料都捨不得。}`],
+        five: ["每科都找人補", "一次全部顧到", "你每一科都找了地方補，{每天晚上十點才回到家，|週末也被考卷塞滿，}{回家的客運上總是睡著。|書包重得像磚頭。}"],
+      };
+      const none = {
+        report: ["不補，自己讀", "把時間留給自己", "你決定不補習，{放學就回家自己讀，|把不會的題目留到隔天問老師，}{成績普普通通，但睡得很飽。|多出來的時間拿去打球。}"],
+        peers: ["不補，自己讀", "別人是別人", "你決定照自己的步調，{放學就回家自己讀，|把不會的題目留到隔天問老師，}{下課聽不懂他們的笑話，但你睡得很飽。|多出來的時間拿去打球。}"],
+        flyer: ["把傳單收起來", "自己讀就好", "你把傳單折成了紙飛機，{放學還是回家自己讀，|把不會的題目留到隔天問老師，}{成績普普通通，但睡得很飽。|多出來的時間拿去打球。}"],
+        cousin: ["謝謝好意，自己讀", `你不是${cousin}`, `你跟${who}說想先自己試試看，{放學就回家讀書，|把不會的題目留到隔天問老師，}{${who}嘆了口氣，還是答應了。|成績普普通通，但這是你自己的步調。}`],
+        teacher: ["不去，自己讀", "把補習費省下來", `你沒有去，{放學就回家自己讀，|把不會的題目留到隔天問同學，}{${who}用省下來的錢幫你買了一本參考書。|多出來的時間拿去幫家裡做事。}`],
+        cost: ["不補了，自己讀", "把錢省下來", `你跟${who}說不補了，{跟同學借了補習班的講義來${y >= 1980 ? "影印" : "抄"}，|每天在學校的圖書館讀到關門，}{成績沒有掉下去。|${who}什麼都沒說，隔天便當裡多了一顆滷蛋。}`],
+        five: ["不補，去問學長姊", "自己想辦法", "你沒有去補習，{抱著考古題去找學長姊，|跟同學在圖書館互相講題目，}{期末考低空飛過。|學長說他當年也是這樣過來的。}"],
+      };
+      const online = {
+        report: ["上線上課程", "在家看影片學", "你買了線上課程，{在家用平板看老師的影片，|不懂的地方就按暫停重看，}{省下不少通勤的時間。|有幾天看著看著就睡著了。}"],
+        peers: ["上線上課程", "補在自己房間", "你買了線上課程，{在家用平板看老師的影片，|不懂的地方就按暫停重看，}{同學問你補哪裡，你說「補在房間」。|有幾天看著看著就睡著了。}"],
+        flyer: ["改上線上課程", "不用跑補習班", "比起跑補習班，你選了線上課程，{在家用平板看老師的影片，|不懂的地方就按暫停重看，}{省下不少通勤的時間。|有幾天看著看著就睡著了。}"],
+        cost: ["上便宜的線上課程", "比補習班省", `你挑了一套便宜很多的線上課程，{在家用平板看老師的影片，|不懂的地方就按暫停重看，}{${who}說這樣錢花得值得。|有幾天看著看著就睡著了。}`],
+        five: ["上線上課程", "在家看影片學", `你買了線上的${subj}課程，{在家用平板看老師的影片，|不懂的地方就按暫停重看，}{期末考終於及格了。|有幾天看著看著就睡著了。}`],
+      };
+      const tutor = {
+        report: ["請家教", "一對一比較清楚", `${who}請了一位大學生來家裡當家教，{每週兩次坐在客廳的餐桌上，|講解得很清楚，|講話很有趣，}{你第一次覺得數學沒那麼可怕。|你們常常聊到忘了時間。}`],
+        peers: ["請家教", "不想擠補習班", `${who}覺得補習班人太多，請了一位大學生來家裡當家教，{每週兩次坐在客廳的餐桌上，|講解得很清楚，}{你第一次覺得數學沒那麼可怕。|下課同學聊補習班，你只能在旁邊聽。}`],
+        flyer: ["請家教", "一對一比較清楚", `你把試聽券送給了同學，${who}幫你請了一位大學生來家裡當家教，{每週兩次坐在客廳的餐桌上，|講解得很清楚，}{你第一次覺得數學沒那麼可怕。|你們常常聊到忘了時間。}`],
+        cousin: [`請${cousin}當家教`, "自己人比較好問", `${who}乾脆請${cousin}週末來家裡教你，{${cousin}講解得比老師還清楚，|兩個人常常講到一半就聊起天來，}{你第一次覺得數學沒那麼可怕。|${cousin}說你比${cta}當年還聰明。}`],
+        cost: ["請鄰居的大學生教", "便宜一點", `${who}拜託鄰居讀大學的孩子每週來教你兩次，{學費只收補習班的一半，|兩個人坐在客廳的餐桌上，}{你第一次覺得數學沒那麼可怕。|你們常常聊到忘了時間。}`],
+        five: ["請家教", "一對一比較清楚", `${who}請了一位大學生來家裡教你${subj}，{每週兩次坐在客廳的餐桌上，|講解得很清楚，}{你第一次覺得${subj}沒那麼可怕。|你們常常聊到忘了時間。}`],
+      };
+      const opt = (id, m, act, style, weight, mood, more = null) => {
+        const [label, hint, text] = of(m);
+        return { id: `t_cram.${id}`, label, hint, act, style, weight, apply: (s2, c) => { s2.flags.cram = id; if (more) more(s2); return { text: c.w(`${lead}。${text}`), mood }; } };
+      };
+      return {
+        prompt: `${lead}。${sc.ask}`,
+        options: [
+          opt("math", math, "study", "learn", 0.25, 1),
+          opt("english", english, "study", "learn", 0.15, 1),
+          opt("all", all, "pushThrough", "safe", 0.2, -2, s2 => stressBy(s2, 0.05)),
+          opt("none", none, "wait", "self", 0.2, 1),
+          { ...opt("online", online, "study", "learn", 0.12, 1), when: () => y >= 2015 },
+          opt("tutor", tutor, "study", "social", 0.08, 2),
+        ],
+      };
+    },
+  },
+  {
+    // 社團。情境：社團活動課的志願單（2000 年以前，國中一直都有）、社團博覽會（2000 年起）、迎新的社團表演、死黨拉你去、
+    // 田徑隊教練或合唱團老師來找你、家裡手頭緊時社團要自己買樂器。
     id: "t_club", domain: "study", channel: "good", once: true, ages: [13, 17], when: inSchool, p: () => 0.12,
     choice: (s, ctx) => {
-      const y = s.year, music = y < 1985 ? "國樂社" : y < 1995 ? "吉他社" : "熱音社", scout = y < 1985 ? "童軍團" : "康輔社";
-      const lead = y < 2000 ? "學校的社團活動課要選社團了" : "社團博覽會上，學長姊在走廊擺攤拉人";
+      const y = s.year, f = bestFriend(s), pal1 = f ? f.call : "死黨", tight = homeMoney(s, ctx) === "tight";
+      const band = y < 1985 ? "國樂社" : y < 1995 ? "吉他社" : "熱音社", camp = y < 1985 ? "童軍團" : "康輔社";
+      const sc = sceneOf(ctx, [
+        { key: "form", w: y < 2000 ? 2 : s.track === "國中" ? 1 : 0, lead: "學校的社團活動課要選社團了，導師發下志願單，要填三個志願", ask: "第一志願要填哪一個？" },
+        { key: "fair", w: y >= 2000 ? 2 : 0, lead: "社團博覽會上，學長姊在走廊擺攤拉人", ask: "想參加哪一個？" },
+        { key: "show", w: y >= 1970 ? 1 : 0, lead: "開學的社團聯合迎新上，各社團輪流上台表演", ask: "想參加哪一個？" },
+        { key: "pal", w: f ? 1.5 : 0, lead: `${pal1}拉著你去看社團招生，說要跟你參加同一個`, ask: "要參加哪一個？" },
+        { key: "coach", w: 0.8, lead: "體育課測八百公尺，你跑了全班第一，田徑隊的教練下課特地來找你", ask: "要加入田徑隊，還是參加別的社團？" },
+        { key: "choir", w: 0.8, lead: "音樂課上老師點你起來獨唱，下課後合唱團的老師特地來找你", ask: "要加入合唱團，還是參加別的社團？" },
+        { key: "cost", w: tight ? 1.5 : 0, lead: `你很想參加${band}，可是社團規定要自己買${band === "國樂社" ? "一支笛子和一把二胡" : "一把吉他"}，你看著價錢猶豫了很久`, ask: "要怎麼辦？" },
+      ]);
+      const k = sc.key, lead = sc.lead;
+      const music = k === "choir" ? "合唱團" : band;
+      const team = k === "coach" ? "田徑隊" : ctx.rng.pick(["籃球隊", "排球隊", y >= 1970 ? "棒球隊" : "田徑隊", "桌球隊"]);
+      const stage = k === "fair" && ctx.rng() < 0.5 ? "熱舞社" : "話劇社", comic = k === "fair" ? "動漫社" : "漫研社";
       // Without a best friend yet, the club brings one.
-      const pal = (s2, c, how) => { if (bestFriend(s2)) return ""; const f = makeFriend(s2, c, how, 0.75); return `在社團認識的${f.call}，後來成了你的死黨。`; };
+      const pal = (s2, c, how) => { if (bestFriend(s2)) return ""; const n = makeFriend(s2, c, how, 0.75); return `在社團認識的${n.call}，後來成了你的死黨。`; };
       const join = (key, how, text, mood = 3) => (s2, c) => { s2.flags.club = key; const p = how ? pal(s2, c, how) : ""; return { text: c.w(`${lead}，${text}`) + p, mood }; };
+      // What each club was like, by name.
+      const tail = {
+        國樂社: "{學會了吹笛子和拉二胡，|手指磨出了繭，}{成果發表會上台時腿一直抖。|和社員約好畢業前要辦一場演出。}",
+        吉他社: "{第一個學會的和弦是 C 和 G，|按 F 和弦按到手指發紅，}{成果發表會上台時腿一直抖。|和社員約好畢業前要辦一場演出。}",
+        熱音社: "{手指磨出了繭，|第一次在團練室和社員練到半夜，}{成果發表會上台時腿一直抖。|你們的樂團在校慶上唱了三首歌。}",
+        合唱團: "{每天早自習都在音樂教室練發聲，|比賽時你站在第二排，}{全團唱完最後一個音，台下安靜了一秒才響起掌聲。|合唱比賽拿了第二名，大家抱在一起哭。}",
+        田徑隊: "{每天清晨在操場跑二十圈，|小腿練出了兩塊結實的肌肉，}{第一次比賽緊張到差點搶跑。|曬得跟木炭一樣黑。}",
+        球隊: "{每天放學練到天黑，|假日也去學校練球，}{第一次上場比賽緊張到同手同腳。|曬得跟木炭一樣黑。}",
+        童軍團: "{學會了打各種繩結，|在營火晚會上帶大家跳舞，}{露營那晚，大家圍著營火聊到半夜。|交到一群很愛鬧的朋友。}",
+        康輔社: "{學會了帶團康和一整套營火舞，|在迎新晚會上帶全場跳舞，}{社課的教室永遠最吵。|交到一群很愛鬧的朋友。}",
+        話劇社: "{第一次上台就忘詞，|演了一棵不用說話的樹，|在成果發表會演了主角，}{台下的笑聲你一直記得。|後來你上台再也不怕了。}",
+        熱舞社: "{每天在穿堂對著玻璃練舞，|第一次上台就跳錯了一拍，}{成果發表會上台下的尖叫聲你一直記得。|後來你上台再也不怕了。}",
+        漫研社: "{和社員一起畫了一本同人誌，|每週社課都在聊最新一集的動畫，}{第一次覺得有人懂你。|你畫的四格漫畫被貼在社團教室的牆上。}",
+      };
+      tail.動漫社 = tail.漫研社;
+      const tailOf = name => tail[name] || tail.球隊;
+      // How the result opens in each scene; the club that came looking for you is joined, the others chosen instead.
+      const open = (name, invited = false) => ({
+        form: `你第一志願填了${name}，`, fair: `你在${name}的攤位填了入社單，`, show: `看完表演，你加入了${name}，`, pal: `你和${pal1}一起參加了${name}，`,
+        coach: invited ? `你答應了教練，加入${name}，` : `你謝過教練，參加了${name}，`, choir: invited ? `你答應了老師，加入${name}，` : `你謝過老師，參加了${name}，`,
+        cost: name === music ? `你把零用錢和紅包存了兩個月，買了一把二手${band === "國樂社" ? "的二胡" : "吉他"}，` : `你改參加了${name}，`,
+      }[k]);
+      const L = {
+        form: { music: [`填${music}`, "學一樣樂器"], ball: [`填${team}`, "每天練到天黑"], scout: [`填${camp}`, "露營、營火晚會"], drama: [`填${stage}`, "站上舞台"], comic: [`填${comic}`, "畫漫畫、聊動漫"], none: ["隨便填，社團課拿來讀書", "時間比較多"] },
+        fair: { music: [music, "攤位前有人在刷吉他"], ball: [team, "學長在攤位前表演運球"], scout: [camp, "一直在跳團康舞拉人"], drama: [stage, "站上舞台"], comic: [comic, "攤位上擺滿了同人誌"], none: ["拿了傳單就走", "時間留給讀書"] },
+        show: { music: [music, "台上那首歌你還在哼"], ball: [team, "學長表演了一段運球"], scout: [camp, "帶全場跳了一支團康舞"], drama: [stage, "那齣短劇讓全場笑翻"], comic: [comic, "社員穿著角色的衣服走台步"], none: ["看完表演就回家", "熱鬧看看就好"] },
+        pal: { music: [`一起去${music}`, "學一樣樂器"], ball: [`一起去${team}`, "每天練到天黑"], scout: [`一起去${camp}`, "露營、營火晚會"], drama: [`一起去${stage}`, "站上舞台"], comic: [`一起去${comic}`, "畫漫畫、聊動漫"], none: [`跟${pal1}說你不參加`, "想把時間留給讀書"] },
+        coach: { music: [`改參加${music}`, "比起跑步，更想學樂器"], ball: ["加入田徑隊", "教練說你有天分"], scout: [`參加${camp}`, "露營、營火晚會"], drama: [`參加${stage}`, "站上舞台"], comic: [`參加${comic}`, "畫漫畫、聊動漫"], none: ["謝謝教練，回家讀書", "時間比較多"] },
+        choir: { music: ["加入合唱團", "老師說你的聲音很乾淨"], ball: [`去${team}`, "比起唱歌更想流汗"], scout: [`參加${camp}`, "露營、營火晚會"], drama: [`參加${stage}`, "既然敢唱，也就敢演"], comic: [`參加${comic}`, "畫漫畫、聊動漫"], none: ["謝謝老師，回家讀書", "時間比較多"] },
+        cost: { music: ["存錢買二手的", "自己想辦法"], ball: [`改參加${team}`, "球隊不用買樂器"], scout: [`改參加${camp}`, "露營、營火晚會"], drama: [`改參加${stage}`, "站上舞台"], comic: [`改參加${comic}`, "一支筆就夠了"], none: ["不參加了", "把錢留著"] },
+      }[k];
+      const quiet = "{社團時間都在自習教室讀書，|放學就直接回家，}{成績穩穩的，只是偶爾有點羨慕別人。|你把時間留給了自己喜歡的書。}";
+      const noneText = {
+        form: "你隨便填了一個，{社團課都坐在最後一排寫參考書，|社團時間都拿來自習，}{成績穩穩的，只是偶爾有點羨慕別人。|你把時間留給了自己喜歡的書。}",
+        fair: `你拿了一疊傳單就走，${quiet}`,
+        show: `你看完表演就回家了，${quiet}`,
+        pal: `你跟${pal1}說想把時間留給讀書，${pal1}{自己去了${music}，|一個人去了${team}，}{偶爾回來跟你講社團的趣事。|你有點羨慕，但不後悔。}`,
+        coach: "你謝過教練，說想專心讀書，{放學就直接回家，|社團時間都在自習教室讀書，}{偶爾經過操場，看到田徑隊在跑步，你會停下來看一會兒。|成績穩穩的，只是偶爾有點羨慕別人。}",
+        choir: "你謝過老師，說想專心讀書，{放學就直接回家，|社團時間都在自習教室讀書，}{合唱比賽那天，你在台下聽得好認真。|成績穩穩的，只是偶爾有點羨慕別人。}",
+        cost: `你沒有參加，把錢留了下來，{社團時間都在自習教室讀書，|放學就回家幫忙，}{偶爾聽到${music}在練習，你會在走廊停一下。|你把這個心願寫進了日記。}`,
+      }[k];
+      const club = (key, id, name, how, act, style, weight, extra = {}) => ({ id: `t_club.${id}`, label: L[id][0], hint: L[id][1], act, style, weight, ...extra, apply: join(key, how, `${open(name, (k === "coach" && id === "ball") || (k === "choir" && id === "music"))}${tailOf(name)}`) });
       return {
-        prompt: `${lead}。想參加哪一個？`,
+        prompt: `${lead}。${sc.ask}`,
         options: [
-          { id: "t_club.music", label: music, hint: "學一樣樂器", act: "hobby", style: "learn", weight: 0.2, apply: join("music", "社團的朋友", `你參加了${music}，{${y < 1985 ? "學會了吹笛子和拉二胡，" : "第一個學會的和弦是 C 和 G，"}|手指磨出了繭，}{成果發表會上台時腿一直抖。|和社員約好畢業前要辦一場演出。}`) },
-          { id: "t_club.ball", label: "球隊", hint: "每天練到天黑", act: "exercise", style: "health", weight: 0.22, apply: join("ball", "隊友", `你加入了{籃球隊|排球隊|${y >= 1970 ? "棒球隊" : "田徑隊"}|桌球隊}，{每天放學練到天黑，|假日也去學校練球，}{第一次上場比賽緊張到同手同腳。|曬得跟木炭一樣黑。}`) },
-          { id: "t_club.scout", label: scout, hint: "露營、營火晚會", act: "socialize", style: "social", weight: 0.15, apply: join("scout", "社團的朋友", `你參加了${scout}，{學會了打各種繩結，|在營火晚會上帶大家跳舞，}{露營那晚，大家圍著營火聊到半夜。|交到一群很愛鬧的朋友。}`) },
-          { id: "t_club.drama", label: "話劇社", hint: "站上舞台", act: "hobby", style: "risk", weight: 0.1, apply: join("drama", "社團的朋友", "你參加了話劇社，{第一次上台就忘詞，|演了一棵不用說話的樹，|在成果發表會演了主角，}{台下的笑聲你一直記得。|後來你上台再也不怕了。}") },
-          { id: "t_club.comic", label: "漫研社", hint: "畫漫畫、聊動漫", act: "hobby", style: "self", weight: 0.13, when: () => y >= 1995, apply: join("comic", "同好", "你參加了漫研社，{和社員一起畫了一本同人誌，|每週社課都在聊最新一集的動畫，}{第一次覺得有人懂你。|你畫的四格漫畫被貼在社團教室的牆上。}") },
-          { id: "t_club.none", label: "不參加，回家讀書", hint: "時間比較多", act: "wait", style: "safe", weight: 0.2, apply: join("none", null, "你沒有參加社團，{社團時間都在自習教室讀書，|放學就直接回家，}{成績穩穩的，只是偶爾有點羨慕別人。|你把時間留給了自己喜歡的書。}", 0) },
+          club("music", "music", music, "社團的朋友", "hobby", "learn", 0.2),
+          club("ball", "ball", team, "隊友", "exercise", "health", 0.22),
+          club("scout", "scout", camp, "社團的朋友", "socialize", "social", 0.15),
+          club("drama", "drama", stage, "社團的朋友", "hobby", "risk", 0.1),
+          club("comic", "comic", comic, "同好", "hobby", "self", 0.13, { when: () => y >= 1995 }),
+          { id: "t_club.none", label: L.none[0], hint: L.none[1], act: "wait", style: "safe", weight: 0.2, apply: join("none", null, noneText, 0) },
         ],
       };
     },
@@ -384,21 +541,74 @@ export const TEEN = [
     },
   },
   {
-    // 大考前一年的壓力（國中、高中職各一次）
+    // 大考前一年的壓力（國中、高中職各一次）。情境：倒數計時牌、模擬考退步、半夜睡不著、家人貼出的目標學校、晚自習、
+    // 聯考一試定終身（聯考、聯招的年代）、學測加上學習歷程檔案（2020 年起的高中）。
     id: "t_examStress", domain: "study", channel: "bad", max: 2, cooldown: 2, ages: [14, 17], p: () => 0.3,
     when: s => !s.abroad && s.studying && ((s.age === 14 && s.track === "國中") || (["高中", "高職"].includes(s.track) && s.age === (s.flags.trackAt ?? 15) + 2)),
     choice: (s, ctx) => {
-      const y = s.year, who = grownUp(s, ctx), f = bestFriend(s);
-      const lead = `離${nextExam(s)}剩不到一年，${ctx.rng.pick([...(y >= 1975 ? ["教室後面的倒數計時牌每天少一天"] : []), "模擬考的成績一次比一次差", "每天讀到半夜，還是覺得讀不完", `${who}每天都問你讀得怎麼樣`])}`;
+      const y = s.year, who = grownUp(s, ctx), f = bestFriend(s), exam = nextExam(s);
+      const sc = sceneOf(ctx, [
+        { key: "board", w: y >= 1975 ? 1 : 0, lead: `教室後面的倒數計時牌又翻了一頁，離${exam}只剩${ctx.rng.pick(["三百", "兩百", "一百五十"])}天` },
+        { key: "mock", lead: `模擬考的成績單發下來，你又退步了${ctx.rng.pick(["二十", "三十", "十幾"])}名` },
+        { key: "night", lead: `凌晨兩點，你躺在床上盯著天花板，腦袋裡全是${exam}還沒讀完的範圍` },
+        { key: "wall", lead: `${who}在${y < 1972 ? "你書桌前的牆上" : "冰箱門上"}貼了一張紙，寫著你要考的學校` },
+        { key: "late", w: y >= 1975 ? 1 : 0, lead: `離${exam}剩不到一年，學校開始留晚自習，教室裡安靜得只聽得到翻書的聲音` },
+        { key: "once", w: /聯考|聯招/.test(exam) ? 1 : 0, lead: `大家都說${exam}一試定終身，考壞了就只能重考` },
+        { key: "portfolio", w: s.track === "高中" && y >= 2020 ? 1.5 : 0, lead: "準備學測之外，還要整理學習歷程檔案，每天的時間都不夠用" },
+      ]);
+      const k = sc.key, lead = sc.lead, listener = f ? f.call : k === "night" ? "輔導老師" : "導師", mates = f ? f.call : "幾個同學";
+      const trip = ctx.rng.pick(["墾丁", "花蓮", "日月潭", "澎湖"]), noodle = y < 1972 ? "冷掉的饅頭" : "泡麵";
+      // The buttons in each scene: [label, hint].
+      const B = {
+        cram: { board: ["跟著倒數拚到底", "睡少一點"], mock: ["把錯的題目全部重做", "今晚不睡了"], night: ["乾脆起來繼續讀", "反正也睡不著"], wall: [`拚命讀，不讓${who}失望`, "睡少一點"], late: ["留到最後一個才走", "大家都在拚"], once: ["拚命讀，一次考上", "沒有第二次機會"], portfolio: ["熬夜把兩邊都做完", "睡少一點"] },
+        rest: { board: ["週末留一天給自己", "讀書也要喘口氣"], mock: ["先放自己一天假", "腦袋需要休息"], night: ["關燈，好好睡一覺", "先把覺睡飽"], wall: ["週末還是留一天給自己", "目標先放一邊"], late: ["準時回家睡覺", "照自己的步調"], once: ["週末還是去看場電影", "讀書也要喘口氣"], portfolio: ["先睡飽再說", "做不完也沒關係"] },
+        talk: { board: [`找${listener}聊聊`, "說出心裡的慌"], mock: ["拿成績單去找老師", "問問哪裡出了問題"], night: [`隔天找${listener}說說`, "說出來比較好"], wall: [`跟${who}說出你的壓力`, "說出來比較好"], late: [f ? `跟${f.call}互相打氣` : "找導師聊聊", "說出來比較好"], once: ["去找考過的學長姊", "聽聽過來人怎麼說"], portfolio: ["找導師討論怎麼排", "一個人想不出辦法"] },
+        run: { board: ["每天傍晚去跑操場", "動一動腦袋比較清楚"], mock: ["去球場流一身汗", "把悶氣打掉"], night: ["早上提早起來慢跑", "把作息調回來"], wall: ["出門跑步透透氣", "先離開書桌"], late: ["下課去操場跑兩圈", "動一動比較清醒"], once: ["每天清晨去跑步", "身體顧好才撐得住"], portfolio: ["把運動排進行程", "動一動比較清醒"] },
+        pray: { board: ["去拜文昌帝君", "求個考運"], mock: ["去廟裡求個考運", "求個心安"], night: ["去廟裡求個平安符", "求個安心"], wall: [`跟${who}去拜文昌帝君`, "一起求個考運"], late: ["去拜文昌帝君", "求個考運"], once: ["去拜文昌帝君", "求個考運"], portfolio: ["去拜文昌帝君", "求個考運"] },
+        group: { board: ["找同學組讀書會", "大家一起讀"], mock: ["跟考好的同學一起讀", "看看別人怎麼讀"], night: ["白天找同學一起讀", "一個人讀太悶"], wall: ["跟同學去圖書館讀", "不想一直待在家"], late: ["約幾個同學一起讀", "互相出題"], once: [y >= 1980 ? "跟同學去K書中心" : "跟同學去圖書館讀", "大家一起讀"], portfolio: ["跟同學組讀書會", "互相看檔案"] },
+      };
+      const cramDo = { board: "每天讀到凌晨一點", mock: "把錯的題目一題一題重做，每天讀到凌晨一點", night: "爬起來打開檯燈，一路讀到天亮", wall: `每天讀到凌晨一點，想讓${who}看到成績`, late: "每天留晚自習到最後一個才走", once: "每天讀到凌晨一點，連洗澡都在背公式", portfolio: "每天熬到半夜，把考試和檔案一起趕完" }[k];
+      const restText = {
+        night: "你把檯燈關掉，告訴自己明天的事明天再說，{一覺睡到鬧鐘響。|隔天上課頭一次沒打瞌睡。}{那天你讀得特別順。|你發現睡飽比多讀一小時有用。}",
+        late: `你沒有留晚自習，每天準時回家吃飯、睡覺，{有同學說你太悠哉，|${who}反而比你還緊張，}{但你的成績沒有退步。|你覺得這才是自己的步調。}`,
+        mock: "你把成績單收進抽屜，放了自己一天假，{睡到自然醒，|去看了一場電影，}{隔天再拿出來看，好像也沒那麼可怕了。|有點罪惡感，但心情好多了。}",
+        once: "你週末還是去看了一場電影，{在黑漆漆的戲院裡，你兩個小時都沒想到考試。|散場後買了一包鹹酥雞邊走邊吃。}{星期一回到教室，反而讀得比較進去。|有點罪惡感，但心情好多了。}",
+        portfolio: "你決定先把覺睡飽，{一天只做一件事，|檔案寫不完就先放著，}{隔天反而做得比較快。|有點罪惡感，但心情好多了。}",
+      }[k] || "你決定週末留一天給自己，{睡到自然醒，|去看了一場電影，}{星期一回到教室，反而讀得比較進去。|有點罪惡感，但心情好多了。}";
+      const talkText = {
+        mock: "你拿著成績單去找老師，老師{幫你把錯的題目分成「不會」和「粗心」兩堆，|陪你把剩下的進度重新排了一遍，}{你發現粗心的那一堆比較高。|心裡的石頭輕了一些。}",
+        wall: `你跟${who}說，每次看到那張紙都覺得喘不過氣，{${who}愣了一下，隔天那張紙就不見了。|${who}說：「我只是想幫你加油，考得怎樣都沒關係。」}{那晚你睡了一個好覺。|心裡的石頭輕了一些。}`,
+        once: "你跑去找畢業的學長姊，{學姊說她當年也怕得要命，|學長把當年的筆記和考古題都給了你，}{你發現考試只是一天，人生還很長。|心裡的石頭輕了一些。}",
+        portfolio: "你找導師討論，{導師幫你把要做的事排成一張表，|導師說檔案不用寫得多，寫得真就好，}{你終於知道先做什麼了。|心裡的石頭輕了一些。}",
+        late: f ? `你和${f.call}每天晚自習下課一起走去搭車，{原來${pronoun(f)}也一樣怕。|${f.call}說：「考完我們去吃一頓好的。」}{那段路成了你一天最輕鬆的時候。|心裡的石頭輕了一些。}` : null,
+      }[k] || `你跟${listener}聊了一個下午，{原來大家都一樣怕。|對方說：「盡力就好，考完你還是你。」}{那晚你睡了一個好覺。|心裡的石頭輕了一些。}`;
+      const runText = {
+        mock: "你抓起籃球去球場，{一個人投籃投到天黑，|跟隔壁班的人鬥牛鬥到滿身大汗，}{回家時悶氣已經消了一半。|流完汗，那張成績單好像也沒那麼重了。}",
+        night: "你把鬧鐘調早半小時，每天天一亮就出門慢跑，{晚上倒頭就睡著了。|一個月後，你又能一覺睡到天亮。}{|考前那幾個月，你一天都沒停過。}",
+        wall: "你換上球鞋出門，{沿著河堤跑了好幾公里，|在公園繞了一圈又一圈，}{回家時心情好多了。|跑完回家，那張紙看起來沒那麼刺眼了。}",
+        late: "你每節下課都去操場跑兩圈，{回到教室腦袋清楚多了。|同學笑你是全班唯一在流汗的人。}{晚自習反而讀得比較進去。|你覺得身體比腦袋先輕鬆了。}",
+      }[k] || "你每天傍晚去操場跑三圈，{跑完腦袋清楚多了。|流完汗，焦慮好像也跟著流掉了一點。}{|考前那幾個月，你一天都沒停過。}";
+      const prayText = {
+        night: "週末你去廟裡拜了文昌帝君，求了一個平安符，{回家壓在枕頭下面，|掛在書包的拉鍊上，}{那晚睡得安穩多了。|心裡安定了不少。}",
+        mock: `你和${who}去廟裡拜文昌帝君，{擲了三次筊才拿到聖筊，|在紙上寫了名字和想考的學校，}{求一個「包中」的好兆頭。|心裡安定了不少。}`,
+      }[k] || `你和${who}去廟裡拜文昌帝君，{供了蔥、芹菜和一顆包子，|在紙上寫了名字和學校，|${y >= 1985 ? "把准考證影本放在供桌上，" : "點了一盞光明燈，"}}{求一個「包中」的好兆頭。|心裡安定了不少。}`;
+      const spot = y < 1980 ? "圖書館讀到關門" : y < 1990 ? "K書中心讀到十點" : y < 2015 ? "麥當勞讀到打烊" : "自習室讀到關門";
+      const groupText = {
+        mock: "你厚著臉皮去找班上考最好的同學一起讀，{才發現對方也會粗心，|對方教你把錯的題目抄在一本小冊子上，}{讀書變得沒那麼孤單。|下一次模擬考，你們兩個都進步了。}",
+        once: y >= 1980 ? `你和${mates}每天放學去K書中心，{一人一格小隔間，讀到十點才回家，|休息時間在門口互相出題，}{讀書變得沒那麼孤單。|你們約好考完要一起去${trip}。}` : null,
+        portfolio: `你和${mates}組了讀書會，{一邊準備學測，一邊互相看對方的檔案，|用雲端共用筆記，誰讀完哪一章就打勾，}{讀書變得沒那麼孤單。|你們約好考完要一起去${trip}。}`,
+        wall: `你和${mates}約好每天去圖書館讀，{讀到關門才回家，|中午就在附近吃一碗麵，}{讀書變得沒那麼孤單。|你們約好考完要一起去${trip}。}`,
+      }[k] || `你和${mates}組了讀書會，{每天放學在${spot}，|互相出題考對方，}{讀書變得沒那麼孤單。|你們約好考完要一起去${trip}。}`;
+      const opt = (id, act, style, weight, text, mood, more = null) => ({ id: `t_examStress.${id}`, label: B[id][k][0], hint: B[id][k][1], act, style, weight, apply: (s2, c) => { if (more) more(s2); return { text: c.w(`${lead}。${text}`), mood }; } });
       return {
         prompt: `${lead}。要怎麼辦？`,
         options: [
-          { id: "t_examStress.cram", label: "拚命讀", hint: "睡少一點", act: "pushThrough", style: "risk", weight: 0.3, apply: (s2, c) => { s2.health.stress = Math.min(1, s2.health.stress + 0.05); return { text: c.w(`${lead}。你每天讀到凌晨一點，{泡麵成了每天的宵夜，|黑眼圈越來越深，}{模擬考進步了，人卻瘦了一圈。|有一天在公車上睡過了站。}`), mood: -2 }; } },
-          { id: "t_examStress.rest", label: "放鬆一下", hint: "週末留給自己", act: "rest", style: "self", weight: 0.2, apply: (s2, c) => ({ text: c.w(`${lead}。你決定週末留一天給自己，{睡到自然醒，|去看了一場電影，}{星期一回到教室，反而讀得比較進去。|有點罪惡感，但心情好多了。}`), mood: 2 }) },
-          { id: "t_examStress.talk", label: "找人聊聊", hint: "說出來比較好", act: "talk", style: "social", weight: 0.15, apply: (s2, c) => ({ text: c.w(`${lead}。你跟${f ? `{${f.call}|導師}` : "{導師|輔導老師}"}聊了一個下午，{原來大家都一樣怕。|對方說：「盡力就好，考完你還是你。」}{那晚你睡了一個好覺。|心裡的石頭輕了一些。}`), mood: 2 }) },
-          { id: "t_examStress.run", label: "去運動", hint: "每天跑幾圈操場", act: "exercise", style: "health", weight: 0.15, apply: (s2, c) => ({ text: c.w(`${lead}。你每天傍晚去操場跑三圈，{跑完腦袋清楚多了。|流完汗，焦慮好像也跟著流掉了一點。}`), mood: 2 }) },
-          { id: "t_examStress.pray", label: "去拜文昌帝君", hint: "求個考運", act: "spiritual", style: "safe", weight: 0.12, apply: (s2, c) => ({ text: c.w(`${lead}。你和${who}去廟裡拜文昌帝君，{供了蔥、芹菜和一顆包子，|在紙上寫了名字和學校，}{求一個「包中」的好兆頭。|心裡安定了不少。}`), mood: 2 }) },
-          { id: "t_examStress.group", label: "組讀書會", hint: "大家一起讀", act: "study", style: "learn", weight: 0.08, apply: (s2, c) => ({ text: c.w(`${lead}。你和${f ? f.call : "幾個同學"}組了讀書會，{每天放學在${y >= 1990 ? "麥當勞讀到打烊" : "圖書館讀到關門"}，|互相出題考對方，}{讀書變得沒那麼孤單。|你們約好考完要一起去${c.rng.pick(["墾丁", "花蓮", "日月潭", "澎湖"])}。}`), mood: 2 }) },
+          opt("cram", "pushThrough", "risk", 0.3, `你${cramDo}，{${noodle}成了每天的宵夜，|黑眼圈越來越深，}{模擬考進步了，人卻瘦了一圈。|有一天在公車上睡過了站。}`, -2, s2 => stressBy(s2, 0.05)),
+          opt("rest", "rest", "self", 0.2, restText, 2),
+          opt("talk", "talk", "social", 0.15, talkText, 2),
+          opt("run", "exercise", "health", 0.15, runText, 2),
+          opt("pray", "spiritual", "safe", 0.12, prayText, 2),
+          opt("group", "study", "learn", 0.08, groupText, 2),
         ],
       };
     },
@@ -479,6 +689,560 @@ export const TEEN = [
         `不讀書以後，你跟著${who}{顧店|做事}，{學會了怎麼算帳、怎麼跟客人說話，|才知道大人每天有多辛苦，}{你偷偷存著錢，想學更多本事。|有時候你會想，如果繼續讀書會怎樣。}`,
         "沒有繼續升學，你{白天幫忙家裡，晚上去學{修機車|美髮|做麵包}，|在親戚的店裡從學徒做起，}{手上的工夫一天比一天熟。|你發現自己很喜歡用雙手做東西。}",
       ]), mood: 0 };
+    },
+  },
+  {
+    // 考試時同學要答案。情境：考到一半、考前一天、早自習借抄作業、死黨拜託（考不及格東西就要被沒收）、外流的答案。
+    id: "t_cheat", domain: "study", channel: "bad", once: true, ages: [13, 18], when: s => inSchool(s) && (s.age <= 17 || s.track === "五專"), p: () => 0.13,
+    choice: (s, ctx) => {
+      const y = s.year, f = bestFriend(s), m = classmate(s, ctx);
+      const sc = sceneOf(ctx, [{ key: "exam", p: m }, { key: "night", p: m }, { key: "homework", p: m }, { key: "bff", p: f, w: f ? 1.2 : 0 }, { key: "leak", p: null }]);
+      const k = sc.key, name = sc.p ? sc.p.call : "", ta = sc.p ? pronoun(sc.p) : "";
+      const askBy = y < 1990 ? "放學時塞了一張紙條給你" : y < 2000 ? "打電話到你家" : y < 2005 ? "傳簡訊給你" : y < 2011 ? "在 MSN 上敲你" : "傳 LINE 給你";
+      const lose = y < 1990 ? "漫畫" : y < 2005 ? "隨身聽" : "手機", drink = y < 1980 ? "一瓶汽水" : y < 1995 ? "一包鋁箔包紅茶" : "一杯珍珠奶茶";
+      const seen = y >= 2011 ? "沒有點開" : "沒有接過來看";
+      const lead = {
+        exam: `段考考到一半，坐你隔壁的${name}用腳輕輕踢你的椅子，小聲說「第五題」`,
+        night: `段考前一天，${name}${askBy}，拜託你明天考試時把考卷往旁邊挪一點`,
+        homework: `早自習的時候，${name}跑到你的座位旁，說第一節要交的作業借${ta}抄一下`,
+        bff: `${name}說這次段考再不及格，爸媽就要沒收${ta}的${lose}，拜託你考試時幫${ta}一把`,
+        leak: `有人說拿到了明天段考的答案，下課時在${y >= 2011 ? "班上的群組裡" : "教室後面"}偷偷傳`,
+      }[k];
+      const opt = (id, act, style, weight, labels, hints, run) => ({ id: `t_cheat.${id}`, label: labels[k], hint: hints[k] || hints.exam, act, style, weight, apply: (s2, c) => { const [text, mood] = run(c); return { text: c.w(`${lead}。${text}`), mood }; } });
+      return {
+        prompt: `${lead}。要怎麼辦？`,
+        options: [
+          opt("give", "socialize", "risk", 0.15,
+            { exam: "把考卷挪過去", night: `答應幫${ta}`, homework: `借${ta}抄`, bff: `幫${name}這一次`, leak: "也拿一份來看" },
+            { exam: "就這一次", night: "朋友有難", homework: "只是作業而已", bff: "朋友有難", leak: "大家都在看" },
+            c => {
+              if (k === "leak") return ["你也偷偷看了那份答案，{隔天一翻開考卷，題目跟那份答案完全對不上，|考卷發下來，題目根本不一樣，}{你只好硬著頭皮自己寫。|你氣自己前一晚沒有好好讀。}", -1];
+              if (k === "homework") return [`你把作業簿遞了過去，{${name}抄得太急，連你寫錯的地方都照抄，|${name}抄完還幫你把作業簿包上書套，}{老師改到你們兩本，抬頭看了你們一眼。|${name}說下次換${ta}請你吃早餐。}`, 0];
+              const how = k === "exam" ? "你把考卷往旁邊挪了一點" : k === "night" ? "你答應了，隔天考試時把考卷往旁邊挪了一點" : `你心一軟，考試時把考卷往${name}那邊挪了一點`;
+              if (c.rng() < 0.3) return [`${how}，{監考老師剛好走到你們這一排，|監考老師在講台上看得一清二楚，}{兩個人的考卷都被收走，那一科都是零分。|兩個人都被記了一支警告。}`, -3];
+              return [`${how}，{心跳得比寫考卷時還快，|手心全是汗，}{還好監考老師一直盯著窗外。|結果那題你自己寫錯了，兩個人一起錯。}{考完你發誓再也不做這種事。|${name}下課請你喝了${drink}。}`, 0];
+            }),
+          opt("ignore", "avoid", "safe", 0.35,
+            { exam: "裝作沒聽到", night: y >= 2011 ? "已讀不回" : "假裝沒收到", homework: "說你也還沒寫完", bff: "假裝沒聽懂", leak: "不看，照自己讀的考" },
+            { exam: "專心寫自己的", night: "明天再說", homework: "找個藉口", bff: "不想撕破臉", leak: "看了心會亂" },
+            () => [{
+              exam: `你假裝沒聽到，{把考卷壓得更緊，|眼睛死盯著自己的考卷，}{${name}考完一整天都不跟你說話。|下課${name}嘟囔了一句「小氣」，隔天就忘了。}`,
+              night: `你${y >= 2011 ? "已讀不回" : "假裝沒收到"}，隔天考試時把考卷壓得緊緊的，{${name}考完一整天都不跟你說話。|下課${name}嘟囔了一句「小氣」，隔天就忘了。}`,
+              homework: `你說你也還沒寫完，{低頭假裝在趕作業，|把作業簿塞進抽屜最裡面，}{${name}又去找了別人。|你有點心虛，但也鬆了一口氣。}`,
+              bff: `你笑笑說「你一定可以的啦」，考試時把考卷壓得緊緊的，{${name}考完沒說什麼，只是一路踢著石頭走回家。|成績發下來，${name}差兩分及格，你心裡很不好受。}`,
+              leak: `你${seen}，{照原本的進度讀到半夜，|把那份答案的事拋在腦後，}{隔天才知道那份答案根本是假的。|考得普普通通，但每一題都是自己寫的。}`,
+            }[k], 0]),
+          opt("teach", "study", "learn", 0.2,
+            { exam: `考完再教${ta}`, night: `今晚先教${ta}`, homework: `下課教${ta}寫`, bff: `今晚陪${name}讀`, leak: "約同學把範圍讀完" },
+            { exam: "不給答案，教方法", night: "現在讀還來得及", homework: "抄了也學不會", bff: "臨時抱佛腳也好", leak: "與其看答案" },
+            () => [{
+              exam: `你沒有理${ta}，考完卻{把第五題的解法寫在紙上給${name}，|放學留下來教${name}那幾題，}{${name}說原來沒那麼難。|下一次段考，${name}自己寫出來了。}`,
+              night: `你回${ta}：「我現在教你，比明天偷看有用。」{你們${y >= 2005 ? "開著視訊" : y >= 1990 ? "抱著電話" : "在巷口的路燈下"}把重點講了一遍，|你把自己的筆記借給了${name}，}{隔天${name}自己寫完了整張考卷。|${name}說原來沒那麼難。}`,
+              homework: `你說抄了也學不會，下課陪${name}把那幾題重寫一遍，{${name}寫到一半突然說「原來是這樣」。|第一節${name}遲交了，但每一題都是自己寫的。}{後來${name}常常拿題目來問你。|你發現教別人，自己也記得更牢。}`,
+              bff: `你說：「答案不能給你，但今晚我陪你讀。」{你們在${name}家的書桌前讀到十一點，|你把考試範圍畫成一張重點表給${name}，}{成績發下來，${name}剛好及格，抱著你大叫。|${name}還是差了一點點，但說這是${ta}讀得最認真的一次。}`,
+              leak: `你${seen}，放學約了幾個同學在${y >= 1985 ? "速食店" : "圖書館"}把範圍讀完，{隔天發現那份答案根本是假的，看了的人都傻眼。|你們互相出題出到天黑。}`,
+            }[k], 2]),
+          opt("refuse", "insist", "self", 0.18,
+            { exam: "小聲說「不行」", night: "直接回絕", homework: `叫${ta}自己寫`, bff: `跟${name}說不行`, leak: "叫大家不要再傳" },
+            { exam: "把話說清楚", night: "這種事不幫", homework: "作業不是這樣用的", bff: "朋友也有不能做的事", leak: "這樣不公平" },
+            () => [{
+              exam: `你小聲回了一句「不行」，{${name}瞪了你一眼，|整場考試你都覺得背後涼涼的，}{後來${name}跟你說，其實${ta}也知道不對。|過了幾天，兩個人又照樣一起去福利社。}`,
+              night: `你直接回${ta}：「這個我不能幫。」{${name}回了一個「好啦」，|${name}好幾天不太理你，}{隔天考試，${name}自己埋頭寫到最後一分鐘。|後來${name}說，被你拒絕以後，${ta}反而認真讀了一次。}`,
+              homework: `你說：「作業借不了，你自己寫吧。」{${name}翻了個白眼走開了，|${name}嘟著嘴回到座位，}{第一節還是遲交了。|後來找了別人借。}{你們好幾天沒說話。|過幾天兩個人又一起去福利社了。}`,
+              bff: `你跟${name}說：「別的都可以，這個不行。」{${name}氣得一整天不跟你說話，|${name}愣了一下，說：「我知道啦，問問而已。」}{幾天後${ta}還是拉著你去福利社。|你們好像沒什麼改變，又好像更懂對方了一點。}`,
+              leak: `你在${y >= 2011 ? "群組裡打了一句" : "教室後面說了一句"}：「不要再傳了，這樣不公平。」{有人說你假清高，|好幾個人跟著說對，}{隔天才知道那份答案根本是假的。|那天放學，有個同學偷偷跟你說謝謝。}`,
+            }[k], 0]),
+          opt("report", "seekHelp", "social", 0.12,
+            { exam: "考完跟老師說", night: "先跟導師說", homework: `陪${ta}去跟老師說`, bff: `請老師幫${name}補救`, leak: "去跟老師說" },
+            { exam: "交給大人處理", night: "先讓老師知道", homework: "誠實比較好", bff: "找大人想辦法", leak: "讓老師處理" },
+            () => [{
+              exam: `考完你去跟老師說了這件事，{老師沒有說是誰講的，只在班會上提醒大家考試的規矩。|老師找了${name}去談，${name}之後幾天都不太理你。}{你不確定這樣做對不對，但心裡比較踏實。|你知道自己守住了一件事。}`,
+              night: `你把這件事告訴了導師，{隔天考試前，老師把座位全部拉開，什麼也沒說。|老師私下找${name}聊了一節下課。}{${name}後來沒再提這件事。|你不確定這樣做對不對，但心裡比較踏實。}`,
+              homework: `你陪${name}去辦公室，跟老師說作業還沒寫完，{老師讓${name}放學前補交。|老師說誠實比抄來的作業好，讓${name}隔天再交。}{${name}鬆了一口氣。|後來${name}的作業都準時交了。}`,
+              bff: `你陪${name}去找老師，說${ta}跟不上，{老師答應考前幫${ta}複習一次，|老師給了${ta}一份練習卷，}{${name}說謝謝你沒讓${ta}做傻事。|那次段考，${name}剛好及格。}`,
+              leak: "你去辦公室跟老師說了，{老師連夜換了一份考卷，|老師笑說那份答案早就傳到辦公室了，是假的，}{隔天考試大家都只能靠自己。|你覺得心裡很踏實。}",
+            }[k], 0]),
+        ],
+      };
+    },
+  },
+  {
+    // 被誤會。情境：班費不見、同學的東西不見、福利社說你沒付錢、文具店要你打開書包、小老師保管的答案卷不見；
+    // 已經出去工作的，是店裡的收銀機少了錢或工廠的倉庫少了東西。真相最後都會水落石出（truth），不指認任何人。
+    id: "t_blamed", domain: "study", channel: "bad", once: true, ages: [12, 17],
+    when: s => pupil(s) || (!s.studying && !s.abroad && s.employed && !!s.job && !["家業", "自營"].includes(s.job.field)), p: s => (s.age === 12 ? 0.14 : 0.11),
+    choice: (s, ctx) => {
+      const y = s.year, who = grownUp(s, ctx), m = classmate(s, ctx), name = m.call, ta = pronoun(m), school = s.studying;
+      const plant = !school && (s.job.field === "製造" || /工廠/.test(s.job.title)), clean = !school && /清潔/.test(s.job.title), boss = plant ? "領班" : clean ? "組長" : "老闆";
+      const cash = y < 1970 ? "兩百塊" : y < 1990 ? "一千塊" : y < 2010 ? "兩千塊" : "三千塊";
+      const fund = y < 1970 ? "五十塊" : y < 1990 ? "三百塊" : y < 2010 ? "一千塊" : "兩千塊";
+      const thing = y < 1980 ? "鋼筆" : y < 1998 ? "隨身聽" : y < 2008 ? "MP3" : y < 2016 ? "手機" : "無線耳機";
+      const shop = y < 1985 ? "書局" : "文具店", subj = ctx.rng.pick(["數學", "英文", "國文"]);
+      const sc = sceneOf(ctx, [
+        { key: "work", w: school ? 0 : 1,
+          lead: plant ? "工廠的倉庫少了一箱零件，那天最後一個鎖門的是你" : clean ? "你負責打掃的辦公室有人掉了錢包，那天最後一個進去打掃的是你" : `店裡的收銀機少了${cash}，那天最後一個關店的是你`,
+          truth: plant ? "{後來領班在另一個倉庫找到了那箱零件，原來是早班的人搬錯了地方。|月底盤點才發現，是出貨單寫錯了。}" : clean ? "{後來那個人在自己的車上找到了錢包，還託組長跟你說聲抱歉。|過了兩天才知道，錢包早就被同事撿去交給了警衛室。}" : "{後來老闆在收銀機底下找到了那疊鈔票，原來是卡在抽屜後面。|月底對帳才發現，是老闆娘拿去付了貨款，忘了說一聲。}" },
+        { key: "fund", w: school ? 1 : 0, lead: `班上放在講桌抽屜裡的班費少了${fund}，那天最後一個離開教室的是你`, truth: "{後來大家在掃具櫃後面找到了那個信封，原來是早上收錢時掉的。|沒多久，總務股長紅著臉說，那筆錢夾在課本裡被帶回家了。}" },
+        { key: "item", w: school ? 1 : 0, lead: `${name}的${pad(thing)}不見了，有人說午休時看到你在${ta}的座位旁邊`, truth: `{過了兩天，${name}在自己的書包夾層裡找到了，紅著臉跟你道歉。|後來才知道是坐後面的同學借去，忘了說一聲。}` },
+        { key: "shop", w: school ? 1 : 0, lead: `福利社的阿姨說你上次拿了一包${ctx.rng.pick(snackOf(y))}沒付錢，當著排隊的同學叫住你`, truth: "{阿姨翻了帳本，才發現是記錯人了，隔天多塞了一包給你。|後來阿姨想起來，那天沒付錢的是另一個個子差不多的學生。}" },
+        { key: "store", w: school ? 1 : 0, lead: `放學後你在${shop}逛了一圈要走，店員突然擋在門口，要你把書包打開`, truth: `{你把書包整個倒出來，只有課本、便當盒和一包衛生紙，店員說了聲對不起。|後來${y >= 1995 ? "看了監視器畫面" : "老闆問清楚了"}，店員才知道是自己看錯了。}` },
+        { key: "key", w: school ? 1 : 0, lead: `老師鎖在抽屜裡的考卷答案不見了，你是${subj}小老師，第一個被叫去辦公室問話`, truth: "{後來老師在另一個資料夾裡找到了，拍拍你的肩膀說抱歉。|過了兩天，老師說答案卷被夾進了別班的作業簿裡。}" },
+      ]);
+      const k = sc.key, lead = sc.lead, truth = sc.truth, store = k === "store";
+      return {
+        prompt: `${lead}。要怎麼辦？`,
+        options: [
+          {
+            id: "t_blamed.explain", label: { work: "當場說清楚", fund: "當場說清楚", item: "說你只是經過", shop: "說你那天根本沒去", store: "打開書包給店員看", key: "把那天的事說清楚" }[k], hint: "沒做就是沒做", act: "talk", style: "self", weight: 0.3,
+            apply: (s2, c) => ({ text: c.w(`${lead}。${{ fund: "你站起來，把那天放學的事一五一十說了一遍，", item: "你說你只是經過，{看著大家的眼睛說「不是我」，|把那天午休做了什麼一件一件講出來，}", shop: "你說你那天根本沒去福利社，{聲音大到整排的人都回頭看，|把當天的課表一節一節講給阿姨聽，}", store: "你把書包打開放在櫃檯上，{說：「你看。」|手在發抖，聲音卻很穩，}", key: "你在辦公室把那天的事一五一十說了一遍，", work: `你把那天${plant ? "鎖門前" : clean ? "打掃時" : "關店前"}做了哪些事，一件一件說給${boss}聽，` }[k]}${truth}{你這才發現手心都是汗。|回家的路上，你一直在想要是沒人相信你怎麼辦。}`), mood: 0 }),
+          },
+          {
+            id: "t_blamed.teacher", label: { work: plant ? "請領班一起盤點" : clean ? "請組長陪你去說明" : "請老闆一起對帳", fund: "請導師幫忙查", item: "請導師幫忙找", shop: "請導師陪你去說", store: y >= 1995 ? "請店員看監視器" : "請老闆出來", key: "請老師再找一次" }[k], hint: "交給大人查清楚", act: "seekHelp", style: "social", weight: 0.2,
+            apply: (s2, c) => ({ text: c.w(`${lead}。${{ fund: "你請導師幫忙查，{導師一個一個問清楚，|導師陪你把那天放學的經過重新走了一遍，}", item: "你請導師幫忙找，{導師請大家先翻翻自己的抽屜和書包，|導師陪你把那天午休的經過重新走了一遍，}", shop: "你請導師陪你去福利社，{導師陪阿姨把那天的帳一筆一筆對過，|導師站在你旁邊，請阿姨再想想，}", key: "你請老師再仔細找一次，{老師把抽屜裡的東西全部倒了出來，|老師一個資料夾一個資料夾地翻，}", work: plant ? "你請領班陪你把倉庫重新點了一遍，{點到天都黑了，|兩個人一箱一箱搬開來看，}" : clean ? "你請組長陪你去說明，{組長把那天的打掃紀錄翻了出來，|組長站在你旁邊，一句一句幫你說，}" : "你請老闆陪你把那天的帳一筆一筆對過，{對到半夜，|老闆戴起老花眼鏡一張一張翻收據，}" }[k] || `你請${y >= 1995 ? "店員調出監視器畫面" : "老闆出來看看"}，{在櫃檯邊等了好久，|旁邊的客人都在看你，}`}${store ? (y >= 1995 ? "畫面裡你的雙手一直在外套口袋外面，店員紅著臉說了聲對不起。" : "老闆問清楚以後，說是店員看錯了，還送你一枝筆賠罪。") : truth}{你心裡的石頭終於落了地。|你發現遇到事情，先找對的人很重要。}`), mood: 1 }),
+          },
+          {
+            id: "t_blamed.home", label: store ? `打電話請${who}來` : `回家跟${who}說`, hint: "家人會相信你", act: "seekHelp", style: "family", weight: 0.18,
+            apply: (s2, c) => ({ text: c.w(store
+              ? `${lead}。你${y >= 2005 ? "用手機" : "借店裡的電話"}打給${who}，${who}{十分鐘就趕到了，|一進門就站到你旁邊，}${truth}{回家的路上，${who}什麼都沒問，只買了一支冰棒給你。|${who}說：「我相信你。」}`
+              : `${lead}。你回家跟${who}說了，${who}{只問了一句「你有沒有拿？」，聽到你說沒有，就說「那就好，我相信你」。|${school ? "隔天請假陪你到學校，跟老師把事情談清楚。" : `隔天陪你去找${boss}，把事情談清楚。`}}${truth}`), mood: 2 }),
+          },
+          {
+            id: "t_blamed.wait", label: "先忍下來", hint: "清者自清", act: "wait", style: "safe", weight: 0.2,
+            apply: (s2, c) => ({ text: c.w(`${lead}。${store ? "你什麼都沒說，默默把書包打開，{臉燙得像發燒，|旁邊的客人都在看，}" : (school ? "你什麼都沒多說，{那幾天走進教室，總覺得有人在背後看你，|一個人吃了好幾天的便當，}" : "你什麼都沒多說，{那幾天上班，總覺得有人在背後看你，|一個人默默把工作做完，}")}${truth}{那件事讓你學會不要急著懷疑別人。|你把那幾天的委屈都寫在日記裡。}`), mood: -2 }),
+          },
+          {
+            id: "t_blamed.prove", label: store ? "要店員拿出證據" : "自己把真相找出來", hint: "找證據", act: "insist", style: "risk", weight: 0.12,
+            apply: (s2, c) => ({ text: c.w(store
+              ? `${lead}。你站著不動，要店員先說清楚看到了什麼，{店員支支吾吾說不出來，|老闆走過來問發生了什麼事，}${truth}{你走出店門時，腿才開始發軟。|從此你再也沒去過那家店。}`
+              : `${lead}。你決定自己把真相找出來，${school ? "{下課就去問每一個那天在場的人，|把那天的每一節課都寫在紙上，}" : (clean ? "{把那天打掃的路線重新走了一遍，|去問每一個那天在辦公室的人，}" : "{把那天的帳一筆一筆重算，|把那天經手的每一張單子都翻出來，}")}${truth}{大家看你的眼神都不一樣了。|${school ? "同學" : "同事"}說你${y >= 1997 ? "很有柯南的架勢" : "像偵探一樣"}。}`), mood: 1 }),
+          },
+        ],
+      };
+    },
+  },
+  {
+    // 當幹部（記在 s.flags.cadre）。情境：被起鬨選班長、被指定當風紀股長、接社長或隊長、園遊會總召、畢業紀念冊總編輯
+    // （畢業那一年）、學生會長（1995 年起的高中職、五專）。
+    id: "t_leader", domain: "study", channel: "good", once: true, ages: [12, 18], when: s => pupil(s) && (s.age <= 17 || s.track === "五專"), p: s => (s.age >= 16 ? 0.14 : s.age === 12 ? 0.12 : 0.1),
+    choice: (s, ctx) => {
+      const y = s.year, who = grownUp(s, ctx), f = bestFriend(s), fc = f ? f.call : "";
+      const club = s.flags.club && s.flags.club !== "none" ? s.flags.club : null, head = club === "ball" ? "隊長" : "社長", meet = club === "ball" ? "練球" : "社課";
+      const last = (s.track === "國小" && s.age === 12) || (s.track === "國中" && s.age === 14) || (["高中", "高職"].includes(s.track) && s.age === (s.flags.trackAt ?? 15) + 2);
+      const food = ctx.rng.pick(y < 1985 ? ["愛玉冰", "粉圓冰"] : y < 2005 ? ["熱狗", "炒麵", "紅茶"] : ["雞蛋糕", "珍珠奶茶", "章魚燒"]);
+      const sc = sceneOf(ctx, [
+        { key: "class", role: "班長", lead: `開學選幹部，${f ? f.call : "後排的同學"}起鬨提名你當班長，全班都在拍手` },
+        { key: "order", role: "風紀股長", lead: "導師指定你當風紀股長，以後自習課要在黑板上記下講話的人" },
+        { key: "club", role: head, w: club && s.track !== "國小" ? 1.5 : 0, lead: `${club === "ball" ? "球隊" : "社團"}的學長姊要畢業了，最後一次${meet}時，他們說想把${head}交給你` },
+        { key: "fair", role: "總召", w: y >= 1970 ? 1 : 0, lead: "校慶園遊會班上要擺攤，導師問誰要當總召，全班的眼睛都看向你" },
+        { key: "book", role: "畢冊總編輯", w: last ? 2 : 0, lead: "畢業紀念冊要開始做了，大家推你當總編輯" },
+        { key: "council", role: "學生會長", w: senior(s) && y >= 1995 ? 1 : 0, lead: `學生會要改選，${f ? f.call : "同學"}說你最適合，硬要你出來選會長` },
+      ]);
+      const k = sc.key, lead = sc.lead, role = sc.role, vote = k === "council";
+      const take = s2 => { s2.flags.cadre = role; stressBy(s2, 0.03); };
+      const opt = (id, act, style, weight, label, hint, run, extra = {}) => ({ id: `t_leader.${id}`, label, hint, act, style, weight, ...extra, apply: (s2, c) => { const win = !vote || c.roll("study", "good", 0.45); const [text, mood, took] = run(win, c); if (took && win) take(s2); return { text: c.w(`${lead}。${text}`), mood }; } });
+      return {
+        prompt: `${lead}。要怎麼辦？`,
+        options: [
+          opt("yes", "volunteer", "risk", 0.25,
+            { class: "答應當班長", order: "接下，照規矩記", club: `接下${head}`, fair: "接下總召", book: "接下總編輯", council: "出來選" }[k], "累，但值得",
+            win => [{
+              class: "你答應了，{每天早上第一個到教室開窗、喊「起立、敬禮」，|開學第一週就把座位表和打掃表全部排好，}{有一次全班太吵，你被導師叫到走廊談話。|期末全班送你一張簽滿名字的卡片。}",
+              order: `你答應了，每節自習課都站在講台上記名字，{有人在背後叫你「抓耙仔」，你假裝沒聽到。|你記的第一個名字是${f ? `${fc}，${fc}` : "自己的好朋友，對方"}氣了你一整天。}{學期末，導師說班上的秩序是全年級最好的。|你學會了不用討好每一個人，也能把事情做好。}`,
+              club: `你接下了${head}，{招生的時候在攤位前喊到喉嚨都啞了，|每週的${meet}都要你排，}{成果發表那天，你在後台一直數人數。|學弟妹叫你「${head}」的時候，你還是有點不習慣。}`,
+              fair: `你答應了，{訂材料、排班表、借瓦斯爐，全是你一手包辦，|班上決定賣${food}，你連算了三個晚上的成本，}{園遊會那天，攤位賣到一半就缺貨了。|收攤時算錢，比預期多賺了一些，全班拿去吃了一頓。}`,
+              book: "你答應了，{收全班的照片收到快崩潰，|每天放學留下來排版面，}{畢冊印出來那天，大家搶著在最後一頁簽名。|你把自己寫的序言讀了好幾遍。}",
+              council: `你出來選了，{在穿堂發傳單、在朝會上發表政見，|和${f ? fc : "同學"}熬夜做海報，}${win ? "{開票那天你贏了，第一件事是爭取讓福利社多賣一種飲料。|開票那天你贏了，緊張到上台忘了說謝謝。}" : "{結果差了幾十票落選，你卻覺得學到最多。|最後落選了，但好幾個學弟妹跑來說有投給你。}"}`,
+            }[k], vote && !win ? 0 : 2, true]),
+          opt("team", "socialize", "social", 0.2,
+            { class: `答應，但要${fc}當副班長`, order: `答應，請${fc}一起幫忙`, club: `找${fc}一起扛`, fair: `拉${fc}一起當總召`, book: `找${fc}當副總編`, council: `找${fc}當競選搭檔` }[k], "一個人扛不來",
+            win => [vote
+              ? `你找${fc}當搭檔出來選，{兩個人每天早上站在校門口喊口號，|你們把政見編成一首歌，在午休的廣播裡播出來，}${win ? `{開票那天你們贏了，兩個人抱在一起跳。|開票那天你們贏了，${fc}比你還激動。}` : "{結果差一點點落選，兩個人去吃了一碗冰。|最後落選了，你們說這是最好玩的一次失敗。}"}`
+              : `你說要${fc}一起才答應，{${{ class: `你喊口令、排打掃，${fc}收作業、記聯絡事項，`, order: "兩個人輪流站講台，一個記名字、一個負責提醒，", club: `一個管${meet}、一個管招生，`, fair: "一個顧攤位、一個跑採買，", book: "一個收照片、一個寫文字，" }[k]}|你們每天下課都在走廊開「祕密會議」，}{雖然吵過幾次架，事情最後都辦得很好。|那一年你們變得更有默契。}`, vote && !win ? 1 : 3, true],
+            { when: () => !!f }),
+          opt("change", "insist", "self", 0.15,
+            { class: "答應，但要改一個規矩", order: "答應，但只提醒不記名", club: `接下${head}，大改一番`, fair: "接下，照你的點子做", book: "接下，做一本不一樣的", council: "出來選，政見寫得大膽" }[k], "照你的方式做",
+            win => [{
+              class: "你答應了，第一件事就是{跟導師爭取讓大家自己選座位，|把打掃工作改成每週輪換，}{有人說你太囂張，也有人說早該這樣。|導師想了一個禮拜，竟然答應了。}",
+              order: "你答應了，但跟導師說好只提醒、不記名，{第一週全班吵到隔壁班跑來抗議，|大家反而比較聽你的，}{到了期中，自習課安靜了很多。|導師說你找到了自己的方法。}",
+              club: `你接下了${head}，{把${meet}改成每個人輪流上台帶一次，|開始帶著大家去校外比賽，}{有幾個老成員不習慣，退出了。|那一年多了好多新面孔。}`,
+              fair: "你答應了，但堅持要賣{自己發明的口味|班上沒人賣過的東西}，{第一個小時沒人買，你差點想收攤。|結果大排長龍，連老師都來排隊。}",
+              book: "你答應了，還決定{每個人都要寫一句話給十年後的自己，|把全班的糗照做成一整頁，}{有人說太丟臉，最後卻是大家最常翻的一頁。|畢冊發下來那天，全班笑成一團。}",
+              council: `你出來選，{政見寫著「午休可以不用趴著睡」，|政見是讓福利社賣什麼由全校投票，}${win ? "{結果高票當選，第一個月就把政見做到了一半。|開票那天你贏了，台下的歡呼聲你一直記得。}" : "{結果落選了，但那條政見後來真的被學校採用了。|最後差了幾十票，你笑著說明年再來。}"}`,
+            }[k], vote && !win ? 1 : 2, true]),
+          opt("no", "wait", "safe", 0.25,
+            { class: "婉拒", order: "說你做不來", club: "推給別人", fair: "說你沒空", book: "婉拒", council: "說你不適合" }[k], "不想被綁住",
+            () => [`你{搖搖頭說自己做不來，|推說要專心讀書，}${role}後來由別人${vote ? "當上" : "接下"}了，{你偶爾有點羨慕。|你鬆了一口氣，把時間留給自己。}`, 0, false]),
+          opt("family", "talk", "family", 0.15, `回家問${who}`, "聽聽家人的意見",
+            win => [vote
+              ? `你回家問${who}，${who}{說：「去試試看，輸了也沒關係。」|說：「功課顧好就好，其他的你自己決定。」}你想了一晚，決定出來選，${win ? "結果真的選上了。" : "結果差一點點落選。"}`
+              : `你回家問${who}，${who}{說：「去試試看，做不好也沒關係。」你隔天就答應了。|說：「功課顧好就好，其他的你自己決定。」你想了一晚，還是答應了。|笑著說你小時候連排隊都排不好，現在要管這麼多人了。你決定試試看。}`, vote && !win ? 0 : 2, true]),
+        ],
+      };
+    },
+  },
+  {
+    // 筆友和網友（依年代）：雜誌的筆友欄（1995 年以前）、英文課配的國外筆友（1975–1999 的學生）、BBS 和聊天室（1995–2003）、
+    // 線上遊戲、無名小站、IG、手遊、Discord（2004 年起），網友一直要你的照片（2008 年起）。
+    id: "t_penpal", once: true, ages: [13, 17], when: s => !s.abroad, p: s => (s.age >= 16 ? 0.14 : 0.1),
+    choice: (s, ctx) => {
+      const y = s.year, who = grownUp(s, ctx), f = bestFriend(s), buddy = f ? f.call : "同學", city = s.county || "你住的城市";
+      const sex = ctx.rng() < 0.6 ? s.sex : s.sex === "male" ? "female" : "male";
+      const p = ctx.person({ role: "friend", sex, birthYear: s.birthYear + ctx.rng.int(3) - 1, how: y < 1995 ? "筆友" : "網友" });
+      const name = p.call, ta = pronoun(p);
+      const far = ctx.rng.pick(COUNTIES.map(c => c[0]).filter(c => c !== s.county && c !== "金門縣"));
+      const fname = ctx.rng.pick(sex === "female" ? ["Emily", "Sarah", "Anna", "Yuki"] : ["Tom", "David", "Peter", "Kenji"]);
+      const land = /Yuki|Kenji/.test(fname) ? "日本" : ctx.rng.pick(["美國", "加拿大", "澳洲", "英國"]), en = pad(fname).trimStart();
+      const nick = ctx.rng.pick(["藍色天空", "夜貓子", "小熊軟糖", "星期五", "不睡覺的魚"]);
+      const net = y < 2013 ? ctx.rng.pick(["線上遊戲的公會", "無名小站的留言板"]) : ctx.rng.pick(["手遊的公會", "IG 上追同一個偶像的帳號", ...(y >= 2018 ? ["Discord 的群組"] : [])]);
+      const sc = sceneOf(ctx, [
+        { key: "letter", w: y < 1995 ? 2 : 0, lead: `你和雜誌筆友欄認識的${name}寫信寫了大半年，${ta}說暑假要來${city}，想跟你見一面` },
+        { key: "abroad", w: y >= 1975 && y < 2000 && s.studying ? 1 : 0, lead: `英文老師幫全班配了國外的筆友，${land}的${pad(fname)}已經寄來第三封信，說明年暑假要跟家人來台灣，想去你家看看` },
+        { key: "bbs", w: y >= 1995 && y < 2004 ? 2 : 0, lead: `你在${y < 1999 ? " BBS 的聊天版" : "網路聊天室"}認識了網友「${nick}」，每天放學都聊到家裡的電話打不進來，最近${ta}說想約出來見面` },
+        { key: "net", w: y >= 2004 ? 2 : 0, lead: `你在${pad(net)}認識了網友${name}，每天都聊到半夜，${ta}說週末想約出來見面` },
+        { key: "photo", w: y >= 2008 ? 1 : 0, lead: `你在${pad(net)}認識的一個網友，聊了好幾個月，最近一直要你傳一張照片，還問你讀哪一所學校` },
+      ]);
+      const k = sc.key, lead = sc.lead, online = k === "bbs" || k === "net", them = k === "bbs" ? `「${nick}」` : name;
+      const opt = (id, act, style, weight, labels, hints, texts, mood, more = null) => ({ id: `t_penpal.${id}`, label: labels[k], hint: hints[k] || hints.net, act, style, weight, apply: (s2, c) => { if (more) more(s2, c); return { text: c.w(`${lead}。${texts[k]}`), mood: typeof mood === "number" ? mood : mood[k] ?? mood.net }; } });
+      const meetOk = (s2, c) => { if (k === "letter" || online) befriend(s2, c, p); };
+      return {
+        prompt: `${lead}。要怎麼辦？`,
+        options: [
+          opt("meet", "socialize", "risk", 0.2,
+            { letter: "約在車站見面", abroad: `帶${pad(fname)}逛${city}`, bbs: "約在人多的地方見面", net: "約在人多的地方見面", photo: "傳一張照片過去" },
+            { letter: "拉朋友一起去", abroad: "練英文的好機會", net: "拉朋友一起去", photo: "應該沒關係吧" },
+            {
+              letter: `你們約在火車站前見面，你拉著${buddy}一起去，{${name}本人比信裡還害羞，你們吃了一碗冰就聊開了。|${name}一眼就認出你，說你跟信裡寫的一模一樣。}{那天之後，信寫得更勤了。|回家後，你把那天的車票夾進了日記本。}`,
+              abroad: `你答應了，${en}來的那天，你{帶${ta}去夜市吃臭豆腐，|帶${ta}去廟裡看人拜拜，}{你的英文說得結結巴巴，兩個人比手畫腳也笑得很開心。|${ta}回國後寄來一張全家福，背面寫著你教${ta}的那句台語。}`,
+              bbs: `你們約在車站前的速食店，你拉著${buddy}一起去。網友「${nick}」本名叫${name}，{本人比你想像的害羞，|講話比網路上還好笑，}{你們聊了一個下午。|回家後，你們在網路上聊得更起勁了。}`,
+              net: `你們約在車站前的速食店，你拉著${buddy}一起去，{${name}本人跟照片差不多，就是比較害羞，|${name}比你想像的矮一點，講話很好笑，}{三個人聊了一個下午。|回家後，你們在網路上聊得更起勁了。}`,
+              photo: `你挑了一張照片傳過去，{對方回傳的照片，卻是網路上一搜就找得到的${y >= 2015 ? "網紅" : "明星"}照，|對方接著一直問你家住在哪裡，}{你嚇了一跳，馬上封鎖了對方。|你把這件事告訴了${buddy}，兩個人越想越不對勁，一起把對方封鎖了。}`,
+            }, { net: 3, photo: -2 }, meetOk),
+          opt("keep", "wait", "safe", 0.3,
+            { letter: "繼續寫信就好", abroad: "寫信介紹台灣就好", bbs: "先在網路上聊就好", net: "先在網路上聊就好", photo: "不傳，換個話題" },
+            { letter: "見面會不會很尷尬", abroad: "不麻煩人家", net: "不急著見面", photo: "照片不急" },
+            {
+              letter: "你回信說還想再寫一陣子，{你們從考試寫到喜歡的歌，|信封上的郵票一張比一張漂亮，}{那疊信你一直收在餅乾鐵盒裡。|後來升學忙了，信越寫越少，卻一直沒斷。}",
+              abroad: `你回信說家裡太小，改寄了一大包台灣的明信片給${ta}，{還附上一張你用英文寫的${s.county ? s.county : "家鄉"}介紹，|在信裡教${ta}寫「你好」兩個字，}{${ta}回信說要把明信片貼滿房間。|後來你們一直通信到大學。}`,
+              bbs: `你說還不想見面，{你們繼續在網路上聊，從功課聊到喜歡的歌，|「${nick}」也沒有勉強你，}{後來${ta}換了帳號，你們就慢慢斷了聯絡。|那段每天聊到半夜的日子，你一直記得。}`,
+              net: `你說還不想見面，{你們繼續在網路上聊，從功課聊到喜歡的歌，|${name}也沒有勉強你，}{後來${name}換了帳號，你們就慢慢斷了聯絡。|那段每天聊到半夜的日子，你一直記得。}`,
+              photo: "你說不想傳照片，{對方又問了好幾次，|對方說了一聲「好吧」就不太回了，}{你越想越不對勁，就沒再聊了。|你發現在網路上，有些事還是要留給自己。}",
+            }, 1),
+          opt("tell", "talk", "family", 0.2,
+            { letter: `先跟${who}說`, abroad: `先跟${who}說`, bbs: `先跟${who}說`, net: `先跟${who}說`, photo: `把對話拿給${who}看` },
+            { net: "讓家人知道" },
+            {
+              letter: `你把信拿給${who}看，${who}{看完笑說你們的字都好醜，答應讓${name}來家裡吃飯。那天${name}在你家吃了三碗飯。|說要陪你一起去車站，你嘴上抱怨，心裡卻安心多了。見完面，${who}還請你們吃了一碗冰。}{那是你第一次交到外地的朋友。|}`,
+              abroad: `你跟${who}說了，${who}{緊張得把家裡大掃除了一遍，|特地去買了一本英文會話，}{${en}來的那天，${who}煮了一整桌菜。|那是你們家第一次來外國的客人。}`,
+              bbs: `你把這件事告訴了${who}，${who}{沒有罵你，只要你約在白天、人多的地方，還要你隨時打電話回家。|說要陪你去，最後坐在隔壁桌假裝看報紙。}{見面那天一切順利，${them}就是一個跟你一樣的學生。|那天之後，你什麼事都比較敢跟${who}說了。}`,
+              net: `你把這件事告訴了${who}，${who}{沒有罵你，只要你約在白天、人多的地方，還要你隨時打電話回家。|說要陪你去，最後坐在隔壁桌假裝在滑手機。}{見面那天一切順利，${them}就是一個跟你一樣的學生。|那天之後，你什麼事都比較敢跟${who}說了。}`,
+              photo: `你把對話拿給${who}看，${who}皺起眉頭，{陪你一起把那個帳號封鎖了。|教你怎麼把個人資料設成不公開。}{你把手機裡的隱私設定都重新檢查了一遍。|你很慶幸自己先開了口。}`,
+            }, 2, meetOk),
+          opt("stop", "cutOff", "self", 0.15,
+            { letter: "不再回信", abroad: "不回信了", bbs: "不再上線找對方", net: "不再回了", photo: "直接封鎖" },
+            { letter: "突然覺得有點怪", abroad: "用英文寫信好累", net: "突然覺得有點怪", photo: "這樣不對勁" },
+            {
+              letter: `你一直沒有回信，{後來${name}又寄來兩封，你都沒有拆，|那年暑假你一直怕在路上遇到${ta}，}{很多年後整理抽屜看到那疊信，你有點後悔。|你把那幾封信收進抽屜最裡面。}`,
+              abroad: `你一直拖著沒回信，{${en}又寄來一張聖誕卡，|英文課本裡還夾著${ta}的最後一封信，}{後來就沒有消息了。|很多年後，你還記得信封上那張外國郵票。}`,
+              bbs: `你突然覺得有點怪，就不再上線找${ta}了，{「${nick}」留了好幾封站內信，|後來那個帳號再也沒亮過，}{你有時候會想，${ta}是不是真的只是想交朋友。|你覺得自己做得沒錯。}`,
+              net: `你突然覺得有點怪，就不再回了，{${name}傳來的訊息一則一則堆著，|後來那個帳號再也沒亮過，}{你有時候會想，${ta}是不是真的只是想交朋友。|你覺得自己做得沒錯。}`,
+              photo: "你直接封鎖了對方，{把那段對話全部刪掉，|順手把自己的帳號改成不公開，}{之後在網路上交朋友，你都多留了一個心眼。|你覺得自己做得沒錯。}",
+            }, { letter: -1, net: 0 }),
+          opt("share", "hobby", "learn", 0.15,
+            { letter: y >= 1975 ? "交換自己錄的錄音帶" : "交換自己畫的明信片", abroad: "交換家鄉的歌", bbs: "一起寫接龍小說", net: `跟${name}一起學東西`, photo: "只聊興趣，不聊私事" },
+            { abroad: "用音樂交朋友", net: "有共同的興趣", photo: "保持一點距離" },
+            {
+              letter: y >= 1975 ? `你們約好每個月寄一捲自己錄的錄音帶，{你錄了廣播裡最喜歡的歌，|${name}錄了${ta}家附近夜市的聲音，}{你在那捲帶子裡聽到了另一個城市。|那幾捲錄音帶你一直留著。}` : `你們約好每個月寄一張自己畫的明信片，{你畫了家門口的大榕樹，|${name}畫了${far}的老街，}{你把那些明信片貼滿了書桌前的牆。|那幾張明信片你一直留著。}`,
+              abroad: `你們開始交換家鄉的歌，{你寄了一捲${y >= 1990 ? "國語流行歌" : "民歌"}的錄音帶，|${en}寄來一捲${ta}最愛的樂團，}{你照著歌詞本一個字一個字查字典。|那是你英文進步最快的一年。}`,
+              bbs: `你們決定先不見面，一起在版上寫一篇接龍小說，{你寫一段、「${nick}」接一段，|每天放學第一件事就是看${ta}寫到哪裡，}{版上竟然有人追著看。|那篇小說最後寫了三十幾集。}`,
+              net: `你們先不見面，約好一起{學畫畫|學剪影片|練同一首歌}，{每天互傳自己的進度，|${name}教了你很多你不知道的技巧，}{你發現自己真的進步了。|那是你第一個不用見面的好朋友。}`,
+              photo: "你說只聊興趣、不聊私事，{對方慢慢就不找你了，|後來你們只在群組裡打招呼，}{你覺得這樣剛剛好。|你學會了在網路上替自己留一道門。}",
+            }, 2),
+        ],
+      };
+    },
+  },
+  {
+    // 比賽和功課卡在一起。情境：演講作文比賽遇上段考、校隊集訓、班際合唱比賽、暑假做科展、機器人比賽（2010 年起）。
+    id: "t_contest", domain: "study", channel: "good", once: true, ages: [12, 18], when: s => pupil(s) && (s.age <= 17 || s.track === "五專"), p: s => (s.age >= 16 ? 0.16 : 0.12),
+    choice: (s, ctx) => {
+      const y = s.year, who = grownUp(s, ctx), role = s.flags.talent === "piano" ? "伴奏" : "指揮";
+      const kind = ctx.rng.pick(["演講", "作文", "朗讀", "書法", ...(y >= 1985 ? ["英文演講"] : [])]);
+      const team = s.flags.club === "ball" ? "球隊" : ctx.rng.pick(["籃球隊", "田徑隊", "排球隊"]), track = team === "田徑隊";
+      const sc = sceneOf(ctx, [
+        { key: "speech", act: "hobby", coach: "老師", lead: `老師推薦你代表班上參加${kind}比賽，比賽那週剛好是段考` },
+        { key: "team", act: "exercise", coach: "教練", w: s.flags.club === "ball" ? 3 : 1, lead: `${team}要${track ? "參加" : "打"}${ctx.rng.pick(["縣賽", "區域賽", "全國賽"])}了，教練要大家每天練到七點，你的成績卻一直往下掉` },
+        { key: "choir", act: "hobby", coach: "導師", lead: `班際合唱比賽快到了，導師要你當${role}，每天早自習和午休都要練` },
+        { key: "fair", act: "hobby", coach: "自然老師", w: y >= 1965 ? 1 : 0, lead: `自然老師找你做科展，暑假每天都要到學校的實驗室${ctx.rng.pick(["記錄豆芽長多高", "觀察螞蟻搬家", "測河水的水質"])}` },
+        { key: "robot", act: "hobby", coach: "指導老師", w: y >= 2010 ? 1.2 : 0, lead: "學校的機器人社要參加比賽，社長拉你進隊，週末都要留在學校寫程式" },
+      ]);
+      const k = sc.key, lead = sc.lead, coach = sc.coach;
+      const prep = { speech: kind === "書法" ? "每天放學在教室寫掉一大疊報紙" : kind === "作文" ? "每天寫一篇作文拿去給老師改" : "每天放學對著鏡子練到口乾舌燥", team: "每天練到天黑才回家", choir: role === "伴奏" ? "每天午休都在音樂教室練伴奏" : "每天對著鏡子練指揮的手勢", fair: "每天記錄、拍照、畫圖表", robot: "把程式改了一遍又一遍" }[k];
+      const won = {
+        speech: "{結果拿了第{一|二|三}名，獎狀貼在客廳的牆上。|上台領獎時，你的腿還在抖。}",
+        team: track ? "{比賽那天，你跑出了自己最好的成績。|你拿到了一面獎牌，教練拍了拍你的頭。}" : "{你們一路打進了前四強。|最後一球進的時候，全隊衝進場內抱成一團。}",
+        choir: "{全班拿到第一名，在台上抱在一起尖叫。|最後一個音落下，評審點了點頭，全班拿了第二名。}",
+        fair: "{作品拿到了縣賽的優等，還被送去全國展覽。|評審問了你好多問題，你都答得出來。}",
+        robot: "{你們的機器人跑完全程，拿了第三名。|比賽那天你們修到最後一分鐘，機器人終於動了起來，還拿了佳作。}",
+      }[k];
+      const lost = {
+        speech: "{結果沒有得名，你卻記得站在台上的每一秒。|最後只拿了佳作，你還是覺得很值得。}",
+        team: track ? "{比賽那天你起跑慢了半步，沒有進決賽。|你沒拿到名次，但破了自己的紀錄。}" : "{第一場就輸了，全隊在場邊哭成一團，教練說明年再來。|最後沒有晉級，但那是你最熱血的一段日子。}",
+        choir: "{結果沒有得名，但大家唱完都笑了。|全班只拿了第五名，你還是覺得那首歌唱得最好聽。}",
+        fair: "{作品沒有得獎，但你學會了怎麼做實驗。|評審說你的題目很有趣，只是數據不夠多。}",
+        robot: "{機器人比賽時突然卡住，你們只能看著它停在半路。|最後沒有得名，你們約好明年再來。}",
+      }[k];
+      const doing = { speech: "練習比賽", team: track ? "練跑" : "練球", choir: "練唱", fair: "待在實驗室", robot: "寫程式" }[k];
+      return {
+        prompt: `${lead}。要怎麼辦？`,
+        options: [
+          {
+            id: "t_contest.all", label: { speech: `全力準備${kind}比賽`, team: track ? "全心練習" : "全心練球", choir: `全心當好${role}`, fair: "整個暑假泡在實驗室", robot: "週末都耗在社團教室" }[k], hint: "這是你喜歡的事", act: sc.act, style: "self", weight: 0.25,
+            apply: (s2, c) => { const win = c.roll("study", "good", 0.4); return { text: c.w(`${lead}。你決定全力拚比賽，${prep}，${win ? won : lost}${k === "fair" ? "" : "{|那次段考退步了一點，你也認了。}"}`), mood: win ? 4 : 1 }; },
+          },
+          {
+            id: "t_contest.both", label: "兩邊都顧，睡少一點", hint: "比賽和成績都要", act: "pushThrough", style: "risk", weight: 0.25,
+            apply: (s2, c) => { stressBy(s2, 0.04); const win = c.roll("study", "good", 0.35); return { text: c.w(`${lead}。你決定兩邊都顧，${k === "fair" ? "{白天待在實驗室，晚上去補習，|上午做實驗，下午寫暑假作業，}" : `{放學先${doing}，回家再讀書讀到半夜，|下課十分鐘也拿來背單字，}`}${win ? "{比賽拿了名次，成績也沒掉，只是黑眼圈深了一圈。|最後比賽和成績都撐住了，你在公車上睡到過站。}" : "{比賽沒有得名，成績也只是普普通通，你累得在公車上睡過了站。|結果比賽和成績都差了一點點，你還是不後悔。}"}`), mood: win ? 2 : -1 }; },
+          },
+          {
+            id: "t_contest.study", label: { speech: "推掉比賽，專心考試", team: "先跟教練請假", choir: `請導師換人當${role}`, fair: "說暑假要補習", robot: "說要先顧功課" }[k], hint: "成績比較要緊", act: "study", style: "safe", weight: 0.2,
+            apply: (s2, c) => ({ text: c.w(`${lead}。你${{ speech: "跟老師說要專心準備段考，把機會讓給了別人", team: "跟教練請了一個月的假", choir: `請導師找別人當${role}`, fair: "跟自然老師說暑假要補習", robot: "跟社長說要先顧功課" }[k]}，{成績穩穩的，|${k === "fair" ? "開學的段考" : "那次段考"}考得不錯，}{${{ speech: "只是比賽那天，你在台下看得心裡有點酸。", team: "只是比賽那天，你在看台上喊到喉嚨都啞了。", choir: "比賽那天，你站在隊伍裡跟著大家一起唱。", fair: "只是看到同學的作品得獎，你心裡有點酸。", robot: "只是看到隊友抱著獎盃回來，你心裡有點酸。" }[k]}|你告訴自己，以後還有機會。}`), mood: 0 }),
+          },
+          {
+            id: "t_contest.ask", label: { speech: "跟老師商量時間", team: "跟教練談練習時間", choir: "請大家一起調時間", fair: "跟老師商量進度", robot: "跟隊友重新分工" }[k], hint: "找出兩全的辦法", act: "negotiate", style: "social", weight: 0.15,
+            apply: (s2, c) => {
+              const win = c.roll("study", "good", 0.4);
+              const how = { choir: "你去跟導師和同學商量，{大家決定段考前一週先停練，|大家把練唱改到午休的前半段，}", fair: "你跟自然老師商量，{把實驗改成每週去三天，|老師答應讓你早上做實驗、下午去補習，}", robot: "你跟隊友重新分工，{你負責寫程式、隊友負責組裝，|週末只去半天，晚上再各自在家改程式，}" }[k] || `你去跟${coach}商量，{${coach}答應考前一週讓你先回家讀書，|${coach}把練習改到考完試以後，}`;
+              return { text: c.w(`${lead}。${how}${win ? "{你兩邊都沒放棄，比賽還拿了名次。|比賽和功課都比你想的順利。}" : "{比賽沒得名，但功課穩住了。|兩邊都顧到了，你覺得自己長大了一點。}"}`), mood: win ? 3 : 1 };
+            },
+          },
+          {
+            id: "t_contest.family", label: `問${who}的意見`, hint: "聽聽家人怎麼說", act: "talk", style: "family", weight: 0.15,
+            apply: (s2, c) => ({ text: c.w(`${lead}。你回家問${who}，${who}{說：「成績我不擔心，你想比就去比。」比賽那天，${who}特地請假來看。|說：「先把書讀好，比賽以後還有。」你嘴上答應，心裡偷偷記下了明年比賽的日子。|想了很久，說：「你自己決定，我都支持你。」你想了一個晚上，做出了自己的決定。}`), mood: 2 }),
+          },
+        ],
+      };
+    },
+  },
+  {
+    // 服儀（依年代）：髮禁時代的頭髮檢查（2005 年以前）、朝會的服裝檢查（1995 年以前）、糾察隊（1985–2015）、
+    // 冬天在制服外加穿自己的外套（2005–2015）、學生會提案穿便服（2016 年起）。
+    id: "t_uniform", domain: "study", channel: "bad", once: true, ages: [13, 17], when: inSchool, p: () => 0.13,
+    choice: (s, ctx) => {
+      const y = s.year, who = grownUp(s, ctx), off = officerOf(s), office = officeOf(s), girl = s.sex === "female";
+      const note = s.track === "國中" ? "聯絡簿" : "字條";
+      const item = ctx.rng.pick([girl ? { it: "改短的裙子", fix: `${who}連夜幫你把裙襬放了回去` } : { it: "改窄的褲管", fix: `${who}帶你去修改店把褲管放了回去` }, { it: "白襪子上的花邊", fix: "你把襪子換成了學校規定的素面白襪" }, { it: "剪短背帶的書包", fix: `${who}一邊幫你把背帶縫回去，一邊念你亂花心思` }, { it: "沒繡學號的制服", fix: `${who}帶你去學校附近的繡學號攤，把學號繡了上去` }]);
+      const miss = ctx.rng.pick([{ what: "戴名牌", fix: "把名牌別上" }, { what: `把襯衫紮進${girl ? "裙子" : "褲子"}裡`, fix: "把襯衫紮好" }, { what: "穿學校規定的皮鞋", fix: "答應明天換上皮鞋" }]);
+      const sc = sceneOf(ctx, [
+        { key: "hair", w: y < 2005 ? 2 : 0, lead: `早上進校門時，${off}拿著尺站在門口，說你的${girl ? "髮尾已經碰到衣領了" : "頭髮長到可以用手抓起來了"}` },
+        { key: "check", w: y < 1995 ? 1.5 : 0, lead: `朝會時${off}一排一排檢查服裝，你${item.it}被當場抓到` },
+        { key: "patrol", w: y >= 1985 && y < 2016 ? 1 : 0, lead: `你剛進校門，糾察隊的學長姊就把你攔下來，說你沒有${miss.what}` },
+        { key: "coat", w: y >= 2005 && y < 2016 ? 2 : 0, lead: `天氣變冷，你在制服外面套了一件自己的外套，在校門口被${off}攔下來` },
+        { key: "vote", w: y >= 2016 ? 2 : 0, lead: "學生會提案讓大家可以穿便服上學，班會要討論，大家吵成一團" },
+      ]);
+      const k = sc.key, lead = sc.lead;
+      const opt = (id, act, style, weight, label, hint, text, mood) => ({ id: `t_uniform.${id}`, label, hint, act, style, weight, apply: (s2, c) => ({ text: c.w(`${lead}。${text}`), mood }) });
+      return {
+        prompt: `${lead}。要怎麼辦？`,
+        options: [
+          opt("obey", "reconcile", "safe", 0.35, { hair: "放學就去剪", check: "乖乖改好", patrol: "當場改好", coat: "把外套脫掉", vote: "投給維持制服" }[k], k === "vote" ? "穿制服也沒什麼不好" : "規定就是規定", {
+            hair: girl ? `放學你就去巷口的家庭理髮店，{理髮師傅一刀剪到耳下，你看著鏡子差點哭出來，|剪完的瀏海齊得像用尺畫的，}{隔天同學笑你是西瓜皮。|${who}倒是說這樣看起來比較有精神。}` : `放學你就去巷口的家庭理髮店，{師傅拿起電剪三兩下就推平了，|剪完摸著刺刺的後腦勺，}{隔天同學笑你像剛剃完毛的綿羊。|${who}倒是說這樣看起來比較有精神。}`,
+            check: `${item.fix}，{之後你每天出門前都先檢查一遍。|那年你成了全班服裝最整齊的人。}`,
+            patrol: `你當場${miss.fix}，{學長姊點點頭讓你進去了，|還是被記了一次名字，}{之後每天出門前都先照一下鏡子。|你覺得有點丟臉，但也就這樣了。}`,
+            coat: `你把外套脫下來塞進書包，{一整天冷得直搓手，|改穿了兩件學校的長袖制服，}{隔天${who}陪你去買了一件學校的外套。|你在週記上寫了這件事，導師回了一句「我也覺得冷」。}`,
+            vote: "你投給維持穿制服，{覺得每天不用想穿什麼也不錯，|說制服會是畢業後最懷念的東西，}{結果只差兩票，|最後學校決定一週開放一天便服，}{大家吵完還是一起去吃午餐。|你覺得能這樣吵一吵也很好。}",
+          }[k], 0),
+          opt("argue", "insist", "risk", 0.15, { hair: `跟${off}說規定不合理`, check: `跟${off}理論`, patrol: "跟糾察隊理論", coat: `跟${off}說真的很冷`, vote: "上台支持穿便服" }[k], "說出你的想法", {
+            hair: `你跟${off}說，頭髮長短跟讀書沒有關係，{結果被記了一支警告，|${off}愣了一下，罰你去掃一個禮拜的廁所，}{但你一點都不後悔。|${y >= 2000 ? "幾年後髮禁真的解除了，你想起那天還是有點驕傲。" : "那件事你到現在還記得。"}}`,
+            check: `你跟${off}爭了幾句，說這又不影響上課，{被記了一支警告，|被叫去${office}罰站了一節課，}{回家又被${who}念了一頓。|但你覺得很值得。}`,
+            patrol: `你跟糾察隊的學長姊說規定沒寫得那麼細，{結果被記下名字送到${office}，|學長姊被你問得答不出來，揮揮手讓你進去了，}{你覺得自己說得沒錯。|你有點得意，又有點心虛。}`,
+            coat: `你跟${off}說天氣真的很冷，學校的外套又不夠暖，{${off}看了你一眼，說下不為例，|還是被記了一次，}{後來班上好幾個同學都跟你一樣穿。|隔年冬天，學校開放可以在制服外面加穿外套。}`,
+            vote: "你站上講台支持穿便服，{說一個人穿什麼不影響他讀書，|說制服太熱、太貴，又不好洗，}{台下有人鼓掌，也有人噓你。|最後學校開放每週一天便服日。}{|你第一次覺得自己的話有人聽。}",
+          }[k], 1),
+          opt("dodge", "avoid", "self", 0.2, { hair: girl ? "把頭髮綁起來藏好" : "用水把頭髮壓扁", check: "下次藏好一點", patrol: "明天早點到", coat: "進校門前先脫掉", vote: "不想管，反正都行" }[k], "不想多事", {
+            hair: `你${girl ? "把頭髮綁起來塞進衣領" : "每天早上用水把頭髮壓得扁扁的"}，{每天早上從側門溜進學校，|看到${off}就繞路走，}{撐了一個多月還是被抓到，最後乖乖去剪了。|居然一直撐到學期末都沒被抓到。}`,
+            check: `你嘴上說好，{之後每到朝會就換回規定的樣子，|只有朝會那天才乖乖照規定，}{${off}好像也睜一隻眼閉一隻眼。|一直到畢業都沒再被抓到。}`,
+            patrol: "你決定隔天早一點到，{七點不到就溜進教室，|專挑糾察隊還沒站好的時候進校門，}{那學期你一次也沒被攔下來。|同學說你是全班最早到的人。}",
+            coat: `你每天走到校門口前就把外套脫掉塞進書包，{一進教室再穿回來，|在${off}看不到的地方才拿出來，}{一整個冬天都沒被抓到。|有一次忘了脫，被抓個正著。}`,
+            vote: "你覺得穿什麼都可以，沒有舉手，{趴在桌上等大家吵完，|在底下偷偷寫數學作業，}{最後學校開放每週一天便服日，你還是每天穿制服。|結果是什麼你也沒放在心上。}",
+          }[k], 1),
+          opt("petition", "negotiate", "social", 0.15, { hair: "找同學一起向學校反映", check: "找同學一起向學校反映", patrol: "在班會上提出來", coat: "發起連署", vote: "幫忙整理大家的意見" }[k], "大家一起說比較有用", {
+            hair: `你和幾個同學在班會上提出來，{請班長把大家的意見寫進班會紀錄，|一起在週記裡寫了同一件事，}{學校沒有改規定，但${off}之後檢查時寬鬆了一點。|導師在週記上回了一句「我會幫你們反映」。}`,
+            check: `你和幾個同學在班會上提出來，{請班長把大家的意見寫進班會紀錄，|一起在週記裡寫了同一件事，}{學校沒有改規定，但${off}之後檢查時寬鬆了一點。|導師在週記上回了一句「我會幫你們反映」。}`,
+            patrol: `你在班會上提出糾察隊的標準不一致，{班長把它寫進了班會紀錄，|全班投票通過，送到了${office}，}{後來糾察隊的檢查表多了一條說明。|下個月，糾察隊檢查的方式真的改了。}`,
+            coat: `你和幾個同學發起連署，請學校讓大家冬天可以在制服外加穿外套，{一個禮拜就收到了好幾百個簽名，|學生會也出來幫忙，}{${y >= 2010 ? "隔年學校改了規定。" : "學校說會再研究。"}|你第一次知道，事情是可以去爭取的。}`,
+            vote: "你自願幫忙整理大家的意見，{做了一張問卷發給全班，|把贊成和反對的理由整理成一張表，}{學生會說那是他們收到最清楚的一份。|最後學校開放每週一天便服日。}",
+          }[k], 2),
+          opt("family", "seekHelp", "family", 0.15, k === "vote" ? `回家問${who}的看法` : `請${who}寫${note}說明`, k === "vote" ? "聽聽大人怎麼想" : "讓大人出面", {
+            hair: `你請${who}在${note}上寫幾句話，{${who}寫說你頭髮長得特別快，週末就會帶你去剪，|${who}看了一眼，說「規定就是規定」，週末就帶你去剪了，}{${off}看完${note}，揮揮手讓你過了。|你嘟著嘴，但也沒再說什麼。}`,
+            check: `你請${who}在${note}上替你說幾句話，${who}{寫了好長一段，|只寫了「下次注意」四個字，}{${off}看完說下不為例。|你還是乖乖改好了。}`,
+            patrol: `你請${who}在${note}上替你說幾句話，導師看了，{幫你去跟糾察隊說明，|笑著說下次記得就好，}{那次的紀錄被撤掉了。|你鬆了一口氣。}`,
+            coat: `你請${who}在${note}上寫你怕冷，請學校通融，{${off}看完說下不為例。|隔週${who}乾脆幫你買了一件學校的外套。}`,
+            vote: `你回家問${who}，${who}{說以前連頭髮長度都要管，現在的你們很幸福，|說穿什麼都好，重要的是你們自己決定，}{隔天你在班會上把這段話說給大家聽。|你決定投給自己真心想要的那一邊。}`,
+          }[k], 1),
+        ],
+      };
+    },
+  },
+  {
+    // 排擠（你是旁觀的人）。情境：小團體不跟某個同學說話、沒有某人的群組（2011 年起）、分組時沒人要的同學、新來的轉學生、
+    // 桌上被寫了綽號。
+    id: "t_clique", domain: "study", channel: "bad", once: true, ages: [12, 16], when: pupil, p: s => (s.age === 12 ? 0.15 : 0.12),
+    choice: (s, ctx) => {
+      const y = s.year, m = classmate(s, ctx, 0.7), name = m.call, ta = pronoun(m);
+      const sc = sceneOf(ctx, [
+        { key: "lunch", alone: "一個人吃便當的樣子", lead: `班上的小團體開始不跟${name}說話，還要大家午餐時別跟${ta}坐在一起` },
+        { key: "group", alone: "下課一個人看著手機的樣子", w: y >= 2011 ? 1.5 : 0, lead: `你發現班上開了一個沒有${name}的群組，有人在裡面拿${ta}的照片開玩笑` },
+        { key: "team", alone: "一個人站在講台旁的樣子", lead: `分組報告時，沒有一組願意收${name}，${ta}一個人站在講台旁邊` },
+        { key: "new", alone: "下課一個人坐在位子上的樣子", lead: `班上轉來了${name}，才一個星期，就有人笑${ta}講話的口音，下課都不找${ta}` },
+        { key: "desk", alone: "低頭擦桌子的樣子", w: y >= 1980 ? 1 : 0, lead: `有人用立可白在${name}的桌上寫了難聽的綽號，大家都在偷笑` },
+      ]);
+      const k = sc.key, lead = sc.lead;
+      const opt = (id, act, style, weight, label, hint, text, mood, more = null) => ({ id: `t_clique.${id}`, label, hint, act, style, weight, apply: (s2, c) => { if (more) more(s2, c); return { text: c.w(`${lead}。${text}`), mood }; } });
+      const friends = `{後來${name}成了你很好的朋友。|那學期你們每天中午都一起吃飯。}`;
+      return {
+        prompt: `${lead}。要怎麼辦？`,
+        options: [
+          opt("befriend", "socialize", "social", 0.25, { lunch: `端著便當去跟${name}坐`, group: `約${name}一起吃午餐`, team: `邀${name}進你們這組`, new: `下課主動找${name}聊天`, desk: `幫${name}把桌子擦乾淨` }[k], "總要有人先開始", {
+            lunch: `你端著便當走到${name}旁邊坐下，{${name}愣了一下，把${ta}的滷蛋分了一半給你。|小團體的人瞪了你好幾眼，你假裝沒看到。}${friends}`,
+            group: `你沒在群組裡說話，隔天卻約${name}一起吃午餐，{${name}有點驚訝，然後笑了。|你們聊著聊著，才發現喜歡同一個 YouTuber。}${friends}`,
+            team: `你舉手說：「來我們這組。」{組員有人小聲抱怨，|${name}紅著臉走過來，}{結果${name}做的海報是全班最漂亮的。|報告那天，你們這組拿了最高分。}{後來${name}成了你很好的朋友。|}`,
+            new: `你下課主動去找${name}，{問${ta}以前的學校是什麼樣子，|請${ta}教你講${ta}家鄉的話，}{後來${name}成了你很好的朋友。|沒多久，班上其他人也開始跟${ta}說話了。}`,
+            desk: `你拿了濕抹布，陪${name}一點一點把桌上的字刮掉，{${name}一直低著頭說謝謝，|擦了整整一節下課，}{後來${name}成了你很好的朋友。|那天放學，你們一起走路回家。}`,
+          }[k], 3, (s2, c) => befriend(s2, c, m)),
+          opt("note", "talk", "safe", 0.2, `私下${y < 1990 ? "塞紙條給" : y < 2000 ? "打電話給" : "傳訊息給"}${name}`, "不想被小團體發現",
+            `你${sendTo(y)}${name}，{${y < 1990 ? "寫" : "說"}「不要理他們，我覺得你很好」，|只${y < 1990 ? "寫" : "說"}了一句「明天見」，}{隔天${name}對你笑了一下。|${name}${y < 1990 ? "在紙條背面回" : "回你"}：「謝謝，真的。」}{你們在班上還是不太說話，但你知道${ta}沒那麼孤單了。|很多年後，${name}說那是${ta}那一年收到最好的東西。}`, 2),
+          opt("speak", "insist", "risk", 0.15, { lunch: "跟小團體說不要這樣", group: "在群組裡說「夠了」", team: "說這樣不公平", new: `叫大家別再笑${ta}`, desk: "問是誰寫的" }[k], "站出來", {
+            lunch: `你跟小團體的人說：「這樣很幼稚。」{有人翻白眼，|帶頭的那個愣了一下，}{接下來幾天，他們連你也不太理。|但沒多久，有幾個人也悄悄去跟${name}說話了。}`,
+            group: "你在群組裡打了一句「夠了，這樣不好笑」，{群組安靜了好久，|有人默默退出了群組，}{隔天那張照片被收回了。|有人私訊跟你說，他其實也覺得不好笑。}",
+            team: `你站起來說：「這樣不公平。」{老師點點頭，請大家重新分組，|全班安靜了一下，}{最後${name}被分到了你們這組。|下課時，${name}遠遠地對你點了點頭。}`,
+            new: `你在大家笑的時候說：「有什麼好笑的？」{笑聲停了，|帶頭的那個臉紅了，}{之後就沒人再學${ta}講話了。|下課時，${name}遠遠地對你點了點頭。}`,
+            desk: "你站上講台問是誰寫的，{全班安靜得連電風扇的聲音都聽得到，|沒有人承認，}{隔天那張桌子被換成了新的。|後來再也沒有人在桌上亂寫了。}",
+          }[k], 1),
+          opt("teacher", "seekHelp", "social", 0.15, k === "group" ? "截圖給導師看" : "告訴導師", "請大人處理",
+            `你私下${k === "group" ? "把截圖拿給導師看" : "告訴了導師"}，{導師在班會上讓大家談談被冷落的感覺，|導師找了帶頭的幾個人去談，}{沒有人知道是你說的。|班上的氣氛慢慢變了。}{${name}後來在畢業紀念冊上寫了一句謝謝。|}`, 1),
+          opt("follow", "wait", "self", 0.25, { lunch: "跟著大家，不想惹麻煩", group: "已讀，不說話", team: "低頭不說話", new: `跟大家一樣不理${ta}`, desk: "假裝沒看到" }[k], "不想被一起排擠",
+            `你什麼都沒做，{跟著大家假裝沒看到，|低頭做自己的事，}{那學期就這樣過去了。|${name}後來轉學了，你連聲再見都沒說。}{很多年後，你還記得${name}${sc.alone}。|你一直不太喜歡想起那一年。}`, -2),
+        ],
+      };
+    },
+  },
+  {
+    // 照顧弟弟妹妹（4–11 歲）。情境：家裡的大人加班或顧店、安親班接送（1990 年起）、陪寫功課、暑假整天帶著。
+    id: "t_siblingCare", domain: "family", channel: "change", tags: ["siblings"], about: "siblings", once: true, ages: [12, 17],
+    when: s => !s.abroad && (s.father.alive || s.mother.alive) && littleSibs(s).length > 0, p: () => 0.2,
+    choice: (s, ctx) => {
+      const y = s.year, home = liveWith(s, ctx), who = grownUp(s, ctx), f = bestFriend(s), buddy = f ? f.call : "同學";
+      const kid = ctx.rng.pick(littleSibs(s)), x = siblingCall(kid), xta = /Brother/.test(kid.relation) ? "他" : "她", xage = s.age - kid.bornAt;
+      const me = s.sex === "male" ? "哥哥" : "姊姊", shop = s.flags.familyShop, tight = homeMoney(s, ctx) === "tight";
+      const others = bornSiblings(s).filter(z => z !== kid && s.age - z.bornAt >= 10), other = others.length ? siblingCall(ctx.rng.pick(others)) : null;
+      const helper = y < 1990 ? "隔壁的阿姨" : "樓下的鄰居阿姨";
+      const busy = shop ? `家裡的${shop}最近生意正忙，${home}顧店顧到晚上八點` : `${home}${tight ? "為了多賺一點錢" : "最近"}${y < 1985 ? "在工廠趕貨" : "常常加班"}，晚上八點多才到家`;
+      const after = s.flags.club === "ball" ? { what: "球隊練到六點", name: "球隊", where: "球場邊" } : s.flags.club && s.flags.club !== "none" ? { what: "社團忙到六點", name: "社團", where: "社團教室" } : { what: "跟同學打球打到六點", name: "打球", where: "球場邊" };
+      const subj = xage <= 7 ? "注音" : ctx.rng.pick(["數學", "作文", ...(y >= 2005 ? ["英文"] : [])]);
+      const sc = sceneOf(ctx, [
+        { key: "late", lead: `${busy}，${s.studying ? "放學" : "下班"}後${x}都要由你顧` },
+        { key: "pickup", w: y >= 1990 && s.studying && xage >= 6 ? 1 : 0, lead: `${x}的安親班五點下課，${who}要你每天先去接${xta}，可是你每天${after.what}` },
+        { key: "homework", w: xage >= 6 ? 1 : 0, lead: `${x}的${subj}作業寫不出來，每天晚上都哭著來敲你的房門，可是${s.studying ? "你自己下禮拜也要段考" : "你白天上班已經累得要命"}` },
+        { key: "summer", w: s.studying ? 1 : 0, lead: `暑假${home}都要上班，${x}整天跟在你後面，你原本跟${buddy}約好要出去玩` },
+      ]);
+      const k = sc.key, lead = sc.lead, cook = y < 1972 ? "熱了一鍋地瓜稀飯" : "煮了兩碗加蛋的泡麵";
+      const opt = (id, act, style, weight, label, hint, text, mood) => ({ id: `t_siblingCare.${id}`, label, hint, act, style, weight, apply: (s2, c) => ({ text: c.w(`${lead}。${text}`), mood }) });
+      return {
+        prompt: `${lead}。要怎麼辦？`,
+        options: [
+          opt("care", "care", "family", 0.3, { late: `每天準時回家顧${x}`, pickup: `每天準時去接${x}`, homework: `陪${x}寫完作業`, summer: `整個暑假帶著${x}` }[k], "家裡需要你", {
+            late: `你每天${s.studying ? "一放學" : "一下班"}就趕回家，{${cook}，和${x}一起吃，|幫${x}洗澡、陪${xta}寫功課、哄${xta}睡覺，}{${home}回到家，看到你們兩個都睡著了。|有一天${x}在作文裡寫：我的${me}是超人。}`,
+            pickup: `你跟大家說每天要先走，{五點準時出現在安親班門口，|牽著${x}的手走路回家，路上買一支冰棒分著吃，}{${x}逢人就說你最準時。|${after.name}的事你只好週末再補回來。}`,
+            homework: `你每天晚上先陪${x}把作業寫完，{${xta}寫一題你講一題，|教到一半，自己也弄懂了一個以前沒搞懂的地方，}{${x}的作業簿上多了好幾個${y < 2005 ? "「甲上」" : "笑臉章"}。|${s.studying ? "自己的書只好讀到半夜。" : `你常常比${x}還早睡著。`}}`,
+            summer: `你跟${buddy}說改天再約，{整個暑假帶著${x}${y < 1980 ? "去河邊抓魚" : "去圖書館吹冷氣"}，|每天帶著${x}在巷口騎腳踏車，}{${x}曬得跟你一樣黑。|那是你們兩個最常待在一起的一個夏天。}`,
+          }[k], 1),
+          opt("bring", "socialize", "social", 0.2, { late: `帶${x}去${buddy}家寫功課`, pickup: `接了${x}再一起去${after.where}`, homework: `帶${x}去圖書館一起寫`, summer: `帶${x}一起去玩` }[k], "兩邊都顧到", {
+            late: `你帶著${x}去${buddy}家寫功課，{${buddy}教${x}摺紙飛機，|${x}跟${buddy}家的狗玩成一片，}{${x}從此每天都吵著要去。|${buddy}的媽媽常常留你們吃晚飯。}`,
+            pickup: `你接了${x}就帶${xta}一起去${after.where}，{${x}坐在旁邊安安靜靜地畫畫，|大家都把${x}當成吉祥物，}{${x}說長大也要跟你一樣。|你兩邊都沒放棄。}`,
+            homework: `你帶著${x}去圖書館，{兩個人各寫各的，誰先寫完誰就可以去借漫畫，|你讀你的書，順便幫${xta}看作業，}{${x}${y >= 1980 ? "說圖書館的冷氣比家裡涼" : "說圖書館比家裡安靜"}。|你們每天都在圖書館關門前才回家。}`,
+            summer: `你帶著${x}一起赴約，{${buddy}說多一個人更好玩，|大家輪流背${x}走回家，}{${x}從此把你的朋友都當成自己的朋友。|那天${x}笑得最大聲。}`,
+          }[k], 2),
+          opt("talk", "negotiate", "self", 0.15, `跟${home}商量`, "不能全部都我來",
+            `你跟${home}說你也有自己的事，{你們說好一週三天由你顧，其他時間${home}再想辦法。|${home}想了想，說週末會多陪${x}，讓你喘口氣。}{你這才知道${home}也很為難。|那天晚上，${home}多煮了一道你愛吃的菜。}`, 1),
+          opt("teach", "talk", "learn", 0.2, `教${x}自己來`, "總有一天要長大", {
+            late: `你決定教${x}自己來，{教${xta}怎麼用電鍋熱飯，|教${xta}自己檢查書包、自己洗澡，}{一個月後，${x}已經會自己準備明天要帶的東西。|沒多久，${x}就得意地說自己是「小大人」了。}`,
+            pickup: `你教${x}認路，讓${xta}跟同一個安親班的同學結伴走回家，{頭幾天你請了假，偷偷跟在後面，|你拜託路口雜貨店的老闆幫忙看著，}{一個月後，${x}已經會自己回家了。|沒多久，${x}就得意地說自己是「小大人」了。}`,
+            homework: `你跟${x}說好，每一題先自己想十分鐘，想不出來再來問你，{${x}一開始嘟著嘴，|${x}想著想著就寫出來了，}{後來${xta}敲門的次數越來越少。|過了一個月，${x}得意地說自己是「小大人」了。}`,
+            summer: `你幫${x}排了一張暑假作息表，{幾點寫功課、幾點出去玩都寫得清清楚楚，|教${xta}自己去巷口買早餐，}{${x}居然照著做了一整個暑假。|你終於有時間跟${buddy}出去了。}`,
+          }[k], 2),
+          {
+            id: "t_siblingCare.share", label: other ? `跟${other}輪流` : `請${helper}幫忙`, hint: other ? "大家一起分擔" : "遠親不如近鄰", act: other ? "shareCare" : "seekHelp", style: "social", weight: 0.15,
+            apply: (s2, c) => ({ text: c.w(other
+              ? `${lead}。你跟${other}排了一張表，{一三五你顧、二四六${other}顧，|一個負責煮飯、一個負責陪寫功課，}{兩個人第一次合作得這麼好。|有時候還是會為了誰多顧一天吵架。}`
+              : `${lead}。你拜託${helper}幫忙，{${helper}說${x}${k === "summer" ? "白天" : "放學"}可以先去她家，|${helper}每天傍晚會過來看一下，}{你帶了一盒水果去謝謝她。|你這才發現，鄰居也可以像家人一樣。}`), mood: 1 }),
+          },
+        ],
+      };
+    },
+  },
+  {
+    // 已經出去工作的青少年（國小、國中畢業就工作，做滿一年以後；y_firstWeek 講的是第一個星期）。情境：師傅或領班答應
+    // 教你真功夫（家裡的店不算）、晚上的技藝班在招生、下班遇到穿制服的老同學。
+    id: "t_youngWorker", domain: "career", channel: "change", once: true, ages: [14, 17],
+    when: s => !s.studying && !s.abroad && s.employed && !!s.job && s.job.field !== "自營" && s.age > (s.job.since ?? s.age), p: () => 0.5,
+    choice: (s, ctx) => {
+      const y = s.year, who = grownUp(s, ctx), title = s.job.title, family = s.job.field === "家業";
+      const boss = family ? who : /工廠/.test(title) ? "領班" : /清潔/.test(title) ? "組長" : "師傅";
+      const skill = /廚房/.test(title) ? "掌杓" : /工廠/.test(title) ? "操作機台" : /清潔/.test(title) ? "排班和帶新人" : /田/.test(title) ? "開耕耘機" : "進貨和算帳";
+      const course = ctx.rng.pick(y < 1980 ? ["鎮上裁縫補習班的夜間班", "夜間的電工訓練班"] : y < 2000 ? ["補習班的夜間電腦班", "夜間的英文會話班", "職訓中心的夜間美髮班"] : ["職訓中心的夜間電腦繪圖班", "夜間的英文會話班", "社區大學的烘焙課"]);
+      const exam = s.edu === "國小" ? exam15Name(y + 1) : exam18Name(y + 1);
+      const sc = sceneOf(ctx, [
+        { key: "skill", w: family ? 0 : 1, lead: `${boss}說要開始教你${skill}，可是以後每天要提早一個小時到` },
+        { key: "night", lead: `你看到${course}在招生，上課時間是晚上七點，跟下班的時間只差半小時` },
+        { key: "uniform", lead: `下班路上遇到以前的同學，他們穿著制服，聊的都是下個月的${exam}` },
+      ]);
+      const k = sc.key, lead = sc.lead;
+      const opt = (id, act, style, weight, labels, hints, texts, mood, more = null) => ({ id: `t_youngWorker.${id}`, label: labels[k], hint: hints[k], act, style, weight, apply: (s2, c) => { if (more) more(s2); return { text: c.w(`${lead}。${texts[k]}`), mood }; } });
+      return {
+        prompt: `${lead}。要怎麼辦？`,
+        options: [
+          opt("push", "pushThrough", "risk", 0.25,
+            { skill: "每天提早一個小時到", night: "下班直接衝去上課", uniform: "回去更拚命做" },
+            { skill: "趁年輕多學一點", night: "累也要學", uniform: "這也是一條路" },
+            {
+              skill: `你每天天還沒亮就出門，{${boss}教得很仔細，也很兇，|你把${boss}說的每一句話都記在小本子上，}{三個月後，${boss}第一次放手讓你${skill}。|你發現自己做得比想像中好。}`,
+              night: "你每天下班連飯都來不及吃，{啃著麵包就衝去上課，|騎著腳踏車一路趕過去，}{結業那天，你把證書拿回家給家人看。|雖然常常在課堂上打瞌睡，你一堂也沒缺過。}",
+              uniform: `你回去以後做得更拚，{每天第一個到、最後一個走，|${boss}開始把重要的事交給你，}{你告訴自己，這也是一條路。|一年後，你做事已經比剛來的大人還俐落。}`,
+            }, 0, s2 => stressBy(s2, 0.03)),
+          opt("ask", "negotiate", "social", 0.2,
+            { skill: `跟${boss}談時間`, night: `請${boss}讓你早點走`, uniform: `問${boss}能不能多學一點` },
+            { skill: "早到可以，早點走", night: "說清楚為什麼", uniform: "主動開口" },
+            {
+              skill: `你跟${boss}說，早到可以，但想早一點下班，{${boss}想了想就答應了，|${boss}笑說你年紀小小就會談條件，}{你多了一段自己的時間。|你學得很快，也沒有累垮。}`,
+              night: `你跟${boss}說想去上課，{${boss}答應讓你提早半小時下班，|${boss}說年輕人多學一點好，還幫你調了班，}{你每天準時趕到教室。|拿到結業證書那天，你第一個拿去給${boss}看。}`,
+              uniform: `你主動問${boss}能不能多學一點，{${boss}愣了一下，開始帶你學${skill}，|${boss}說「肯學就好」，下班後多留半小時教你，}{你覺得自己每天都在進步。|你發現開口沒有想像中難。}`,
+            }, 2),
+          opt("learn", "study", "learn", 0.2,
+            { skill: "先自己下功夫", night: "買書自己讀", uniform: "買參考書自己讀" },
+            { skill: "不想麻煩別人", night: "比較省錢", uniform: "書不一定要在學校讀" },
+            {
+              skill: `你決定先自己下功夫，{下班後把${boss}教的在心裡一遍一遍重來，|把${boss}的每個步驟都記在小本子上，}{${boss}發現了，說你有心。|一個月後，你已經做得有模有樣。}`,
+              night: "你沒有報名，去書局買了一本自學的書回家，{每天睡前讀一個小時，|看不懂的地方就畫起來，假日再去圖書館查，}{進度很慢，但你沒有放棄。|那本書被你翻到起了毛邊。}",
+              uniform: "你去書局買了一套參考書，{每天下班後讀一個小時，|假日就去圖書館坐一整天，}{你發現自己其實很喜歡讀書。|你在書的第一頁寫下了一個目標。}",
+            }, 2),
+          opt("rest", "rest", "self", 0.2,
+            { skill: "說現在還不行", night: "等以後再說", uniform: "先別想那麼多" },
+            { skill: "先把身體顧好", night: "現在已經夠累了", uniform: "日子一天一天過" },
+            {
+              skill: `你跟${boss}說現在還不行，{每天下班就回家好好睡一覺，|假日騎車去河邊吹風，}{${boss}也沒有勉強你。|你覺得自己的日子剛剛好。}`,
+              night: "你把招生的傳單收進抽屜，{下班就回家休息，|假日睡到自然醒，}{偶爾會拿出來看一看。|你告訴自己，等存夠了錢再說。}",
+              uniform: "你笑著跟他們揮揮手，{回家吃了一大碗飯，|那天晚上早早就睡了，}{有些事，你決定先放在心裡。|你覺得自己過得也不差。}",
+            }, 1),
+          opt("family", "talk", "family", 0.15,
+            { skill: `回家問${who}`, night: `跟${who}商量學費`, uniform: `回家跟${who}聊聊` },
+            { skill: "聽聽家人的意見", night: "學費不便宜", uniform: "說出心裡話" },
+            {
+              skill: `你回家問${who}，${who}{說：「肯教你的人不多，要珍惜。」你隔天比平常早一個小時出門。|說：「別累壞了，身體最重要。」你想了一晚，跟${boss}說等過一陣子再學。}`,
+              night: `你跟${who}商量學費，${who}{二話不說拿出了一個信封，|說要幫你出一半，另一半你自己存，}{你每天下班都準時去上課。|那張結業證書，${who}一直收著。}`,
+              uniform: `你回家跟${who}說了這件事，${who}{說：「你想讀書，什麼時候都不嫌晚。」|說：「你做的每一件事，我們都看在眼裡。」}{那晚你們聊到很晚。|你心裡的結鬆開了一些。}`,
+            }, 2),
+        ],
+      };
     },
   },
 ];
