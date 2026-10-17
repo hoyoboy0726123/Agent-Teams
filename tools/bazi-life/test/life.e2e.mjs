@@ -15,9 +15,21 @@ const check = (name, ok, extra = "") => { results.push(ok); console.log(`${ok ? 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
 const errors = [];
 const watch = p => { p.on("pageerror", e => errors.push(e.message)); return p; };
-const page = watch(await browser.newPage({ viewport: { width: 1100, height: 1300 } }));
-await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+// A fresh page. Unless `welcomed` is false it opens where a returning player lands (我的人生), not on 歡迎.
+async function fresh(opts, { welcomed = true } = {}) {
+  const p = watch(await browser.newPage(opts));
+  if (welcomed) await p.addInitScript(() => { try { localStorage.setItem("bazi-life.welcomed", "1"); } catch {} });
+  await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+  return p;
+}
+const page = await fresh({ viewport: { width: 1100, height: 1300 } }, { welcomed: false });
 await page.goto(url);
+const welcome = await page.textContent("#welcome");
+check("a first visit opens on 歡迎: how to play, what is fun, and that the data stays on the phone", await page.isVisible("#welcome") && await page.isHidden("#form-me") && /怎麼玩/.test(welcome) && /好玩的地方/.test(welcome) && /不會上傳到網站後台/.test(welcome) && /沒有帳號、沒有資料庫/.test(welcome));
+await page.click('[data-goto="me"]');
+check("開始我的人生 opens the birth form", await page.isVisible("#form-me") && await page.getAttribute("#tab-me", "aria-selected") === "true" && await page.isHidden("#welcome"));
+await page.reload();
+check("after that, the page opens on 我的人生", await page.isVisible("#form-me") && await page.isHidden("#welcome"));
 
 check("setup form is shown first", await page.isVisible("#form-me") && !(await page.isVisible("#play")));
 await page.click("#form-me button[type=submit]");
@@ -47,7 +59,9 @@ await page.click("#c-skip");
 await page.waitForSelector("#end:not([hidden])", { timeout: 20000 });
 const title = await page.textContent("#end-title");
 check("the ending says how long this life lasted", /這一次，你活到 \d+ 歲/.test(title), title);
-check("the K-line has candles and the 100-run band", (await page.$$("#plot svg rect")).length > 20 && (await page.$$("#plot svg path")).length === 1);
+// The seed is random, so a life can end young: then there is a candle for each year it lasted.
+const lived = Number((/活到 (\d+) 歲/.exec(title) || [])[1]), candles = (await page.$$("#plot svg rect")).length;
+check("the K-line has candles and the 100-run band", (lived > 20 ? candles > 20 : candles >= lived) && (await page.$$("#plot svg path")).length === 1, `${candles} candles, lived ${lived}`);
 const cards = await page.textContent("#cards");
 check("lifespan card counts out of 100 and shows the 1925 line", /100 次人生裡/.test(cards) && /1925/.test(cards));
 check("health and marriage cards carry their notices", /不是看命盤/.test(cards) && /抉擇/.test(cards));
@@ -147,12 +161,12 @@ const server = createServer((req, res) => {
 });
 await new Promise(done => server.listen(0, "127.0.0.1", done));
 const site = `http://127.0.0.1:${server.address().port}/life.html`;
-async function servedPage(answer) {
-  const p = watch(await browser.newPage({ viewport: { width: 1000, height: 1200 } }));
-  await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+async function servedPage(answer, before = null) {
+  const p = await fresh({ viewport: { width: 1000, height: 1200 } });
   const sent = [];
   await p.route("**/api/interpret", route => { sent.push(route.request()); return answer(route); });
   await p.goto(site);
+  if (before) await before(p);
   await p.click("#form-me button[type=submit]");
   await p.waitForSelector("#play:not([hidden])");
   await p.click('[data-speed="10"]');
@@ -171,6 +185,19 @@ await ai.p.click("#free-out [data-free-action]");
 await ai.p.waitForTimeout(400);
 check("the confirmed reading continues the story", /你自己的決定：你決定帶家人去花蓮走走/.test(await ai.p.textContent("#feed")));
 await ai.p.close();
+// Names typed on the page never reach the Worker: they go out as 伴侶, 你 and the like.
+const named = await servedPage(route => route.fulfill(ok), async p => {
+  await p.fill("#f-name", "陳志明");
+  await p.click("#family > summary");
+  await p.fill(".member[data-role=partner] .m-name", "王小美");
+  await p.fill(".member[data-role=partner] .m-date", "1990-05-20");
+});
+await named.p.fill("#free-text", "帶小美和陳志明的爸媽去花蓮走走");
+await named.p.click("#free-go");
+await named.p.waitForSelector("#free-out [data-free-action]");
+const namedBody = named.sent[0] ? named.sent[0].postData() || "" : "";
+check("names typed on the page are swapped out before a written choice is sent", (JSON.parse(namedBody || "{}").text || "") === "帶伴侶和你的爸媽去花蓮走走" && !/小美|志明/.test(namedBody), namedBody.slice(0, 100));
+await named.p.close();
 for (const [name, answer] of [["busy or over quota (503)", route => route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"unavailable"}' })], ["unreachable", route => route.abort("connectionrefused")]]) {
   const fb = await servedPage(answer);
   await fb.p.fill("#free-text", "先跟家人好好商量看看");
@@ -183,8 +210,7 @@ for (const [name, answer] of [["busy or over quota (503)", route => route.fulfil
 server.close();
 
 // 伴侶合盤: a partner with a birthday gets a bond on the family card, counts over the 100 lives and a report section.
-const couple = watch(await browser.newPage({ viewport: { width: 1000, height: 1200 } }));
-await couple.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+const couple = await fresh({ viewport: { width: 1000, height: 1200 } });
 await couple.goto(url);
 await couple.click("#family > summary");
 check("the partner's sex follows yours until it is picked", await couple.inputValue(".member[data-role=partner] .m-sex") === "female" && (await couple.click("#sex-f"), await couple.inputValue(".member[data-role=partner] .m-sex")) === "male");
@@ -213,8 +239,7 @@ check("the report has a 伴侶合盤 section", coupleSections.includes("伴侶�
 await couple.close();
 
 // 準爸媽模式: two names compared over the same 100 lives, a slot before 39 weeks refused, then a life with a name.
-const baby = watch(await browser.newPage({ viewport: { width: 400, height: 900 } }));
-await baby.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+const baby = await fresh({ viewport: { width: 400, height: 900 } });
 await baby.goto(url);
 await baby.click("#tab-baby");
 check("the 準爸媽 tab shows its own form", await baby.isVisible("#form-baby") && !(await baby.isVisible("#form-me")));
@@ -243,9 +268,12 @@ await baby.waitForSelector("#play:not([hidden])");
 check("a name starts the baby's life", /林沐希在臺北市出生/.test(await baby.textContent("#born")) && await baby.isHidden("#baby"));
 await baby.close();
 
-const phone = watch(await browser.newPage({ viewport: { width: 400, height: 900 }, colorScheme: "dark", deviceScaleFactor: 2 }));
-await phone.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+const phone = await fresh({ viewport: { width: 400, height: 900 }, colorScheme: "dark", deviceScaleFactor: 2 });
 await phone.goto(url);
+await phone.setViewportSize({ width: 360, height: 900 });
+const tabRows = await phone.$eval(".tabs", t => new Set([...t.children].map(b => Math.round(b.getBoundingClientRect().top))).size);
+check("the four tabs fit in one row at 360px", tabRows === 1, `${tabRows} rows`);
+await phone.setViewportSize({ width: 400, height: 900 });
 await phone.click("#family > summary");
 await phone.click("#add-sibling");
 const formWidth = await phone.evaluate(() => document.documentElement.scrollWidth);

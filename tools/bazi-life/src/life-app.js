@@ -22,6 +22,7 @@ import { kindOf, TURNING, explainable } from "./sim/reason-kinds.js";
 import { ALL_EVENTS } from "./sim/story/index.js";
 import { safetyCheck, matchIntent } from "./sim/intent.js";
 import { readInterpretation } from "./sim/interpret.js";
+import { nameSwaps, withoutNames } from "./sim/privacy.js";
 import { ACTIONS } from "./sim/actions.js";
 import { trait } from "./sim/words.js";
 import { initBaby } from "./baby-app.js";
@@ -47,7 +48,12 @@ function setup() {
   $("#data-note").hidden = !PROVISIONAL;
   $("#f-place").innerHTML = PLACE_GROUPS.map(g => `<optgroup label="${esc(g.group)}">${g.places.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("");
   $("#f-place").value = "臺北市";
-  for (const tab of ["me", "random", "baby"]) $(`#tab-${tab}`).addEventListener("click", () => selectTab(tab));
+  for (const tab of TABS) $(`#tab-${tab}`).addEventListener("click", () => selectTab(tab));
+  for (const b of document.querySelectorAll("[data-goto]")) b.addEventListener("click", () => { selectTab(b.dataset.goto); $("#setup").scrollIntoView({ behavior: "smooth", block: "start" }); });
+  // The first visit opens on 歡迎; once another tab is opened, later visits start on 我的人生 (this browser only).
+  let welcomed = false;
+  try { welcomed = localStorage.getItem("bazi-life.welcomed") === "1"; } catch {}
+  selectTab(welcomed ? "me" : "welcome");
   initBaby({ begin, showError });
   $("#f-nohour").addEventListener("change", () => { $("#f-time").disabled = $("#f-nohour").checked; });
   const partnerSex = $(".member[data-role=partner] .m-sex");
@@ -88,11 +94,14 @@ function setup() {
   window.addEventListener("resize", () => { if (run && run.summary && !$("#end").hidden) drawKline(); });
 }
 
+const TABS = ["welcome", "me", "random", "baby"];
+const PANEL = { welcome: "#welcome", me: "#form-me", random: "#form-random", baby: "#form-baby" };
 function selectTab(tab) {
-  for (const t of ["me", "random", "baby"]) {
+  for (const t of TABS) {
     $(`#tab-${t}`).setAttribute("aria-selected", String(t === tab));
-    $(`#form-${t}`).hidden = t !== tab;
+    $(PANEL[t]).hidden = t !== tab;
   }
+  if (tab !== "welcome") try { localStorage.setItem("bazi-life.welcomed", "1"); } catch {}
 }
 
 function showError(text) { const e = $("#error"); e.textContent = text; e.hidden = !text; }
@@ -313,7 +322,9 @@ async function interpretFree(text) {
     freeOut(`<p class="muted">正在理解你的決定…</p>`);
     go.disabled = true; box.disabled = true;
     try {
-      const reply = await askWorker({ ...p.free, text });
+      // Names the player typed (theirs, the family's, the partner's) are swapped for 你, 爸爸, 伴侶… before sending.
+      const swaps = nameSwaps({ name: run.extra && run.extra.name, members: run.prep.family ? run.prep.family.members : [] });
+      const reply = await askWorker(withoutNames({ ...p.free, text }, swaps));
       // The player may have picked a button or started over while waiting.
       const now = run === asked && run.life.pending;
       if (!now || now.id !== p.id || now.prompt !== p.prompt) return;

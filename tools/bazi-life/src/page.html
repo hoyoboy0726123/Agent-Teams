@@ -48,6 +48,13 @@ input, select, button { font: inherit; color: inherit; }
 input[type="date"], input[type="time"], input[type="number"], select {
   width: 100%; box-sizing: border-box; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; min-height: 40px;
 }
+/* iPhone Safari draws date and time boxes natively and then ignores box-sizing, so they stuck out of the card.
+   The query below matches iOS only, so other browsers keep their own date boxes. */
+input[type="date"], input[type="time"] { min-width: 0; max-width: 100%; }
+@supports (-webkit-touch-callout: none) {
+  input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: none; display: flex; align-items: center; }
+}
+input::-webkit-date-and-time-value { margin: 0; min-height: 1.5em; text-align: left; }
 input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
 .inline { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; min-height: 40px; }
 .inline label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
