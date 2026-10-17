@@ -40,7 +40,7 @@ export function starLegend(chart) {
 // ---------- the whole report ----------
 // parts: { natal: natalReading(), decades: [decadeReading()], years: [yearReading()] (ten years), yearsTitle,
 //          events: [{ entry, reason }] (the turning points of this life with their explanation), name: nameReading() | null,
-//          overall: overallReading() | null }
+//          overall: overallReading() | null, partner: partnerReading() | null }
 // Order: the chart, the natal readings, the 大運, the turning points, the 流年, the name, the 綜合論斷 and, last, the
 // 開運建議 (the natal reading's own advice section).
 const para = list => (list || []).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join("");
@@ -51,7 +51,7 @@ const luckRow = (name, when, sub, gods, tone, text) => `<tr><td class="lt-name">
 const godsOf = x => (x.gods ? `${x.gods.stem}・${x.gods.branch}` : "");
 
 export function reportHTML(chart, parts) {
-  const { natal, decades = [], years = [], events = [], name = null, overall = null, yearsTitle = "近十年流年" } = parts;
+  const { natal, decades = [], years = [], events = [], name = null, overall = null, partner = null, yearsTitle = "近十年流年" } = parts;
   const basics = natal && natal.basics ? `<dl class="basics">${natal.basics.map(b => `<div><dt>${esc(b.label)}</dt><dd>${esc(b.value)}</dd></div>`).join("")}</dl>` : "";
   const natalSections = natal ? natal.sections : [];
   const sectionHTML = (s, open) => section(s.title, para(s.paragraphs) + items(s.items), open);
@@ -71,6 +71,7 @@ export function reportHTML(chart, parts) {
     paipanTable(chart),
     section("神煞說明", starLegend(chart)),
     body,
+    partner ? partnerHTML(partner) : "",
     section("大運詳批", decadeTable),
     section("這一生的大事與命理", lifeList),
     section(yearsTitle, yearTable),
@@ -81,6 +82,18 @@ export function reportHTML(chart, parts) {
   ].join("");
 }
 const ADVICE = { elements: "喜用五行", colors: "顏色", directions: "方位", numbers: "數字", industries: "行業", habits: "生活習慣", zodiac: "相合的生肖" };
+
+// 伴侶合盤: the overall picture, the points that apply (生肖, 日柱, 夫妻宮, 配偶星, 用神互補 …) and advice.
+function partnerHTML(p) {
+  const tone = p.tone === "互補" ? "tone-good" : p.tone === "需要磨合" ? "tone-bad" : "tone-even";
+  const inner = [
+    `<p><span class="tone ${tone}">${esc(p.tone)}</span>${esc(p.summary)}</p>`,
+    (p.highlights || []).length ? `<p class="chips">${p.highlights.map(h => `<span>${esc(h)}</span>`).join("")}</p>` : "",
+    (p.sections || []).map(x => `<h4>${esc(x.title)}</h4>${para(x.paragraphs)}${items(x.items)}`).join(""),
+    (p.advice || []).length ? `<h4>相處建議</h4>${items(p.advice.map(text => ({ text })))}` : "",
+  ].join("");
+  return section(p.title || "伴侶合盤", inner);
+}
 
 // 姓名詳批: the score, the strokes, the five grids with how each is counted, 三才, 三運, the characters' elements against
 // the chart, and the notes and credit of the texts.

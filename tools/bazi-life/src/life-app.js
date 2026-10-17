@@ -23,6 +23,7 @@ import { safetyCheck, matchIntent } from "./sim/intent.js";
 import { readInterpretation } from "./sim/interpret.js";
 import { ACTIONS } from "./sim/actions.js";
 import { trait } from "./sim/words.js";
+import { initBaby } from "./baby-app.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -45,8 +46,12 @@ function setup() {
   $("#data-note").hidden = !PROVISIONAL;
   $("#f-place").innerHTML = PLACE_GROUPS.map(g => `<optgroup label="${esc(g.group)}">${g.places.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("");
   $("#f-place").value = "臺北市";
-  for (const tab of ["me", "random"]) $(`#tab-${tab}`).addEventListener("click", () => selectTab(tab));
+  for (const tab of ["me", "random", "baby"]) $(`#tab-${tab}`).addEventListener("click", () => selectTab(tab));
+  initBaby({ begin, showError });
   $("#f-nohour").addEventListener("change", () => { $("#f-time").disabled = $("#f-nohour").checked; });
+  const partnerSex = $(".member[data-role=partner] .m-sex");
+  partnerSex.addEventListener("change", () => { partnerSex.dataset.picked = "1"; });
+  for (const r of document.querySelectorAll('input[name="sex"]')) r.addEventListener("change", () => { if (!partnerSex.dataset.picked) partnerSex.value = $("#sex-f").checked ? "male" : "female"; });
   $("#form-me").addEventListener("submit", e => { e.preventDefault(); startFromForm(); });
   $("#go-random").addEventListener("click", startRandom);
   $("#c-pause").addEventListener("click", () => { paused = !paused; $("#c-pause").textContent = paused ? "繼續" : "暫停"; if (!paused) schedule(); });
@@ -83,7 +88,7 @@ function setup() {
 }
 
 function selectTab(tab) {
-  for (const t of ["me", "random"]) {
+  for (const t of ["me", "random", "baby"]) {
     $(`#tab-${t}`).setAttribute("aria-selected", String(t === tab));
     $(`#form-${t}`).hidden = t !== tab;
   }
@@ -118,13 +123,14 @@ function readFamily() {
   const out = { siblings: [], onlyChild: $("#f-only").checked };
   for (const el of document.querySelectorAll(".member[data-role]")) {
     const m = readMember(el);
+    if (el.dataset.role === "partner") m.sex = el.querySelector(".m-sex").value;
     if (m.name || m.date) out[el.dataset.role] = m;
   }
   if (!out.onlyChild) for (const el of document.querySelectorAll("#sibling-list .member")) {
     const m = readMember(el);
     if (m.name || m.date) out.siblings.push({ relation: el.querySelector(".m-rel").value, ...m });
   }
-  return out.father || out.mother || out.siblings.length || out.onlyChild ? out : null;
+  return out.father || out.mother || out.partner || out.siblings.length || out.onlyChild ? out : null;
 }
 
 function startFromForm() {
@@ -135,7 +141,7 @@ function startFromForm() {
   const [h, mi] = ($("#f-time").value || "").split(":").map(Number);
   if (!noHour && !Number.isFinite(h)) return showError("請輸入出生時間，或勾選「時辰不詳」。");
   const family = readFamily();
-  const members = family ? [family.father, family.mother, ...family.siblings].filter(Boolean) : [];
+  const members = family ? [family.father, family.mother, family.partner, ...family.siblings].filter(Boolean) : [];
   if (members.some(x => x.date && (x.date.y < 1900 || x.date.y > 2100))) return showError("家人的出生年份請在 1900 到 2100 年之間。");
   const problems = checkFamily(family, { y, m, d });
   if (problems.length) { $("#family").open = true; return showError(problems.join(" ")); }
@@ -164,7 +170,7 @@ function begin(input, born, extra = {}) {
   const name = prep.name || (extra.name ? { full: extra.name, effects: null } : null);
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
   run = { input, extra, chart, prep, name, seed, born, life: createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed, name, family: prep.family, majorOnly: $("#c-major").checked }), summary: null };
-  $("#setup").hidden = true; $("#end").hidden = true; $("#play").hidden = false;
+  $("#setup").hidden = true; $("#baby").hidden = true; $("#end").hidden = true; $("#play").hidden = false;
   $("#feed").innerHTML = ""; $("#choice").hidden = true;
   $("#born").textContent = born || `${input.date.y} 年 ${input.date.m} 月 ${input.date.d} 日在${input.place.name}出生。`;
   paused = false; $("#c-pause").textContent = "暫停";

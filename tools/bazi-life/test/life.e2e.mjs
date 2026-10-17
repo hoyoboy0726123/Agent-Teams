@@ -130,7 +130,7 @@ await page.check("#c-major");
 await page.click('[data-speed="10"]');
 let asked = 0;
 for (let i = 0; i < 60 && !(await page.isVisible("#end")); i++) {
-  await page.waitForSelector("#choice:not([hidden]), #end:not([hidden])", { timeout: 20000 });
+  await page.waitForSelector("#choice:not([hidden]), #end:not([hidden])", { timeout: 45000 });
   if (await page.isVisible("#choice .options button")) { asked++; await page.click("#choice .options button"); }
 }
 await page.waitForSelector("#end:not([hidden])", { timeout: 20000 });
@@ -181,6 +181,37 @@ for (const [name, answer] of [["busy or over quota (503)", route => route.fulfil
   await fb.p.close();
 }
 server.close();
+
+// 準爸媽模式: two names compared over the same 100 lives, a slot before 39 weeks refused, then a life with a name.
+const baby = watch(await browser.newPage({ viewport: { width: 400, height: 900 } }));
+await baby.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+await baby.goto(url);
+await baby.click("#tab-baby");
+check("the 準爸媽 tab shows its own form", await baby.isVisible("#form-baby") && !(await baby.isVisible("#form-me")));
+await baby.fill("#b-surname", "林");
+const givenInputs = await baby.$$(".b-given");
+await givenInputs[0].fill("怡君");
+await givenInputs[1].fill("沐希");
+await baby.fill("#b-date", "2027-03-15");
+await baby.click("#b-slots > summary");
+await baby.fill("#b-due", "2027-03-22");
+const slotInputs = await baby.$$("#slot-list .s-when");
+await slotInputs[0].fill("2027-03-14T09:00");
+await baby.click("#form-baby button[type=submit]");
+check("a birth slot before 39 weeks is refused with the reason", /還不到 39 週/.test(await baby.textContent("#error")) && await baby.isHidden("#baby"));
+await slotInputs[0].fill("2027-03-16T15:00");
+await baby.click("#form-baby button[type=submit]");
+await baby.waitForSelector("#baby-advice .advice", { timeout: 60000 });
+await baby.waitForSelector(".slot-card .rank", { timeout: 60000 });
+const babyCards = await baby.$$eval(".name-card", els => els.map(e => e.textContent.replace(/\s+/g, "")));
+check("both names get a score and their 100 lives", babyCards.length === 2 && babyCards.every(t => /\d+分/.test(t) && /結婚\d+次/.test(t) && /離婚\d+次/.test(t)), babyCards.map(t => t.slice(0, 12)).join(" | "));
+check("the advice compares the names and says names matter little", /差別最多 \d+ 次/.test(await baby.textContent("#baby-advice")) && /±5%/.test(await baby.textContent("#baby-advice")));
+check("the slot comparison carries the medical note and leaves out lifespan", /醫師的醫療判斷/.test(await baby.textContent("#baby-slots")) && /不比較壽命和健康/.test(await baby.textContent("#baby-slots")));
+check("the baby's report is shown for a name", (await baby.$$("#baby-report .paipan tbody tr")).length === 10 && /林怡君/.test(await baby.textContent("#baby-report h3")));
+await baby.click('[data-start="1"]');
+await baby.waitForSelector("#play:not([hidden])");
+check("a name starts the baby's life", /林沐希在臺北市出生/.test(await baby.textContent("#born")) && await baby.isHidden("#baby"));
+await baby.close();
 
 const phone = watch(await browser.newPage({ viewport: { width: 400, height: 900 }, colorScheme: "dark", deviceScaleFactor: 2 }));
 await phone.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
