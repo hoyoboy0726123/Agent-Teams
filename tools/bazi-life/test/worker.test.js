@@ -104,6 +104,24 @@ test("the pages are served as HTML by path; other paths and API paths are not fo
   for (const path of ["/nope", "/toString", "/__proto__", "/api/other"]) assert.equal((await worker.fetch(new Request(`${SITE}${path}`), e)).status, 404, path);
 });
 
+test("the pages are checked on every visit: no-cache with an ETag, and 304 when the page has not changed", async () => {
+  const e = env(null);
+  const first = await worker.fetch(new Request(`${SITE}/`), e);
+  const tag = first.headers.get("etag");
+  assert.equal(first.headers.get("cache-control"), "no-cache");
+  assert.match(tag, /^"[0-9a-f]{24}"$/);
+  const again = await worker.fetch(new Request(`${SITE}/`, { headers: { "if-none-match": tag } }), e);
+  assert.equal(again.status, 304);
+  assert.equal(await again.text(), "");
+  assert.equal(again.headers.get("etag"), tag);
+  assert.equal((await worker.fetch(new Request(`${SITE}/`, { headers: { "if-none-match": `W/${tag}, "other"` } }), e)).status, 304);
+  const other = await worker.fetch(new Request(`${SITE}/index.html`, { headers: { "if-none-match": tag } }), e);
+  assert.equal(other.status, 200, "a different page has a different tag");
+  assert.notEqual(other.headers.get("etag"), tag);
+  const updated = makeApp({ "/": "<p>命盤人生 新版</p>" });
+  assert.equal((await updated.fetch(new Request(`${SITE}/`, { headers: { "if-none-match": tag } }), e)).status, 200, "a new deploy is sent in full");
+});
+
 test("the request is trimmed to what the prompt needs", () => {
   const r = readRequest({
     ...CHOICE,

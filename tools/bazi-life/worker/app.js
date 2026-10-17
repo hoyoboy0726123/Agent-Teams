@@ -81,10 +81,22 @@ export async function interpret(request, env) {
 
 // The pages are part of the Worker itself rather than static assets: an asset upload is authorised by a token of its
 // own, which the cloud environment's proxy would replace with the account's API token.
+// no-cache with an ETag: the browser keeps the page but asks each time, so a new deploy shows at once and an unchanged
+// page costs a 304 with no body. (With max-age=600 a phone kept showing the old page for ten minutes after a fix.)
 const PAGE_HEADERS = {
-  "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=600",
+  "content-type": "text/html; charset=utf-8", "cache-control": "no-cache",
   "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin",
 };
+const ETAGS = new Map();
+async function etagOf(html) {
+  if (!ETAGS.has(html)) {
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(html)));
+    ETAGS.set(html, `"${[...digest.slice(0, 12)].map(b => b.toString(16).padStart(2, "0")).join("")}"`);
+  }
+  return ETAGS.get(html);
+}
+// If-None-Match: a list of tags, or *.
+const matches = (header, etag) => !!header && (header.trim() === "*" || header.split(",").some(t => t.trim().replace(/^W\//, "") === etag));
 
 // The Worker for the given pages ({ path: html }): the pages, and the API.
 export function makeApp(pages) {
@@ -96,7 +108,9 @@ export function makeApp(pages) {
       const html = Object.hasOwn(pages, pathname) ? pages[pathname] : null;
       if (html === null) return new Response("找不到這個頁面。", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
       if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405, headers: { allow: "GET, HEAD" } });
-      return new Response(request.method === "HEAD" ? null : html, { headers: PAGE_HEADERS });
+      const etag = await etagOf(html), headers = { ...PAGE_HEADERS, etag };
+      if (matches(request.headers.get("if-none-match"), etag)) return new Response(null, { status: 304, headers });
+      return new Response(request.method === "HEAD" ? null : html, { headers });
     },
   };
 }
