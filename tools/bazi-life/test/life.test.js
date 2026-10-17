@@ -100,3 +100,51 @@ test("each simulated year uses its own 流年: luck[age] is the pillar of birth 
   const life = runLife({ chart, analysis, luck, seed: 7 });
   for (const k of life.kline) assert.equal(k.luck, luck[k.age].score, `age ${k.age}`);
 });
+
+// Plays a life, answering the questions with `answer(pending, life)`: { button }, { action }, or nothing for the
+// auto choice. Returns what was asked (age, id, prompt) and the state at the end.
+function drive({ sex = "female", seed = 11, until = 32, answer }) {
+  const c = chartOf(1980, 3, 5, 9, 0, sex), p = prepare(c);
+  const life = createLife({ chart: c, analysis: p.analysis, luck: p.luck, seed });
+  const asked = [];
+  for (let guard = 0; guard < 600 && !life.done && life.state.age <= until; guard++) {
+    if (!life.pending) { life.step(); continue; }
+    const q = life.pending;
+    asked.push({ age: life.state.age, id: q.id, prompt: q.prompt });
+    const a = answer(q, life);
+    if (a && a.button) life.choose(q.options.findIndex(o => o.id === a.button));
+    else if (a && a.action) life.chooseAction({ action: a.action, summary: "你決定照自己的想法走" });
+    else life.autoChoose();
+  }
+  return { asked, s: life.state };
+}
+const vocational = q => (q.id === "exam15" ? { button: "exam15.vocational" } : null);
+
+test("the first job's question does not tell the graduation again; right after the service it says 退伍", () => {
+  for (const sex of ["female", "male"]) {
+    const { asked } = drive({ sex, answer: q => vocational(q) || (q.id === "exam18" ? { button: "exam18.work" } : null) });
+    const job = asked.find(x => x.id === "firstJob");
+    assert.ok(job, sex);
+    assert.doesNotMatch(job.prompt, /畢業/, `${sex}: ${job.prompt}`);
+    assert.match(job.prompt, sex === "male" ? /^退伍了，開始找工作/ : /^開始找工作了/, job.prompt);
+  }
+});
+
+test("a written answer at a school gate closes it: the question is not asked again, and a graduate leaves school", () => {
+  for (const action of ["own", "jobSearch", "travel"]) {
+    const { asked } = drive({ answer: q => vocational(q) || (q.id === "exam18" ? { action } : null) });
+    assert.equal(asked.filter(x => x.id === "exam18").length, 1, `exam18 asked again after a written ${action}`);
+  }
+  const retake = drive({ answer: q => vocational(q) || (q.id === "exam18" && !q.prompt.includes("重考") ? { action: "study" } : null) });
+  assert.ok(retake.asked.filter(x => x.id === "exam18").length >= 2, "a written 重考 sits the exam again");
+  for (const action of ["own", "travel"]) {
+    const { asked, s } = drive({ answer: q => (q.id === "exam15" ? { button: "exam15.high" } : q.id === "exam18" ? { button: "exam18.go" } : q.id === "graduateUni" ? { action } : null) });
+    assert.ok(asked.some(x => x.id === "graduateUni"), action);
+    assert.equal(s.studying, false, `still a student after a written ${action} at graduation`);
+    assert.ok(asked.some(x => x.id === "firstJob"), `no first job after a written ${action} at graduation`);
+  }
+  const fifteen = drive({ until: 20, answer: q => (q.id === "exam15" ? { action: "own" } : null) });
+  assert.ok(fifteen.asked.some(x => x.id === "exam18"), "a written answer at 15 goes on to 高中 and its exam at 18");
+  const work15 = drive({ until: 20, answer: q => (q.id === "exam15" ? { action: "jobSearch" } : null) });
+  assert.ok(!work15.asked.some(x => x.id === "exam18") && !work15.s.studying, "a written answer about working at 15 leaves school");
+});

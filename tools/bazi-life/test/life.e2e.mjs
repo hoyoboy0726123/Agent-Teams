@@ -372,6 +372,26 @@ const hourBranch = (await sc.textContent("#report .paipan tbody tr:nth-child(3) 
 check("a life born in 辰時 has a 辰 hour pillar and the report says 辰時", hourBranch === "辰" && /1988 年 2 月 15 日 辰時/.test(await sc.textContent("#report")) && /依出生日期與辰時排出的命盤/.test(await sc.textContent("#report-lede")), hourBranch);
 await sc.close();
 
+// A question covers the lines printed just before it, so its box repeats the big moments since the last answer.
+const rc = await fresh({ viewport: { width: 400, height: 900 } });
+await rc.goto(url);
+await rc.click("#form-me button[type=submit]");
+await rc.waitForSelector("#play:not([hidden])");
+await rc.click('[data-speed="10"]');
+let recapLines = [], nextRecap = null;
+for (let k = 0; k < 150; k++) {
+  await rc.waitForSelector("#choice:not([hidden]), #end:not([hidden])", { timeout: 30000 });
+  if (await rc.isVisible("#end")) { await rc.waitForSelector("#story:not([hidden])", { timeout: 5000 }).catch(() => {}); if (await rc.isVisible("#story")) await rc.click("#story .skip"); await rc.click("#again-same"); await rc.waitForSelector("#play:not([hidden])"); continue; }
+  const lines = await rc.$$eval("#choice .recap li", els => els.map(e => e.textContent));
+  if (recapLines.length) { nextRecap = lines; break; }
+  if (lines.length) recapLines = lines;
+  await rc.click("#choice .options button");
+}
+const feedText = await rc.textContent("#feed");
+check("a question opens with the big moments since the last answer, as told in the story", recapLines.length > 0 && recapLines.length <= 3 && recapLines.every(t => /^\d+ 歲./.test(t) && feedText.includes(t.replace(/^\d+ 歲/, ""))), JSON.stringify(recapLines));
+check("after an answer the recap starts over", nextRecap !== null && !nextRecap.some(t => recapLines.includes(t)), JSON.stringify(nextRecap));
+await rc.close();
+
 const phone = await fresh({ viewport: { width: 400, height: 900 }, colorScheme: "dark", deviceScaleFactor: 2 });
 await phone.goto(url);
 await phone.setViewportSize({ width: 360, height: 900 });

@@ -69,12 +69,16 @@ const HANDLERS = {
   // ---------- work and study ----------
   jobSearch(s, ctx, sit) {
     if (s.retired || s.age >= 66) return no("已經過了退休的年紀，找工作不容易了。");
-    if (s.studying && s.age < 18) return no("還在讀書，先把書讀完吧。");
+    // At a graduation question (exam15, exam18) going to work is one of the answers.
+    if (s.studying && s.age < 18 && !/^exam1[58]$/.test(sit.situation || "")) return no("還在讀書，先把書讀完吧。");
     if (s.employed) {
       s.income *= ctx.rng.between(0.95, 1.18);
       return { text: lead(sit) + ctx.w("{投了幾家公司|請朋友幫忙推薦}，{兩個月後|沒多久}換到另一家公司，一樣當{job}。"), mood: 2 };
     }
-    if (ctx.roll("career", "good", 0.6)) return { text: lead(sit) + ctx.w("{投了二十幾封履歷|面試了好幾家}，{終於|第三個月}找到新工作：{title}。", { title: startJob(s, ctx) }), mood: 5 };
+    if (ctx.roll("career", "good", 0.6)) {
+      const first = !s.jobsHeld.length && !s.job;
+      return { text: lead(sit) + ctx.w(`{投了二十幾封履歷|面試了好幾家}，{終於|第三個月}找到${first ? "第一份" : "新"}工作：{title}。`, { title: startJob(s, ctx) }), mood: 5 };
+    }
     return { text: lead(sit) + ctx.w("{履歷投出去大多沒有回音|面試了幾家都沒下文}，你{一邊找一邊打零工|繼續找}。"), mood: -3 };
   },
   jobHop(s, ctx, sit) {

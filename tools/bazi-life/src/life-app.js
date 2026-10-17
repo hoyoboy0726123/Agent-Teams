@@ -42,6 +42,11 @@ const EDU = { none: "沒有上學", 國小: "國小", 國中: "國中", 高中: 
 let run = null;   // { input, extra: { name, family }, chart, prep, life, seed, born }
 let timer = null, speed = 1, paused = false;
 let leanNoted = false;
+// The big moments since the last answer: a wedding, a birth, a new partner, a death in the family. A question opens at
+// once and covers the lines printed just before it (on a phone, under the scene), so its box repeats them.
+let recap = [];
+const RECAP_IDS = new Set(["baby", "dating", "realPartnerMeet", "breakup"]);
+const recapWorthy = e => (e.big || RECAP_IDS.has(e.id)) && e.id !== "birth" && e.id !== "death" && !e.free && !(e.asked && !e.picked);
 // What the player writes is read by the site's Worker (worker/index.js, Workers AI) when the page is served by it; the
 // build puts its address in <meta name="interpret-endpoint"> (empty for the Claude artifact). Without it, or when it
 // does not answer, the page matches the words itself; the player sees the same choice box either way.
@@ -258,7 +263,7 @@ function begin(input, born, extra = {}) {
   run = { input, extra, chart, prep, name, seed, born, life: createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed, name, family: prep.family, majorOnly: $("#c-major").checked }), summary: null };
   startScene(seed, run.life.state, age => luckAt(prep, age));
   $("#setup").hidden = true; $("#baby").hidden = true; $("#end").hidden = true; $("#play").hidden = false;
-  $("#feed").innerHTML = ""; $("#choice").hidden = true;
+  $("#feed").innerHTML = ""; $("#choice").hidden = true; recap = [];
   $("#born").textContent = born || `${input.date.y} 年 ${input.date.m} 月 ${input.date.d} 日在${input.place.name}出生。`;
   paused = false; $("#c-pause").textContent = "暫停";
   updateStatus();
@@ -285,7 +290,7 @@ function tick() {
 
 function choose(i) {
   const entries = run.life.choose(i);
-  $("#choice").hidden = true;
+  $("#choice").hidden = true; recap = [];
   render(entries);
   updateStatus();
   showStep(run.life.state, age => luckAt(run.prep, age), entries);
@@ -346,6 +351,7 @@ function render(entries) {
       feed.appendChild(li);
     }
     li.querySelector(".lines").insertAdjacentHTML("beforeend", lineOf(e));
+    if (recapWorthy(e)) recap.push(e);
   }
   const last = feed.lastElementChild;
   if (last && !$("#play").hidden) last.scrollIntoView({ block: "nearest", behavior: speed === 10 ? "auto" : "smooth" });
@@ -372,7 +378,9 @@ function showChoice() {
   const dm = run.prep.analysis.dayMaster, nature = (trait(run.prep.analysis) || "").split("，").pop();
   const leanNote = p.lean >= 0 && !leanNoted ? `<p class="lean-note">標著「個性傾向」的選項，是從你的${esc(dm.stem + dm.element)}日主（${esc(nature)}）和這一生做過的選擇推算的。選哪一個都可以。</p>` : "";
   if (p.lean >= 0) leanNoted = true;
-  box.innerHTML = `<p class="q">${esc(p.prompt)}</p>${why}<div class="options">${p.options.map((o, i) => `<button type="button" data-option="${i}"><b>${esc(o.label)}</b>${o.hint ? `<small>${esc(o.hint)}</small>` : ""}${o.lean ? `<span class="lean">個性傾向</span>` : ""}</button>`).join("")}</div>${leanNote}`
+  const since = recap.slice(-3);
+  const recapBox = since.length ? `<div class="recap"><p>上次選擇之後</p><ul>${since.map(e => `<li><b>${e.age} 歲</b>${esc(e.text)}</li>`).join("")}</ul></div>` : "";
+  box.innerHTML = `${recapBox}<p class="q">${esc(p.prompt)}</p>${why}<div class="options">${p.options.map((o, i) => `<button type="button" data-option="${i}"><b>${esc(o.label)}</b>${o.hint ? `<small>${esc(o.hint)}</small>` : ""}${o.lean ? `<span class="lean">個性傾向</span>` : ""}</button>`).join("")}</div>${leanNote}`
     + (p.free ? `<form class="free" id="free-form" autocomplete="off">
       <label for="free-text">或者，寫下你自己的決定</label>
       <div class="free-row"><input type="text" id="free-text" maxlength="80" placeholder="例如：先跟家人商量看看"><button type="submit" id="free-go">這樣做</button></div>
@@ -457,7 +465,7 @@ function confirmFree(action, summary) {
 function applyFree(action, summary) {
   const r = run.life.chooseAction({ action, summary });
   if (r.infeasible) return freeOut(`<p>這個現在做不到：${esc(r.infeasible)}</p>`);
-  $("#choice").hidden = true;
+  $("#choice").hidden = true; recap = [];
   render(r.entries);
   updateStatus();
   showStep(run.life.state, age => luckAt(run.prep, age), r.entries);

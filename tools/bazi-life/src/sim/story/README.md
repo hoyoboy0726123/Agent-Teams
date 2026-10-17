@@ -52,7 +52,7 @@ choice: (s, ctx) => ({
 - `when`：這個選項什麼時候才出現（例如要有兄弟姊妹）。
 - `prompt` 和每個結果的 `text` 要說清楚情境，讓只看那一行的人也看得懂。
 - 玩家自己寫的決定，故事那一行會用 `prompt` 的第一句開頭（「公司裁員，你被列在名單上。你決定……」）。`prompt` 沒有問句之前的那一句時，可以在 choice 回傳 `topic: "朋友找你合開早餐店"`。
-- 跨好幾年的故事線：玩家自己寫、沒有對應到按鈕時，按鈕的 `apply` 不會跑。在 choice 回傳 `onFree: (actionId, s, ctx) => …`，決定故事線怎麼往下走（例子見 `work.js` 的 `startupYear1`、`civilExam`）。
+- 跨好幾年的故事線：玩家自己寫、沒有對應到按鈕時，按鈕的 `apply` 不會跑。在 choice 回傳 `onFree: (actionId, s, ctx) => …`，決定故事線怎麼往下走（例子見 `work.js` 的 `startupYear1`、`civilExam`）。升學的關卡也要：`core.js` 的 `exam15`、`exam18`、`graduateUni` 都用 `onFree` 關上關卡，不然同一個畢業問題會每年再問，或是一直當學生。離開學校一律用 `leaveSchool(s)`（記下 `s.flags.leftSchool`，找第一份工作的題目靠它決定怎麼開頭）。
 
 ## 節奏
 
