@@ -282,7 +282,9 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
       const ev = queue.shift();
       if (ev.choice && !ev.core && choicesThisYear > 0) continue;
       if (!eligible(ev)) continue;
-      const p0 = ev.p(s, ctx) * (recent && ev.choice && !ev.major && recent.has(ev.id) ? NOVELTY : 1), fromLuck = luckTilt(ev);
+      // A question that is certain this year (選組 has one year to happen in) is a step of the story, not a pick among
+      // everyday situations, so the replay damping leaves it alone.
+      const base = ev.p(s, ctx), p0 = base * (recent && ev.choice && !ev.major && base < 1 && recent.has(ev.id) ? NOVELTY : 1), fromLuck = luckTilt(ev);
       if ((ev.core ? fate() : rng()) < tilt(p0, fromLuck + personalTilt(ev, s, name && name.effects))) {
         fire(ev, l, fromLuck);
         if (pending) return false;

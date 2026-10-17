@@ -207,5 +207,18 @@ test("a replay is steered away from the everyday questions of recent lives; the 
     bigPlain += a.filter(id => major.has(id)).length; bigSteered += b.filter(id => major.has(id)).length;
   }
   assert.ok(steered < plain * 0.7, `repeats ${(plain / 40).toFixed(2)} → ${(steered / 40).toFixed(2)}`);
+  // A question certain in its year (選組) is asked on a replay as often as before.
+  const track = (seed, seen) => {
+    const life = createLife({ chart: c, analysis: p.analysis, luck: p.luck, seed, seen });
+    for (let g = 0; g < 2000 && !life.done && life.state.age <= 17; g++) {
+      if (!life.pending) { life.step(); continue; }
+      if (life.pending.id === "t_major") return true;
+      if (life.pending.id === "exam15") life.choose(life.pending.options.findIndex(o => o.id === "exam15.high")); else life.autoChoose();
+    }
+    return false;
+  };
+  let majorPlain = 0, majorSeen = 0;
+  for (let k = 1; k <= 30; k++) { majorPlain += track(k * 17, null); majorSeen += track(k * 17, ["t_major"]); }
+  assert.ok(majorPlain >= 20 && majorSeen === majorPlain, `選組 asked ${majorPlain} → ${majorSeen}`);
   assert.ok(Math.abs(bigSteered - bigPlain) <= bigPlain * 0.1, `big decisions ${bigPlain} → ${bigSteered}`);
 });
