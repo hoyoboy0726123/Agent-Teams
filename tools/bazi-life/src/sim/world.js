@@ -96,6 +96,10 @@ export function chatTool(year) {
 }
 // 北區高中聯招 from 1956, 基測 from 2001, 會考 from 2014; 大專聯考 from 1954, 學測 for the 2002 多元入學 on.
 export function exam15Name(year) { return year < 1956 ? "高中入學考試" : year < 2001 ? "高中聯考" : year < 2014 ? "國中基測" : "國中會考"; }
-export function exam18Name(year) { return year < 1954 ? "大學入學考試" : year < 2002 ? "大學聯考" : "學測"; }
+// The exam after senior high: for 高中 大學聯考 (學測 from 2002), for 高職 the 四技二專 exam into 科大 (統測 from 2001).
+export function exam18Name(year, track = "高中") {
+  if (track === "高職") return year < 2001 ? "四技二專聯招" : "統測";
+  return year < 1954 ? "大學入學考試" : year < 2002 ? "大學聯考" : "學測";
+}
 export const TRIP_PLACES = { home: ["墾丁", "花蓮", "台東", "日月潭", "阿里山", "澎湖", "綠島", "九份", "清境", "太魯閣"], abroad: ["日本", "韓國", "泰國", "香港", "新加坡", "峇里島", "歐洲", "美國", "越南", "北海道"] };
 export const tripPlace = (s, ctx) => (s.year >= 1979 && ctx.rng() < 0.5 ? ctx.rng.pick(TRIP_PLACES.abroad) : ctx.rng.pick(TRIP_PLACES.home));   // 1979: overseas tourism opens

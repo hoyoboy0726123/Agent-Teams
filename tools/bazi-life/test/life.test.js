@@ -103,20 +103,20 @@ test("each simulated year uses its own 流年: luck[age] is the pillar of birth 
 
 // Plays a life, answering the questions with `answer(pending, life)`: { button }, { action }, or nothing for the
 // auto choice. Returns what was asked (age, id, prompt) and the state at the end.
-function drive({ sex = "female", seed = 11, until = 32, answer }) {
-  const c = chartOf(1980, 3, 5, 9, 0, sex), p = prepare(c);
+function drive({ sex = "female", seed = 11, until = 32, year = 1980, answer }) {
+  const c = chartOf(year, 3, 5, 9, 0, sex), p = prepare(c);
   const life = createLife({ chart: c, analysis: p.analysis, luck: p.luck, seed });
   const asked = [];
   for (let guard = 0; guard < 600 && !life.done && life.state.age <= until; guard++) {
     if (!life.pending) { life.step(); continue; }
     const q = life.pending;
-    asked.push({ age: life.state.age, id: q.id, prompt: q.prompt });
+    asked.push({ age: life.state.age, id: q.id, prompt: q.prompt, labels: q.options.map(o => o.label) });
     const a = answer(q, life);
     if (a && a.button) life.choose(q.options.findIndex(o => o.id === a.button));
     else if (a && a.action) life.chooseAction({ action: a.action, summary: "你決定照自己的想法走" });
     else life.autoChoose();
   }
-  return { asked, s: life.state };
+  return { asked, s: life.state, log: life.log };
 }
 const vocational = q => (q.id === "exam15" ? { button: "exam15.vocational" } : null);
 
@@ -147,4 +147,28 @@ test("a written answer at a school gate closes it: the question is not asked aga
   assert.ok(fifteen.asked.some(x => x.id === "exam18"), "a written answer at 15 goes on to 高中 and its exam at 18");
   const work15 = drive({ until: 20, answer: q => (q.id === "exam15" ? { action: "jobSearch" } : null) });
   assert.ok(!work15.asked.some(x => x.id === "exam18") && !work15.s.studying, "a written answer about working at 15 leaves school");
+});
+
+test("the exam after 高職 is the vocational one into 科大, and after 高中 the university one", () => {
+  const cases = [
+    { year: 1980, track: "exam15.vocational", exam: "四技二專聯招", go: "去讀科大" },
+    { year: 1990, track: "exam15.vocational", exam: "統測", go: "去讀科大" },
+    { year: 1980, track: "exam15.high", exam: "大學聯考", go: "去讀大學" },
+    { year: 1990, track: "exam15.high", exam: "學測", go: "去讀大學" },
+  ];
+  for (const c of cases) {
+    const { asked } = drive({ year: c.year, until: 19, answer: q => (q.id === "exam15" ? { button: c.track } : q.id === "exam18" ? { button: "exam18.go" } : null) });
+    const q = asked.find(x => x.id === "exam18");
+    assert.ok(q && q.prompt.includes(c.exam), `${c.year} ${c.track}: ${q && q.prompt}`);
+    assert.ok(q.labels.includes(c.go), `${c.year} ${c.track}: ${q.labels.join("/")}`);
+    if (c.track === "exam15.vocational") assert.doesNotMatch(q.prompt, /大學聯考|學測/);
+  }
+  // Through to graduation the story names the school: 科大畢業, not 大學畢業.
+  for (const button of ["uni.work", "uni.master", "uni.rest"]) {
+    const { asked, log } = drive({ until: 24, answer: q => (q.id === "exam15" ? { button: "exam15.vocational" } : q.id === "exam18" ? { button: "exam18.go" } : q.id === "graduateUni" ? { button } : null) });
+    const grad = log.find(e => e.id === "graduateUni");
+    assert.ok(asked.some(x => x.id === "graduateUni" && /^科大畢業了/.test(x.prompt)) && grad, button);
+    assert.match(grad.text, /科大|四年|學士服/, grad.text);
+    assert.doesNotMatch(grad.text, /大學畢業/, grad.text);
+  }
 });

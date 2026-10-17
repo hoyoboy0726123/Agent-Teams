@@ -154,7 +154,7 @@ export const CORE = [
       const enter = ctx.R.college(s.year, s.track), retake = !!s.flags.retake_exam18;
       const good = ctx.rng() < ctx.odds("study", "good", retake ? 0.5 : 0.35);
       s.edu = s.track;
-      const exam = exam18Name(s.year);
+      const exam = exam18Name(s.year, s.track);
       const where = good ? ctx.rng.pick(["理想的科系", "第一志願"]) : ctx.rng.pick(["還可以的學校", "離家有點遠的學校"]);
       const done = s2 => { s2.flags.done18 = true; s2.flags.retake_exam18 = false; s2.flags.uniAt = s2.age; };
       const uni = s.track === "高中" ? "大學" : "科大";
@@ -187,22 +187,22 @@ export const CORE = [
     id: "uniDropout", once: true, ages: [18, 25], when: s => s.studying && (s.track === "大學" || s.track === "科大") && s.age > (s.flags.uniAt ?? 18) && s.age < (s.flags.uniAt ?? 18) + 4, p: () => 0.017,
     apply: (s, ctx) => {
       leaveSchool(s); s.track = s.edu; s.flags.dropout = s.age;
-      return { text: ctx.w(["大學讀到第{二|三}年，{覺得科系不適合自己，|家裡的經濟出了狀況，|一直提不起勁念書，}決定休學，先去工作。", "{學分一直被當，|打工越做越多，}{最後辦了休學。|書沒讀完就離開學校了。}爸媽嘆了一口氣，沒有多說什麼。"]), mood: -3 };
+      return { text: ctx.w([`${s.track === "科大" ? "科大" : "大學"}讀到第{二|三}年，{覺得科系不適合自己，|家裡的經濟出了狀況，|一直提不起勁念書，}決定休學，先去工作。`, "{學分一直被當，|打工越做越多，}{最後辦了休學。|書沒讀完就離開學校了。}爸媽嘆了一口氣，沒有多說什麼。"]), mood: -3 };
     },
   },
   {
     id: "graduateUni", calibrated: true, once: true, ages: [21, 26], when: s => s.studying && (s.track === "大學" || s.track === "科大") && s.age >= (s.flags.uniAt ?? 18) + 4, p: () => 1,
     choice: (s, ctx) => {
       s.edu = s.track;
-      const p = ctx.R.master(s.year);
+      const p = ctx.R.master(s.year), school = s.track;   // 大學 or 科大
       return {
         prompt: `${s.track}畢業了！接下來呢？`,
         options: [
-          { id: "uni.master", label: "考研究所", hint: "多讀兩年", act: "study", style: "learn", weight: p, apply: s2 => { s2.track = "碩士"; s2.flags.masterAt = s2.age; return { text: ctx.w(["大學畢業，接著考上研究所。", "大學畢業，決定再讀兩年研究所。"]), mood: 4 }; } },
-          { id: "uni.work", label: "直接工作", hint: "開始賺錢", act: "jobSearch", style: "safe", weight: (1 - p) * 0.85, apply: s2 => { leaveSchool(s2); return { text: ctx.w(["{大學|四年}畢業了，{準備找工作。|把履歷修了一遍又一遍。|和室友約好要常聯絡。}", "穿著學士服拍完照，{開始投履歷。|隔週就去面試了。|在校門口和爸媽合照。}"]), mood: 3 }; } },
-          { id: "uni.gap", label: "先去打工度假", hint: "看看世界", act: "workAbroad", style: "risk", weight: (1 - p) * 0.05, when: s2 => s2.year >= 2004, apply: s2 => { leaveSchool(s2); s2.abroad = ctx.rng.pick(["澳洲", "紐西蘭", "日本", "加拿大"]); s2.leftAt = s2.age; return { text: `大學畢業，先去${s2.abroad}打工度假一年，在農場和餐廳打工。`, mood: 5, big: true }; } },
-          { id: "uni.abroad", label: "出國讀研究所", hint: "花費比較高", act: "studyAbroad", style: "learn", weight: p * 0.1, apply: s2 => { s2.track = "碩士"; s2.flags.masterAt = s2.age; s2.abroad = ctx.rng.weighted([["美國", 3], ["英國", 2], ["日本", 1], ["德國", 1]]); s2.leftAt = s2.age; return { text: `大學畢業，出國到${s2.abroad}讀研究所。`, mood: 5, big: true }; } },
-          { id: "uni.rest", label: "先休息一陣子", hint: "想清楚再出發", act: "rest", style: "self", weight: (1 - p) * 0.1, apply: s2 => { leaveSchool(s2); return { text: ctx.w("大學畢業，{先在家休息幾個月，|打打工，}{想清楚自己要什麼。|陪家人過了一段悠閒的日子。}"), mood: 2 }; } },
+          { id: "uni.master", label: "考研究所", hint: "多讀兩年", act: "study", style: "learn", weight: p, apply: s2 => { s2.track = "碩士"; s2.flags.masterAt = s2.age; return { text: ctx.w([`${school}畢業，接著考上研究所。`, `${school}畢業，決定再讀兩年研究所。`]), mood: 4 }; } },
+          { id: "uni.work", label: "直接工作", hint: "開始賺錢", act: "jobSearch", style: "safe", weight: (1 - p) * 0.85, apply: s2 => { leaveSchool(s2); return { text: ctx.w([`{${school}|四年}畢業了，{準備找工作。|把履歷修了一遍又一遍。|和室友約好要常聯絡。}`, "穿著學士服拍完照，{開始投履歷。|隔週就去面試了。|在校門口和爸媽合照。}"]), mood: 3 }; } },
+          { id: "uni.gap", label: "先去打工度假", hint: "看看世界", act: "workAbroad", style: "risk", weight: (1 - p) * 0.05, when: s2 => s2.year >= 2004, apply: s2 => { leaveSchool(s2); s2.abroad = ctx.rng.pick(["澳洲", "紐西蘭", "日本", "加拿大"]); s2.leftAt = s2.age; return { text: `${school}畢業，先去${s2.abroad}打工度假一年，在農場和餐廳打工。`, mood: 5, big: true }; } },
+          { id: "uni.abroad", label: "出國讀研究所", hint: "花費比較高", act: "studyAbroad", style: "learn", weight: p * 0.1, apply: s2 => { s2.track = "碩士"; s2.flags.masterAt = s2.age; s2.abroad = ctx.rng.weighted([["美國", 3], ["英國", 2], ["日本", 1], ["德國", 1]]); s2.leftAt = s2.age; return { text: `${school}畢業，出國到${s2.abroad}讀研究所。`, mood: 5, big: true }; } },
+          { id: "uni.rest", label: "先休息一陣子", hint: "想清楚再出發", act: "rest", style: "self", weight: (1 - p) * 0.1, apply: s2 => { leaveSchool(s2); return { text: ctx.w(`${school}畢業，{先在家休息幾個月，|打打工，}{想清楚自己要什麼。|陪家人過了一段悠閒的日子。}`), mood: 2 }; } },
         ],
         // Studying on (here or abroad) is 研究所; any other answer leaves school.
         onFree: (action, s2) => {

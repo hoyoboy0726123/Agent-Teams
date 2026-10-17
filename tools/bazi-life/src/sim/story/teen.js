@@ -22,7 +22,7 @@ import { bestFriend, friendName, makeFriend, grownUp, snackOf, pad } from "./chi
 const inSchool = s => s.studying && !s.abroad && ["國中", "高中", "高職", "五專"].includes(s.track);
 const senior = s => s.studying && !s.abroad && ["高中", "高職", "五專"].includes(s.track);
 // The next big exam: 會考 (or its earlier names) in junior high, 學測 in senior high, 統測 (from 2001) in vocational.
-const nextExam = s => (s.track === "國中" ? exam15Name(s.year + Math.max(1, 15 - s.age)) : s.track === "高職" ? (s.year + 1 >= 2001 ? "統測" : "聯招") : exam18Name(s.year + 1));
+const nextExam = s => (s.track === "國中" ? exam15Name(s.year + Math.max(1, 15 - s.age)) : exam18Name(s.year + 1, s.track));
 // What music played on: the radio, then a 隨身聽 (cassette, CD or MP3), then the phone.
 const player = y => (y < 1980 ? "收音機" : y < 2011 ? "隨身聽" : "手機");
 // How a teenager got a message to a friend.
