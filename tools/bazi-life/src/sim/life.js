@@ -20,8 +20,9 @@ import * as R from "./rates.js";
 export const MAX_AGE = 110;
 // The action of a written answer the player keeps as written, without a button's or an action's rules.
 export const OWN = "own";
-// How likely an everyday question the player saw in a recent life is, compared with one they have not seen.
-export const NOVELTY = 0.35;
+// On a replay, how likely an everyday question the player saw in a recent life is (NOVELTY), and one they have not
+// seen (FRESH), so the replay brings other questions rather than fewer of them.
+export const NOVELTY = 0.35, FRESH = 1.3;
 
 // Parents and siblings come from the optional family input when given, and are drawn at random otherwise.
 function initialState({ sex, birthYear, county, rng, family, name, analysis }) {
@@ -95,8 +96,8 @@ const STYLE_NUDGE = { risk: [["drive", 0.02], ["caution", -0.02]], safe: [["caut
 
 //   majorOnly  ask the player only the big decisions (core.js and work.js); everyday choices follow the personality
 //   seen       the kinds of question the player was asked in recent lives (the page keeps them for this tab only).
-//              Everyday questions among them come up less often (NOVELTY), so a replay brings other situations; the
-//              big decisions are asked as always.
+//              Everyday questions among them come up less often (NOVELTY) and the others a little more (FRESH), so a
+//              replay brings other situations; the big decisions, and questions certain in their year, are as always.
 export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed = 1, auto = false, policy = null, county = null, name = null, family = null, majorOnly = false, seen = null }) {
   const rng = makeRng(seed);
   const recent = seen && seen.length ? new Set(seen) : null;
@@ -284,7 +285,7 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
       if (!eligible(ev)) continue;
       // A question that is certain this year (選組 has one year to happen in) is a step of the story, not a pick among
       // everyday situations, so the replay damping leaves it alone.
-      const base = ev.p(s, ctx), p0 = base * (recent && ev.choice && !ev.major && base < 1 && recent.has(ev.id) ? NOVELTY : 1), fromLuck = luckTilt(ev);
+      const base = ev.p(s, ctx), p0 = base * (recent && ev.choice && !ev.major && base < 1 ? (recent.has(ev.id) ? NOVELTY : FRESH) : 1), fromLuck = luckTilt(ev);
       if ((ev.core ? fate() : rng()) < tilt(p0, fromLuck + personalTilt(ev, s, name && name.effects))) {
         fire(ev, l, fromLuck);
         if (pending) return false;

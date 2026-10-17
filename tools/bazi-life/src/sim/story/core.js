@@ -322,7 +322,7 @@ export const CORE = [
         return { text: ctx.w(["找到第一份工作：{title}。{lead}", "第一份工作是{title}，{第一個月的薪水拿去請爸媽吃飯。|穿上新買的襯衫去報到。}{lead}", "當上{title}，{開始每天擠公車上班。|從最基層做起。}{lead}"], { title, lead }), mood: 5, big: true };
       };
       return {
-        prompt: `${jobSearchLead(s, ctx)}。${ctx.rng.pick(["有幾個工作機會，你想做哪一個？", "幾個機會擺在眼前，你想選哪一個？", "你想先做哪一個？"])}`,
+        prompt: `${jobSearchLead(s, ctx)}。${ctx.rng.pick(["有幾個工作機會，你想做哪一個？", "幾個機會擺在眼前，你想選哪一個？", "有幾個機會，你想先做哪一個？"])}`,
         options: [
           ...offers.map((job, i) => ({ id: `firstJob.${i}`, label: job[0], hint: hint(job), act: "jobSearch", weight: jobFit(ctx.analysis, job, ctx.name), apply: s2 => done(s2, job) })),
           { id: "firstJob.wait", label: "都不要，再找找看", hint: "可能要多等一陣子", act: "wait", style: "self", weight: 0.08, apply: () => ({ text: "看了幾個工作機會都不喜歡，你決定再找找看。", mood: -1 }) },
