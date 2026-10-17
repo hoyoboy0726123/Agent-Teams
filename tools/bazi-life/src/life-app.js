@@ -28,6 +28,7 @@ import { trait } from "./sim/words.js";
 import { initBaby } from "./baby-app.js";
 import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
+import { initTimeField, readTimeField, syncTimeField, timeFieldIds } from "./time-field.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -58,6 +59,7 @@ function setup() {
   try { welcomed = localStorage.getItem("bazi-life.welcomed") === "1"; } catch {}
   const lastTab = TAB_DRAFT.load();
   selectTab(TABS.includes(lastTab) ? lastTab : welcomed ? "me" : "welcome");
+  initTimeField("f");
   initBaby({ begin, showError });
   restoreForm();
   for (const type of ["input", "change"]) $("#form-me").addEventListener(type, saveFormSoon);
@@ -70,7 +72,6 @@ function setup() {
   // The sticky status bar (with the pixel scene) is as tall as the screen makes it; scrolling to a choice leaves room for it.
   const status = $(".status");
   if (status && typeof ResizeObserver === "function") new ResizeObserver(() => document.documentElement.style.setProperty("--sticky", `${Math.ceil(status.getBoundingClientRect().height) + 8}px`)).observe(status);
-  $("#f-nohour").addEventListener("change", () => { $("#f-time").disabled = $("#f-nohour").checked; });
   const partnerSex = $(".member[data-role=partner] .m-sex");
   partnerSex.addEventListener("change", () => { partnerSex.dataset.picked = "1"; });
   for (const r of document.querySelectorAll('input[name="sex"]')) r.addEventListener("change", () => { if (!partnerSex.dataset.picked) partnerSex.value = $("#sex-f").checked ? "male" : "female"; });
@@ -122,7 +123,7 @@ function selectTab(tab) {
 
 // 填到一半的表單 stays through a reload (draft.js: this tab only, gone when it is closed).
 const FORM_DRAFT = draftStore("bazi-life.form"), TAB_DRAFT = draftStore("bazi-life.tab");
-const ME_FIELDS = ["f-name", "f-date", "f-time", "f-nohour", "sex-m", "sex-f", "f-place", "family", "f-met", "f-wed", "f-only"];
+const ME_FIELDS = ["f-name", "f-date", ...timeFieldIds("f"), "sex-m", "sex-f", "f-place", "family", "f-met", "f-wed", "f-only"];
 const memberValues = el => ({ name: el.querySelector(".m-name").value, date: el.querySelector(".m-date").value, time: el.querySelector(".m-time").value });
 function setMember(el, m) { el.querySelector(".m-name").value = m.name || ""; el.querySelector(".m-date").value = m.date || ""; el.querySelector(".m-time").value = m.time || ""; }
 function saveForm() {
@@ -155,7 +156,7 @@ function restoreForm() {
 }
 // The parts of the form that follow other fields.
 function applyFormState() {
-  $("#f-time").disabled = $("#f-nohour").checked;
+  syncTimeField("f");
   const only = $("#f-only").checked;
   $("#sibling-list").hidden = only; $("#add-sibling").hidden = only;
 }
@@ -221,16 +222,15 @@ function startFromForm() {
   const [y, m, d] = ($("#f-date").value || "").split("-").map(Number);
   if (!y) return showError("請輸入出生日期。");
   if (y < 1900 || y > 2100) return showError("出生年份請在 1900 到 2100 年之間。");
-  const noHour = $("#f-nohour").checked;
-  const [h, mi] = ($("#f-time").value || "").split(":").map(Number);
-  if (!noHour && !Number.isFinite(h)) return showError("請輸入出生時間，或勾選「時辰不詳」。");
+  const hour = readTimeField("f");
+  if (hour.error) return showError(hour.error);
   const family = readFamily();
   const members = family ? [family.father, family.mother, family.partner, ...family.siblings].filter(Boolean) : [];
   if (members.some(x => x.date && (x.date.y < 1900 || x.date.y > 2100))) return showError("家人的出生年份請在 1900 到 2100 年之間。");
   const problems = checkFamily(family, { y, m, d });
   if (problems.length) { $("#family").open = true; return showError(problems.join(" ")); }
   showError("");
-  const input = { date: { y, m, d }, time: noHour ? null : { h, mi: mi || 0 }, place: findPlace($("#f-place").value), sex: $("#sex-f").checked ? "female" : "male" };
+  const input = { date: { y, m, d }, time: hour.time, place: findPlace($("#f-place").value), sex: $("#sex-f").checked ? "female" : "male" };
   begin(input, null, { name: cleanName($("#f-name").value), family });
 }
 
@@ -678,7 +678,8 @@ function drawReport() {
   }) : null;
   const yearsTitle = birth <= now ? `近十年流年（${now}–${now + 9}）` : `成年後十年的流年（${birth + 18}–${birth + 27}）`;
   $("#report-body").innerHTML = reportHTML(chart, { natal, decades, years, events, name, overall, partner, yearsTitle });
-  $("#report-lede").textContent = `依${prep.name ? `「${prep.name.full}」的姓名與` : ""}出生時刻（真太陽時）排出的命盤，用傳統子平八字${prep.name ? "與姓名學" : ""}的方法逐項分析。傳統命理的說法，僅供參考。`;
+  const born = chart.time.shichen ? `出生日期與${chart.time.shichen}時` : chart.hourKnown ? "出生時刻（真太陽時）" : "出生日期（時辰不詳）";
+  $("#report-lede").textContent = `依${prep.name ? `「${prep.name.full}」的姓名與` : ""}${born}排出的命盤，用傳統子平八字${prep.name ? "與姓名學" : ""}的方法逐項分析。傳統命理的說法，僅供參考。`;
   $("#report").hidden = false;
 }
 

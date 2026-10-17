@@ -72,6 +72,11 @@ fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; min-width:
 .secondary:hover { border-color: var(--indigo); color: var(--indigo); }
 .error { color: var(--seal); font-size: 14px; }
 #setup form { display: grid; gap: 16px; }
+.tmode { display: inline-flex; width: max-content; border: 1px solid var(--rule); border-radius: 999px; overflow: hidden; }
+.tmode label { display: inline-flex; align-items: center; padding: 3px 14px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.tmode input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.tmode label:has(input:checked) { background: var(--indigo-wash); color: var(--indigo); font-weight: 500; }
+.tmode label:has(input:focus-visible) { outline: 2px solid var(--indigo); outline-offset: -2px; }
 .form-actions { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
 .clear { border: 0; background: none; padding: 6px 2px; font-size: 14px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .clear:hover { color: var(--ink); }
@@ -426,8 +431,13 @@ footer a { color: var(--indigo); }
         <label class="field"><span>姓名（選填）</span><input type="text" id="f-name" maxlength="8" placeholder="例如：陳怡君" lang="zh-Hant" spellcheck="false"></label>
         <label class="field"><span>出生日期（國曆）</span><input type="date" id="f-date" min="1900-01-01" max="2100-12-31" value="1988-02-15"></label>
         <div class="field">
-          <label class="name" for="f-time">出生時間</label>
-          <input type="time" id="f-time" value="23:30">
+          <span class="name" id="f-time-label">出生時間</span>
+          <div class="tmode" role="radiogroup" aria-labelledby="f-time-label">
+            <label><input type="radio" name="f-tmode" id="f-tmode-clock" value="clock" checked> 時間</label>
+            <label><input type="radio" name="f-tmode" id="f-tmode-shichen" value="shichen"> 時辰</label>
+          </div>
+          <input type="time" id="f-time" value="23:30" aria-labelledby="f-time-label">
+          <select id="f-shichen" hidden aria-label="出生的時辰"></select>
           <label class="check" for="f-nohour"><input type="checkbox" id="f-nohour"> 時辰不詳</label>
         </div>
         <fieldset>
@@ -494,8 +504,13 @@ footer a { color: var(--indigo); }
         </fieldset>
         <label class="field"><span>出生日期（或預產期）</span><input type="date" id="b-date" min="1900-01-01" max="2100-12-31"></label>
         <div class="field">
-          <label class="name" for="b-time">出生時間</label>
-          <input type="time" id="b-time">
+          <span class="name" id="b-time-label">出生時間</span>
+          <div class="tmode" role="radiogroup" aria-labelledby="b-time-label">
+            <label><input type="radio" name="b-tmode" id="b-tmode-clock" value="clock" checked> 時間</label>
+            <label><input type="radio" name="b-tmode" id="b-tmode-shichen" value="shichen"> 時辰</label>
+          </div>
+          <input type="time" id="b-time" aria-labelledby="b-time-label">
+          <select id="b-shichen" hidden aria-label="出生的時辰"></select>
           <label class="check" for="b-nohour"><input type="checkbox" id="b-nohour" checked> 還不知道時辰</label>
         </div>
         <label class="field"><span>出生地</span><select id="b-place"></select></label>

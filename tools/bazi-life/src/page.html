@@ -42,6 +42,11 @@ form { background: var(--sheet); border: 1px solid var(--rule); border-radius: 1
 .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 16px; }
 .field { display: grid; gap: 6px; min-width: 0; }
 .field > span, .field > .name, legend { font-size: 13px; font-weight: 500; color: var(--muted); }
+.tmode { display: inline-flex; width: max-content; border: 1px solid var(--rule); border-radius: 999px; overflow: hidden; }
+.tmode label { display: inline-flex; align-items: center; padding: 3px 14px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.tmode input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.tmode label:has(input:checked) { background: var(--indigo-wash); color: var(--indigo); font-weight: 500; }
+.tmode label:has(input:focus-visible) { outline: 2px solid var(--indigo); outline-offset: -2px; }
 .check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; }
 .stack { display: grid; gap: 28px; }
 input, select, button { font: inherit; color: inherit; }
@@ -156,8 +161,13 @@ footer p { max-width: 70ch; }
     <div class="fields">
       <label class="field"><span>出生日期（國曆）</span><input type="date" id="f-date" min="1900-01-01" max="2100-12-31" required></label>
       <div class="field">
-        <label class="name" for="f-time">出生時間（出生證明上的時間）</label>
-        <input type="time" id="f-time">
+        <span class="name" id="f-time-label">出生時間（出生證明上的時間）</span>
+        <div class="tmode" role="radiogroup" aria-labelledby="f-time-label">
+          <label><input type="radio" name="f-tmode" id="f-tmode-clock" value="clock" checked> 時間</label>
+          <label><input type="radio" name="f-tmode" id="f-tmode-shichen" value="shichen"> 時辰</label>
+      </div>
+        <input type="time" id="f-time" aria-labelledby="f-time-label">
+        <select id="f-shichen" hidden aria-label="出生的時辰"></select>
         <label class="check" for="f-nohour"><input type="checkbox" id="f-nohour"> 時辰不詳</label>
       </div>
       <fieldset>

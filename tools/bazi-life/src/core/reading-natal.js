@@ -430,9 +430,10 @@ function basics(c) {
   if (c.name) out.push({ label: "姓名", value: c.name });
   out.push({ label: "性別", value: c.male ? "乾造（男）" : "坤造（女）" });
   const place = chart.input.place.name || "自訂地點";
-  out.push({ label: "國曆", value: `${ymd(chart.time.entered)}${c.hourKnown ? ` ${hm(chart.time.entered)}` : "，時辰不詳"}（${place}）` });
+  const shichen = chart.time.shichen;
+  out.push({ label: "國曆", value: `${ymd(chart.time.entered)}${c.hourKnown ? (shichen ? ` ${shichen}時` : ` ${hm(chart.time.entered)}`) : "，時辰不詳"}（${place}）` });
   const mode = chart.input.options.solar;
-  if (c.hourKnown && mode !== "clock") {
+  if (c.hourKnown && mode !== "clock" && !shichen) {
     const vs = Math.round(Math.abs(chart.time.vsEntered)), sign = chart.time.vsEntered < 0 ? "−" : "+";
     out.push({ label: mode === "mean" ? "平太陽時" : "真太陽時", value: `${ymd(chart.time.solarClock)} ${hm(chart.time.solarClock)}（鐘錶 ${hm(chart.time.entered)}，${vs ? `校正 ${sign}${vs} 分鐘` : "與鐘錶時間相同"}）` });
   }

@@ -133,3 +133,45 @@ test("流年 cover all ten 大運", () => {
   assert.deepEqual(c.years.slice(0, 3).map(y => `${y.year}${y.name}${y.age}`), ["1988戊辰1", "1989己巳2", "1990庚午3"]);
   assert.equal(c.luck.decades.length, 10);
 });
+
+// 時辰: the hour given as 午時 and the like (shichen.js).
+import { SHICHEN, shichenTime, timeText } from "../src/core/shichen.js";
+import { fourPillars } from "../src/core/chart.js";
+
+test("a chosen 時辰 is the hour pillar, even where solar time would move a clock reading", () => {
+  const urumqi = findPlace("烏魯木齊（北京時間）"), wu = shichenTime("wu");
+  const byClock = computeChart({ date: { y: 2000, m: 6, d: 21 }, time: { h: 12, mi: 0 }, place: urumqi, sex: "male" });
+  const byShichen = computeChart({ date: { y: 2000, m: 6, d: 21 }, time: wu, place: urumqi, sex: "male" });
+  assert.equal(byClock.pillars[3].name[1], "巳", "noon on Beijing time is 巳時 in Ürümqi solar time");
+  assert.equal(byShichen.pillars[3].name[1], "午");
+  assert.equal(byShichen.time.shichen, "午");
+  assert.ok(byShichen.warnings.some(w => w.kind === "shichen"));
+  assert.equal(gz(byClock).slice(0, 5), gz(byShichen).slice(0, 5), "year and month still come from the real moment");
+  assert.equal(fourPillars({ date: { y: 2000, m: 6, d: 21 }, time: wu, place: urumqi }).hour, byShichen.pillars[3].name);
+  assert.deepEqual(byShichen.variants.map(v => Object.keys(v.options)), [["zi"]], "the solar settings cannot change a chosen 時辰, so only the 子時 rule is compared");
+});
+
+test("with a 時辰 the year and month read the real moment, whatever the solar setting", () => {
+  // 2024 立春 is 16:27 Beijing time. 辰時 in New York that morning is 21:00 Beijing time, after it; read as a Beijing
+  // clock (the 不校正 setting for clock times), 08:00 would still be before it.
+  const ny = findPlace("紐約"), date = { y: 2024, m: 2, d: 4 }, chen = shichenTime("chen");
+  const at = solar => computeChart({ date, time: chen, place: ny, options: { solar } });
+  for (const solar of ["true", "mean", "clock"]) {
+    assert.deepEqual(at(solar).pillars.map(p => p.name), ["甲辰", "丙寅", ...at("true").pillars.slice(2).map(p => p.name)], solar);
+    assert.equal(at(solar).pillars[3].name[1], "辰", solar);
+  }
+  assert.equal(at("clock").terms.prev.time.slice(0, 16), "2024-02-04 03:27", "the term is shown on the New York clock");
+  assert.equal(computeChart({ date, time: { h: 8, mi: 0 }, place: ny, options: { solar: "clock" } }).pillars[0].name, "癸卯", "a clock time under 不校正 still reads the clock as Beijing time");
+});
+
+test("every 時辰 gives its own branch, and 子時 at either end of the date lands on the right day", () => {
+  for (const s of SHICHEN) assert.equal(computeChart({ date: { y: 1990, m: 5, d: 20 }, time: shichenTime(s.key), place: taipei }).pillars[3].name[1], s.branch, s.key);
+  const at = (key, zi) => computeChart({ date: { y: 2000, m: 6, d: 21 }, time: shichenTime(key), place: taipei, options: { zi } });
+  const day = at("wu", "early").pillars[2].name, next = computeChart({ date: { y: 2000, m: 6, d: 22 }, time: shichenTime("wu"), place: taipei }).pillars[2].name;
+  assert.equal(at("zi-am", "early").pillars[2].name, day, "子時 after midnight belongs to the date");
+  assert.equal(at("zi-pm", "early").pillars[2].name, next, "with 23 點換日, 子時 before midnight is the next day");
+  assert.equal(at("zi-pm", "late").pillars[2].name, day, "with 夜子時, it stays on the date");
+  assert.equal(timeText(shichenTime("hai")), "亥時");
+  assert.equal(timeText({ h: 9, mi: 5 }), "09:05");
+  assert.equal(shichenTime("nope"), null);
+});

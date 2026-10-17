@@ -9,6 +9,8 @@ import { reportHTML } from "./report.js";
 import { babyCharts, nameCandidates, runSlice, statsOf, gestation, slotRange, checkSlot, slotEntry, rankSlots, MAX_NAMES, MAX_SLOTS, RUNS, EARLIEST_WEEKS } from "./sim/compare.js";
 import { showNursery } from "./pixel-app.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
+import { initTimeField, readTimeField, syncTimeField, timeFieldIds } from "./time-field.js";
+import { timeText } from "./core/shichen.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -26,8 +28,8 @@ let job = 0;        // bumps to cancel a running comparison
 export function initBaby(h) {
   hooks = h;
   $("#b-place").innerHTML = PLACE_GROUPS.map(g => `<optgroup label="${esc(g.group)}">${g.places.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("");
+  initTimeField("b");
   defaults();
-  $("#b-nohour").addEventListener("change", () => { $("#b-time").disabled = $("#b-nohour").checked; });
   $("#add-slot").addEventListener("click", () => { addSlot(); saveSoon(); });
   $("#slot-list").addEventListener("click", e => { const b = e.target.closest(".remove"); if (b) { b.closest(".slot").remove(); saveSoon(); } });
   restore();
@@ -62,14 +64,14 @@ function defaults() {
   $("#b-place").value = "臺北市";
   const today = new Date(), soon = new Date(today.getTime() + 120 * 86400000);
   $("#b-date").value = `${soon.getFullYear()}-${pad(soon.getMonth() + 1)}-${pad(soon.getDate())}`;
-  $("#b-time").disabled = $("#b-nohour").checked;
+  syncTimeField("b");
   $("#slot-list").innerHTML = "";
   addSlot(); addSlot();
 }
 
 // 填到一半的表單 stays through a reload (draft.js: this tab only, gone when it is closed).
 const DRAFT = draftStore("bazi-life.baby");
-const FIELDS = ["b-surname", "b-sex-m", "b-sex-f", "b-sex-u", "b-date", "b-time", "b-nohour", "b-place", "b-parents", "b-slots", "b-due"];
+const FIELDS = ["b-surname", "b-sex-m", "b-sex-f", "b-sex-u", "b-date", ...timeFieldIds("b"), "b-place", "b-parents", "b-slots", "b-due"];
 function save() {
   const parents = {};
   for (const el of document.querySelectorAll("#b-parents .member[data-brole]")) parents[el.dataset.brole] = { name: el.querySelector(".m-name").value, date: el.querySelector(".m-date").value, time: el.querySelector(".m-time").value };
@@ -90,7 +92,7 @@ function restore() {
     for (const v of d.slots.slice(0, MAX_SLOTS)) addSlot(typeof v === "string" ? v : "");
     while ($("#slot-list").children.length < 2) addSlot();
   }
-  $("#b-time").disabled = $("#b-nohour").checked;
+  syncTimeField("b");
 }
 function clearForm() {
   if (!confirm("要清空這張表單嗎？填過的資料會刪掉。")) return;
@@ -119,11 +121,10 @@ function readForm() {
   const unique = [...new Set(givens)].slice(0, MAX_NAMES);
   const date = parseDate($("#b-date").value);
   if (!date || date.y < 1900 || date.y > 2100) return "請填出生日期（或預產期），年份在 1900 到 2100 年之間。";
-  const noHour = $("#b-nohour").checked;
-  const [h, mi] = ($("#b-time").value || "").split(":").map(Number);
-  if (!noHour && !Number.isFinite(h)) return "請填出生時間，或勾選「還不知道時辰」。";
+  const hour = readTimeField("b");
+  if (hour.error) return hour.error.replace("「時辰不詳」", "「還不知道時辰」");
   const sex = (document.querySelector('input[name="b-sex"]:checked') || {}).value || "unknown";
-  const birth = { date, time: noHour ? null : { h, mi: mi || 0 }, place: findPlace($("#b-place").value), sex };
+  const birth = { date, time: hour.time, place: findPlace($("#b-place").value), sex };
   const family = { siblings: [] };
   for (const el of document.querySelectorAll(".member[data-brole]")) { const m = readMember(el); if (m.name || m.date) family[el.dataset.brole] = m; }
   const parents = family.father || family.mother ? family : null;
@@ -157,7 +158,7 @@ async function compare() {
   state = { form, charts, analysis, key, names, slots: [], reportFor: null, reportSex: charts[0].sex };
   $("#baby").hidden = false;
   showNursery($("#baby-scene"), form.birth.sex);
-  $("#baby-lede").textContent = `${dateText(form.birth.date)}${form.birth.time ? ` ${pad(form.birth.time.h)}:${pad(form.birth.time.mi)}` : "（時辰還不知道）"}在${form.birth.place.name}出生的${SEX[form.birth.sex] || "寶寶（性別還不知道）"}。每個名字都用同一張命盤、同樣的 ${RUNS} 次人生來比，差別只來自名字。`;
+  $("#baby-lede").textContent = `${dateText(form.birth.date)}${form.birth.time ? ` ${timeText(form.birth.time)}` : "（時辰還不知道）"}在${form.birth.place.name}出生的${SEX[form.birth.sex] || "寶寶（性別還不知道）"}。每個名字都用同一張命盤、同樣的 ${RUNS} 次人生來比，差別只來自名字。`;
   $("#baby-chart").innerHTML = chartBlock(charts);
   $("#baby-parents").innerHTML = parentsBlock(charts[0].prep.family);
   $("#baby-slots").innerHTML = "";
@@ -320,7 +321,7 @@ function startLife(i) {
   const { birth, family } = state.form;
   const sex = birth.sex === "unknown" ? (crypto.getRandomValues(new Uint8Array(1))[0] < 128 ? "male" : "female") : birth.sex;
   const input = { date: birth.date, time: birth.time, place: birth.place, sex };
-  const born = `${dateText(birth.date)}${birth.time ? ` ${pad(birth.time.h)}:${pad(birth.time.mi)}` : ""}，${cand.full}在${birth.place.name}出生，是個${sex === "female" ? "女孩" : "男孩"}。`;
+  const born = `${dateText(birth.date)}${birth.time ? ` ${timeText(birth.time)}` : ""}，${cand.full}在${birth.place.name}出生，是個${sex === "female" ? "女孩" : "男孩"}。`;
   job++;   // stop any comparison still running
   hooks.begin(input, born, { name: cand.full, family });
 }

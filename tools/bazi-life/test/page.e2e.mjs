@@ -78,6 +78,17 @@ await page.fill("#f-date", "1850-01-01");
 await page.waitForTimeout(50);
 check("out-of-range year explains itself", /1900 到 2100/.test(await text("#error")));
 
+// A 時辰 instead of a clock time: the hour pillar is that branch, the trail says so, and an example goes back to a clock time.
+await page.click('[data-example="spring"]');
+await page.click("label:has(#f-tmode-shichen)");
+await page.selectOption("#f-shichen", "wu");
+await page.waitForTimeout(50);
+check("a chosen 午時 gives a 午 hour pillar and the trail names it", (await pillarNames()).endsWith("午") && /你選的時辰/.test(await text("#trail")) && /午時/.test(await text("#trail")), await pillarNames());
+check("with a 時辰 the settings check leaves the hour alone, and the solar-time setting is greyed out", !/時柱/.test(await text("#edges")) && !/太陽時/.test(await text("#edges")) && await page.isDisabled("#f-solar"), await text("#edges"));
+await page.click('[data-example="dst"]');
+await page.waitForTimeout(50);
+check("an example switches back to a clock time", await page.isChecked("#f-tmode-clock") && await page.isVisible("#f-time") && await page.isHidden("#f-shichen") && !(await page.isDisabled("#f-solar")) && (await pillarNames()).endsWith("己卯"));
+
 if (process.env.SHOTS) {
   await page.click('[data-example="dst"]');
   await page.screenshot({ path: `${process.env.SHOTS}/desktop-light.png`, fullPage: true });
@@ -95,6 +106,11 @@ await page.fill("#f-time", "08:45");
 await page.reload();
 await page.waitForSelector("#result:not([hidden])");
 check("a reload keeps the date and time that were typed", await page.inputValue("#f-date") === "1995-11-11" && await page.inputValue("#f-time") === "08:45" && (await pillarNames()).split(" ").length === 4);
+await page.click("label:has(#f-tmode-shichen)");
+await page.selectOption("#f-shichen", "zi-pm");
+await page.reload();
+await page.waitForSelector("#result:not([hidden])");
+check("a reload keeps a chosen 時辰", await page.isChecked("#f-tmode-shichen") && await page.inputValue("#f-shichen") === "zi-pm" && (await pillarNames()).endsWith("子"), await pillarNames());
 check("no page errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 await browser.close();
 

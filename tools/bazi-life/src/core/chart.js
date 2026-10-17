@@ -37,7 +37,10 @@ const solarTimeOf = f => SolarTime.fromYmdHms(f.y, f.m, f.d, f.h, f.mi, f.s || 0
 const termMs = term => { const t = term.getJulianDay().getSolarTime(); return fieldsToMs({ y: t.getYear(), m: t.getMonth(), d: t.getDay(), h: t.getHour(), mi: t.getMinute(), s: t.getSecond() }); };
 
 // The two clocks the pillars read, for one instant. `wallMs` is the entered reading taken as UTC (clock mode).
-function basesAt(utc, wallMs, place, solar) {
+// byShichen: the hour was given as a 時辰 (shichen.js), so the day and hour pillars take it as it is, and the year
+// and month read the real moment against the solar terms, whatever the solar setting.
+function basesAt(utc, wallMs, place, solar, byShichen = false) {
+  if (byShichen) return { term: msToFields(utc + 8 * HOUR), solar: msToFields(wallMs), shift: null };
   if (solar === "clock") { const f = msToFields(wallMs); return { term: f, solar: f, shift: null }; }
   const s = solarFields(utc, place.lon, solar);
   return { term: msToFields(utc + 8 * HOUR), solar: s.fields, shift: s.shift };
@@ -118,15 +121,17 @@ export function computeChart({ date, time = null, place, sex = "male", options =
   if (!SOLAR_MODES[opts.solar] || !ZI_RULES[opts.zi] || !YUN_METHODS[opts.yun]) throw new Error("unknown option");
   if (!(date.y >= 1801 && date.y <= 2199)) throw new Error("year out of range");
   const hourKnown = !!time;
+  // A time like { h: 12, mi: 0, branch: "午" } is a 時辰 (the middle of its two hours), not a clock reading.
+  const byShichen = hourKnown && !!time.branch;
   const wall = { y: date.y, m: date.m, d: date.d, h: hourKnown ? time.h : 12, mi: hourKnown ? time.mi : 0, s: 0 };
   const resolved = resolveWallTime(wall, place.tz);
   const chosen = Math.min(opts.occurrence, resolved.instants.length - 1);
   const utc = resolved.instants[chosen];
   const wallMs = fieldsToMs(wall);
-  const bases = basesAt(utc, wallMs, place, opts.solar);
+  const bases = basesAt(utc, wallMs, place, opts.solar, byShichen);
   const ctx = {
     hourKnown, zi: opts.zi,
-    pillarsAtShift: min => pillarsFrom(basesAt(utc + min * MINUTE, wallMs + min * MINUTE, place, opts.solar), hourKnown, opts.zi, date),
+    pillarsAtShift: min => pillarsFrom(basesAt(utc + min * MINUTE, wallMs + min * MINUTE, place, opts.solar, byShichen), hourKnown, opts.zi, date),
   };
   const sc = pillarsFrom(bases, hourKnown, opts.zi, date);
   const dm = sc.day.getHeavenStem();
@@ -140,7 +145,8 @@ export function computeChart({ date, time = null, place, sex = "male", options =
   const warnings = [];
   if (resolved.status === "ambiguous") warnings.push({ kind: "ambiguous", text: `這個時間在當地出現了兩次（日光節約時間結束時，時鐘撥回一小時）。目前用第 ${chosen + 1} 次，可以切換。` });
   if (resolved.status === "gap") warnings.push({ kind: "gap", text: `這個時間在當地不存在（日光節約時間開始時，時鐘直接跳過 ${resolved.skipped} 分鐘），已當成標準時間計算。` });
-  if (opts.solar !== "clock" && resolved.status !== "gap") warnings.push(...clock.notes);
+  if (opts.solar !== "clock" && !byShichen && resolved.status !== "gap") warnings.push(...clock.notes);
+  if (byShichen) warnings.push({ kind: "shichen", text: `依你選的${time.branch}時排日柱和時柱，不再做真太陽時校正；起運以這個時辰的中間估算。` });
   if (!hourKnown) warnings.push({ kind: "hour", text: "時辰不詳：只排年、月、日三柱，起運以中午 12 點估算。" });
 
   const sens = sensitivity(ctx, bases, sc);
@@ -212,10 +218,12 @@ export function computeChart({ date, time = null, place, sex = "male", options =
       solarClock: formatFields(bases.solar, true),
       shift: shift && { longitude: round(shift.longitude), eot: round(shift.eot), total: round(shift.total) },
       vsEntered: round((fieldsToMs(bases.solar) - wallMs) / MINUTE),
+      shichen: byShichen ? time.branch : null,
     },
+    // With a 時辰 the terms are shown on the local clock, the clock the 時辰 is read on.
     terms: {
-      prev: { name: zh(sens.jie.prev.getName()), time: localTermTime(sens.jie.prev, place, opts.solar) },
-      next: { name: zh(sens.jie.next.getName()), time: localTermTime(sens.jie.next, place, opts.solar) },
+      prev: { name: zh(sens.jie.prev.getName()), time: localTermTime(sens.jie.prev, place, byShichen ? "true" : opts.solar) },
+      next: { name: zh(sens.jie.next.getName()), time: localTermTime(sens.jie.next, place, byShichen ? "true" : opts.solar) },
     },
     sensitivity: sens.list,
     variants: variants({ date, time, place, sex, options: opts }, names(sc)),
@@ -243,15 +251,18 @@ export function fourPillars({ date, time = null, place, options = {} }) {
   const wall = { y: date.y, m: date.m, d: date.d, h: time ? time.h : 12, mi: time ? time.mi : 0, s: 0 };
   const r = resolveWallTime(wall, place.tz);
   const utc = r.instants[Math.min(opts.occurrence, r.instants.length - 1)];
-  return names(pillarsFrom(basesAt(utc, fieldsToMs(wall), place, opts.solar), !!time, opts.zi, date));
+  return names(pillarsFrom(basesAt(utc, fieldsToMs(wall), place, opts.solar, !!(time && time.branch)), !!time, opts.zi, date));
 }
 
 // The pillars under the other settings, so a reader can see which choices matter for this birth.
 function variants(input, current) {
   const o = input.options, alts = [];
-  if (o.solar !== "clock") alts.push({ label: SOLAR_MODES.clock, options: { solar: "clock" } });
-  if (o.solar !== "true") alts.push({ label: SOLAR_MODES.true, options: { solar: "true" } });
-  if (o.solar !== "mean") alts.push({ label: SOLAR_MODES.mean, options: { solar: "mean" } });
+  // A chosen 時辰 is taken as it is, so the solar settings cannot change it.
+  if (!(input.time && input.time.branch)) {
+    if (o.solar !== "clock") alts.push({ label: SOLAR_MODES.clock, options: { solar: "clock" } });
+    if (o.solar !== "true") alts.push({ label: SOLAR_MODES.true, options: { solar: "true" } });
+    if (o.solar !== "mean") alts.push({ label: SOLAR_MODES.mean, options: { solar: "mean" } });
+  }
   if (input.time) alts.push({ label: ZI_RULES[o.zi === "early" ? "late" : "early"], options: { zi: o.zi === "early" ? "late" : "early" } });
   return alts.map(a => {
     const p = fourPillars({ ...input, options: { ...o, ...a.options } });

@@ -2,6 +2,7 @@
 import { computeChart, SOLAR_MODES, ZI_RULES, YUN_METHODS } from "./core/chart.js";
 import { PLACE_GROUPS, findPlace } from "./core/places.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
+import { initTimeField, readTimeField, syncTimeField, useClockTime, timeFieldIds } from "./time-field.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -28,7 +29,7 @@ let example = null;
 
 // The form stays through a reload (draft.js: this tab only, gone when it is closed).
 const DRAFT = draftStore("bazi-chart.form");
-const FIELDS = ["f-date", "f-time", "f-nohour", "sex-m", "sex-f", "f-place", "f-lon", "f-lat", "f-tz", "advanced", "f-solar", "f-zi", "f-yun"];
+const FIELDS = ["f-date", ...timeFieldIds("f"), "sex-m", "sex-f", "f-place", "f-lon", "f-lat", "f-tz", "advanced", "f-solar", "f-zi", "f-yun"];
 const saveSoon = later(() => DRAFT.save({ v: 1, fields: readIds(FIELDS), example, occurrence }));
 
 function setup() {
@@ -40,10 +41,11 @@ function setup() {
   $("#f-tz").innerHTML = zones.map(z => `<option${z === "Asia/Taipei" ? " selected" : ""}>${esc(z)}</option>`).join("");
   const fill = (sel, map) => { sel.innerHTML = Object.entries(map).map(([k, v]) => `<option value="${k}">${esc(typeof v === "string" ? v : v.label)}</option>`).join(""); };
   fill($("#f-solar"), SOLAR_MODES); fill($("#f-zi"), ZI_RULES); fill($("#f-yun"), YUN_METHODS);
+  initTimeField("f");
 
   examples.addEventListener("click", e => { const b = e.target.closest("[data-example]"); if (b) loadExample(b.dataset.example); });
   $("#form").addEventListener("submit", e => e.preventDefault());
-  $("#form").addEventListener("input", e => { if (["f-date", "f-time", "f-place", "f-tz"].includes(e.target.id)) { occurrence = 0; markExample(null); } if (["sex-m", "sex-f", "f-nohour", "f-lon", "f-lat"].includes(e.target.id)) markExample(null); update(); saveSoon(); });
+  $("#form").addEventListener("input", e => { if (["f-date", "f-time", "f-shichen", "f-tmode-clock", "f-tmode-shichen", "f-place", "f-tz"].includes(e.target.id)) { occurrence = 0; markExample(null); } if (["sex-m", "sex-f", "f-nohour", "f-lon", "f-lat"].includes(e.target.id)) markExample(null); update(); saveSoon(); });
   $("#advanced").addEventListener("toggle", saveSoon);
   $("#warnings").addEventListener("click", e => { const b = e.target.closest("[data-occ]"); if (b) { occurrence = Number(b.dataset.occ); update(); saveSoon(); } });
   $("#decades").addEventListener("click", e => { const b = e.target.closest("[data-decade]"); if (b) { selectedDecade = Number(b.dataset.decade); update(); } });
@@ -52,6 +54,7 @@ function setup() {
   const draft = DRAFT.load();
   if (draft && draft.v === 1) {
     writeIds(draft.fields);
+    syncTimeField("f");
     occurrence = Number.isInteger(draft.occurrence) ? draft.occurrence : 0;
     markExample(EXAMPLES.some(e => e.id === draft.example) ? draft.example : null);
     update();
@@ -66,8 +69,10 @@ function markExample(id) {
 function loadExample(id) {
   const ex = EXAMPLES.find(e => e.id === id);
   $("#f-date").value = ex.date;
+  useClockTime("f");
   $("#f-time").value = ex.time || "12:00";
   $("#f-nohour").checked = !ex.time;
+  syncTimeField("f");
   $("#f-place").value = ex.place;
   $(ex.sex === "female" ? "#sex-f" : "#sex-m").checked = true;
   occurrence = 0; selectedDecade = null;
@@ -80,10 +85,8 @@ function readForm() {
   const [y, m, d] = ($("#f-date").value || "").split("-").map(Number);
   if (!y || !m || !d) return { error: "請輸入出生日期。" };
   if (y < 1900 || y > 2100) return { error: "出生年份請在 1900 到 2100 年之間。" };
-  const noHour = $("#f-nohour").checked;
-  $("#f-time").disabled = noHour;
-  const [h, mi] = ($("#f-time").value || "").split(":").map(Number);
-  if (!noHour && !Number.isFinite(h)) return { error: "請輸入出生時間，或勾選「時辰不詳」。" };
+  const hour = readTimeField("f");
+  if (hour.error) return hour;
   const custom = $("#f-place").value === "custom";
   $("#custom").hidden = !custom;
   let place = findPlace($("#f-place").value);
@@ -95,7 +98,7 @@ function readForm() {
   }
   return {
     input: {
-      date: { y, m, d }, time: noHour ? null : { h, mi: mi || 0 }, place,
+      date: { y, m, d }, time: hour.time, place,
       sex: $("#sex-f").checked ? "female" : "male",
       options: { solar: $("#f-solar").value, zi: $("#f-zi").value, yun: $("#f-yun").value, occurrence },
     },
@@ -103,6 +106,8 @@ function readForm() {
 }
 
 function update() {
+  // A chosen 時辰 is used as it is, so the solar-time setting does not apply.
+  $("#f-solar").disabled = $("#f-tmode-shichen").checked && !$("#f-nohour").checked;
   const form = readForm();
   const err = $("#error");
   if (form.error) { err.textContent = form.error; err.hidden = false; $("#result").hidden = true; return; }
@@ -175,6 +180,15 @@ const hourName = clock => { const h = Number(clock.slice(11, 13)); return HOURS[
 function renderTrail(c) {
   const t = c.time, p = c.input.place, mode = c.input.options.solar;
   const steps = [];
+  if (t.shichen) {
+    // A 時辰 was chosen: the day and hour pillars take it as it is; only the year and month read the real moment.
+    steps.push({ k: "你選的時辰", v: `${t.entered.slice(0, 10)} ${t.shichen}時`, why: `${p.name}・${p.tz}` });
+    steps.push({ k: "東八區時間", v: t.termClock, why: "以這個時辰的中間估算出生的時刻。節氣表以東八區計時，年柱、月柱和起運拿這個時刻和節氣比對。", key: true });
+    steps.push({ k: "日柱和時柱", v: `${t.shichen}時`, why: "直接用你選的時辰，不再做真太陽時校正。", key: true });
+    $("#trail").innerHTML = steps.map(s => `<li${s.key ? ' class="key"' : ""}><span class="k">${esc(s.k)}</span><span class="v">${esc(s.v)}</span><span class="why">${esc(s.why)}</span></li>`).join("");
+    $("#total").textContent = "";
+    return;
+  }
   steps.push({ k: "你輸入的時間", v: c.hourKnown ? t.entered : `${t.entered.slice(0, 10)}（時辰不詳，用 12:00 估算）`, why: `${p.name}・${p.tz}` });
   if (mode === "clock") {
     steps.push({ k: "不校正", v: t.termClock.slice(0, 16), why: "直接把輸入的時間當作東八區時間，四柱都用它。", key: true });
@@ -202,7 +216,8 @@ function span(min) {
 function renderEdges(c) {
   const s = Object.fromEntries(c.sensitivity.map(x => [x.role, x]));
   const win = $("#window");
-  if (c.hourKnown) {
+  // A chosen 時辰 has no position inside its two hours to show.
+  if (c.hourKnown && !c.time.shichen) {
     const h = s.hour, total = h.earlier.minutes + h.later.minutes, solar = c.time.solarClock;
     const now = Number(solar.slice(11, 13)) * 60 + Number(solar.slice(14, 16)) + Number(solar.slice(17, 19)) / 60;
     const clock = m => { const x = ((Math.round(m) % 1440) + 1440) % 1440; return `${String(Math.floor(x / 60)).padStart(2, "0")}:${String(x % 60).padStart(2, "0")}`; };
@@ -222,7 +237,7 @@ function renderEdges(c) {
     return `<li><span class="tag${hot ? " hot" : ""}">${x.label}</span>出生時間只要再${side}。</li>`;
   };
   if (c.hourKnown) {
-    items.push(describe(s.hour, Infinity));
+    if (!c.time.shichen) items.push(describe(s.hour, Infinity));
     const near = [describe(s.day, 120), describe(s.month, 2880), describe(s.year, 2880)];
     items.push(...near);
     if (!near.some(Boolean)) items.push(`<li><span class="tag">其他</span>日柱、月柱、年柱都離交界很遠，出生時間差一點也不會變。</li>`);
