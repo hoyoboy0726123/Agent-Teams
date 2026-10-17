@@ -7,6 +7,8 @@
 //   --fragment <file>        the 排盤 page without the skeleton, tyme4ts from unpkg (the same npm file)
 //   --life-fragment <file>   the same for the 人生 page
 //   --chart-url <url>        where the 人生 fragment links to the 排盤 page
+// The full 人生 page asks the site's Worker (worker/index.js) at /api/interpret to read what the player writes; the
+// fragment has no Worker behind it, so it leaves the address empty and the page reads the words itself.
 import { build } from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -43,5 +45,8 @@ async function page({ html, js, out, fragment, links }) {
 await page({ html: "src/page.html", js: "src/app.js", out: "public/index.html", fragment: arg("--fragment"), links: { standalone: {}, artifact: {} } });
 await page({
   html: "src/life.html", js: "src/life-app.js", out: "public/life.html", fragment: arg("--life-fragment"),
-  links: { standalone: { __CHART_URL__: "index.html" }, artifact: { __CHART_URL__: arg("--chart-url") || "https://claude.ai/artifact/3a3ezBHmLKeKBxGaNveAV2" } },
+  links: {
+    standalone: { __CHART_URL__: "index.html", __INTERPRET_URL__: "/api/interpret" },
+    artifact: { __CHART_URL__: arg("--chart-url") || "https://claude.ai/artifact/3a3ezBHmLKeKBxGaNveAV2", __INTERPRET_URL__: "" },
+  },
 });

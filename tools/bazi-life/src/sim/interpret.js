@@ -42,6 +42,16 @@ ${general}
 回覆格式：{"action":"<id>","summary":"<15 字以內>","confidence":<0 到 1>}`;
 }
 
+// The model's text → the JSON object it was asked for: the last flat {...} that names an action, so a thought, a code
+// fence or a sentence around it does not matter. null when there is none.
+export function jsonFromText(text) {
+  const found = String(text || "").match(/\{[^{}]*"action"[^{}]*\}/g) || [];
+  for (let i = found.length - 1; i >= 0; i--) {
+    try { return JSON.parse(found[i]); } catch { /* not this one */ }
+  }
+  return null;
+}
+
 // The model's reply, checked: an unknown id becomes "unknown"; the summary is cut to a short line.
 export function readInterpretation(reply, { options = [] } = {}) {
   const allowed = new Set([...options.map(o => o.id), ...Object.keys(ACTIONS), ...SPECIAL]);

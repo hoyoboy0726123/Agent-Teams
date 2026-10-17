@@ -2,6 +2,8 @@
 // PLAYWRIGHT=/path/to/playwright CHROMIUM=/path/to/chrome node test/life.e2e.mjs
 // SHOTS=<dir> also saves a desktop (light) and a phone (dark) screenshot of the ending.
 import { createRequire } from "node:module";
+import { createServer } from "node:http";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const require = createRequire(import.meta.url);
@@ -32,7 +34,8 @@ check("writing about self-harm shows help lines and keeps the choice open", /192
 await page.fill("#free-text", "先跟家人好好商量看看");
 await page.click("#free-go");
 await page.waitForSelector("#free-out [data-free-action]");
-check("without Claude, a written choice gets the closest options to confirm", (await page.$$("#free-out [data-free-action]")).length >= 1);
+check("opened as a file (no Worker), a written choice gets the closest options to confirm", (await page.$$("#free-out [data-free-action]")).length >= 1);
+check("the choice box says nothing about who reads the sentence", !(await page.$("#free-note")) && !/Claude|AI|上傳|判讀/.test(await page.textContent("#choice")));
 await page.click("#free-out [data-free-action]");
 await page.waitForTimeout(400);
 check("a written choice continues the story in your own words", /你自己的決定：你決定「先跟家人好好商量看看」/.test(await page.textContent("#feed")));
@@ -135,31 +138,49 @@ const majorFeed = await page.textContent("#feed");
 check("with 只問人生大事 the big decisions are asked and the rest follow the personality", asked >= 3 && /依你的個性：/.test(majorFeed), `${asked} asked`);
 await page.uncheck("#c-major");
 
-// The Claude path, with a stand-in for the artifact's sample capability that answers like Claude would.
-const ai = watch(await browser.newPage({ viewport: { width: 1000, height: 1200 } }));
-await ai.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
-await ai.addInitScript(() => {
-  window.__prompts = [];
-  const sample = async () => ({ text: "" });
-  sample.json = async prompt => { window.__prompts.push(prompt); return { action: "travel", summary: "你決定帶家人去花蓮走走", confidence: 0.9 }; };
-  window.claude = { use: async name => (name === "sample" ? sample : null) };
+// Served over http, as the Worker serves it: /api/interpret answers like worker/index.js would. A Worker that is
+// busy or out of quota (503), or a request that fails, leaves the player with the local options, with no message.
+const html = await readFile(fileURLToPath(new URL("../public/life.html", import.meta.url)));
+const server = createServer((req, res) => {
+  if (req.url === "/life.html") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(html); }
+  else { res.writeHead(404); res.end(); }
 });
-await ai.goto(url);
-await ai.click("#form-me button[type=submit]");
-await ai.waitForSelector("#play:not([hidden])");
-await ai.click('[data-speed="10"]');
-await ai.waitForSelector("#choice:not([hidden])", { timeout: 20000 });
-check("with Claude available, the note says the sentence goes to Claude", /交給 Claude 判讀/.test(await ai.textContent("#free-note")));
-await ai.fill("#free-text", "帶家人去花蓮走走，散散心");
-await ai.click("#free-go");
-await ai.waitForSelector("#free-out [data-free-action]");
-check("Claude's reading is shown for confirmation with the rule it follows", /你決定帶家人去花蓮走走/.test(await ai.textContent("#free-out")) && /照「去旅行」的規則計算/.test(await ai.textContent("#free-out")));
-const sent = await ai.evaluate(() => window.__prompts[0] || "");
-check("the prompt carries the situation but no name or birth date", /帶家人去花蓮走走，散散心/.test(sent) && !/1988|2 月 15|陳/.test(sent));
-await ai.click("#free-out [data-free-action]");
-await ai.waitForTimeout(400);
-check("the confirmed reading continues the story", /你自己的決定：你決定帶家人去花蓮走走/.test(await ai.textContent("#feed")));
-await ai.close();
+await new Promise(done => server.listen(0, "127.0.0.1", done));
+const site = `http://127.0.0.1:${server.address().port}/life.html`;
+async function servedPage(answer) {
+  const p = watch(await browser.newPage({ viewport: { width: 1000, height: 1200 } }));
+  await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+  const sent = [];
+  await p.route("**/api/interpret", route => { sent.push(route.request()); return answer(route); });
+  await p.goto(site);
+  await p.click("#form-me button[type=submit]");
+  await p.waitForSelector("#play:not([hidden])");
+  await p.click('[data-speed="10"]');
+  await p.waitForSelector("#choice:not([hidden])", { timeout: 20000 });
+  return { p, sent };
+}
+const ok = { status: 200, contentType: "application/json", body: JSON.stringify({ action: "travel", summary: "你決定帶家人去花蓮走走", confidence: 0.9 }) };
+const ai = await servedPage(route => route.fulfill(ok));
+await ai.p.fill("#free-text", "帶家人去花蓮走走，散散心");
+await ai.p.click("#free-go");
+await ai.p.waitForSelector("#free-out [data-free-action]");
+check("the Worker's reading is shown for confirmation with the rule it follows", /你決定帶家人去花蓮走走/.test(await ai.p.textContent("#free-out")) && /照「去旅行」的規則計算/.test(await ai.p.textContent("#free-out")));
+const req = ai.sent[0], body = req ? JSON.parse(req.postData() || "{}") : {};
+check("the page posts the choice and the sentence, without a name or birth date", req && req.method() === "POST" && body.text === "帶家人去花蓮走走，散散心" && body.situation && Array.isArray(body.options) && !/1988|2 月 15|陳/.test(req.postData() || ""), (req && req.postData() || "").slice(0, 80));
+await ai.p.click("#free-out [data-free-action]");
+await ai.p.waitForTimeout(400);
+check("the confirmed reading continues the story", /你自己的決定：你決定帶家人去花蓮走走/.test(await ai.p.textContent("#feed")));
+await ai.p.close();
+for (const [name, answer] of [["busy or over quota (503)", route => route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"unavailable"}' })], ["unreachable", route => route.abort("connectionrefused")]]) {
+  const fb = await servedPage(answer);
+  await fb.p.fill("#free-text", "先跟家人好好商量看看");
+  await fb.p.click("#free-go");
+  await fb.p.waitForSelector("#free-out [data-free-action]", { timeout: 10000 });
+  const out = await fb.p.textContent("#free-out");
+  check(`a Worker that is ${name} falls back to the local options without a message`, fb.sent.length === 1 && /比較接近哪一個/.test(out) && !/錯誤|失敗|AI|Claude/.test(out), out.slice(0, 60));
+  await fb.p.close();
+}
+server.close();
 
 const phone = watch(await browser.newPage({ viewport: { width: 400, height: 900 }, colorScheme: "dark", deviceScaleFactor: 2 }));
 await phone.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());

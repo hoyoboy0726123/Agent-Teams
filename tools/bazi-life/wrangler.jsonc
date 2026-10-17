@@ -1,0 +1,26 @@
+// 命盤人生 on Cloudflare: the two pages in public/ as static assets, and the Worker (worker/index.js) only for /api/*.
+// Deploy from this folder: npm run build && npx wrangler deploy
+{
+  "name": "bazi-life",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    // Static files are served without running the Worker; only the API runs it.
+    "run_worker_first": ["/api/*"]
+  },
+  // Workers AI (Gemma 4 26B). The free plan has 10,000 neurons a day, about 950 readings; past that the call fails
+  // and the page reads the words itself.
+  "ai": { "binding": "AI" },
+  // At most 12 readings a minute from one IP, counted per Cloudflare location. namespace_id must be unique in the
+  // account (a binding with the same id in another Worker would share these counters).
+  "ratelimits": [
+    { "name": "INTERPRET_LIMIT", "namespace_id": "4721", "simple": { "limit": 12, "period": 60 } }
+  ],
+  "vars": {
+    // "compact" sends the shorter prompt: about 6 instead of 10 neurons a reading, slightly less accurate.
+    "PROMPT": "full"
+  },
+  "observability": { "enabled": true }
+}

@@ -217,8 +217,8 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 
 1. 玩家寫下自己的決定。
 2. 本機先檢查安全：想傷害自己時不模擬，顯示 1925 安心專線、1995 生命線、1980 張老師；想傷害別人或違法時，請玩家換一個選擇（`src/sim/intent.js`）。
-3. 在 claude.ai 上，句子交給 Claude（Artifact 的 `sample` 功能，快速模型）判讀成一個行動，只附上年齡、工作、感情狀態，不送姓名和生日（`src/sim/interpret.js`）。玩家第一次使用時要同意，用的是玩家自己的 Claude 額度。
-4. 不能用 Claude 時（一般網站、玩家不同意），在瀏覽器裡比對最接近的三個行動給玩家點選。
+3. 網站部署在 Cloudflare 時，句子送到同一個網站的 Worker（`worker/index.js`），由 Workers AI 的 Gemma 4 判讀成一個行動。只送這個抉擇的題目、按鈕和年齡、工作、感情狀態這些情境，不送姓名和生日；Worker 在伺服器端組提示詞（`src/sim/interpret.js`），回覆也在伺服器端檢查過，只能是已經允許的行動。
+4. 沒有 Worker（直接開檔案、放在其他靜態網站、Claude Artifact 預覽），或 Worker 沒有回應（免費額度用完、限速、逾時 7 秒、斷線）時，在瀏覽器裡比對最接近的三個行動給玩家點選。兩種情況都在同一個選擇框裡確認，不會出現錯誤訊息，也沒有「交給誰判讀」的說明，玩家感覺不到差別。
 5. 套用前讓玩家確認。結果由模擬規則決定（`src/sim/act.js`，約 50 種行動），所以寫的選擇不會比按鈕更厲害。現在做不到的事會說明原因，讓玩家重選：沒有對象卻要結婚、存款不夠卻要買房，或是小孩子寫了大人的事（工作從 15 歲起；結婚、借錢、買彩券、移民要滿 18 歲）。小孩寫「進修」就是更用功、去補習，不是在職專班。
 6. 故事那一行會先交代情境，再接玩家自己的話（「公司裁員，你被列在名單上。你決定先休息一下。……」）。跨好幾年的故事線（創業、考公職）也會跟著往下走，不會隔年又問一樣的問題。
 7. 同盤重跑 100 次不使用玩家寫的選擇。
@@ -235,13 +235,24 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 | Gemma 4 26B，精簡版提示詞（`interpretPrompt({ compact: true })`） | — | 97.5% |
 | 本機比對（不用 AI） | 62.1%（前三個 66.7%；30% 猜不出來） | 86.5%（用它調過詞庫） |
 
-**公開網站的做法（評估過，還沒做）**：claude.ai 以外沒有 Claude，可以用 Cloudflare Workers AI 的免費額度跑 Gemma 4 26B（`@cf/google/gemma-4-26b-a4b-it`，免費方案可用）。
+### 部署到 Cloudflare
 
-- 每個帳號每天 10,000 neurons，台灣時間早上 8 點重置。
-- 每句大約 1,070 個 token 進、22 個 token 出，約 10 neurons，一天大約 950 句；精簡版提示詞約 6 neurons、一天約 1,500 句。
-- 免費方案用完會回錯誤，不會收費，頁面改用本機比對。付費方案每月 5 美元，超過免費額度的部分每句約 0.0001 美元。
-- 要加：每個 IP 的限速（Workers 的 Rate Limiting）、只接受自己網站的請求、伺服器端組提示詞並檢查回覆（同樣用 `interpret.js`）。
-- 部署要在能連到 `api.cloudflare.com` 的地方執行 `wrangler deploy`。
+一個 Worker 同時放兩個網頁（`public/`，靜態檔案不經過 Worker 程式）和判讀 API（`/api/interpret`）。設定在 `wrangler.jsonc`。
+
+```bash
+cd tools/bazi-life
+npm install
+npm run deploy        # = npm run build，再 npx wrangler deploy（第一次會開瀏覽器登入 Cloudflare）
+```
+
+部署後網址是 `https://bazi-life.<你的子網域>.workers.dev/life.html`（排盤引擎在 `/`）。也可以在 Cloudflare 後台替這個 Worker 加上自己的網域。
+
+- **Workers AI**：Gemma 4 26B（`@cf/google/gemma-4-26b-a4b-it`，關閉思考）。免費方案每個帳號每天 10,000 neurons，台灣時間早上 8 點重置；每句約 1,070 個 token 進、22 個 token 出，約 10 neurons，一天大約 950 句。用完會回錯誤、不會收費，頁面改用本機比對。付費方案每月 5 美元，超過免費額度的部分每句約 0.0001 美元。
+- **精簡版提示詞**：`wrangler.jsonc` 的 `PROMPT` 改成 `"compact"`，每句約 6 neurons、一天約 1,500 句，準確度從 99.4% 降到 97.5%（`free-text-heldout.json`）。
+- **限速**：每個 IP 每分鐘最多 12 句（Workers Rate Limiting，`INTERPRET_LIMIT`）。
+- **只接受自己網站的請求**：`Origin` 必須是這個 Worker 自己的網址（workers.dev 或接到它的自訂網域），其他網站和 curl 都會被拒絕。
+- **隱私**：Worker 不記錄玩家寫的句子；回覆只有行動代號、15 字以內的摘要和信心值。
+- `test/worker.test.js` 用替身測 Worker：正常回答、各種回覆格式、不允許的行動、來源不對、太大、限速、額度用完都會回錯誤狀態。
 
 ### 檔案
 
@@ -264,7 +275,8 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 | `src/sim/traits.js` | 個性 |
 | `src/sim/grammar.js` | 句子模板 |
 | `src/sim/actions.js`、`src/sim/act.js` | 行動的清單與結果（按鈕和自己寫的選擇共用） |
-| `src/sim/intent.js`、`src/sim/interpret.js` | 判讀玩家自己寫的選擇：本機比對與安全檢查、給 Claude 的提示詞 |
+| `src/sim/intent.js`、`src/sim/interpret.js` | 判讀玩家自己寫的選擇：本機比對與安全檢查、給 Workers AI 的提示詞與回覆檢查 |
+| `worker/index.js`、`wrangler.jsonc` | Cloudflare Worker：放網頁，並在 `/api/interpret` 用 Workers AI 判讀玩家寫的選擇 |
 | `src/sim/life.js` | 模擬引擎 |
 | `src/sim/monte.js` | 同盤重跑 100 次 |
 | `src/sim/setup.js` | 從命盤到模擬需要的資料 |
@@ -275,7 +287,8 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 | `src/sim/random-name.js` | 隨機投胎用的常見名字 |
 | `src/life.html`、`src/life-app.js` | 人生模擬網頁 |
 | `public/life.html` | 產生出來的網頁 |
-| `test/life.e2e.mjs` | 人生模擬頁的瀏覽器測試（包括姓名、家人、自己寫選項；Claude 的部分用替身測） |
+| `test/life.e2e.mjs` | 人生模擬頁的瀏覽器測試（包括姓名、家人、自己寫選項；Worker 的回答、503 和斷線都用替身測） |
+| `test/worker.test.js` | Cloudflare Worker 的單元測試（Workers AI 用替身） |
 | `test/reading-natal.test.js`、`test/reading-year.test.js`、`test/reading-overall.test.js` | 詳批的文字沒有破洞；流年的重點和吉凶一致；大事的理由只引用這一年真的有的訊號、方向一致，而且從不解釋死亡 |
 | `test/story.test.js` | 故事庫：句子沒有破洞、每個抉擇夠多選項、每個事件都會發生、每種行動都能回答任何抉擇；小孩不能做大人的事、自己寫的那一行有情境、故事線會往下走、只問人生大事、每年最多一個日常抉擇 |
 
@@ -328,6 +341,6 @@ node scripts/make-name-texts.mjs <shunshi-naming 的 data 資料夾>
 ## 還沒做的
 
 - 第 1 步的門檻：換成官方完整統計表；請命理顧問看過規則與詳批的文字。
-- 公開網站上「自己寫選項」的 AI 判讀（Cloudflare Workers AI，見上面的評估）。
+- 部署到 Cloudflare 之後，用真的 Workers AI 抽查幾句判讀（`test/fixtures/free-text-fresh.json`）。
 - 第 2 步：準爸媽模式，包括候選名字比較與時辰比較。
 - 出生地目前到縣市與主要鄉鎮。經度差 0.01° 只影響 2.4 秒，所以對時柱影響很小。

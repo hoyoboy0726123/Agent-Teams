@@ -20,7 +20,7 @@ import { reportHTML } from "./report.js";
 import { kindOf, TURNING, explainable } from "./sim/reason-kinds.js";
 import { ALL_EVENTS } from "./sim/story/index.js";
 import { safetyCheck, matchIntent } from "./sim/intent.js";
-import { interpretPrompt, readInterpretation } from "./sim/interpret.js";
+import { readInterpretation } from "./sim/interpret.js";
 import { ACTIONS } from "./sim/actions.js";
 import { trait } from "./sim/words.js";
 
@@ -34,10 +34,12 @@ const EDU = { none: "沒有上學", 國小: "國小", 國中: "國中", 高中: 
 
 let run = null;   // { input, extra: { name, family }, chart, prep, life, seed, born }
 let timer = null, speed = 1, paused = false;
-// Claude reads what the player writes, when this view can use it (the artifact's sample capability). Elsewhere, or
-// once the viewer declines, the page matches the words itself and asks the player to pick.
-let sampler = null, claudeOff = false, leanNoted = false;
-if (window.claude && typeof window.claude.use === "function") window.claude.use("sample").then(fn => { sampler = fn || null; showFreeNote(); }).catch(() => {});
+let leanNoted = false;
+// What the player writes is read by the site's Worker (worker/index.js, Workers AI) when the page is served by it; the
+// build puts its address in <meta name="interpret-endpoint"> (empty for the Claude artifact). Without it, or when it
+// does not answer, the page matches the words itself; the player sees the same choice box either way.
+const INTERPRET_URL = (document.querySelector('meta[name="interpret-endpoint"]') || {}).content || "";
+let remoteOff = !INTERPRET_URL || !/^https?:$/.test(location.protocol);
 
 function setup() {
   $("#data-note").hidden = !PROVISIONAL;
@@ -274,21 +276,11 @@ function showChoice() {
     + (p.free ? `<form class="free" id="free-form" autocomplete="off">
       <label for="free-text">或者，寫下你自己的決定</label>
       <div class="free-row"><input type="text" id="free-text" maxlength="80" placeholder="例如：先跟家人商量看看"><button type="submit" id="free-go">這樣做</button></div>
-      <p class="free-note" id="free-note"></p>
       <div class="free-out" id="free-out" aria-live="polite"></div>
     </form>` : "");
-  showFreeNote();
   box.hidden = false;
   box.scrollIntoView({ block: "nearest", behavior: "smooth" });
   box.querySelector("button").focus({ preventScroll: true });
-}
-
-function showFreeNote() {
-  const note = $("#free-note");
-  if (!note) return;
-  note.textContent = sampler && !claudeOff
-    ? "你寫的這句話會交給 Claude 判讀（只附上年齡、工作、感情狀態，不送姓名和生日），結果一樣照模擬規則計算。"
-    : "會在你的瀏覽器裡找出最接近的選擇給你確認，不會上傳。";
 }
 
 const freeOut = html => { const out = $("#free-out"); if (out) out.innerHTML = html; };
@@ -297,29 +289,46 @@ const SAFETY_TEXT = {
   harm: `<p>這個選擇會傷害別人或違法，故事不會往這個方向走。換個方式寫寫看？</p>`,
 };
 
-// What the player wrote → an action. Safety words first (never simulated), then Claude when allowed, else the
-// local matcher's closest guesses for the player to pick. Nothing applies until the player confirms.
+// What the player wrote → an action. Safety words first (never simulated, never sent), then the Worker when there is
+// one, else the local matcher's closest guesses for the player to pick. Nothing applies until the player confirms.
 async function interpretFree(text) {
   const p = run.life.pending;
   if (!p || !p.free) return;
   const safety = safetyCheck(text);
   if (safety !== "ok") return freeOut(SAFETY_TEXT[safety]);
-  const go = $("#free-go"), box = $("#free-text");
-  if (sampler && !claudeOff) {
-    freeOut(`<p class="muted">Claude 正在理解你的決定…</p>`);
+  if (!remoteOff) {
+    const go = $("#free-go"), box = $("#free-text"), asked = run;
+    freeOut(`<p class="muted">正在理解你的決定…</p>`);
     go.disabled = true; box.disabled = true;
     try {
-      const reply = await sampler.json(interpretPrompt({ ...p.free, text }), { modelTier: "quick" });
-      const r = readInterpretation(reply, { options: p.free.options });
-      if (r.action === "self_harm" || r.action === "harm") return freeOut(SAFETY_TEXT[r.action]);
-      if (r.action !== "unknown") return confirmFree(r.action, r.summary || `你決定「${text}」`);
-    } catch (e) {
-      if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"].includes(e && e.code)) { claudeOff = true; showFreeNote(); }
+      const reply = await askWorker({ ...p.free, text });
+      // The player may have picked a button or started over while waiting.
+      const now = run === asked && run.life.pending;
+      if (!now || now.id !== p.id || now.prompt !== p.prompt) return;
+      const r = reply ? readInterpretation(reply, { options: p.free.options }) : null;
+      if (r && (r.action === "self_harm" || r.action === "harm")) return freeOut(SAFETY_TEXT[r.action]);
+      if (r && r.action !== "unknown") return confirmFree(r.action, r.summary || `你決定「${text}」`);
     } finally {
       go.disabled = false; box.disabled = false;
     }
   }
   suggestFree(text);
+}
+
+// The Worker's reading, or null on any failure. A missing endpoint (a static host without the Worker) or a network
+// error turns it off for the rest of the visit; a busy or over-quota Worker (429, 5xx) is only skipped this time.
+async function askWorker(payload) {
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 7000);
+  try {
+    const res = await fetch(INTERPRET_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: ctrl.signal });
+    if (res.status === 404 || res.status === 405) remoteOff = true;
+    return res.ok ? await res.json() : null;
+  } catch (e) {
+    if (!(e && e.name === "AbortError")) remoteOff = true;
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // Up to three closest actions, preferring this choice's own option when one does the same thing.
