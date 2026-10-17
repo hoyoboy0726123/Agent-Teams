@@ -81,8 +81,9 @@ export async function interpret(request, env) {
 
 // The pages are part of the Worker itself rather than static assets: an asset upload is authorised by a token of its
 // own, which the cloud environment's proxy would replace with the account's API token.
-// no-cache with an ETag: the browser keeps the page but asks each time, so a new deploy shows at once and an unchanged
-// page costs a 304 with no body. (With max-age=600 a phone kept showing the old page for ten minutes after a fix.)
+// no-cache: the browser asks each time, so a new deploy shows at once (with max-age=600 a phone kept showing the old page
+// for ten minutes after a fix). The ETag lets an unchanged page be a 304, but on workers.dev Cloudflare removes ETags
+// from HTML (Email Obfuscation and the like are on there), so for now each visit downloads the page (~560 KB zstd).
 const PAGE_HEADERS = {
   "content-type": "text/html; charset=utf-8", "cache-control": "no-cache",
   "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin",

@@ -334,7 +334,7 @@ CLOUDFLARE_API_TOKEN=proxy-injected CLOUDFLARE_ACCOUNT_ID=a535bb4f35cdac784e0806
 - **限速**：每個 IP 每分鐘最多 12 句（Workers Rate Limiting，`INTERPRET_LIMIT`）。
 - **只接受自己網站的請求**：`Origin` 必須是這個 Worker 自己的網址（workers.dev 或接到它的自訂網域），其他網站和 curl 都會被拒絕。
 - **隱私**：Worker 不記錄玩家寫的句子；回覆只有行動代號、15 字以內的摘要和信心值。
-- **網頁快取**：`cache-control: no-cache` 加上 ETag。瀏覽器每次開網頁都向網站確認一次，沒改過就回 304（不重傳），部署之後馬上看得到新版。以前是 `max-age=600`，手機在部署後還會顯示舊版最多 10 分鐘。
+- **網頁快取**：`cache-control: no-cache`，瀏覽器每次開網頁都向網站確認，部署之後馬上看得到新版。以前是 `max-age=600`，手機在部署後還會顯示舊版最多 10 分鐘。Worker 也送 ETag，沒改過可以回 304；但 workers.dev 的 HTML 開著 Email Obfuscation 等功能，Cloudflare 會把 ETag 拿掉（[說明](https://developers.cloudflare.com/cache/reference/etag-headers/)），所以目前每次開網頁都重新下載一次（壓縮後約 560 KB）。改用自訂網域並關掉這些功能後，304 就會生效。
 - `test/worker.test.js` 用替身測 Worker：正常回答、各種回覆格式、不允許的行動、來源不對、太大、限速、額度用完都會回錯誤狀態。
 
 ### 檔案
