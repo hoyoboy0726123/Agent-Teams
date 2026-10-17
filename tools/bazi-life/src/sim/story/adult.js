@@ -10,8 +10,9 @@
 //
 // Probabilities in this file are design assumptions, not statistics (see above). Event ids start with "a_".
 import { yearsMarried, bornSiblings, otherJob, startJob, exam15Name, exam18Name } from "../world.js";
-import { pronoun } from "../people.js";
+import { pronoun, partnerMember } from "../people.js";
 import { siblingCall } from "../words.js";
+import { clash } from "../../core/detail.js";
 
 // ---------- helpers ----------
 const UNI = ["大學", "科大", "碩士", "博士"];
@@ -32,6 +33,36 @@ const corp = s => s.employed && !!s.job && !["自營", "家業"].includes(s.job.
 const parentsWord = s => (s.father.alive && s.mother.alive ? "爸媽" : s.father.alive ? "爸爸" : s.mother.alive ? "媽媽" : null);
 const pick2 = (ctx, list) => { const i = ctx.rng.int(list.length); let j = ctx.rng.int(list.length - 1); if (j >= i) j += 1; return [list[i], list[j]]; };
 const contactWord = s => (s.year >= 2011 ? "互加了 LINE" : s.year >= 2005 ? "互加了 MSN" : s.year >= 1998 ? "交換了手機號碼" : "留了電話");
+// 日支相沖 between you and the partner from the family input (家人合盤的伴侶), only while that person is your partner.
+const rhythmClash = (s, ctx) => {
+  const m = s.partner && s.partner.real ? partnerMember(ctx.family) : null;
+  return !!(m && m.chart) && clash(ctx.chart.pillars[2].name[1], m.chart.pillars[2][1]);
+};
+
+// Where 生活節奏不同 shows: the situation, what adapting to the partner means there, and what giving each other room
+// means there. Living together (married, or moved in while dating) or not; `night` is what the night owl stays up for.
+function rhythmScenes(s, home, night) {
+  const msg = s.year >= 1998;
+  if (!home) {
+    return [
+      { lead: `你習慣早睡，{partner}卻是夜貓子，${msg ? "常常半夜還傳訊息給你" : "總是半夜才打電話給你"}`, adapt: `晚一點睡，${msg ? "手機開著等{ta}的訊息" : "把電話放在床邊等{ta}打來"}`, space: "說好晚上十一點以後不吵對方，有話隔天再說" },
+      { lead: "{partner}週末喜歡把行程排得滿滿的，你只想{好好睡一覺|待在家裡休息}，約會常常為了要去哪裡{僵持不下|討論好久}", adapt: "跟著{ta}跑完一整天的行程", space: "週末各自先過半天，下午再見面" },
+      { lead: `你做事喜歡先計畫，{partner}卻總是臨時約你，{${s.employed ? "常常下班前一個小時才說要見面" : "常常一個小時前才說要見面"}|說走就走}`, adapt: "把自己的時間空下來，{ta}一約就到", space: "說好臨時的邀約可以說不，不用勉強" },
+      ...(s.employed ? [{ lead: "你和{partner}一個{上早班|朝九晚五}、一個{上晚班|常常加班到很晚}，{一週只見得到一次面|想見面總是對不上時間}", adapt: "配合{ta}的時間，{ta}一下班你就去找{ta}", space: `見不到面的日子各忙各的，不再為了${msg ? "沒回訊息" : "沒打電話"}生氣` }] : []),
+    ];
+  }
+  const little = s.rel === "married" && s.kids.some(k => k.age <= 6);
+  return [
+    { lead: `你習慣{十點|十一點}就上床，{partner}卻常常${night}到半夜{一兩點|兩三點}`, adapt: `{晚一點睡，陪{ta}${night}|把上床的時間往後挪了一個小時}`, space: "{晚睡的人改到客廳，不吵醒先睡的人|你戴上眼罩，{ta}也把燈調暗}" },
+    { lead: "{partner}每天{五點半|六點}就起床{去運動|準備早餐|出門晨跑}，你卻總要賴床到最後一刻", adapt: "{跟著{ta}早起，陪{ta}去運動|把鬧鐘往前調了一個小時，和{ta}一起吃早餐}", space: "{ta}照樣早起，你照樣睡到最後一刻，晚上再一起吃飯" },
+    { lead: "一到週末，{partner}就想{出門走走|找朋友聚餐|去爬山}，你只想待在家裡{補眠|看電視|整理東西}", adapt: "週末跟著{ta}出門，{爬山、逛街|和{ta}的朋友聚餐}都陪著", space: "週末{ta}去找朋友，你在家裡{補眠|看書}，晚上再一起吃飯" },
+    { lead: "你什麼事都喜歡先排好計畫，{partner}卻常常想到什麼就做什麼，{連晚餐要吃什麼都臨時才決定|出門旅行從來不先訂房}", adapt: "試著不排行程，跟著{ta}{說走就走|臨時決定}", space: "你照樣排你的計畫，{ta}照樣臨時起意，誰也不管誰" },
+    { lead: "你吃飯、走路、做事都很快，{partner}卻什麼都慢慢來，{每次出門你都在門口等{ta}|你常常忍不住催{ta}}", adapt: "放慢腳步，{陪{ta}慢慢吃完一頓飯|出門前不再催{ta}}", space: "出門前誰先準備好，就先下樓等，不再催對方" },
+    ...(s.employed ? [{ lead: "你和{partner}一個{上早班|朝九晚五}、一個{上晚班|常常加班到很晚}，{回到家另一個人已經睡了|一天說不上幾句話}", adapt: "把自己的作息往{ta}那邊調，等{ta}下班再睡", space: "說好不再等門，先睡的人留一張紙條給對方" }] : []),
+    ...(little ? [{ lead: "有了{kid}以後，你和{partner}一個顧早上、一個顧晚上，兩個人像在輪班，{好久沒有好好說話|一天說不上幾句話}", adapt: "多接了幾個晚上，好讓{ta}多睡一點", space: "一人顧一個時段，輪到休息的人就出門走走，不用陪著" }] : []),
+    ...(s.age >= 60 ? [{ lead: `${s.retired ? "退休以後" : "這幾年"}，你每天一早就去{公園運動|市場買菜|爬山}，{partner}卻喜歡在家裡{泡茶|看電視|看報紙}到很晚才睡`, adapt: "{晚一點出門，陪{ta}吃完早餐|晚上陪{ta}看完電視再睡}", space: "早上你出門，{ta}睡到自然醒，下午再一起去散步" }] : []),
+  ];
+}
 
 // A friend for the story: one already in it, or an old classmate who joins the story now.
 function friendOf(s, ctx, how = "同學") {
@@ -222,6 +253,33 @@ export const ADULT = [
       ]));
       const found = yearsMarried(s) >= 8 ? "結婚這麼多年，你和{partner}終於找到" : "你和{partner}找到了";
       return { text: ctx.w([`{partner}拉你一起${h}，{一開始你只是陪著，後來比{ta}還投入。|兩個人好像又回到剛交往的時候。}`, `你和{partner}迷上了${h}，{每個週末多了一個期待。|家裡多了一整櫃的裝備。|認識了一群年紀差不多的朋友。}`, `${found}一件可以一起做的事：${h}。{你們約好每個月至少去一次。|回家的路上，兩個人有說不完的話。}`]), mood: 3 };
+    },
+  },
+  {
+    // 生活節奏不同（研究四）：家人資料裡的伴侶和你的日支相沖，兩個人的作息和步調對不上，要找到相處的方式。只在和這位
+    // 伴侶交往（第二年起）或結婚時、而且兩人的日支相沖才會發生，不限 30–55 歲；沒有填伴侶的人生裡永遠不會出現（rare）。
+    // 一年 8% 是假設的；影響和其他婚姻小事一樣小：好好談給 s.guard，不去管它給小幅的 s.crisis。合盤的說明一定是
+    // 日支相沖那一條（bondNote，life.js）。
+    id: "a_rhythm", domain: "love", channel: "bad", tags: ["spouse"], about: "partner", bondNote: "日支相沖", rare: true,
+    ages: [18, 90], cooldown: 4, max: 3,
+    when: (s, ctx) => (s.rel === "dating" || s.rel === "married") && s.age > s.datingSince && rhythmClash(s, ctx), p: () => 0.08,
+    choice: (s, ctx) => {
+      const ta = pronoun(s.partner), home = s.rel === "married" || s.flags.y_cohabit === s.partner.id;
+      const night = ctx.rng.pick([s.year >= 2015 ? "追劇" : "看電視", s.year >= 2010 ? "滑手機" : "聽廣播", s.year >= 1995 ? "打電動" : "看小說"]);
+      // A situation this life has not had yet, if there is one (ctx.w remembers the template).
+      const scenes = rhythmScenes(s, home, night), fresh = scenes.filter(x => !s.used.has(x.lead));
+      const scene = ctx.rng.pick(fresh.length ? fresh : scenes), lead = ctx.w(scene.lead);
+      const routine = home ? "{每天一起吃晚餐|每個週六早上一起去市場|睡前留半個小時聊天|每個星期留一個晚上約會}" : `{每個星期固定見兩次面|${s.year >= 2011 ? "每天睡前視訊十分鐘" : "每天睡前通一次電話"}|每個週末留一天給彼此}`;
+      return {
+        prompt: ctx.w(`${lead}。{兩個人的生活節奏很不一樣，|你們的步調總是對不上，}{最近常常為了小事鬧彆扭。|你開始覺得有點累。}要怎麼辦？`),
+        options: [
+          { id: "a_rhythm.talk", label: "好好談一次", hint: "說出彼此的習慣和需要", act: "talk", style: "social", weight: 0.3, apply: (s2, c) => { guardUp(s2, 2); return { text: c.w(`${lead}。你們找了{一個週末的下午|一個安靜的晚上}坐下來好好談，{把彼此在意的事一件一件說出來，|你才知道{partner}也一直在遷就你，}{最後說好誰都不用完全改變自己。|兩個人都鬆了一口氣。}`), mood: 2 }; } },
+          { id: "a_rhythm.routine", label: "約好共同的時間", hint: "每天或每週留一段給兩個人", act: "negotiate", style: "safe", weight: 0.25, apply: (s2, c) => ({ text: c.w(`${lead}。你們約好${routine}，{其他時間各忙各的。|那段時間不做別的事，只陪對方。}{日子久了，那成了你們最期待的時候。|雖然偶爾會忘記，但兩個人多了一段固定相處的時間。}`), mood: 2 }) },
+          { id: "a_rhythm.space", label: "給彼此空間", hint: "各照自己的節奏，不勉強對方", act: "wait", style: "self", weight: 0.2, apply: (s2, c) => ({ text: c.w(`${lead}。你們說好不勉強對方配合：${scene.space}。{${home ? "兩個人在一起的時候反而更輕鬆" : "見面的時候反而更珍惜"}。|你自在多了，{partner}也是。|吵架的次數少了很多。}`), mood: 1 }) },
+          { id: "a_rhythm.adapt", label: `配合${ta}的步調`, hint: "自己調整一點", act: "reconcile", style: "family", weight: 0.1, apply: (s2, c) => ({ text: c.w(`${lead}。你決定配合{partner}，${scene.adapt}。{累是累了點，{partner}都看在眼裡。|有時候會覺得，自己好像不太像自己了。|{ta}笑著說，沒想到你願意為{ta}改。}`), mood: -1 }) },
+          { id: "a_rhythm.ignore", label: "不去管它", hint: "日子久了就習慣了", act: "avoid", style: "risk", weight: 0.15, apply: (s2, c) => { crisisUp(s2, 2); return { text: c.w(`${lead}。你覺得沒什麼好談的，{日子照樣過，|誰也沒有開口，}${home ? "{只是兩個人越來越像室友。|小小的不滿一點一點累積起來。}" : "{只是見面的次數越來越少。|小小的不滿一點一點累積起來。}"}`), mood: -3 }; } },
+        ],
+      };
     },
   },
 

@@ -51,7 +51,7 @@ test("family tilts stay within ±0.15", () => {
     for (const v of [t.childhood, t.study, ...Object.values(t.bond)]) assert.ok(Math.abs(v) <= 0.15 + 1e-12, `${net}: ${v}`);
   }
   assert.ok(Math.abs(all(1).childhood - 0.15) < 1e-12 && Math.abs(all(-1).bond.siblings + 0.15) < 1e-12);
-  assert.deepEqual(familyTilts(null), { childhood: 0, study: 0, bond: { father: 0, mother: 0, siblings: 0 } });
+  assert.deepEqual(familyTilts(null), { childhood: 0, study: 0, bond: { father: 0, mother: 0, siblings: 0, partner: 0 } });
 });
 
 test("a life with family input: names at birth, parents' real ages, and the younger sister born on time", () => {

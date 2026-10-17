@@ -10,7 +10,7 @@
 import { analyseText, siblingCall, listWords } from "../words.js";
 import { RELATIONS } from "../../core/family.js";
 import { JOBS, tier, jobsFor, startJob, otherJob, moveTo, yearsMarried, bornSiblings, ABROAD, exam15Name, exam18Name, wage, jobFit, fitsPattern } from "../world.js";
-import { newKid, meetPlace, pronoun } from "../people.js";
+import { newKid, meetPlace, pronoun, realPartnerDue, realPartnerAhead, realPartnerEngaged, realPartnerWeddingDue, realPartnerPlan, realPartner } from "../people.js";
 import { marry, endRelationship, closeSpell, ownHome } from "../act.js";
 
 // How two people met, as the start of a sentence.
@@ -295,21 +295,59 @@ export const CORE = [
     apply: (s, ctx) => ({ text: ctx.w(s.year < 1995 ? ["偷偷喜歡{班上|隔壁班|樂隊}的一個同學，{每天都期待上學。|上課時一直偷看。}", "收到人生第一封情書，{夾在課本裡帶回家。|藏在枕頭底下。}", "喜歡上{隔壁班|補習班}的同學，{在日記裡寫滿了對方的名字。|放學故意繞路經過對方家。}"] : s.year < 2011 ? ["偷偷喜歡{班上|隔壁班|補習班}的一個同學，{每天都期待上學。|段考前還幫對方整理筆記。}", "每天晚上用{chat}跟喜歡的人聊到半夜，{隔天上課一直打瞌睡。|被爸媽發現電話費暴增。}", "收到人生第一封情書，{開心了一整個星期。|不知道怎麼回才好。}"] : ["偷偷喜歡{班上|隔壁班|補習班}的一個同學，{每天都期待上學。|一直找藉口跟對方說話。}", "跟喜歡的人在 LINE 上聊到半夜，{已讀不回時心都碎了。|貼圖傳了一百張。}", "收到人生第一封情書，{拍照傳給死黨看。|害羞到不敢回。}"]), mood: 2 }),
   },
   {
+    // The partner from the family input, when there is one, is the first partner once you are both adults
+    // (people.js realPartnerDue); the love events below are tilted by their chart while you are together
+    // (about: "partner", life.js). Everyone else is drawn at random.
     id: "dating", domain: "love", channel: "good", tags: ["spouse"], ages: [17, 75], when: s => s.rel === "single" || s.rel === "divorced" || s.rel === "widowed",
     p: (s, ctx) => ctx.R.dating(s.age, s.rel, s.year) * (s.flags.pursueUntil >= s.age ? 1.8 : 1),
     apply: (s, ctx) => {
       s.prevRel = s.rel; s.rel = "dating"; s.datingSince = s.age;
-      const partnerAge = Math.max(17, s.age + Math.round(ctx.rng.between(-3, 4)) * (s.sex === "male" ? -1 : 1));
-      const how = meetPlace(s, ctx);
-      const p = ctx.person({ role: "partner", sex: s.sex === "male" ? "female" : "male", birthYear: s.year - partnerAge, how });
-      p.age = partnerAge; s.partner = p;
-      const ta = pronoun(p), met = MET[how] || "認識了";
-      return { text: ctx.w([`${met}{name}，一個${p.nature.word}的人，{開始交往。|兩個人很快就在一起了。}`, `${met}{name}，{聊著聊著就在一起了。|第一次約會就聊到餐廳打烊。}`, `${met}{name}。{你對${ta}的第一印象是：好${p.nature.word}。|兩個人第一次見面就很聊得來。}{沒多久就在一起了。|半年後，你們開始交往。}`], { name: p.call }), mood: 6 };
+      const real = realPartnerDue(s, ctx);
+      let p;
+      if (real) { p = realPartner(s, ctx, real); s.flags.realPartnerMet = s.age; }
+      else {
+        const partnerAge = Math.max(17, s.age + Math.round(ctx.rng.between(-3, 4)) * (s.sex === "male" ? -1 : 1));
+        const how = meetPlace(s, ctx);
+        p = ctx.person({ role: "partner", sex: s.sex === "male" ? "female" : "male", birthYear: s.year - partnerAge, how });
+        p.age = partnerAge;
+      }
+      s.partner = p;
+      const ta = pronoun(p), met = MET[p.how] || "認識了";
+      return { text: ctx.w([`${met}{name}，一個${p.nature.word}的人，{開始交往。|兩個人很快就在一起了。}`, `${met}{name}，{聊著聊著就在一起了。|第一次約會就聊到餐廳打烊。}`, `${met}{name}。{你對${ta}的第一印象是：好${p.nature.word}。|兩個人第一次見面就很聊得來。}{沒多久就在一起了。|半年後，你們開始交往。}`], { name: p.call }), mood: 6, big: !!p.real };
+    },
+  },
+  {
+    // The year you said you got together with your partner (family input metYear): they come into the story that year,
+    // after an earlier relationship ends if there is one. Only in lives with such a partner; never in other lives.
+    id: "realPartnerMeet", domain: "love", channel: "good", tags: ["spouse"], rare: true, once: true, ages: [14, 95],
+    when: (s, ctx) => { const m = realPartnerDue(s, ctx); return !!m && realPartnerPlan(m).meet !== null && s.rel !== "married"; },
+    p: () => 1,
+    apply: (s, ctx) => {
+      let before = "";
+      if (s.rel === "dating" && s.partner) { before = `和${s.partner.call}分手之後，`; endRelationship(s, ctx); }
+      const m = realPartnerDue(s, ctx);
+      s.prevRel = s.rel; s.rel = "dating"; s.datingSince = s.age;
+      const p = realPartner(s, ctx, m);
+      s.flags.realPartnerMet = s.age; s.partner = p;
+      const met = MET[p.how] || "認識了";
+      return { text: ctx.w(`${before}${met}{name}，{兩個人很快就在一起了。|聊著聊著就在一起了。|開始交往。}`, { name: p.call }), mood: 6, big: true };
+    },
+  },
+  {
+    // The wedding year given for the real partner: you marry that year (the proposal choice is not asked). Only in
+    // lives with such a partner.
+    id: "realPartnerWedding", domain: "love", channel: "good", tags: ["spouse"], about: "partner", rare: true, once: true, ages: [16, 95],
+    when: (s, ctx) => realPartnerWeddingDue(s, ctx),
+    p: () => 1,
+    apply: (s, ctx) => {
+      const name = s.partner.call;
+      marry(s);
+      return { text: ctx.w(`和${name}結婚了！{婚禮上爸媽哭得比你還兇。|請兩邊的家人吃了一頓飯，大家都很開心。|兩個人去戶政事務所登記，回家的路上一直笑。}`), mood: 10, big: true };
     },
   },
   {
     // A couple that talked things through (s.guard) breaks up less often; one in a crisis more often.
-    id: "breakup", domain: "love", channel: "bad", tags: ["spouse"], cooldown: 1, when: s => s.rel === "dating" && s.age > s.datingSince,
+    id: "breakup", domain: "love", channel: "bad", tags: ["spouse"], about: "partner", cooldown: 1, when: (s, ctx) => s.rel === "dating" && s.age > s.datingSince && !realPartnerEngaged(s, ctx),
     p: (s, ctx) => ctx.R.breakup(s.age) * (s.guard > 0 ? 0.6 : 1) * (s.crisis > 0 ? 1.5 : 1),
     apply: (s, ctx) => {
       const name = s.partner ? s.partner.call : "對方";
@@ -318,7 +356,7 @@ export const CORE = [
     },
   },
   {
-    id: "proposal", calibrated: true, domain: "love", channel: "good", tags: ["spouse"], when: s => s.rel === "dating" && s.age > s.datingSince, p: (s, ctx) => ctx.R.proposal(s.age, s.sex, s.year, s.marriages),
+    id: "proposal", calibrated: true, domain: "love", channel: "good", tags: ["spouse"], about: "partner", when: (s, ctx) => s.rel === "dating" && s.age > s.datingSince && !realPartnerAhead(s, ctx) && !realPartnerEngaged(s, ctx) && !realPartnerWeddingDue(s, ctx), p: (s, ctx) => ctx.R.proposal(s.age, s.sex, s.year, s.marriages),
     choice: (s, ctx) => {
       const name = s.partner ? s.partner.call : "對方";
       const again = s.marriages > 0;
@@ -336,7 +374,7 @@ export const CORE = [
     },
   },
   {
-    id: "crisis", calibrated: true, domain: "love", channel: "bad", tags: ["spouse"], cooldown: 4, when: s => s.rel === "married",
+    id: "crisis", calibrated: true, domain: "love", channel: "bad", tags: ["spouse"], about: "partner", cooldown: 4, when: s => s.rel === "married",
     p: (s, ctx) => ctx.R.crisis(yearsMarried(s)) * (s.partner && s.partner.nature ? s.partner.nature.crisis : 1),
     choice: (s, ctx) => {
       const name = s.partner ? s.partner.call : "另一半";
@@ -355,7 +393,7 @@ export const CORE = [
   },
   {
     // Not in the wedding year itself: in a story told year by year, a wedding and a divorce in the same year read as a slip.
-    id: "divorce", domain: "love", channel: "bad", tags: ["spouse"], when: s => s.rel === "married" && yearsMarried(s) >= 1,
+    id: "divorce", domain: "love", channel: "bad", tags: ["spouse"], about: "partner", when: s => s.rel === "married" && yearsMarried(s) >= 1,
     p: (s, ctx) => ctx.R.divorce(yearsMarried(s), s.year) * (s.guard > 0 ? 0.4 : 1) * (s.crisis > 0 ? 2.5 : 1) * (s.flags.askedDivorce >= s.age - 1 ? 3 : 1),
     apply: (s, ctx) => {
       const name = s.partner ? s.partner.call : "另一半", n = Math.max(1, yearsMarried(s));

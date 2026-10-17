@@ -24,6 +24,8 @@
 ```
 
 - `domain`：career、wealth、love、health、study、family、move；`channel`：good、bad、change。
+- `about`：father、mother、siblings，或 `partner`。`partner` 只在現在的另一半是家人資料裡填的伴侶（`s.partner.real`）時，才用伴侶的合盤傾斜機率、在故事裡說明；和隨機的對象在一起時沒有作用。
+- `bondNote`：這個事件本身就來自兩張命盤的某一種關係（例如 `"日支相沖"`），合盤的說明一定用這一條。
 - `mood`：心情變化，大約 −15 到 +12。`big: true` 會用粗體顯示。
 - `grave: true`：死亡和重病。名字和家人合盤不會影響它們。故事模組**不要**寫任何人的死亡或重病，那些都在 `core.js`。
 - `rare: true`：本來就很少發生的事件（500 次人生裡可能一次都沒有）。
@@ -90,14 +92,16 @@ choice: (s, ctx) => ({
 | `age`、`year`、`birthYear`、`sex`（male/female）、`county`、`birthCounty`、`abroad` | |
 | `edu`（none/國小/國中/高中/高職/五專/科大/大學/碩士/博士）、`studying`、`track` | 學歷 |
 | `employed`、`job`（`{title, factor, field, since}`）、`career`（0–5）、`income`（相對全國中位數）、`savings`、`debt`、`retired`、`unemployedFor` | 工作與金錢（單位是一年的中位數薪水） |
-| `rel`（single/dating/married/divorced/widowed）、`partner`（人物，有 `age`）、`exes`（分手、離婚的對象，也包括過世的配偶，那一位 `alive` 是 false）、`marriages`、`divorces`、`guard`、`crisis` | 感情 |
+| `rel`（single/dating/married/divorced/widowed）、`partner`（人物，有 `age`；家人資料裡的伴侶有 `real: true`）、`exes`（分手、離婚的對象，也包括過世的配偶，那一位 `alive` 是 false）、`marriages`、`divorces`、`guard`、`crisis` | 感情 |
 | `kids`（人物陣列，有 `age`、`call`、`sex`）、`friends`（人物陣列）、`siblings.list`、`father`、`mother`（`{alive, age, name}`） | 家人朋友 |
 | `health`（`chronic`、`serious`、`hr`、`fitness`、`smoke`、`drink`、`stress`） | 健康 |
 | `traits`（drive、caution、warmth、health、curiosity，0–1） | 個性 |
 | `abroad`（在國外時是國家名）、`leftAt`（出國那年的年齡） | 出國 |
 | `home`（parents/rent/own）、`flags`、`arcs`、`memory`、`done`（發生過的事件 id）、`last`（事件 id → 最後一次發生的年齡） | 其他 |
 
-`src/sim/world.js` 有工作清單、`jobsFor`（未成年不能做的工作會拿掉）、`startJob`、`moveTo`、`bornSiblings`、`chatTool`、`exam15Name` 等；`src/sim/words.js` 有 `siblingCall`（「哥哥志明」）；`src/sim/act.js` 有 `marry`、`endRelationship`、`ownHome`。
+`src/sim/world.js` 有工作清單、`jobsFor`（未成年不能做的工作會拿掉）、`startJob`、`moveTo`、`bornSiblings`、`chatTool`、`exam15Name` 等；`src/sim/words.js` 有 `siblingCall`（「哥哥志明」）；`src/sim/act.js` 有 `marry`、`endRelationship`、`ownHome`；`src/sim/people.js` 有 `partnerMember(ctx.family)`（家人資料裡的伴侶）、`realPartnerDue`、`realPartner`。
+
+家人資料裡填了伴侶時，兩個人都滿 18 歲那年以後的第一段戀愛，對象就是這位伴侶（`core.js` 的 `dating`，`s.flags.realPartnerMet` 記下認識的年齡，`s.flags.realPartnerWed` 記下結婚的年齡）；那一年你已經和別人結婚的話，伴侶就不會出現。分手或離婚之後的對象又是隨機的。
 
 ## 不能動到統計
 

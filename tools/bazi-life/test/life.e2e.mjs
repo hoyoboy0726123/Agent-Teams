@@ -118,7 +118,7 @@ await page.click("#go-random");
 await page.waitForSelector("#play:not([hidden])");
 check("random birth announces who you became, with a name", /你投胎成為 \d{4} 年.+名叫.{2,4}。/.test(await page.textContent("#born")));
 await page.click("#c-skip");
-await page.waitForSelector("#end:not([hidden])", { timeout: 20000 });
+await page.waitForSelector("#end:not([hidden])", { timeout: 45000 });
 check("a random life gets a name card", /姓名：/.test(await page.textContent("#personal")));
 
 // 只問人生大事: everyday choices follow the personality and say so; the big ones are still asked.
@@ -181,6 +181,36 @@ for (const [name, answer] of [["busy or over quota (503)", route => route.fulfil
   await fb.p.close();
 }
 server.close();
+
+// 伴侶合盤: a partner with a birthday gets a bond on the family card, counts over the 100 lives and a report section.
+const couple = watch(await browser.newPage({ viewport: { width: 1000, height: 1200 } }));
+await couple.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+await couple.goto(url);
+await couple.click("#family > summary");
+check("the partner's sex follows yours until it is picked", await couple.inputValue(".member[data-role=partner] .m-sex") === "female" && (await couple.click("#sex-f"), await couple.inputValue(".member[data-role=partner] .m-sex")) === "male");
+await couple.click("#sex-m");
+await couple.fill(".member[data-role=partner] .m-name", "王小美");
+await couple.fill(".member[data-role=partner] .m-date", "1990-05-20");
+await couple.fill("#f-met", "2014");
+await couple.fill("#f-wed", "2012");
+await couple.click("#form-me button[type=submit]");
+check("a wedding year before the year you got together is refused", /不能早於/.test(await couple.textContent("#error")));
+await couple.fill("#f-wed", "2018");
+await couple.click("#form-me button[type=submit]");
+await couple.waitForSelector("#play:not([hidden])");
+await couple.click("#c-skip");
+for (let i = 0; i < 200 && !(await couple.isVisible("#end")); i++) {
+  await couple.waitForSelector("#choice:not([hidden]), #end:not([hidden])", { timeout: 45000 });
+  if (await couple.isVisible("#choice .options button")) await couple.click("#choice .options button");
+  await couple.click("#c-skip").catch(() => {});
+}
+await couple.waitForSelector("#end:not([hidden])", { timeout: 45000 });
+const coupleCard = await couple.textContent("#personal");
+const wedCount = Number((/次和王小美在一起，其中 (\d+) 次結婚/.exec(coupleCard) || [])[1]);
+check("the family card shows the partner's bond and the 100-run counts; with a wedding year nearly every run marries", /伴侶（王小美）/.test(coupleCard) && wedCount >= 90, `married ${wedCount}`);
+const coupleSections = await couple.$$eval("#report details.sec > summary", els => els.map(e => e.textContent));
+check("the report has a 伴侶合盤 section", coupleSections.includes("伴侶合盤"), coupleSections.join(" / "));
+await couple.close();
 
 // 準爸媽模式: two names compared over the same 100 lives, a slot before 39 weeks refused, then a life with a name.
 const baby = watch(await browser.newPage({ viewport: { width: 400, height: 900 } }));

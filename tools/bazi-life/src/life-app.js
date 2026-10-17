@@ -16,6 +16,7 @@ import { natalReading } from "./core/reading-natal.js";
 import { yearReading, decadeReading, eventReason } from "./core/reading-year.js";
 import { nameReading } from "./core/name-reading.js";
 import { overallReading } from "./core/reading-overall.js";
+import { partnerReading } from "./core/partner.js";
 import { reportHTML } from "./report.js";
 import { kindOf, TURNING, explainable } from "./sim/reason-kinds.js";
 import { ALL_EVENTS } from "./sim/story/index.js";
@@ -123,7 +124,12 @@ function readFamily() {
   const out = { siblings: [], onlyChild: $("#f-only").checked };
   for (const el of document.querySelectorAll(".member[data-role]")) {
     const m = readMember(el);
-    if (el.dataset.role === "partner") m.sex = el.querySelector(".m-sex").value;
+    if (el.dataset.role === "partner") {
+      m.sex = el.querySelector(".m-sex").value;
+      const year = id => ($(id).value ? (Number.isFinite(Number($(id).value)) ? Math.round(Number($(id).value)) : NaN) : undefined);
+      if (m.date && year("#f-met") !== undefined) m.metYear = year("#f-met");
+      if (m.date && year("#f-wed") !== undefined) m.marriedYear = year("#f-wed");
+    }
     if (m.name || m.date) out[el.dataset.role] = m;
   }
   if (!out.onlyChild) for (const el of document.querySelectorAll("#sibling-list .member")) {
@@ -531,6 +537,8 @@ function familyCard() {
   if (has("father")) counts.push(`有 ${f.fatherClash} 次和爸爸吵過架`);
   if (has("mother")) counts.push(`有 ${f.motherClash} 次和媽媽吵過架`);
   if (family.members.some(m => isSibling(m.relation))) counts.push(`有 ${f.siblingRivalry} 次小時候和兄弟姊妹吵過架`, `有 ${f.siblingHelp} 次得到兄弟姊妹幫忙`);
+  const p = summary.partner;
+  if (p) counts.push(`有 ${p.met} 次和${p.name ? esc(p.name) : "伴侶"}在一起，其中 ${p.married} 次結婚、${p.divorced} 次離婚`);
   return `<div class="card"><h3>家人合盤</h3>
     <ul class="bonds">${items.join("")}</ul>
     ${lines.length ? `<p>在這次模擬裡，家人的命盤讓：</p><ul>${lines.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "<p>沒有填生日的家人，所以沒有合盤的傾斜。</p>"}
@@ -572,8 +580,14 @@ function drawReport() {
     .slice(0, 14).map(e => ({ entry: e, reason: chartReason(e.id, e.age, e.channel) }));
   const name = prep.name ? nameReading(prep.name, a) : null;
   const overall = overallReading(a, { decades, name });
+  // 伴侶合盤, when the partner's birthday was given.
+  const pm = prep.family && prep.family.members.find(m => m.relation === "partner" && m.chart);
+  const partner = pm ? partnerReading({
+    me: { pillars: prep.natal, analysis: a, sex: chart.input.sex, name: prep.name ? prep.name.full : run.extra.name || "" },
+    partner: { pillars: pm.chart.pillars, analysis: pm.chart.analysis, sex: pm.sex, name: pm.name },
+  }) : null;
   const yearsTitle = birth <= now ? `近十年流年（${now}–${now + 9}）` : `成年後十年的流年（${birth + 18}–${birth + 27}）`;
-  $("#report-body").innerHTML = reportHTML(chart, { natal, decades, years, events, name, overall, yearsTitle });
+  $("#report-body").innerHTML = reportHTML(chart, { natal, decades, years, events, name, overall, partner, yearsTitle });
   $("#report-lede").textContent = `依${prep.name ? `「${prep.name.full}」的姓名與` : ""}出生時刻（真太陽時）排出的命盤，用傳統子平八字${prep.name ? "與姓名學" : ""}的方法逐項分析。傳統命理的說法，僅供參考。`;
   $("#report").hidden = false;
 }

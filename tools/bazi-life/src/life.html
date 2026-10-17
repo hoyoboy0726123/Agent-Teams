@@ -182,6 +182,8 @@ th:first-child, td:first-child { text-align: left; }
 .slot { display: grid; grid-template-columns: minmax(0, 1fr) 4.5em; gap: 8px; align-items: center; }
 .slot .remove { border: 1px solid var(--rule); background: var(--sheet); border-radius: 6px; min-height: 40px; padding: 0 8px; color: var(--muted); }
 .field.due { max-width: 260px; }
+.partner-years { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; max-width: 540px; }
+input[type="number"] { width: 100%; box-sizing: border-box; background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; min-height: 40px; }
 .baby-chart { display: grid; gap: 8px; }
 .baby-chart .pillars { display: flex; gap: 10px; flex-wrap: wrap; }
 .baby-chart .pillars div { display: grid; justify-items: center; background: var(--wash); border-radius: 8px; padding: 6px 12px; min-width: 3.5em; }
@@ -349,7 +351,11 @@ footer a { color: var(--indigo); }
             <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="伴侶的出生日期"><input type="time" class="m-time" aria-label="伴侶的出生時間（選填）"></span>
             <select class="m-sex" aria-label="伴侶的性別"><option value="female">女</option><option value="male">男</option></select>
           </div>
-          <p class="fine">伴侶填了生日，會在你們都滿 18 歲以後的戀愛裡出現，合盤會讓交往、結婚和婚姻相處的事件機率傾斜（最多 ±15%）；結局的命書也會有一段伴侶合盤。</p>
+          <div class="partner-years">
+            <label class="field met-year"><span>開始交往的年份（選填）</span><input type="number" id="f-met" min="1900" max="2100" step="1" inputmode="numeric" placeholder="例如：2015"></label>
+            <label class="field met-year"><span>結婚的年份（選填）</span><input type="number" id="f-wed" min="1900" max="2100" step="1" inputmode="numeric" placeholder="例如：2018"></label>
+          </div>
+          <p class="fine">伴侶會在你們都滿 22 歲以後的第一段戀愛裡出現。填了交往年份，就在那一年相遇（在那之前的戀愛不會走到結婚）；填了結婚年份，你們會在那一年結婚，之後的婚姻生活由模擬和你的選擇決定。合盤會讓交往、結婚和婚姻相處的事件機率傾斜（最多 ±15%），結局的命書也會有一段伴侶合盤。</p>
           <div id="sibling-list" class="sibling-list"></div>
           <div class="family-actions">
             <button type="button" class="secondary small" id="add-sibling">＋ 新增兄弟姊妹</button>

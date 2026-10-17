@@ -1,6 +1,7 @@
 // 同盤重跑：同一張命盤跑 N 次人生。結果一律用「N 次裡有幾次」呈現，讓一次模擬的結局只是其中一種可能。
 import { runLife } from "./life.js";
 import { hashSeed } from "./rng.js";
+import { partnerMember, realPartnerOutcome } from "./people.js";
 
 // Traditional correspondence of the five elements to body systems (shown as tradition, not diagnosis).
 export const BODY = { 木: "肝膽", 火: "心臟與血液循環", 土: "脾胃消化", 金: "肺與呼吸道", 水: "腎臟與泌尿" };
@@ -65,9 +66,18 @@ export function rerun({ chart, analysis, luck, sex = chart.input.sex, runs = 100
       siblingHelp: count(l => l.log.some(e => e.id === "siblingHelp")),
       parentsDivorce: count(l => l.log.some(e => e.id === "parentsDivorce")),
     },
+    // The partner from the family input: in how many runs you met, married, and divorced that person.
+    partner: partnerSummary(family, lives.map(l => realPartnerOutcome(l.state))),
     band,
     hurdles,
   };
+}
+
+function partnerSummary(family, outcomes) {
+  const m = partnerMember(family);
+  if (!m) return null;
+  const count = key => outcomes.filter(o => o[key]).length;
+  return { name: m.name, met: count("met"), married: count("married"), divorced: count("divorced") };
 }
 
 // The year's most disliked element names the body system tradition links to it.

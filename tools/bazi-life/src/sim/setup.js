@@ -20,6 +20,7 @@ export function prepare(chart, { school = "blend", name = "", family = null } = 
   // each entry is re-keyed: luck[age] is the year the person is `age`, with its 虛歲 kept as `xu`.
   const luck = lifeLuck(analysis, natal, chart.input.sex, decadeAt, yearAt, MAX_AGE + 1).map(e => ({ ...e, age: e.age - 1, xu: e.age }));
   const nameInfo = name ? analyseName(name, analysis) : null;
-  const familyInfo = family ? buildFamily(family, { pillars: natal, analysis }, chart.input.place) : null;
+  // The protagonist's sex gives a partner without one the opposite sex.
+  const familyInfo = family ? buildFamily(family, { pillars: natal, analysis, sex: chart.input.sex }, chart.input.place) : null;
   return { natal, analysis, luck, name: nameInfo && !nameInfo.error ? nameInfo : null, nameError: nameInfo && nameInfo.error ? nameInfo.error : null, family: familyInfo };
 }

@@ -7,7 +7,7 @@
 import { makeRng } from "./rng.js";
 import { tilt } from "../core/luck.js";
 import { nameTilt } from "../core/name.js";
-import { familyTilts, isSibling, isOlder, RELATIONS } from "../core/family.js";
+import { familyTilts, isSibling, isOlder, RELATIONS, partnerNote } from "../core/family.js";
 import { ALL_EVENTS, deathEvent } from "./story/index.js";
 import { ACTIONS } from "./actions.js";
 import { act, closeSpell } from "./act.js";
@@ -65,12 +65,14 @@ function siblingsOf(family, birthYear, rng) {
 }
 
 // Family charts tilt events between you and one person (`about`), else childhood family events, and study.
-// familyTilts keeps each part within ±0.15.
+// familyTilts keeps each part within ±0.15. A love event about the partner is tilted by the chart of the partner from
+// the family input only while that person is your partner (people.js, `real`); with anyone else it is not tilted.
 function familyTilt(ev, s) {
   const t = s.tilts, sign = ev.channel === "good" ? 1 : ev.channel === "bad" ? -1 : 0;
   if (!sign) return 0;
   let v = 0;
-  if (ev.about && t.bond[ev.about] !== undefined) v += t.bond[ev.about];
+  if (ev.about === "partner") v += s.partner && s.partner.real ? t.bond.partner || 0 : 0;
+  else if (ev.about && t.bond[ev.about] !== undefined) v += t.bond[ev.about];
   else if (ev.domain === "family" && s.age <= 17) v += t.childhood;
   if (ev.domain === "study") v += t.study;
   return sign * v;
@@ -112,7 +114,8 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
   // Wording. A list of templates gives one this life has not used yet; every template is expanded with the
   // story's usual words ({partner}, {city}, {kid}…) plus `vars`, and a sentence already told is told differently.
   s.used = new Set();
-  // The friend and the trip of one event stay the same from its question to its result (fire() starts a new scene).
+  // The friend and the trip of one event stay the same from its question to its result (fire() starts a new scene),
+  // and so does the partner it is about: a breakup has ended the relationship by the time its line is written.
   let scene = {};
   const slots = () => ({
     city: s.abroad || s.county || chart.input.place.name, job: s.job ? s.job.title : "工作",
@@ -159,9 +162,20 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     const r = l.reasons.find(x => fits(x) && x.tags) || l.reasons.find(fits);
     return r ? r.text : null;
   };
-  // For an event between you and a family member: their chart, when it pushed the event the way it went.
+  // For an event between you and a family member: their chart, when it pushed the event the way it went. The partner
+  // from the family input explains a love event only while they are your partner, in a line about the two charts
+  // (family.js partnerNote); an event that comes from one relation of the charts (`bondNote`, 生活節奏不同 from
+  // 日支相沖) is always explained by it. A death or a serious illness is never explained by a family chart.
   const bondReason = ev => {
-    if (!ev.about || !family) return null;
+    if (!ev.about || !family || ev.grave) return null;
+    if (ev.about === "partner") {
+      const p = "partner" in scene ? scene.partner : s.partner;
+      const m = p && p.real ? family.members.find(x => x.relation === "partner" && x.bond) : null;
+      if (!m) return null;
+      const dir = ev.channel === "good" ? 1 : -1;
+      if (ev.bondNote) return partnerNote(m.bond, dir, ev.bondNote);
+      return (s.tilts.bond.partner || 0) * dir < 0.045 ? null : partnerNote(m.bond, dir);
+    }
     const bond = s.tilts.bond[ev.about];
     if (bond === undefined || bond * (ev.channel === "good" ? 1 : -1) < 0.045) return null;
     const members = family.members.filter(m => m.bond && (ev.about === "siblings" ? isSibling(m.relation) : m.relation === ev.about));
@@ -170,9 +184,12 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     const notes = [...new Set(members.flatMap(m => m.bond.notes.filter(n => Math.sign(n.score) === Math.sign(bond)).map(n => n.short)))];
     return `和${who}的命盤${bond > 0 ? "互補" : "需要磨合"}${notes.length ? `（${notes.slice(0, 2).join("、")}）` : ""}`;
   };
-  // { text, from: "chart" | "family" }. A death is never explained by the chart: that would read as fate.
+  // { text, from: "chart" | "family" }. A death is never explained by the chart: that would read as fate. An event
+  // that comes from one relation of two charts (`bondNote`) is explained by it before the year's luck.
   const explain = (ev, l, lnm) => {
     if (ev.id === "death") return null;
+    const own = ev.bondNote ? bondReason(ev) : null;
+    if (own) return { text: own, from: "family" };
     const chartReason = reasonFor(ev, l, lnm);
     if (chartReason) return { text: chartReason, from: "chart" };
     const familyReason = bondReason(ev);
@@ -182,6 +199,8 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
   // How an entry came about:  choice  the option's label    asked  it was a real choice (more than one option)
   //   free  the player wrote it    picked  chosen by the personality (majorOnly)
   function record(ev, out, l, lnm, { choice = null, asked = false, free = false, picked = false } = {}) {
+    // The age you married the partner from the family input (for 同盤重跑, people.js realPartnerOutcome).
+    if (s.rel === "married" && s.partner && s.partner.real && s.flags.realPartnerWed === undefined) s.flags.realPartnerWed = s.age;
     if (!out || !out.text) return null;
     const why = explain(ev, l, lnm);
     const entry = { age: s.age, year: s.year, id: ev.id, domain: ev.domain, channel: ev.channel, text: out.text, mood: out.mood || 0, reason: why && why.text, reasonFrom: why && why.from, big: !!(out.big || ev.big), choice, asked, free, picked };
@@ -210,7 +229,7 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
   }
 
   function fire(ev, l, lnm) {
-    scene = {};
+    scene = { partner: s.partner };
     s.done.add(ev.id); s.count[ev.id] = (s.count[ev.id] || 0) + 1; s.last[ev.id] = s.age;
     if (ev.choice) {
       const c = ev.choice(s, ctx);

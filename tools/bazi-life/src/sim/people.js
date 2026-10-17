@@ -1,6 +1,8 @@
 // 故事裡的人：另一半、孩子、朋友、同事。每個人有名字、年紀和個性，故事會一直叫他們的名字。
+// 家人資料裡填了伴侶時，兩個人都滿 22 歲以後的第一段感情就是這個人；填了開始交往或結婚的年份，就照那些年份走（realPartnerDue）。
 import { givenName, randomSurname } from "./random-name.js";
 import { splitName } from "../core/name.js";
+import { callName } from "./words.js";
 
 // A partner's nature changes the odds of a marriage crisis a little; the multipliers average 1 across the list, so
 // the calibrated divorce rate holds.
@@ -23,15 +25,91 @@ function callOf(role, surname, given, rng) {
 }
 
 //   role: "partner" | "kid" | "friend"   sex: "male" | "female"   birthYear: their birth year
-export function newPerson(s, ctx, { role, sex, birthYear, surname = null, how = "", nature = null }) {
+//   name: a full name to use instead of a random one (the real partner); they are called by the given name
+export function newPerson(s, ctx, { role, sex, birthYear, surname = null, how = "", nature = null, name = null }) {
   const rng = ctx.rng;
-  const sn = surname || randomSurname(rng), given = givenName(rng, birthYear, sex);
+  let full, call;
+  if (name) { full = String(name).replace(/\s+/g, ""); call = callName(full); }
+  else { const sn = surname || randomSurname(rng), given = givenName(rng, birthYear, sex); full = sn + given; call = callOf(role, sn, given, rng); }
   const p = {
-    id: `${role}${(s.seq = (s.seq || 0) + 1)}`, role, sex, birthYear, name: sn + given, call: callOf(role, sn, given, rng), how,
+    id: `${role}${(s.seq = (s.seq || 0) + 1)}`, role, sex, birthYear, name: full, call, how,
     nature: nature || (role === "partner" ? rng.pick(PARTNER_NATURES) : role === "friend" ? rng.pick(FRIEND_NATURES) : null),
     bond: 0.5, alive: true,
   };
   return p;
+}
+
+// ---------- the real partner (伴侶, from the family input) ----------
+export const partnerMember = family => (family && family.members.find(m => m.relation === "partner")) || null;
+
+// The age both of you must have reached before the real partner can be the one you date, when you did not say when
+// you got together: most couples who marry in Taiwan meet in their mid-twenties (first marriages come at 31–33), and
+// a first love at 18 usually does not last, so starting at 22 makes the story's partner a plausible spouse.
+export const REAL_PARTNER_AGE = 22;
+
+// The years the family input gives: when you got together (metYear) and when you married (marriedYear). With only
+// a wedding year, you meet two years before it.
+export function realPartnerPlan(m) {
+  const wed = m && Number.isInteger(m.marriedYear) ? m.marriedYear : null;
+  const meet = m && Number.isInteger(m.metYear) ? m.metYear : wed !== null ? wed - 2 : null;
+  return { meet, wed };
+}
+
+// The family's partner when this year's new relationship is with them, else null.
+//   With the year you got together (realPartnerPlan): from that year on, until you meet (story/core.js
+//   realPartnerMeet brings them in that very year). Earlier relationships do not end in marriage (realPartnerAhead).
+//   Otherwise: you have not met yet, you are both at least REAL_PARTNER_AGE this year, and you were not married to
+//   someone else in the year you both reached it (then the real partner never appears). A partner given only by name,
+//   without a birth date, is your first partner from that age on.
+export function realPartnerDue(s, ctx) {
+  const m = partnerMember(ctx.family);
+  if (!m || s.flags.realPartnerMet !== undefined) return null;
+  const plan = realPartnerPlan(m);
+  if (plan.meet !== null) return s.year >= plan.meet ? m : null;
+  const min = REAL_PARTNER_AGE;
+  if (s.age < min) return null;
+  if (m.date && s.year - m.date.y < min) return null;
+  const both = m.date ? Math.max(min, m.date.y + min - s.birthYear) : min;   // your age in the first year both reach it
+  return s.spells.some(x => x.from <= both && (x.to === null || x.to > both)) ? null : m;
+}
+
+// True while the year you got together is still ahead: until then, relationships do not lead to marriage, so the
+// story can reach that year with you free to meet.
+export function realPartnerAhead(s, ctx) {
+  const m = partnerMember(ctx.family), plan = realPartnerPlan(m);
+  return !!(m && plan.meet !== null && s.flags.realPartnerMet === undefined && s.year < plan.meet);
+}
+
+// With a wedding year: while you date the real partner before it, the relationship holds (no breakup, no proposal),
+// and in that year you marry (story/core.js realPartnerWedding). The player's own choices can still change course.
+const datingReal = s => s.rel === "dating" && s.partner && s.partner.real;
+export function realPartnerEngaged(s, ctx) {
+  const wed = realPartnerPlan(partnerMember(ctx.family)).wed;
+  return wed !== null && datingReal(s) && s.year < wed;
+}
+export function realPartnerWeddingDue(s, ctx) {
+  const wed = realPartnerPlan(partnerMember(ctx.family)).wed;
+  return wed !== null && datingReal(s) && s.year >= wed;
+}
+
+// The real partner as a person in the story: their name (called by the given name, 王小明 → 小明), or a random name
+// when none was given; their sex and birth year (without a date, about your age, as a random partner would be); a
+// nature drawn as usual. They did not go to school with you when they are more than three years apart.
+export function realPartner(s, ctx, m) {
+  const age = m.date ? s.year - m.date.y : Math.max(18, s.age + Math.round(ctx.rng.between(-3, 4)) * (s.sex === "male" ? -1 : 1));
+  const how = meetPlace(s, ctx, { classmates: Math.abs(s.age - age) <= 3 });
+  const sex = m.sex || (s.sex === "male" ? "female" : "male");
+  const p = newPerson(s, ctx, { role: "partner", sex, birthYear: s.year - age, how, name: m.name || null });
+  p.age = age; p.real = true;
+  return p;
+}
+
+// How the story went with the real partner, for 同盤重跑: you met, married (life.js records the age), and divorced
+// (they are among your exes and alive: being widowed is not a divorce).
+export function realPartnerOutcome(s) {
+  const p = [s.partner, ...s.exes].find(x => x && x.real);
+  const married = !!p && s.flags.realPartnerWed !== undefined;
+  return { met: !!p, married, divorced: married && p !== s.partner && p.alive !== false };
 }
 export const ageOf = (s, p) => s.year - p.birthYear;
 
@@ -49,9 +127,9 @@ export function newKid(s, ctx) {
 
 // Where two people meet depends on age and era: 相親 was common before the 1990s, chat rooms around 2000,
 // dating apps from about 2013.
-export function meetPlace(s, ctx) {
+export function meetPlace(s, ctx, { classmates = true } = {}) {
   const options = [];
-  if (s.age <= 24) options.push(["同學", 3]);
+  if (s.age <= 24 && classmates) options.push(["同學", 3]);
   if (s.employed) options.push(["同事", 2.5]);
   options.push(["朋友介紹", 2.5], ["社團活動", 1]);
   if (s.year < 1995) options.push(["長輩安排的相親", s.age >= 26 ? 2 : 0.8]);
