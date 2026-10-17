@@ -40,10 +40,15 @@ export const ERA = [
   {
     id: "e_1985lottery", once: true, domain: "wealth", channel: "change", when: s => s.year >= 1985 && s.year <= 1988 && s.age >= 20 && s.age <= 70 && !s.abroad, p: () => 0.12,
     choice: (s, ctx) => ({
-      prompt: "「大家樂」簽賭風靡全台，同事們天天在研究明牌。你要跟嗎？",
+      prompt: `${ctx.rng.pick([
+        "「大家樂」簽賭風靡全台，同事們天天在研究明牌。",
+        "巷口雜貨店的老闆偷偷在收大家樂的簽單，鄰居一個接一個去簽。",
+        `${s.employed ? "同事" : "鄰居"}說昨晚夢到一組數字，拉著你一起湊錢簽大家樂。`,
+        "電視新聞說有人簽大家樂一夜致富，連菜市場的阿伯都在聊明牌。",
+      ])}${ctx.rng.pick(["你要跟嗎？", "你怎麼做？"])}`,
       options: [
-        { id: "e_1985lottery.no", label: "不碰", hint: "賭博不是好事", act: "save", style: "safe", weight: 0.5, apply: () => ({ text: "大家樂正熱的時候，同事都在求明牌，你一張也沒簽。", mood: 0 }) },
-        { id: "e_1985lottery.little", label: "小玩一下", hint: "湊個熱鬧", act: "lottery", style: "social", weight: 0.3, apply: s2 => { s2.savings = Math.max(0, s2.savings - 0.03); return { text: ctx.w("大家樂正熱，你也跟著簽了幾次，{一次都沒中。|中過一次小的，請同事吃了宵夜。}"), mood: 1 }; } },
+        { id: "e_1985lottery.no", label: ctx.rng.pick(["不碰", "笑笑地拒絕"]), hint: ctx.rng.pick(["賭博不是好事", "錢要留著過日子"]), act: "save", style: "safe", weight: 0.5, apply: () => ({ text: "大家樂正熱的時候，同事都在求明牌，你一張也沒簽。", mood: 0 }) },
+        { id: "e_1985lottery.little", label: ctx.rng.pick(["小玩一下", "跟著簽一點點"]), hint: "湊個熱鬧", act: "lottery", style: "social", weight: 0.3, apply: s2 => { s2.savings = Math.max(0, s2.savings - 0.03); return { text: ctx.w("大家樂正熱，你也跟著簽了幾次，{一次都沒中。|中過一次小的，請同事吃了宵夜。}"), mood: 1 }; } },
         { id: "e_1985lottery.temple", label: "跟著去廟裡求明牌", hint: "看看熱鬧", act: "spiritual", style: "risk", weight: 0.1, apply: () => ({ text: "大家樂正熱，你跟同事半夜去廟裡求明牌，那裡擠滿了人。", mood: 1 }) },
         { id: "e_1985lottery.big", label: "下重本", hint: "可能大賺，也可能大賠", act: "lottery", style: "risk", weight: 0.1, apply: (s2, c) => { if (c.rng() < 0.08) { s2.savings += 1.5; return { text: "大家樂正熱，你下了重本，竟然真的中了一筆。", mood: 8 }; } s2.savings = Math.max(0, s2.savings - 0.5); return { text: "大家樂正熱，你下了重本，結果賠掉好幾個月的薪水。", mood: -6 }; } },
       ],
@@ -142,16 +147,34 @@ export const ERA = [
   },
   {
     id: "e_2020covid", once: true, when: at(2020, [3, 100]), p: () => 1,
-    choice: (s, ctx) => ({
-      prompt: "新冠肺炎疫情爆發，口罩要排隊買，出國旅行全部取消。這一年你怎麼過？",
-      options: [
-        { id: "e_2020covid.home", label: "少出門，待在家", hint: "安全第一", act: "rest", style: "safe", weight: 0.4, apply: () => ({ text: ctx.w("疫情那年，你{每週排隊買口罩，|幾乎不出門，}{學會了在家做麵包。|和家人一起看了很多部劇。}"), mood: -1 }) },
-        { id: "e_2020covid.local", label: "改成國內旅遊", hint: "出不了國，就玩台灣", act: "travel", style: "social", weight: 0.25, apply: s2 => { s2.savings = Math.max(0, s2.savings - 0.1); return { text: ctx.w("疫情那年出不了國，你{改去環島，|跑遍了台灣的小鎮，}{發現台灣好多地方都還沒去過。|民宿老闆說這是他們最忙的一年。}"), mood: 3 }; } },
-        { id: "e_2020covid.learn", label: "趁機學新東西", hint: "線上課程", act: "study", style: "learn", weight: 0.15, apply: (s2, c) => { c.nudge("curiosity", 0.03); return { text: "疫情那年，你上了好幾門線上課程，學會了一項新技能。", mood: 2 }; } },
-        { id: "e_2020covid.help", label: "幫忙需要的人", hint: "當志工或捐物資", act: "volunteer", style: "family", weight: 0.1, apply: () => ({ text: "疫情那年，你幫社區的長輩代購口罩和生活用品。", mood: 3 }) },
-        { id: "e_2020covid.work", label: "專心工作", hint: "有些行業反而更忙", act: "pushThrough", style: "risk", weight: 0.1, when: s2 => s2.employed, apply: s2 => ({ text: ctx.w(`疫情那年，你的${s2.job ? s2.job.title : "工作"}反而更忙，{每天戴著口罩加班。|視訊會議一場接一場。}`), mood: -1 }) },
-      ],
-    }),
+    choice: (s, ctx) => {
+      // The year looks different for a student, a worker, a parent, an older person and someone overseas.
+      const little = s.kids.find(k => k.age <= 12);
+      const lead = s.abroad ? `新冠肺炎疫情爆發，你人在${s.abroad}，回台灣的機票一票難求。` : ctx.rng.pick([
+        "新冠肺炎疫情爆發，口罩要排隊買，出國旅行全部取消。",
+        ...(s.studying ? ["新冠肺炎疫情爆發，學校規定每天量體溫，畢業旅行也延期了。"] : []),
+        ...(s.employed ? ["新冠肺炎疫情爆發，公司開始分流上班，進辦公室前要先量體溫。"] : []),
+        ...(little ? [`新冠肺炎疫情爆發，${little.call}的學校天天傳防疫通知，口罩要排隊買。`] : []),
+        ...(s.age >= 65 ? ["新冠肺炎疫情爆發，里長天天廣播提醒長輩少出門，口罩要排隊買。"] : []),
+      ]);
+      const L = {
+        home: ctx.rng.pick([["少出門，待在家", "安全第一"], ["乖乖在家防疫", "安全第一"]]),
+        local: ctx.rng.pick([["改成國內旅遊", "出不了國，就玩台灣"], ["趁人少去環島", "出不了國，就玩台灣"]]),
+        learn: ctx.rng.pick([["趁機學新東西", "線上課程"], ["上線上課程", "把時間拿來學東西"]]),
+        help: s.age >= 65 ? ["幫忙需要的人", "陪鄰居一起排口罩"] : ctx.rng.pick([["幫忙需要的人", "當志工或捐物資"], ["幫鄰居長輩代購口罩", "社區需要人手"]]),
+        work: ctx.rng.pick([["專心工作", "有些行業反而更忙"], ["在家視訊上班", "工作沒有停下來"]]),
+      };
+      return {
+        prompt: `${lead}${ctx.rng.pick(["這一年你怎麼過？", "這一年要怎麼過？"])}`,
+        options: [
+          { id: "e_2020covid.home", label: L.home[0], hint: L.home[1], act: "rest", style: "safe", weight: 0.4, apply: s2 => ({ text: s2.abroad ? ctx.w(`疫情那年，你在${s2.abroad}{幾乎不出門，|每天看台灣的新聞，}{學會了在家做麵包。|和家人視訊的次數比以前多很多。}`) : ctx.w("疫情那年，你{每週排隊買口罩，|幾乎不出門，}{學會了在家做麵包。|和家人一起看了很多部劇。}"), mood: -1 }) },
+          { id: "e_2020covid.local", label: L.local[0], hint: L.local[1], act: "travel", style: "social", weight: 0.25, when: s2 => !s2.abroad, apply: s2 => { s2.savings = Math.max(0, s2.savings - 0.1); return { text: ctx.w("疫情那年出不了國，你{改去環島，|跑遍了台灣的小鎮，}{發現台灣好多地方都還沒去過。|民宿老闆說這是他們最忙的一年。}"), mood: 3 }; } },
+          { id: "e_2020covid.learn", label: L.learn[0], hint: L.learn[1], act: "study", style: "learn", weight: 0.15, apply: (s2, c) => { c.nudge("curiosity", 0.03); return { text: c.w("疫情那年，你上了好幾門線上課程，{學會了一項新技能。|把一直想學的{剪片|語言|程式}學起來了。}"), mood: 2 }; } },
+          { id: "e_2020covid.help", label: L.help[0], hint: L.help[1], act: "volunteer", style: "family", weight: 0.1, apply: s2 => ({ text: s2.age >= 65 ? "疫情那年，你陪著鄰居的老朋友一起排口罩，互相打氣。" : "疫情那年，你幫社區的長輩代購口罩和生活用品。", mood: 3 }) },
+          { id: "e_2020covid.work", label: L.work[0], hint: L.work[1], act: "pushThrough", style: "risk", weight: 0.1, when: s2 => s2.employed, apply: s2 => ({ text: L.work[0] === "在家視訊上班" ? ctx.w("疫情那年，你在家視訊上班，{餐桌變成了辦公桌。|一天開了五場視訊會議。}") : ctx.w(`疫情那年，你的${s2.job ? s2.job.title : "工作"}反而更忙，{每天戴著口罩加班。|視訊會議一場接一場。}`), mood: -1 }) },
+        ],
+      };
+    },
   },
   {
     id: "e_2021level3", once: true, when: at(2021, [3, 100]), p: () => 0.9,

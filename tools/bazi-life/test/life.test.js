@@ -110,7 +110,7 @@ function drive({ sex = "female", seed = 11, until = 32, year = 1980, answer }) {
   for (let guard = 0; guard < 600 && !life.done && life.state.age <= until; guard++) {
     if (!life.pending) { life.step(); continue; }
     const q = life.pending;
-    asked.push({ age: life.state.age, id: q.id, prompt: q.prompt, labels: q.options.map(o => o.label) });
+    asked.push({ age: life.state.age, id: q.id, prompt: q.prompt, labels: q.options.map(o => o.label), go: (q.options.find(o => o.id === "exam18.go") || {}).label });
     const a = answer(q, life);
     if (a && a.button) life.choose(q.options.findIndex(o => o.id === a.button));
     else if (a && a.action) life.chooseAction({ action: a.action, summary: "你決定照自己的想法走" });
@@ -126,7 +126,7 @@ test("the first job's question does not tell the graduation again; right after t
     const job = asked.find(x => x.id === "firstJob");
     assert.ok(job, sex);
     assert.doesNotMatch(job.prompt, /畢業/, `${sex}: ${job.prompt}`);
-    assert.match(job.prompt, sex === "male" ? /^退伍了，開始找工作/ : /^開始找工作了/, job.prompt);
+    if (sex === "male") assert.match(job.prompt, /^退伍/, job.prompt); else assert.doesNotMatch(job.prompt, /退伍/, job.prompt);
   }
 });
 
@@ -151,24 +151,61 @@ test("a written answer at a school gate closes it: the question is not asked aga
 
 test("the exam after 高職 is the vocational one into 科大, and after 高中 the university one", () => {
   const cases = [
-    { year: 1980, track: "exam15.vocational", exam: "四技二專聯招", go: "去讀科大" },
-    { year: 1990, track: "exam15.vocational", exam: "統測", go: "去讀科大" },
-    { year: 1980, track: "exam15.high", exam: "大學聯考", go: "去讀大學" },
-    { year: 1990, track: "exam15.high", exam: "學測", go: "去讀大學" },
+    { year: 1980, track: "exam15.vocational", exam: "四技二專聯招", go: /科大/ },
+    { year: 1990, track: "exam15.vocational", exam: "統測", go: /科大/ },
+    { year: 1980, track: "exam15.high", exam: "大學聯考", go: /大學/ },
+    { year: 1990, track: "exam15.high", exam: "學測", go: /大學/ },
   ];
   for (const c of cases) {
     const { asked } = drive({ year: c.year, until: 19, answer: q => (q.id === "exam15" ? { button: c.track } : q.id === "exam18" ? { button: "exam18.go" } : null) });
     const q = asked.find(x => x.id === "exam18");
     assert.ok(q && q.prompt.includes(c.exam), `${c.year} ${c.track}: ${q && q.prompt}`);
-    assert.ok(q.labels.includes(c.go), `${c.year} ${c.track}: ${q.labels.join("/")}`);
+    assert.match(q.go, c.go, `${c.year} ${c.track}: ${q.labels.join("/")}`);
     if (c.track === "exam15.vocational") assert.doesNotMatch(q.prompt, /大學聯考|學測/);
   }
   // Through to graduation the story names the school: 科大畢業, not 大學畢業.
   for (const button of ["uni.work", "uni.master", "uni.rest"]) {
     const { asked, log } = drive({ until: 24, answer: q => (q.id === "exam15" ? { button: "exam15.vocational" } : q.id === "exam18" ? { button: "exam18.go" } : q.id === "graduateUni" ? { button } : null) });
     const grad = log.find(e => e.id === "graduateUni");
-    assert.ok(asked.some(x => x.id === "graduateUni" && /^科大畢業了/.test(x.prompt)) && grad, button);
+    assert.ok(asked.some(x => x.id === "graduateUni" && !/大學/.test(x.prompt)) && grad, button);
     assert.match(grad.text, /科大|四年|學士服/, grad.text);
     assert.doesNotMatch(grad.text, /大學畢業/, grad.text);
   }
+});
+
+test("a retake year's question says 重考, and the graduation questions come in several situations", () => {
+  const { asked } = drive({ until: 20, answer: q => (q.id === "exam15" ? { button: "exam15.high" } : q.id === "exam18" && !q.prompt.startsWith("重考") ? { button: "exam18.retake" } : null) });
+  const exams = asked.filter(x => x.id === "exam18");
+  assert.ok(exams.length >= 2, "the exam is sat again");
+  assert.match(exams[1].prompt, /^重考一年，/, exams[1].prompt);
+  assert.doesNotMatch(exams[1].prompt, /畢業/, exams[1].prompt);
+  // Over many lives the same question opens in different ways, with different buttons.
+  const prompts = new Set(), buttons = new Set();
+  for (let seed = 1; seed <= 40; seed++) {
+    const r = drive({ seed, until: 16, answer: () => null });
+    for (const q of r.asked.filter(x => x.id === "exam15")) { prompts.add(q.prompt.split(/[。！]/)[0]); buttons.add(q.labels.join("|")); }
+  }
+  assert.ok(prompts.size >= 5 && buttons.size >= 5, `${prompts.size} openings, ${buttons.size} button sets`);
+});
+
+test("a replay is steered away from the everyday questions of recent lives; the big decisions are still asked", async () => {
+  const { MODULES } = await import("../src/sim/story/index.js");
+  const major = new Set([...MODULES.CORE, ...MODULES.WORK].map(e => e.id));
+  const c = chartOf(1988, 2, 15, 12, 0), p = prepare(c);
+  const play = (seed, seen) => {
+    const life = createLife({ chart: c, analysis: p.analysis, luck: p.luck, seed, seen });
+    const asked = [];
+    for (let g = 0; g < 6000 && !life.done; g++) { if (!life.pending) { life.step(); continue; } asked.push(life.pending.id); life.autoChoose(); }
+    return asked;
+  };
+  let plain = 0, steered = 0, bigPlain = 0, bigSteered = 0;
+  for (let k = 1; k <= 40; k++) {
+    const before = new Set(play(k * 31, null).filter(id => !major.has(id)));
+    const a = play(k * 31 + 7, null), b = play(k * 31 + 7, [...before]);
+    const share = list => { const e = list.filter(id => !major.has(id)); return e.filter(id => before.has(id)).length / Math.max(1, e.length); };
+    plain += share(a); steered += share(b);
+    bigPlain += a.filter(id => major.has(id)).length; bigSteered += b.filter(id => major.has(id)).length;
+  }
+  assert.ok(steered < plain * 0.7, `repeats ${(plain / 40).toFixed(2)} → ${(steered / 40).toFixed(2)}`);
+  assert.ok(Math.abs(bigSteered - bigPlain) <= bigPlain * 0.1, `big decisions ${bigPlain} → ${bigSteered}`);
 });

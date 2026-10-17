@@ -20,6 +20,8 @@ import * as R from "./rates.js";
 export const MAX_AGE = 110;
 // The action of a written answer the player keeps as written, without a button's or an action's rules.
 export const OWN = "own";
+// How likely an everyday question the player saw in a recent life is, compared with one they have not seen.
+export const NOVELTY = 0.35;
 
 // Parents and siblings come from the optional family input when given, and are drawn at random otherwise.
 function initialState({ sex, birthYear, county, rng, family, name, analysis }) {
@@ -92,8 +94,12 @@ export function personalTilt(ev, s, nameEffects) {
 const STYLE_NUDGE = { risk: [["drive", 0.02], ["caution", -0.02]], safe: [["caution", 0.02], ["drive", -0.02]], family: [["warmth", 0.02]], self: [["warmth", -0.02]], health: [["health", 0.02]], social: [["warmth", 0.01], ["curiosity", 0.01]], learn: [["curiosity", 0.02]] };
 
 //   majorOnly  ask the player only the big decisions (core.js and work.js); everyday choices follow the personality
-export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed = 1, auto = false, policy = null, county = null, name = null, family = null, majorOnly = false }) {
+//   seen       the kinds of question the player was asked in recent lives (the page keeps them for this tab only).
+//              Everyday questions among them come up less often (NOVELTY), so a replay brings other situations; the
+//              big decisions are asked as always.
+export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed = 1, auto = false, policy = null, county = null, name = null, family = null, majorOnly = false, seen = null }) {
   const rng = makeRng(seed);
+  const recent = seen && seen.length ? new Set(seen) : null;
   // A separate stream decides whether the calibrated core events happen and who dies when, so adding a story
   // event (which draws from rng) does not reshuffle the statistics.
   const fate = makeRng((seed ^ 0x5bd1e995) >>> 0);
@@ -276,7 +282,7 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
       const ev = queue.shift();
       if (ev.choice && !ev.core && choicesThisYear > 0) continue;
       if (!eligible(ev)) continue;
-      const p0 = ev.p(s, ctx), fromLuck = luckTilt(ev);
+      const p0 = ev.p(s, ctx) * (recent && ev.choice && !ev.major && recent.has(ev.id) ? NOVELTY : 1), fromLuck = luckTilt(ev);
       if ((ev.core ? fate() : rng()) < tilt(p0, fromLuck + personalTilt(ev, s, name && name.effects))) {
         fire(ev, l, fromLuck);
         if (pending) return false;

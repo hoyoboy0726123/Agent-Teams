@@ -25,12 +25,17 @@ const leaveSchool = s => { s.studying = false; s.flags.leftSchool = s.age; };
 // year, or a graduate would stay a student for good.
 const WORK_ACTIONS = new Set(["jobSearch", "jobHop", "careerSwitch", "civilService", "startup", "sideJob", "workAbroad", "familyBusiness"]);
 // How the first job's question opens. Every way out of school has already said so (畢業、休學、先去工作), so it is not
-// said again: right after 退伍 it says that, and after a long search it says the search took a while.
-function jobSearchLead(s) {
-  if (s.flags.militaryAt !== undefined && s.age - s.flags.militaryAt <= 1) return "退伍了，開始找工作。有幾個工作機會";
-  if (s.flags.leftSchool !== undefined && s.age - s.flags.leftSchool >= 2) return "找了一陣子工作，終於有幾個機會";
-  return "開始找工作了。有幾個工作機會";
+// said again: right after 退伍 it says that, after a long search it says the search took a while, and otherwise one of
+// several ways the offers came, by era.
+function jobSearchLead(s, ctx) {
+  if (s.flags.militaryAt !== undefined && s.age - s.flags.militaryAt <= 1) return ctx.rng.pick(["退伍了，開始找工作", "退伍那天把軍服收進衣櫃，隔天就開始找工作", "退伍後休息了一個星期，開始投履歷"]);
+  if (s.flags.leftSchool !== undefined && s.age - s.flags.leftSchool >= 2) return ctx.rng.pick(["找了一陣子工作，終於有幾個機會", "履歷投了好幾個月，終於有幾家公司回覆", "打了一陣子零工，終於等到幾個正式的工作機會"]);
+  return ctx.rng.pick(["開始找工作了", s.year < 1997 ? "你在報紙的分類廣告上圈了好幾個徵人啟事" : "你在人力銀行投了二十幾封履歷，有幾家約你面試", "親戚介紹了一個機會，另外也有幾家公司找你面試"]);
 }
+// One situation for a question, out of several; entries that do not fit this life are null and left out.
+const scene = (ctx, list) => ctx.rng.pick(list.filter(Boolean));
+// The parent in a scene: 媽媽, 爸爸 or both, whoever is alive; 阿嬤 when neither is.
+const parentWord = (s, ctx) => (s.mother.alive && s.father.alive ? ctx.rng.pick(["媽媽", "爸爸", "爸媽"]) : s.mother.alive ? "媽媽" : s.father.alive ? "爸爸" : "阿嬤");
 
 // A quarrel with one parent, as a choice. Teenagers quarrel about school and going out, adults about work and love.
 function parentClash(who) {
@@ -40,14 +45,27 @@ function parentClash(who) {
     p: () => 0.03,
     choice: (s, ctx) => {
       const topic = ctx.rng.pick(s.age <= 18 ? ["成績", "滑手機", "晚回家", "交朋友", "選組"] : s.rel === "dating" ? ["交往的對象", "什麼時候結婚"] : s.rel === "married" ? ["過年要回哪一邊", "孩子的事"] : ["工作", "搬出去住", "花錢的方式"]);
+      const helper = ctx.rng.pick(["阿嬤", "姑姑", "舅舅"]), line = s.year >= 2011 && s.age >= 15;
+      const lead = scene(ctx, [
+        `你和${label}為了${topic}吵了一架，兩個人都在氣頭上。`,
+        `${label}又為了${topic}念了你一整晚，你忍不住頂了回去。`,
+        `為了${topic}，你和${label}在飯桌上吵了起來，一頓飯吃得很難受。`,
+      ]);
+      const L = {
+        sorry: ctx.rng.pick([["先去道歉", "退一步"], ["先低頭", "家和萬事興"]]),
+        talk: ctx.rng.pick([["找時間好好談", "說出自己的想法"], ["晚飯後好好說", "把話講開"]]),
+        letter: line ? ctx.rng.pick([["寫一張紙條", "當面說不出口"], [`傳 LINE 給${label}`, "當面說不出口"]]) : ["寫一張紙條", "當面說不出口"],
+        help: ctx.rng.pick([["找家人幫忙說", "請人當和事佬"], [`請${helper}出面`, "請人當和事佬"]]),
+        cold: ctx.rng.pick([["冷戰", "先不理對方"], ["先各自冷靜", "等氣消了再說"]]),
+      };
       return {
-        prompt: `你和${label}為了${topic}吵了一架，兩個人都在氣頭上。要怎麼辦？`,
+        prompt: `${lead}${ctx.rng.pick(["要怎麼辦？", "你打算怎麼做？"])}`,
         options: [
-          { id: "clash.sorry", label: "先去道歉", hint: "退一步", act: "reconcile", style: "family", weight: 0.25, apply: (s2, c) => ({ text: c.w(`和${label}為了${topic}吵架。你先開口道歉，${label}{嘴上沒說什麼，晚餐卻多夾了一塊肉給你。|愣了一下，拍拍你的肩膀。}`), mood: 1 }) },
-          { id: "clash.talk", label: "找時間好好談", hint: "說出自己的想法", act: "talk", style: "social", weight: 0.35, apply: (s2, c) => ({ text: c.w(`和${label}為了${topic}吵架。過了幾天兩個人好好談了一次，你才知道${they}其實是擔心你。`), mood: 2 }) },
-          { id: "clash.letter", label: "寫一張紙條", hint: "當面說不出口", act: "talk", style: "family", weight: 0.1, apply: (s2, c) => ({ text: c.w(`和${label}為了${topic}吵架。你寫了一張紙條放在桌上，隔天早上，紙條背面多了${label}的回覆。`), mood: 2 }) },
-          { id: "clash.help", label: "找家人幫忙說", hint: "請人當和事佬", act: "seekHelp", style: "social", weight: 0.1, apply: (s2, c) => ({ text: c.w(`和${label}為了${topic}吵架。{阿嬤|姑姑|舅舅}出面打圓場，兩個人才各退一步。`), mood: 1 }) },
-          { id: "clash.cold", label: "冷戰", hint: "先不理對方", act: "avoid", style: "self", weight: 0.2, apply: (s2, c) => ({ text: c.w(`和${label}為了${topic}吵架，{冷戰了好幾個星期。|好一陣子在家裡都不說話。}`), mood: -4 }) },
+          { id: "clash.sorry", label: L.sorry[0], hint: L.sorry[1], act: "reconcile", style: "family", weight: 0.25, apply: (s2, c) => ({ text: c.w(`和${label}為了${topic}吵架。你先開口道歉，${label}{嘴上沒說什麼，晚餐卻多夾了一塊肉給你。|愣了一下，拍拍你的肩膀。}`), mood: 1 }) },
+          { id: "clash.talk", label: L.talk[0], hint: L.talk[1], act: "talk", style: "social", weight: 0.35, apply: (s2, c) => ({ text: c.w(`和${label}為了${topic}吵架。{過了幾天|晚飯後}兩個人好好談了一次，你才知道${they}其實是擔心你。`), mood: 2 }) },
+          { id: "clash.letter", label: L.letter[0], hint: L.letter[1], act: "talk", style: "family", weight: 0.1, apply: (s2, c) => ({ text: L.letter[0].startsWith("傳") ? c.w(`和${label}為了${topic}吵架。你傳了一段很長的 LINE 給${label}，{隔了一個小時，${label}回了一句「晚上回來吃飯」。|隔天早上，${label}回了一個抱抱的貼圖。}`) : c.w(`和${label}為了${topic}吵架。你寫了一張紙條放在桌上，隔天早上，紙條背面多了${label}的回覆。`), mood: 2 }) },
+          { id: "clash.help", label: L.help[0], hint: L.help[1], act: "seekHelp", style: "social", weight: 0.1, apply: (s2, c) => ({ text: L.help[0].startsWith("請") ? `和${label}為了${topic}吵架。${helper}出面打圓場，兩個人才各退一步。` : c.w(`和${label}為了${topic}吵架。{阿嬤|姑姑|舅舅}出面打圓場，兩個人才各退一步。`), mood: 1 }) },
+          { id: "clash.cold", label: L.cold[0], hint: L.cold[1], act: "avoid", style: "self", weight: 0.2, apply: (s2, c) => ({ text: c.w(`和${label}為了${topic}吵架，{冷戰了好幾個星期。|好一陣子在家裡都不說話。}`), mood: -4 }) },
         ],
       };
     },
@@ -128,14 +146,34 @@ export const CORE = [
       const score = good ? "考得很好" : ctx.rng.pick(["考得普通", "考得不太理想"]);
       const exam = exam15Name(s.year);
       const done = s2 => { s2.flags.done15 = true; s2.flags.retake_exam15 = false; s2.flags.trackAt = s2.age; };
+      // The situation, the departments on offer and the buttons' words are picked together, so they always match.
+      const parent = parentWord(s, ctx), older = bornSiblings(s).filter(x => x.older);
+      const vocDept = ctx.rng.pick(["電機科", "餐飲科", "商業科", "汽修科", "幼保科", ...(s.year >= 1985 ? ["資訊科"] : []), ...(s.year >= 1990 ? ["美容科", "觀光科"] : [])]);
+      const fiveDept = ctx.rng.pick(["護理科", "電子科", "外語科", "機械科", "企管科"]);
+      const lead = retake ? `重考一年，${exam}${score}。` : scene(ctx, [
+        `國中畢業，${exam}${score}。`,
+        `${exam}放榜了，你的成績${good ? "比模擬考還高" : score === "考得普通" ? "跟平常差不多" : "比預期低了一截"}。`,
+        `國中畢業典禮那天，${exam}的成績也出來了：${score}。`,
+        s.year >= 2014 ? `會考成績出來，你${score}，${parent}拿著免試入學的簡章坐在你旁邊。` : `${exam}${score}，${parent}拿著志願表坐在你旁邊，一格一格陪你填。`,
+        older.length ? `${exam}${score}，${siblingCall(older[0])}特地打電話回來問你的打算。` : null,
+        `${exam}${score}。班上同學有的要拚高中，有的已經決定讀高職。`,
+      ]);
+      const near = ctx.rng() < 0.3;
+      const L = {
+        high: near ? ["讀家附近的高中", "通車方便，家裡也放心"] : ctx.rng.pick([["讀高中", "三年後再考大學"], ["讀普通高中", "先把考大學的路留著"]]),
+        voc: ctx.rng.pick([[`讀高職${vocDept}`, "早點學一技之長"], [`讀高職${vocDept}`, "畢業就能工作"], ["讀高職", `想學${vocDept.replace(/科$/, "")}`]]),
+        five: ctx.rng.pick([[`讀五專${fiveDept}`, "五年一貫，畢業就是專科"], ["讀五專", `不用再考一次，想讀${fiveDept}`]]),
+        retake: ctx.rng.pick([["重考一年", "再拚一次"], ["再拚一年", "想上更好的學校"]]),
+        work: s.year < 1990 ? ctx.rng.pick([["去當學徒", "學一技之長，也賺點錢"], ["先去工作", "幫家裡分擔"]]) : ctx.rng.pick([["先去工作", "提早賺錢"], ["先去打工賺錢", "書以後再讀"]]),
+      };
       return {
-        prompt: `${retake ? "重考一年，" : "國中畢業，"}${exam}${score}。接下來想讀什麼？`,
+        prompt: `${lead}${ctx.rng.pick(["接下來想讀什麼？", "志願要怎麼填？", "你想走哪一條路？"])}`,
         options: [
-          { id: "exam15.high", label: "讀高中", hint: "三年後再考大學", act: "study", style: "learn", weight: w.高中 * (good ? 1.3 : 0.8), apply: s2 => { done(s2); s2.track = "高中"; return { text: ctx.w(`${exam}${score}，{進了高中。|考上{家附近的|離家有點遠的}高中。}`), mood: good ? 6 : 1 }; } },
-          { id: "exam15.vocational", label: "讀高職", hint: "早點學一技之長", act: "careerSwitch", style: "safe", weight: w.高職, apply: s2 => { done(s2); s2.track = "高職"; return { text: ctx.w(`${exam}${score}，選了高職{電機科|餐飲科|商業科|汽修科|資訊科}，想早點學一技之長。`), mood: 2 }; } },
-          { id: "exam15.five", label: "讀五專", hint: "五年一貫，畢業就是專科", act: "study", style: "safe", weight: w.五專, apply: s2 => { done(s2); s2.track = "五專"; return { text: ctx.w(`${exam}${score}，進了五專{護理科|電子科|外語科|機械科}。`), mood: 2 }; } },
-          { id: "exam15.retake", label: "重考一年", hint: "再拚一次", act: "study", style: "risk", weight: retake ? 0 : 0.02, when: () => !retake, apply: s2 => { s2.flags.retake_exam15 = true; return { text: `${exam}${score}，你決定重考一年，每天到補習班報到。`, mood: -2 }; } },
-          { id: "exam15.work", label: "先去工作", hint: "提早賺錢", act: "jobSearch", style: "self", weight: w.就業, apply: s2 => { done(s2); leaveSchool(s2); return { text: ctx.w("國中畢業就先出社會{工作|當學徒}。"), mood: -1 }; } },
+          { id: "exam15.high", label: L.high[0], hint: L.high[1], act: "study", style: "learn", weight: w.高中 * (good ? 1.3 : 0.8), apply: s2 => { done(s2); s2.track = "高中"; return { text: near ? ctx.w(`${exam}${score}，考上家附近的高中，{每天騎腳踏車上學。|通車只要十幾分鐘。|和國中的好朋友又同校了。}`) : ctx.w(`${exam}${score}，{進了高中。|考上{家附近的|離家有點遠的}高中。|開始了每天考試的高中生活。}`), mood: good ? 6 : 1 }; } },
+          { id: "exam15.vocational", label: L.voc[0], hint: L.voc[1], act: "careerSwitch", style: "safe", weight: w.高職, apply: s2 => { done(s2); s2.track = "高職"; return { text: ctx.w(`${exam}${score}，選了高職${vocDept}，{想早點學一技之長。|第一次穿上實習服，覺得自己像個大人。|老師說做得好，畢業就有工作。}`), mood: 2 }; } },
+          { id: "exam15.five", label: L.five[0], hint: L.five[1], act: "study", style: "safe", weight: w.五專, apply: s2 => { done(s2); s2.track = "五專"; return { text: ctx.w(`${exam}${score}，進了五專${fiveDept}，{五年後就是專科畢業。|開學第一天，學長姊在門口發迎新傳單。}`), mood: 2 }; } },
+          { id: "exam15.retake", label: L.retake[0], hint: L.retake[1], act: "study", style: "risk", weight: retake ? 0 : 0.02, when: () => !retake, apply: s2 => { s2.flags.retake_exam15 = true; return { text: ctx.w(`${exam}${score}，你決定重考一年，{每天到補習班報到。|把自己關在書桌前，牆上貼滿了倒數日期。}`), mood: -2 }; } },
+          { id: "exam15.work", label: L.work[0], hint: L.work[1], act: "jobSearch", style: "self", weight: w.就業, apply: s2 => { done(s2); leaveSchool(s2); return { text: L.work[0] === "去當學徒" ? ctx.w("國中畢業就去{鐵工廠|機車行|美髮院|木工廠}當學徒，{師傅很兇，但教得很仔細。|第一個月的薪水全部交給家裡。}") : L.work[0] === "先去打工賺錢" ? ctx.w("國中畢業就先去打工賺錢，{想說書以後再讀。|把薪水存了一半起來。}") : ctx.w("國中畢業就先出社會{工作|當學徒}。"), mood: -1 }; } },
         ],
         // 重考 and 出國 are their own actions (act.js); answers about working leave school; anything else goes on to 高中,
         // as most do.
@@ -158,15 +196,34 @@ export const CORE = [
       const where = good ? ctx.rng.pick(["理想的科系", "第一志願"]) : ctx.rng.pick(["還可以的學校", "離家有點遠的學校"]);
       const done = s2 => { s2.flags.done18 = true; s2.flags.retake_exam18 = false; s2.flags.uniAt = s2.age; };
       const uni = s.track === "高中" ? "大學" : "科大";
+      const parent = parentWord(s, ctx), country = ctx.rng.weighted([["美國", 3], ["日本", 2], ["英國", 1], ["澳洲", 1]]);
+      // A retake year says so; otherwise one of several ways the news arrives, by era.
+      const board = s.year < 1994 ? ctx.rng.pick(["報紙的榜單", "收音機唸的榜單"]) : ctx.rng.pick(["報紙的榜單", "電話語音查榜"]);
+      const lead = retake ? `重考一年，${exam}考上${where}。` : scene(ctx, [
+        `${s.track}畢業了，${exam}考上${where}。`,
+        s.year < 2002 ? `${exam}放榜，你在${board}上找到自己的名字：考上${where}。` : `${exam}放榜，你點開查榜網頁，考上${where}。`,
+        `${s.track}畢業典禮才剛結束，${exam}的結果也出來了：考上${where}。`,
+        where === "離家有點遠的學校" ? `${exam}考上${where}，要一個人搬到外縣市。` : null,
+        s.year >= 2010 && s.track === "高中" && good ? `用${exam}成績申請上了${where}，${parent}高興地把榜單拍下來傳給親戚。` : null,
+      ]);
+      const L = {
+        go: s.track === "高中" ? ctx.rng.pick([["去讀大學", "四年後畢業"], ["去大學報到", "開始大學生活"], ["收拾行李去讀大學", "第一次離家住"]]) : ctx.rng.pick([["去讀科大", "四年後畢業"], ["去科大報到", "學更專門的技術"]]),
+        night: s.year >= 2000 ? ctx.rng.pick([["讀進修部，白天上班", "邊賺邊讀"], ["白天工作，晚上讀夜間部", "減輕家裡負擔"]]) : ["白天工作，晚上讀夜間部", "邊賺邊讀"],
+        retake: ctx.rng.pick([["重考一年", "拚更好的學校"], ["去重考班再拚一年", "不甘心就這樣"]]),
+        abroad: [`去${country}讀大學`, ctx.rng.pick(["需要家裡支持", "學費和生活費都不便宜"])],
+        work: ctx.rng.pick([["先去工作", "邊做邊想"], ["先工作存學費", "以後想讀再讀"]]),
+        military: ctx.rng.pick([["先去當兵", "當完兵再說"], ["先把兵當完", "想清楚再決定"]]),
+      };
+      const nightName = L.night[0].startsWith("讀進修部") ? "進修部" : "夜間部";
       return {
-        prompt: `${s.track}畢業了，${exam}考上${where}。要去讀嗎？`,
+        prompt: `${lead}${ctx.rng.pick(["要去讀嗎？", "要怎麼決定？", "接下來怎麼走？"])}`,
         options: [
-          { id: "exam18.night", label: "白天工作，晚上讀夜間部", hint: "邊賺邊讀", act: "study", style: "safe", weight: enter * 0.05, apply: s2 => { done(s2); s2.track = uni; s2.flags.nightSchool = true; return { text: `考上${where}的夜間部。白天在外面打工，晚上拖著疲累的身體去上課。`, mood: 2 }; } },
-          { id: "exam18.go", label: s.track === "高中" ? "去讀大學" : "去讀科大", hint: "四年後畢業", act: "study", style: "learn", weight: enter * 0.92, apply: s2 => { done(s2); s2.track = uni; return { text: ctx.w(`考上${where}，{開始大學生活。|搬進學校宿舍。|第一次離家住。}`), mood: good ? 7 : 3 }; } },
-          { id: "exam18.retake", label: "重考一年", hint: "拚更好的學校", act: "study", style: "risk", weight: retake ? 0 : enter * 0.03, when: () => !retake, apply: s2 => { s2.flags.retake_exam18 = true; return { text: `考上${where}，但你不甘心，決定重考一年。`, mood: -2 }; } },
-          { id: "exam18.abroad", label: "出國讀大學", hint: "需要家裡支持", act: "studyAbroad", style: "learn", weight: 0.01, when: s2 => s2.year >= 1980, apply: s2 => { done(s2); s2.track = "大學"; s2.abroad = ctx.rng.weighted([["美國", 3], ["日本", 2], ["英國", 1], ["澳洲", 1]]); s2.leftAt = s2.age; return { text: `到${s2.abroad}讀大學，一個人拖著兩個大行李箱出國。`, mood: 4, big: true }; } },
-          { id: "exam18.work", label: "先去工作", hint: "邊做邊想", act: "jobSearch", style: "self", weight: (1 - enter) * 0.8, apply: s2 => { done(s2); leaveSchool(s2); return { text: `${s2.edu}畢業後先去工作。`, mood: 0 }; } },
-          { id: "exam18.military", label: "先去當兵", hint: "當完兵再說", act: "wait", style: "safe", weight: (1 - enter) * 0.2, when: s2 => s2.sex === "male", apply: s2 => { done(s2); leaveSchool(s2); return { text: `${s2.edu}畢業，先去當兵，想清楚再決定。`, mood: 0 }; } },
+          { id: "exam18.night", label: L.night[0], hint: L.night[1], act: "study", style: "safe", weight: enter * 0.05, apply: s2 => { done(s2); s2.track = uni; s2.flags.nightSchool = true; return { text: ctx.w(`考上${where}的${nightName}。{白天在外面打工，晚上拖著疲累的身體去上課。|白天上班，晚上上課，便當常常在公車上吃。}`), mood: 2 }; } },
+          { id: "exam18.go", label: L.go[0], hint: L.go[1], act: "study", style: "learn", weight: enter * 0.92, apply: s2 => { done(s2); s2.track = uni; return { text: ctx.w(`考上${where}，{開始大學生活。|搬進學校宿舍。|第一次離家住。|${parent}幫你把行李搬上宿舍，走的時候一直回頭。}`), mood: good ? 7 : 3 }; } },
+          { id: "exam18.retake", label: L.retake[0], hint: L.retake[1], act: "study", style: "risk", weight: retake ? 0 : enter * 0.03, when: () => !retake, apply: s2 => { s2.flags.retake_exam18 = true; return { text: ctx.w(`考上${where}，但你不甘心，決定重考一年，{住進了重考班的宿舍。|把自己關在書桌前，每天讀到半夜。}`), mood: -2 }; } },
+          { id: "exam18.abroad", label: L.abroad[0], hint: L.abroad[1], act: "studyAbroad", style: "learn", weight: 0.01, when: s2 => s2.year >= 1980, apply: s2 => { done(s2); s2.track = "大學"; s2.abroad = country; s2.leftAt = s2.age; return { text: `到${country}讀大學，一個人拖著兩個大行李箱出國。`, mood: 4, big: true }; } },
+          { id: "exam18.work", label: L.work[0], hint: L.work[1], act: "jobSearch", style: "self", weight: (1 - enter) * 0.8, apply: s2 => { done(s2); leaveSchool(s2); return { text: L.work[0] === "先工作存學費" ? `${s2.edu}畢業後先去工作，想存一筆學費。` : `${s2.edu}畢業後先去工作。`, mood: 0 }; } },
+          { id: "exam18.military", label: L.military[0], hint: L.military[1], act: "wait", style: "safe", weight: (1 - enter) * 0.2, when: s2 => s2.sex === "male", apply: s2 => { done(s2); leaveSchool(s2); return { text: `${s2.edu}畢業，先去當兵，想清楚再決定。`, mood: 0 }; } },
         ],
         // 重考 is its own action (act.js), 出國 goes on to a university abroad; any other answer is not enrolling now.
         onFree: (action, s2) => {
@@ -195,14 +252,32 @@ export const CORE = [
     choice: (s, ctx) => {
       s.edu = s.track;
       const p = ctx.R.master(s.year), school = s.track;   // 大學 or 科大
+      const country = ctx.rng.weighted([["美國", 3], ["英國", 2], ["日本", 1], ["德國", 1]]), gapLand = ctx.rng.pick(["澳洲", "紐西蘭", "日本", "加拿大"]);
+      const home = s.birthCounty && s.birthCounty !== s.county ? s.birthCounty : null;
+      const lead = scene(ctx, [
+        `${school}畢業了！`,
+        `畢業典禮上撥完穗，${ctx.rng.pick(["和同學在校門口拍了最後一張合照", `${parentWord(s, ctx)}特地請假來看你`, "學弟妹送了你一束花"])}。`,
+        s.year >= 2009 && s.year <= 2010 ? `${school}畢業，剛好遇上金融海嘯，很多公司都在凍結人事。` : null,
+        s.year >= 2020 && s.year <= 2022 ? `${school}的畢業典禮改成線上舉行，疫情讓找工作變難了。` : null,
+        s.year >= 1995 ? "畢業前的校園徵才博覽會擠滿了人，你拿著履歷一攤一攤問。" : null,
+        "指導教授問你要不要留下來讀研究所，同學們也各有打算。",
+      ]);
+      const L = {
+        master: ctx.rng.pick([["考研究所", "多讀兩年"], ["留在學校讀碩士", "繼續做研究"], ...(s.year >= 2000 ? [["推甄研究所", "教授願意幫你寫推薦信"]] : [])]),
+        work: ctx.rng.pick([["直接工作", "開始賺錢"], ["投履歷找工作", "早點經濟獨立"], ...(home ? [[`回${home}找工作`, "離家近，生活費省一點"]] : [])]),
+        gap: [`去${gapLand}打工度假`, "看看世界"],
+        abroad: [`申請${country}的研究所`, "花費比較高"],
+        rest: ctx.rng.pick([["先休息一陣子", "想清楚再出發"], ["先打工、想清楚", "不急著決定"]]),
+      };
+      const backHome = L.work[0].startsWith("回");
       return {
-        prompt: `${s.track}畢業了！接下來呢？`,
+        prompt: `${lead}${ctx.rng.pick(["接下來呢？", "接下來要怎麼走？", "你打算怎麼做？"])}`,
         options: [
-          { id: "uni.master", label: "考研究所", hint: "多讀兩年", act: "study", style: "learn", weight: p, apply: s2 => { s2.track = "碩士"; s2.flags.masterAt = s2.age; return { text: ctx.w([`${school}畢業，接著考上研究所。`, `${school}畢業，決定再讀兩年研究所。`]), mood: 4 }; } },
-          { id: "uni.work", label: "直接工作", hint: "開始賺錢", act: "jobSearch", style: "safe", weight: (1 - p) * 0.85, apply: s2 => { leaveSchool(s2); return { text: ctx.w([`{${school}|四年}畢業了，{準備找工作。|把履歷修了一遍又一遍。|和室友約好要常聯絡。}`, "穿著學士服拍完照，{開始投履歷。|隔週就去面試了。|在校門口和爸媽合照。}"]), mood: 3 }; } },
-          { id: "uni.gap", label: "先去打工度假", hint: "看看世界", act: "workAbroad", style: "risk", weight: (1 - p) * 0.05, when: s2 => s2.year >= 2004, apply: s2 => { leaveSchool(s2); s2.abroad = ctx.rng.pick(["澳洲", "紐西蘭", "日本", "加拿大"]); s2.leftAt = s2.age; return { text: `${school}畢業，先去${s2.abroad}打工度假一年，在農場和餐廳打工。`, mood: 5, big: true }; } },
-          { id: "uni.abroad", label: "出國讀研究所", hint: "花費比較高", act: "studyAbroad", style: "learn", weight: p * 0.1, apply: s2 => { s2.track = "碩士"; s2.flags.masterAt = s2.age; s2.abroad = ctx.rng.weighted([["美國", 3], ["英國", 2], ["日本", 1], ["德國", 1]]); s2.leftAt = s2.age; return { text: `${school}畢業，出國到${s2.abroad}讀研究所。`, mood: 5, big: true }; } },
-          { id: "uni.rest", label: "先休息一陣子", hint: "想清楚再出發", act: "rest", style: "self", weight: (1 - p) * 0.1, apply: s2 => { leaveSchool(s2); return { text: ctx.w(`${school}畢業，{先在家休息幾個月，|打打工，}{想清楚自己要什麼。|陪家人過了一段悠閒的日子。}`), mood: 2 }; } },
+          { id: "uni.master", label: L.master[0], hint: L.master[1], act: "study", style: "learn", weight: p, apply: s2 => { s2.track = "碩士"; s2.flags.masterAt = s2.age; return { text: L.master[0] === "推甄研究所" ? `${school}畢業，推甄上了研究所，暑假就進實驗室報到。` : ctx.w([`${school}畢業，接著考上研究所。`, `${school}畢業，決定再讀兩年研究所。`, `${school}畢業，留在學校讀碩士，{搬進了研究室的角落。|指導教授給了你一個新題目。}`]), mood: 4 }; } },
+          { id: "uni.work", label: L.work[0], hint: L.work[1], act: "jobSearch", style: "safe", weight: (1 - p) * 0.85, apply: s2 => { leaveSchool(s2); if (backHome) { s2.county = home; return { text: ctx.w(`${school}畢業，搬回${home}找工作，{${parentWord(s2, ctx)}天天煮你愛吃的菜。|房間還是高中時的樣子。}`), mood: 3 }; } return { text: ctx.w([`{${school}|四年}畢業了，{準備找工作。|把履歷修了一遍又一遍。|和室友約好要常聯絡。}`, "穿著學士服拍完照，{開始投履歷。|隔週就去面試了。|在校門口和家人合照。}"]), mood: 3 }; } },
+          { id: "uni.gap", label: L.gap[0], hint: L.gap[1], act: "workAbroad", style: "risk", weight: (1 - p) * 0.05, when: s2 => s2.year >= 2004, apply: s2 => { leaveSchool(s2); s2.abroad = gapLand; s2.leftAt = s2.age; return { text: `${school}畢業，先去${gapLand}打工度假一年，在農場和餐廳打工。`, mood: 5, big: true }; } },
+          { id: "uni.abroad", label: L.abroad[0], hint: L.abroad[1], act: "studyAbroad", style: "learn", weight: p * 0.1, apply: s2 => { s2.track = "碩士"; s2.flags.masterAt = s2.age; s2.abroad = country; s2.leftAt = s2.age; return { text: `${school}畢業，出國到${country}讀研究所。`, mood: 5, big: true }; } },
+          { id: "uni.rest", label: L.rest[0], hint: L.rest[1], act: "rest", style: "self", weight: (1 - p) * 0.1, apply: s2 => { leaveSchool(s2); return { text: ctx.w(`${school}畢業，{先在家休息幾個月，|打打工，}{想清楚自己要什麼。|陪家人過了一段悠閒的日子。}`), mood: 2 }; } },
         ],
         // Studying on (here or abroad) is 研究所; any other answer leaves school.
         onFree: (action, s2) => {
@@ -247,7 +322,7 @@ export const CORE = [
         return { text: ctx.w(["找到第一份工作：{title}。{lead}", "第一份工作是{title}，{第一個月的薪水拿去請爸媽吃飯。|穿上新買的襯衫去報到。}{lead}", "當上{title}，{開始每天擠公車上班。|從最基層做起。}{lead}"], { title, lead }), mood: 5, big: true };
       };
       return {
-        prompt: `${jobSearchLead(s)}，你想做哪一個？`,
+        prompt: `${jobSearchLead(s, ctx)}。${ctx.rng.pick(["有幾個工作機會，你想做哪一個？", "幾個機會擺在眼前，你想選哪一個？", "你想先做哪一個？"])}`,
         options: [
           ...offers.map((job, i) => ({ id: `firstJob.${i}`, label: job[0], hint: hint(job), act: "jobSearch", weight: jobFit(ctx.analysis, job, ctx.name), apply: s2 => done(s2, job) })),
           { id: "firstJob.wait", label: "都不要，再找找看", hint: "可能要多等一陣子", act: "wait", style: "self", weight: 0.08, apply: () => ({ text: "看了幾個工作機會都不喜歡，你決定再找找看。", mood: -1 }) },
@@ -290,31 +365,64 @@ export const CORE = [
     p: (s, ctx) => ctx.R.layoff(s.year),
     choice: (s, ctx) => {
       s.employed = false; s.unemployedFor = 1;
+      const lead = scene(ctx, [
+        "公司裁員，你被列在名單上。",
+        "公司收掉了，你突然沒了工作。",
+        "部門整個被裁撤，你拿到一筆資遣費。",
+        s.year >= 1988 && s.year <= 2005 ? "工廠要搬到大陸去，你被資遣了。" : null,
+        s.year >= 2001 && s.year <= 2002 ? "網路泡沫破了，公司一夕之間縮編，你被裁員了。" : null,
+        s.year >= 2008 && s.year <= 2009 ? "金融海嘯，公司先放無薪假，接著宣布裁員，你在名單上。" : null,
+        s.year >= 2020 && s.year <= 2022 ? "疫情讓公司的生意掉了一大半，你被裁員了。" : null,
+      ]);
+      const L = {
+        search: ctx.rng.pick([["馬上找同類工作", "收入比較快回來"], ["打給以前的同事打聽職缺", "人脈比較快"]]),
+        retrain: ctx.rng.pick([["趁機進修轉行", "慢一點，但可能更好"], ["去職訓局學新技能", "政府有補助"]]),
+        rest: ctx.rng.pick([["先休息一陣子", "照顧自己"], ["先陪陪家人", "把心情整理好"]]),
+        gig: s.year >= 2016 ? ctx.rng.pick([["先跑外送撐著", "有收入比較安心"], ["先接案撐著", "有收入比較安心"]]) : ["先打零工撐著", "有收入比較安心"],
+        startup: ctx.rng.pick([["乾脆自己創業", "用資遣費當本錢"], ["拿資遣費開店", "自己當老闆"]]),
+      };
+      const gigWhat = L.gig[0].includes("外送") ? "跑外送" : L.gig[0].includes("接案") ? "接案" : ctx.rng.pick(["打零工", "到朋友店裡幫忙"]);
       return {
-        prompt: ctx.w(["公司裁員，你被列在名單上。接下來怎麼辦？", "公司收掉了，你突然沒了工作。接下來怎麼辦？", "部門整個被裁撤，你拿到一筆資遣費。接下來怎麼辦？"]),
+        prompt: `${lead}${ctx.rng.pick(["接下來怎麼辦？", "接下來要怎麼走？", "你打算怎麼做？"])}`,
         options: [
-          { id: "layoff.search", label: "馬上找同類工作", hint: "收入比較快回來", act: "jobSearch", style: "safe", weight: 0.45, apply: () => ({ text: ctx.w("被裁員了，你{馬上開始投履歷。|打給以前的同事打聽職缺。}"), mood: -8 }) },
-          { id: "layoff.retrain", label: "趁機進修轉行", hint: "慢一點，但可能更好", act: "careerSwitch", style: "learn", weight: 0.18, apply: s2 => { s2.flags.retrained = true; s2.income *= 1.08; return { text: ctx.w("被裁員了，決定去{上課|職訓局}學新技能，準備轉行。"), mood: -5 }; } },
+          { id: "layoff.search", label: L.search[0], hint: L.search[1], act: "jobSearch", style: "safe", weight: 0.45, apply: () => ({ text: L.search[0].startsWith("打給") ? "被裁員了，你打給以前的同事一個一個打聽職缺。" : ctx.w("被裁員了，你{馬上開始投履歷。|把履歷更新完，當天就投了十幾家。}"), mood: -8 }) },
+          { id: "layoff.retrain", label: L.retrain[0], hint: L.retrain[1], act: "careerSwitch", style: "learn", weight: 0.18, apply: s2 => { s2.flags.retrained = true; s2.income *= 1.08; return { text: L.retrain[0].startsWith("去職訓局") ? "被裁員了，你去職訓局報名課程，準備學新技能轉行。" : ctx.w("被裁員了，決定去{上課|補習班}學新技能，準備轉行。"), mood: -5 }; } },
           { id: "layoff.civil", label: "考公職", hint: "穩定，但要準備一兩年", act: "civilService", style: "safe", weight: 0.06, when: s2 => s2.age <= 50, apply: (s2, c) => { c.arc.start("civil", { tries: 0, quit: true }, 1); return { text: "被裁員了，你決定拿這段時間準備公職考試。", mood: -5 }; } },
-          { id: "layoff.rest", label: "先休息一陣子", hint: "照顧自己", act: "rest", style: "self", weight: 0.13, apply: s2 => { s2.happiness += 4; return { text: ctx.w("被裁員了，{先讓自己好好休息幾個月。|帶家人去走走，把心情整理好。}"), mood: -4 }; } },
-          { id: "layoff.gig", label: "先打零工撐著", hint: "有收入比較安心", act: "sideJob", style: "safe", weight: 0.13, apply: s2 => { s2.income = Math.max(0.4, s2.income * 0.5); return { text: ctx.w(s2.year >= 2016 ? "被裁員了，先{跑外送|接案}撐著，一邊找工作。" : "被裁員了，先{打零工|到朋友店裡幫忙}撐著，一邊找工作。"), mood: -6 }; } },
-          { id: "layoff.startup", label: "乾脆自己創業", hint: "用資遣費當本錢", act: "startup", style: "risk", weight: 0.05, when: s2 => s2.age >= 25 && s2.age <= 55, apply: (s2, c) => { const kind = c.rng.pick(["小吃店", "咖啡店", "網路商店", "工作室"]); c.arc.start("startup", { kind, from: s2.age }, 1); s2.unemployedFor = 0; return { text: `被裁員了，你拿資遣費開了一間${kind}。`, mood: -2, big: true }; } },
+          { id: "layoff.rest", label: L.rest[0], hint: L.rest[1], act: "rest", style: "self", weight: 0.13, apply: s2 => { s2.happiness += 4; return { text: ctx.w("被裁員了，{先讓自己好好休息幾個月。|帶家人去走走，把心情整理好。}"), mood: -4 }; } },
+          { id: "layoff.gig", label: L.gig[0], hint: L.gig[1], act: "sideJob", style: "safe", weight: 0.13, apply: s2 => { s2.income = Math.max(0.4, s2.income * 0.5); return { text: `被裁員了，先${gigWhat}撐著，一邊找工作。`, mood: -6 }; } },
+          { id: "layoff.startup", label: L.startup[0], hint: L.startup[1], act: "startup", style: "risk", weight: 0.05, when: s2 => s2.age >= 25 && s2.age <= 55, apply: (s2, c) => { const kind = c.rng.pick(["小吃店", "咖啡店", "網路商店", "工作室"]); c.arc.start("startup", { kind, from: s2.age }, 1); s2.unemployedFor = 0; return { text: `被裁員了，你拿資遣費開了一間${kind}。`, mood: -2, big: true }; } },
         ],
       };
     },
   },
   {
     id: "burnout", calibrated: true, domain: "health", channel: "bad", ages: [25, 60], cooldown: 5, when: s => s.employed, p: () => 0.02,
-    choice: (s, ctx) => ({
-      prompt: "工作壓力大到睡不著，身體開始出狀況。要怎麼辦？",
-      options: [
-        { id: "burnout.leave", label: "請長假休息", hint: "收入少一點，身體要緊", act: "rest", style: "health", weight: 0.35, apply: s2 => { s2.income *= 0.95; return { text: ctx.w("工作壓力大到睡不著，你請了長假，{好好睡了一個月。|去花東住了兩個星期。}"), mood: 2 }; } },
-        { id: "burnout.doctor", label: "去看身心科", hint: "找專業的人", act: "counsel", style: "health", weight: 0.15, apply: s2 => { s2.health.stress = Math.max(0, s2.health.stress - 0.2); return { text: "工作壓力大到睡不著，你去看了身心科，醫生說你需要真正的休息。", mood: 1 }; } },
-        { id: "burnout.talk", label: "跟主管談工作量", hint: "可能有轉機", act: "negotiate", style: "social", weight: 0.15, apply: (s2, c) => c.roll("career", "good", 0.5) ? { text: "工作壓力大到睡不著，你跟主管談了，主管把一部分工作分給別人。", mood: 3 } : { text: "工作壓力大到睡不著，你跟主管談了，主管說大家都很忙。", mood: -2 } },
-        { id: "burnout.push", label: "咬牙撐下去", hint: "對身體不好", act: "pushThrough", style: "risk", weight: 0.3, apply: s2 => { s2.health.hr *= 1.05; return { text: "工作壓力大到睡不著，你咬牙撐了過去，但身體記得這一年。", mood: -5 }; } },
-        { id: "burnout.quit", label: "辭職", hint: "先離開再說", act: "quitJob", style: "self", weight: 0.05, apply: s2 => { s2.employed = false; s2.unemployedFor = 1; return { text: "工作壓力大到睡不著，你遞了辭呈，決定先離開。", mood: 1 }; } },
-      ],
-    }),
+    choice: (s, ctx) => {
+      const boss = ctx.rng.pick(["主管", "老闆", "經理"]);
+      const lead = scene(ctx, [
+        "工作壓力大到睡不著，身體開始出狀況。",
+        `連續加班好幾個月，${ctx.rng.pick(["開會時一直頭痛", "胃痛到吃不下飯", "眼睛酸到看不清螢幕"])}。`,
+        `${boss}又丟來一個專案，你發現自己對什麼都提不起勁。`,
+        s.rel === "married" && s.partner ? `半夜還在回公司的訊息，${s.partner.call}說你最近臉色很差。` : null,
+        s.year >= 2011 ? "下班後公司的 LINE 群組還是響個不停，你開始失眠。" : null,
+      ]);
+      const L = {
+        leave: ctx.rng.pick([["請長假休息", "收入少一點，身體要緊"], ["請一個月的假", "先把身體顧好"]]),
+        doctor: s.year >= 2000 ? ["去看身心科", "找專業的人"] : ["去看醫生", "找專業的人"],
+        push: ctx.rng.pick([["咬牙撐下去", "對身體不好"], ["撐過這一季再說", "對身體不好"]]),
+        quit: ctx.rng.pick([["辭職", "先離開再說"], ["遞辭呈", "身體比工作重要"]]),
+      };
+      return {
+        prompt: `${lead}${ctx.rng.pick(["要怎麼辦？", "你打算怎麼做？", "要怎麼面對？"])}`,
+        options: [
+          { id: "burnout.leave", label: L.leave[0], hint: L.leave[1], act: "rest", style: "health", weight: 0.35, apply: s2 => { s2.income *= 0.95; return { text: ctx.w("工作壓力大到睡不著，你請了長假，{好好睡了一個月。|去花東住了兩個星期。|每天早上去公園走一圈。}"), mood: 2 }; } },
+          { id: "burnout.doctor", label: L.doctor[0], hint: L.doctor[1], act: "counsel", style: "health", weight: 0.15, apply: s2 => { s2.health.stress = Math.max(0, s2.health.stress - 0.2); return { text: `工作壓力大到睡不著，你去看了${s2.year >= 2000 ? "身心科" : "醫生"}，醫生說你需要真正的休息。`, mood: 1 }; } },
+          { id: "burnout.talk", label: `跟${boss}談工作量`, hint: "可能有轉機", act: "negotiate", style: "social", weight: 0.15, apply: (s2, c) => c.roll("career", "good", 0.5) ? { text: `工作壓力大到睡不著，你跟${boss}談了，${boss}把一部分工作分給別人。`, mood: 3 } : { text: `工作壓力大到睡不著，你跟${boss}談了，${boss}說大家都很忙。`, mood: -2 } },
+          { id: "burnout.push", label: L.push[0], hint: L.push[1], act: "pushThrough", style: "risk", weight: 0.3, apply: s2 => { s2.health.hr *= 1.05; return { text: "工作壓力大到睡不著，你咬牙撐了過去，但身體記得這一年。", mood: -5 }; } },
+          { id: "burnout.quit", label: L.quit[0], hint: L.quit[1], act: "quitJob", style: "self", weight: 0.05, apply: s2 => { s2.employed = false; s2.unemployedFor = 1; return { text: "工作壓力大到睡不著，你遞了辭呈，決定先離開。", mood: 1 }; } },
+        ],
+      };
+    },
   },
   {
     id: "retire", once: true, ages: [55, 75], when: s => s.employed && !s.retired, p: (s, ctx) => ctx.R.retire(s.age, s.sex, s.year),
@@ -391,16 +499,36 @@ export const CORE = [
     id: "proposal", calibrated: true, domain: "love", channel: "good", tags: ["spouse"], about: "partner", when: (s, ctx) => s.rel === "dating" && s.age > s.datingSince && !realPartnerAhead(s, ctx) && !realPartnerEngaged(s, ctx) && !realPartnerWeddingDue(s, ctx), p: (s, ctx) => ctx.R.proposal(s.age, s.sex, s.year, s.marriages),
     choice: (s, ctx) => {
       const name = s.partner ? s.partner.call : "對方";
-      const again = s.marriages > 0;
-      const wed = (s2, text) => { marry(s2); return { text: again ? `和${name}再一次走進婚姻，這次更懂得珍惜。` : text, mood: 10, big: true }; };
+      const again = s.marriages > 0, years = Math.max(1, s.age - s.datingSince);
+      const place = ctx.rng.pick(["沖繩", "峇里島", "關島"]);
+      const wed = (s2, text) => { marry(s2); return { text: again ? ctx.w([`和${name}再婚了，這一次更懂得珍惜。`, `走過一段婚姻，你和${name}還是決定結婚，這一次更懂得珍惜。`]) : text, mood: 10, big: true }; };
+      const lead = scene(ctx, [
+        `和${name}交往 ${years} 年，走到要不要結婚這一步。`,
+        `${name}在你們常去的${ctx.rng.pick(["餐廳", "河堤", "夜市", "海邊"])}，突然拿出一枚戒指。`,
+        `你們開始一起看房子、聊以後的生活，${name}問你怎麼想。`,
+        s.father.alive || s.mother.alive ? "過年回家，兩邊的長輩都在問什麼時候請喝喜酒。" : null,
+        `朋友一個接一個結婚，${name}看著桌上的喜帖說：「那我們呢？」`,
+        s.year < 1990 ? "兩家人已經見過面，開始談聘金和喜餅。" : null,
+        s.year >= 2020 && s.year <= 2022 ? `疫情讓很多人的婚宴一延再延，你和${name}也在想要不要結婚。` : null,
+      ]);
+      const L = {
+        yes: s.year < 1995 ? ctx.rng.pick([["辦桌請客", "請親朋好友來祝福"], ["辦一場婚禮", "長輩最開心"]]) : ctx.rng.pick([["辦一場婚禮", "請親朋好友來祝福"], ["辦一場溫馨的婚宴", "只請最親的人"]]),
+        small: s.year < 2008 ? ctx.rng.pick([["去法院公證結婚", "簡單又正式"], ["簡單請兩家人吃飯", "不鋪張"]]) : ctx.rng.pick([["簡單登記就好", "省下的錢拿去蜜月"], ["去戶政事務所登記", "錢留著過日子"]]),
+        trip: [`去${place}辦海外婚禮`, "兩個人的小婚禮"],
+        wait: ctx.rng.pick([["再等等", "還沒準備好"], ["等存夠錢再說", "想先把經濟顧好"], ["等工作穩定再說", "現在太忙"]]),
+        no: ctx.rng.pick([["分手", "想要的未來不一樣"], ["說清楚，好聚好散", "不想耽誤彼此"]]),
+      };
+      const yesText = L.yes[0] === "辦一場溫馨的婚宴" ? `和${name}結婚了！只請了最親的家人朋友，{婚宴上大家都哭了。|每一桌你都坐下來聊了好久。}` : `和${name}結婚了！{婚禮上爸媽哭得比你還兇。|喜宴辦了{二十|三十}桌，敬酒敬到腳軟。}`;
+      const smallText = L.small[0] === "去法院公證結婚" ? `和${name}去法院公證結婚，{兩個好朋友來當證人。|簽完名，兩個人去吃了一頓好的。}` : L.small[0] === "簡單請兩家人吃飯" ? `和${name}結婚了，只請兩家人吃了一頓飯，{把省下的錢存起來。|大家反而聊得很開心。}` : `和${name}去戶政事務所登記結婚，{請兩邊家人吃了一頓飯。|把省下來的錢拿去{北海道|峇里島|歐洲}蜜月。}`;
+      const waitText = L.wait[0] === "等存夠錢再說" ? `${name}想結婚，你想先存夠錢，決定再等等。` : L.wait[0] === "等工作穩定再說" ? `${name}想結婚，你想等工作穩定一點，決定再等等。` : `${name}想結婚，你覺得還沒準備好，決定再等等。`;
       return {
-        prompt: `和${name}交往 ${Math.max(1, s.age - s.datingSince)} 年，走到要不要結婚這一步。要結婚嗎？`,
+        prompt: `${lead}${ctx.rng.pick(["要結婚嗎？", "你的答案是？", "要走進婚姻嗎？"])}`,
         options: [
-          { id: "proposal.yes", label: "辦一場婚禮", hint: "請親朋好友來祝福", act: "marry", style: "family", weight: 0.42, apply: s2 => wed(s2, ctx.w(`和${name}結婚了！{婚禮上爸媽哭得比你還兇。|喜宴辦了{二十|三十}桌，敬酒敬到腳軟。}`)) },
-          { id: "proposal.small", label: "簡單登記就好", hint: "省下的錢拿去蜜月", act: "marry", style: "safe", weight: 0.35, apply: s2 => wed(s2, ctx.w(`和${name}去戶政事務所登記結婚，{請兩邊家人吃了一頓飯。|把省下來的錢拿去{北海道|峇里島|歐洲}蜜月。}`)) },
-          { id: "proposal.trip", label: "出國辦婚禮", hint: "兩個人的小婚禮", act: "marry", style: "risk", weight: 0.08, when: s2 => s2.year >= 1990, apply: s2 => wed(s2, ctx.w(`和${name}在{沖繩|峇里島|關島}辦了一場只有兩家人的小婚禮。`)) },
-          { id: "proposal.wait", label: "再等等", hint: "還沒準備好", act: "wait", style: "safe", weight: 0.11, apply: () => ({ text: `${name}想結婚，你覺得還沒準備好，決定再等等。`, mood: -1 }) },
-          { id: "proposal.no", label: "分手", hint: "想要的未來不一樣", act: "separate", style: "self", weight: 0.04, apply: (s2, c) => { endRelationship(s2, c); return { text: `走到要不要結婚這一步，你才發現和${name}想要的未來不一樣，兩個人分手了。`, mood: -6 }; } },
+          { id: "proposal.yes", label: L.yes[0], hint: L.yes[1], act: "marry", style: "family", weight: 0.42, apply: s2 => wed(s2, ctx.w(yesText)) },
+          { id: "proposal.small", label: L.small[0], hint: L.small[1], act: "marry", style: "safe", weight: 0.35, apply: s2 => wed(s2, ctx.w(smallText)) },
+          { id: "proposal.trip", label: L.trip[0], hint: L.trip[1], act: "marry", style: "risk", weight: 0.08, when: s2 => s2.year >= 1990, apply: s2 => wed(s2, `和${name}在${place}辦了一場只有兩家人的小婚禮。`) },
+          { id: "proposal.wait", label: L.wait[0], hint: L.wait[1], act: "wait", style: "safe", weight: 0.11, apply: () => ({ text: waitText, mood: -1 }) },
+          { id: "proposal.no", label: L.no[0], hint: L.no[1], act: "separate", style: "self", weight: 0.04, apply: (s2, c) => { endRelationship(s2, c); return { text: ctx.w(`走到要不要結婚這一步，你才發現和${name}想要的未來不一樣，{兩個人分手了。|好好聊過之後，兩個人分開了。}`), mood: -6 }; } },
         ],
       };
     },
@@ -411,14 +539,28 @@ export const CORE = [
     choice: (s, ctx) => {
       const name = s.partner ? s.partner.call : "另一半";
       const topic = ctx.rng.pick(s.kids.length ? ["孩子的教養", "家事分工", "錢", "婆家和娘家", "工作太忙"] : ["家事分工", "錢", "要不要生小孩", "工作太忙", "婆家和娘家"]);
+      const little = s.kids.find(k => k.age >= 4 && k.age <= 15);
+      const lead = scene(ctx, [
+        `和${name}為了${topic}越來越常吵架，婚姻出現危機。`,
+        `又為了${topic}吵了一架，${name}摔門出去，到半夜才回來。`,
+        `為了${topic}，你和${name}已經冷戰好幾天，飯桌上只剩碗筷的聲音。`,
+        little ? `為了${topic}吵架的時候，${little.call}躲在房門口偷看。` : null,
+      ]);
+      const L = {
+        talk: ctx.rng.pick([["好好溝通", "把話說開"], ["找一個晚上好好談", "不要再吵了"]]),
+        counsel: ctx.rng.pick([["一起去婚姻諮商", "找專業的人幫忙"], ["找諮商師談談", "有第三個人比較好說"]]),
+        trip: [ctx.w("兩個人去{trip}走走"), "找回當初的感覺"],
+        cold: ctx.rng.pick([["冷處理", "先不談"], ["先各自冷靜", "等氣消了再說"]]),
+        split: ctx.rng.pick([["提出離婚", "不想再勉強"], ["說出「離婚吧」", "真的累了"]]),
+      };
       return {
-        prompt: `和${name}為了${topic}越來越常吵架，婚姻出現危機。要怎麼面對？`,
+        prompt: `${lead}${ctx.rng.pick(["要怎麼面對？", "這段婚姻要怎麼走下去？", "你打算怎麼做？"])}`,
         options: [
-          { id: "crisis.talk", label: "好好溝通", hint: "把話說開", act: "talk", style: "social", weight: 0.37, apply: s2 => { s2.guard = 3; return { text: ctx.w(`和${name}為了${topic}吵了好幾次。{兩個人坐下來把話說開，|你們找了一個晚上好好談，}關係慢慢回溫。`), mood: -2 }; } },
-          { id: "crisis.counsel", label: "一起去婚姻諮商", hint: "找專業的人幫忙", act: "counsel", style: "health", weight: 0.17, apply: s2 => { s2.guard = 5; return { text: `和${name}為了${topic}吵了好幾次。你們一起去婚姻諮商，學會用新的方式相處。`, mood: -1 }; } },
-          { id: "crisis.trip", label: "兩個人去旅行", hint: "找回當初的感覺", act: "travel", style: "family", weight: 0.08, apply: (s2, c) => { s2.guard = 2; s2.savings = Math.max(0, s2.savings - 0.15); return { text: c.w(`和${name}為了${topic}吵了好幾次。你們把孩子託給家人，去{trip}待了幾天，回來後{比較會笑了。|約好每個月要有一次約會。}`), mood: 1 }; } },
-          { id: "crisis.cold", label: "冷處理", hint: "先不談", act: "avoid", style: "self", weight: 0.3, apply: s2 => { s2.crisis = 3; return { text: `和${name}為了${topic}吵了好幾次。誰也不想先開口，家裡越來越安靜。`, mood: -6 }; } },
-          { id: "crisis.split", label: "提出離婚", hint: "不想再勉強", act: "separate", style: "self", weight: 0.08, apply: s2 => { s2.crisis = 6; s2.flags.askedDivorce = s2.age; return { text: `和${name}為了${topic}吵到最後，你說出了「離婚吧」。${pronoun(s2.partner)}愣住了，說要想一想。`, mood: -8 }; } },
+          { id: "crisis.talk", label: L.talk[0], hint: L.talk[1], act: "talk", style: "social", weight: 0.37, apply: s2 => { s2.guard = 3; return { text: ctx.w(`和${name}為了${topic}吵了好幾次。{兩個人坐下來把話說開，|你們找了一個晚上好好談，}關係慢慢回溫。`), mood: -2 }; } },
+          { id: "crisis.counsel", label: L.counsel[0], hint: L.counsel[1], act: "counsel", style: "health", weight: 0.17, apply: s2 => { s2.guard = 5; return { text: `和${name}為了${topic}吵了好幾次。你們一起去婚姻諮商，學會用新的方式相處。`, mood: -1 }; } },
+          { id: "crisis.trip", label: L.trip[0], hint: L.trip[1], act: "travel", style: "family", weight: 0.08, apply: (s2, c) => { s2.guard = 2; s2.savings = Math.max(0, s2.savings - 0.15); return { text: c.w(`和${name}為了${topic}吵了好幾次。${s2.kids.length ? "你們把孩子託給家人，" : "你們"}去{trip}待了幾天，回來後{比較會笑了。|約好每個月要有一次約會。}`), mood: 1 }; } },
+          { id: "crisis.cold", label: L.cold[0], hint: L.cold[1], act: "avoid", style: "self", weight: 0.3, apply: s2 => { s2.crisis = 3; return { text: `和${name}為了${topic}吵了好幾次。誰也不想先開口，家裡越來越安靜。`, mood: -6 }; } },
+          { id: "crisis.split", label: L.split[0], hint: L.split[1], act: "separate", style: "self", weight: 0.08, apply: s2 => { s2.crisis = 6; s2.flags.askedDivorce = s2.age; return { text: `和${name}為了${topic}吵到最後，你說出了「離婚吧」。${pronoun(s2.partner)}愣住了，說要想一想。`, mood: -8 }; } },
         ],
       };
     },
@@ -461,12 +603,18 @@ export const CORE = [
     choice: (s, ctx) => {
       const one = s.kids.length === 1, name = s.partner ? s.partner.call : "另一半";
       return {
-        prompt: `${one ? s.kids[0].call : "孩子們"}慢慢長大了。和${name}聊到，還想再生一個嗎？`,
+        prompt: `${scene(ctx, [
+          `${one ? s.kids[0].call : "孩子們"}慢慢長大了，你和${name}聊到要不要再生一個。`,
+          "親戚聚會的時候，長輩又在問什麼時候要再生一個。",
+          one && s.kids[0].age >= 3 ? `${s.kids[0].call}吵著想要一個弟弟或妹妹。` : null,
+          `同事剛生了寶寶，在群組裡分享照片，${name}看了好久。`,
+          `看著${one ? s.kids[0].call : "孩子們"}一天天長大，${name}問你還想不想再生一個。`,
+        ])}${ctx.rng.pick(["還想再生一個嗎？", "你怎麼想？", "要再生一個嗎？"])}`,
         options: [
-          { id: "kids.more", label: "想再生一個", hint: "家裡更熱鬧", act: "haveChild", style: "family", weight: one ? 0.4 : 0.13, apply: () => ({ text: `和${name}討論後，想再生一個孩子。`, mood: 1 }) },
+          { id: "kids.more", label: one ? ctx.rng.pick(["想再生一個", `幫${s.kids[0].call}生個伴`]) : ctx.rng.pick(["想再生一個", "再多一個也好"]), hint: ctx.rng.pick(["家裡更熱鬧", "孩子有個伴"]), act: "haveChild", style: "family", weight: one ? 0.4 : 0.13, apply: () => ({ text: `和${name}討論後，想再生一個孩子。`, mood: 1 }) },
           { id: "kids.ask", label: "問問孩子的意見", hint: "想不想要弟弟妹妹", act: "talk", style: "social", weight: one ? 0.1 : 0.04, when: s2 => s2.kids[0].age >= 4, apply: (s2, c) => { const yes = c.rng() < 0.5, k = s2.kids[0].call; if (!yes) s2.flags.noMoreKids = true; return { text: c.w(yes ? `你問${k}想不想要弟弟妹妹，${k}{開心地跳起來。|說要把玩具分給弟弟妹妹。}你們決定再生一個。` : `你問${k}想不想要弟弟妹妹，${k}說不要。你們笑了笑，決定就這樣好好陪著${k}。`), mood: 2 }; } },
-          { id: "kids.enough", label: "這樣就好", hint: "專心陪現在的孩子", act: "noChild", style: "safe", weight: one ? 0.35 : 0.68, apply: s2 => { s2.flags.noMoreKids = true; return { text: `和${name}討論後，決定不再生了，好好陪現在的孩子長大。`, mood: 1 }; } },
-          { id: "kids.later", label: "過幾年再說", hint: "先把經濟顧好", act: "wait", style: "safe", weight: 0.08, apply: (s2, c) => ({ text: c.w("決定過幾年再說，先把{房貸|工作|身體}顧好。"), mood: 0 }) },
+          { id: "kids.enough", label: ctx.rng.pick(["這樣就好", one ? "一個就很好" : "現在剛剛好"]), hint: ctx.rng.pick(["專心陪現在的孩子", "把心力放在現在的家"]), act: "noChild", style: "safe", weight: one ? 0.35 : 0.68, apply: s2 => { s2.flags.noMoreKids = true; return { text: `和${name}討論後，決定不再生了，好好陪現在的孩子長大。`, mood: 1 }; } },
+          { id: "kids.later", label: ctx.rng.pick(["過幾年再說", "等經濟好一點再說"]), hint: ctx.rng.pick(["先把經濟顧好", "現在還太累"]), act: "wait", style: "safe", weight: 0.08, apply: (s2, c) => ({ text: c.w("決定過幾年再說，先把{房貸|工作|身體}顧好。"), mood: 0 }) },
           { id: "kids.fund", label: "先存一筆教育基金", hint: "準備好了再說", act: "save", style: "safe", weight: 0.07, apply: s2 => { s2.flags.frugalUntil = s2.age + 2; return { text: "決定先替孩子存一筆教育基金，準備好了再說。", mood: 0 }; } },
         ],
       };
@@ -488,11 +636,11 @@ export const CORE = [
       const who = s.father.alive && s.father.age >= 70 ? "爸爸" : "媽媽";
       const adults = bornSiblings(s, 18), with_ = adults.length === 1 ? siblingCall(adults[0]) : "兄弟姊妹";
       return {
-        prompt: `${who}年紀大了，${ctx.rng.pick(["跌倒之後行動不方便", "記性越來越差", "一個人住讓人不放心", "出院後需要人照顧"])}。要怎麼安排？`,
+        prompt: `${who}年紀大了，${ctx.rng.pick(["跌倒之後行動不方便", "記性越來越差", "一個人住讓人不放心", "出院後需要人照顧", "鄰居說看到" + who + "在巷口找不到回家的路", "回診越來越頻繁，需要有人陪著去醫院", "膝蓋退化，上下樓梯都很吃力", "颱風夜一個人在家，你擔心得整晚睡不著"])}。${ctx.rng.pick(["要怎麼安排？", "要怎麼照顧？", "你打算怎麼做？"])}`,
         options: [
-          { id: "care.self", label: "自己照顧", hint: "累，但安心", act: "care", style: "family", weight: 0.3, apply: s2 => { s2.income *= 0.92; return { text: `${who}需要照顧。你減少工作，自己照顧，累，但每天都看得到。`, mood: -4 }; } },
-          { id: "care.move", label: "接來一起住", hint: "家裡要重新安排", act: "care", style: "family", weight: 0.12, apply: () => ({ text: ctx.w(`${who}需要照顧。你把${who}接來一起住，{孩子多了一個人陪。|家裡熱鬧了，你也比較放心。}`), mood: -2 }) },
-          { id: "care.hire", label: "請看護", hint: "花錢，但專業", act: "hireCare", style: "safe", weight: 0.28, apply: s2 => { s2.savings = Math.max(0, s2.savings - 0.6); return { text: `${who}需要照顧。你請了看護，每個週末回去陪。`, mood: -2 }; } },
+          { id: "care.self", label: ctx.rng.pick(["自己照顧", "減少工作，自己照顧"]), hint: ctx.rng.pick(["累，但安心", "自己顧比較放心"]), act: "care", style: "family", weight: 0.3, apply: s2 => { s2.income *= 0.92; return { text: `${who}需要照顧。你減少工作，自己照顧，累，但每天都看得到。`, mood: -4 }; } },
+          { id: "care.move", label: ctx.rng.pick(["接來一起住", `接${who}來家裡住`]), hint: ctx.rng.pick(["家裡要重新安排", "多一個人陪"]), act: "care", style: "family", weight: 0.12, apply: () => ({ text: ctx.w(`${who}需要照顧。你把${who}接來一起住，{孩子多了一個人陪。|家裡熱鬧了，你也比較放心。}`), mood: -2 }) },
+          { id: "care.hire", label: s.year >= 1993 ? ctx.rng.pick(["請看護", "請外籍看護"]) : "請看護", hint: ctx.rng.pick(["花錢，但專業", "有人二十四小時陪著"]), act: "hireCare", style: "safe", weight: 0.28, apply: s2 => { s2.savings = Math.max(0, s2.savings - 0.6); return { text: `${who}需要照顧。你請了看護，每個週末回去陪。`, mood: -2 }; } },
           { id: "care.daycare", label: "白天送日照中心", hint: "晚上接回家", act: "hireCare", style: "safe", weight: 0.12, when: s2 => s2.year >= 2007, apply: s2 => { s2.savings = Math.max(0, s2.savings - 0.25); return { text: `${who}需要照顧。白天送${who}去日照中心，晚上接回家，${who}在那裡交到了朋友。`, mood: -1 }; } },
           { id: "care.share", label: `和${with_}輪流`, hint: "大家一起分擔", act: "shareCare", style: "social", weight: 0.3, when: () => adults.length > 0, apply: () => ({ text: `${who}需要照顧，你和${with_}排班輪流。`, mood: -2 }) },
         ],
@@ -513,14 +661,27 @@ export const CORE = [
     p: () => 0.25,
     choice: (s, ctx) => {
       const sibs = bornSiblings(s, 18), x = sibs.length <= 3 ? sibs.map(siblingCall).join("、") : "兄弟姊妹";
+      const asset = ctx.rng.pick(["一間老房子", "一間老房子", "一塊田和一間老房子", "一間老店面"]);
+      const lead = scene(ctx, [
+        `爸媽都走了，留下${asset}。你和${x}對怎麼分有不同的想法。`,
+        `辦完爸媽的後事，你和${x}在老家客廳坐下來，談起${asset}要怎麼處理。`,
+        `${sibs.length === 1 ? x : "兄弟姊妹"}打電話來，說想談談爸媽留下的${asset}，大家的想法不太一樣。`,
+      ]);
+      const L = {
+        split: ctx.rng.pick([["照法律平分", "公平，各拿各的"], ["各拿各的份", "照規矩來"]]),
+        sell: ctx.rng.pick([["賣掉分錢", "乾脆"], ["賣掉，錢照比例分", "省得以後麻煩"]]),
+        keep: ctx.rng.pick([["先留著不分", "當大家的老家"], ["先放著，以後再說", "大家都還捨不得"]]),
+        give: sibs.length === 1 ? [`讓給${x}`, "錢少一點，感情留著"] : ["讓給其他人", "錢少一點，感情留著"],
+        insist: ctx.rng.pick([["爭取自己的份", "可能傷感情"], ["請律師爭取", "可能傷感情"]]),
+      };
       return {
-        prompt: `爸媽都走了，留下一間老房子。你和${x}對怎麼分有不同的想法。要怎麼做？`,
+        prompt: `${lead}${ctx.rng.pick(["要怎麼做？", "要怎麼分？", "你打算怎麼處理？"])}`,
         options: [
-          { id: "inherit.split", label: "照法律平分", hint: "公平，各拿各的", act: "negotiate", style: "safe", weight: 0.4, apply: s2 => { s2.savings += 0.6; return { text: `爸媽留下的老房子，你和${x}照法律平分。雖然捨不得，大家都沒有意見。`, mood: -1 }; } },
-          { id: "inherit.sell", label: "賣掉分錢", hint: "乾脆", act: "sellAsset", style: "safe", weight: 0.15, apply: s2 => { s2.savings += 0.7; return { text: `你和${x}把老房子賣了，錢照比例分掉。簽約那天，你多看了老家幾眼。`, mood: -2 }; } },
-          { id: "inherit.keep", label: "先留著不分", hint: "當大家的老家", act: "wait", style: "family", weight: 0.1, apply: () => ({ text: `你和${x}說好，老房子先留著，過年大家還是回來團圓。`, mood: 1 }) },
-          { id: "inherit.give", label: "讓給對方", hint: "錢少一點，感情留著", act: "reconcile", style: "family", weight: 0.15, apply: () => ({ text: `爸媽留下的老房子，你讓給了${x}。大家說好，以後過年都回老家吃飯。`, mood: 1 }) },
-          { id: "inherit.insist", label: "爭取自己的份", hint: "可能傷感情", act: "insist", style: "self", weight: 0.2, apply: s2 => { s2.savings += 1.2; s2.flags.estranged = true; return { text: `為了爸媽留下的老房子，你和${x}鬧得很僵，從此很少聯絡。`, mood: -7 }; } },
+          { id: "inherit.split", label: L.split[0], hint: L.split[1], act: "negotiate", style: "safe", weight: 0.4, apply: s2 => { s2.savings += 0.6; return { text: `爸媽留下的${asset}，你和${x}照法律平分。雖然捨不得，大家都沒有意見。`, mood: -1 }; } },
+          { id: "inherit.sell", label: L.sell[0], hint: L.sell[1], act: "sellAsset", style: "safe", weight: 0.15, apply: s2 => { s2.savings += 0.7; return { text: `你和${x}把爸媽留下的${asset}賣了，錢照比例分掉。簽約那天，你多看了老家幾眼。`, mood: -2 }; } },
+          { id: "inherit.keep", label: L.keep[0], hint: L.keep[1], act: "wait", style: "family", weight: 0.1, apply: () => ({ text: `你和${x}說好，爸媽留下的${asset}先留著，過年大家還是回來團圓。`, mood: 1 }) },
+          { id: "inherit.give", label: L.give[0], hint: L.give[1], act: "reconcile", style: "family", weight: 0.15, apply: () => ({ text: `爸媽留下的${asset}，你讓給了${x}。大家說好，以後過年都回老家吃飯。`, mood: 1 }) },
+          { id: "inherit.insist", label: L.insist[0], hint: L.insist[1], act: "insist", style: "self", weight: 0.2, apply: s2 => { s2.savings += 1.2; s2.flags.estranged = true; return { text: L.insist[0] === "請律師爭取" ? `為了爸媽留下的${asset}，你請了律師，和${x}從此很少聯絡。` : `為了爸媽留下的${asset}，你和${x}鬧得很僵，從此很少聯絡。`, mood: -7 }; } },
         ],
       };
     },
@@ -565,13 +726,28 @@ export const CORE = [
     id: "buyHome", calibrated: true, domain: "wealth", channel: "good", tags: ["home"], ages: [25, 60], cooldown: 2, when: (s, ctx) => s.home !== "own" && s.savings >= ctx.R.DOWN_PAYMENT && s.employed, p: (s, ctx) => ctx.R.homeBuy(s.age),
     choice: (s, ctx) => {
       const buy = (s2, kind) => { ownHome(s2); s2.savings -= ctx.R.DOWN_PAYMENT; return { text: ctx.w(`在${s2.county || "家附近"}買了一間${kind}，{拿到鑰匙那天開心得睡不著。|背上二十年房貸，心裡卻很踏實。|第一個晚上，你們在空蕩蕩的客廳吃泡麵。}`), mood: 8, big: true }; };
+      const tower = s.year >= 1990 && ctx.rng() < 0.5;
+      const lead = scene(ctx, [
+        "存到一筆頭期款了。",
+        s.year >= 2010 ? `${s.county || "這裡"}的房價又漲了，你算了算存款，剛好夠付頭期款。` : null,
+        s.year < 1990 ? "存了好幾年，終於湊到一筆頭期款。" : null,
+        s.kids.length ? "孩子越來越大，租的房子快住不下了，存款也夠付頭期款了。" : null,
+        s.rel === "married" && s.partner ? `和${s.partner.call}看了好幾個週末的房子，存款也夠付頭期款了。` : null,
+        s.home === "rent" ? "房東說明年要漲房租，你算了算存款，夠付頭期款了。" : null,
+      ]);
+      const L = {
+        new: tower ? ["買新大樓", "有電梯、有管理員"] : ["買新成屋", "貴，但屋況好"],
+        old: ctx.rng.pick([["買中古屋", "便宜一點，要整理"], ["買老公寓自己整理", "省下的錢拿來裝潢"]]),
+        presale: ctx.rng.pick([["買預售屋", "要等兩三年交屋"], ["買預售屋", "付款比較輕鬆"]]),
+        rent: ctx.rng.pick([["繼續租", "保留彈性"], ["再租幾年", "把錢拿去做別的規畫"]]),
+      };
       return {
-        prompt: "存到一筆頭期款了。要買房子嗎？",
+        prompt: `${lead}${ctx.rng.pick(["要買房子嗎？", "要出手嗎？", "要買嗎？"])}`,
         options: [
-          { id: "home.new", label: "買新成屋", hint: "貴，但屋況好", act: "buyHome", style: "family", weight: 0.3, apply: s2 => buy(s2, "新房子") },
-          { id: "home.old", label: "買中古屋", hint: "便宜一點，要整理", act: "buyHome", style: "safe", weight: 0.3, apply: s2 => buy(s2, "中古公寓") },
-          { id: "home.presale", label: "買預售屋", hint: "要等兩三年交屋", act: "buyHome", style: "risk", weight: 0.15, when: s2 => s2.year >= 1990, apply: s2 => buy(s2, "預售屋") },
-          { id: "home.rent", label: "繼續租", hint: "保留彈性", act: "wait", style: "self", weight: 0.17, apply: () => ({ text: "存到了頭期款，算了算還是決定先繼續租，把錢拿去做別的規畫。", mood: 0 }) },
+          { id: "home.new", label: L.new[0], hint: L.new[1], act: "buyHome", style: "family", weight: 0.3, apply: s2 => buy(s2, tower ? "新大樓的房子" : "新房子") },
+          { id: "home.old", label: L.old[0], hint: L.old[1], act: "buyHome", style: "safe", weight: 0.3, apply: s2 => buy(s2, L.old[0] === "買老公寓自己整理" ? "老公寓，自己重新整理" : "中古公寓") },
+          { id: "home.presale", label: L.presale[0], hint: L.presale[1], act: "buyHome", style: "risk", weight: 0.15, when: s2 => s2.year >= 1990, apply: s2 => buy(s2, "預售屋") },
+          { id: "home.rent", label: L.rent[0], hint: L.rent[1], act: "wait", style: "self", weight: 0.17, apply: () => ({ text: "存到了頭期款，算了算還是決定先繼續租，把錢拿去做別的規畫。", mood: 0 }) },
           { id: "home.back", label: "搬回老家住", hint: "省下房租", act: "moveHome", style: "family", weight: 0.08, when: s2 => s2.father.alive || s2.mother.alive, apply: s2 => { if (s2.birthCounty) s2.county = s2.birthCounty; return { text: "存到了頭期款，最後決定搬回老家和爸媽住，把錢存下來。", mood: 1 }; } },
         ],
       };
@@ -597,16 +773,31 @@ export const CORE = [
   },
   {
     id: "checkups", calibrated: true, once: true, ages: [40, 40], p: () => 1,
-    choice: (s, ctx) => ({
-      prompt: "40 歲了，收到成人健康檢查的通知。要定期去檢查嗎？",
-      options: [
-        { id: "checkup.yearly", label: "每年都去", hint: "早期發現比較好治", act: "seeDoctor", style: "health", weight: 0.32, apply: (s2, c) => { s2.health.checkups = true; return { text: c.w("{開始每年做健康檢查，|把健康檢查排進每年的行事曆，}{抽血時還是會怕。|報告上的紅字越來越少。|醫生說繼續保持。}"), mood: 0 }; } },
-        { id: "checkup.full", label: "自費做全身健檢", hint: "比較仔細，比較貴", act: "seeDoctor", style: "health", weight: 0.08, apply: (s2, c) => { s2.health.checkups = true; s2.savings = Math.max(0, s2.savings - 0.05); return { text: c.w("自費做了一次全身健康檢查，{連胃鏡大腸鏡都做了，|報告厚得像一本書，}之後每年都去。"), mood: 0 }; } },
-        { id: "checkup.public", label: "做公費的基本檢查", hint: "三年一次，免費", act: "seeDoctor", style: "safe", weight: 0.15, apply: (s2, c) => { s2.health.checkups = true; return { text: c.w("{去附近的診所|拿著健保卡}做了公費的成人健康檢查，{之後每三年去一次。|醫生說數字都還在標準內。}"), mood: 0 }; } },
-        { id: "checkup.habits", label: "先從生活習慣改起", hint: "少吃宵夜、多走路", act: "quitHabit", style: "health", weight: 0.12, apply: (s2, c) => { s2.health.hr = Math.max(0.8, s2.health.hr * 0.98); return { text: c.w("收到健康檢查的通知，你決定先{戒掉宵夜|每天走一萬步|早點睡}，明年再去檢查。"), mood: 1 }; } },
-        { id: "checkup.later", label: "有空再說", hint: "現在身體還不錯", act: "wait", style: "risk", weight: 0.33, apply: (s2, c) => ({ text: c.w("收到健康檢查的通知，{覺得身體還不錯，先放著。|想說工作忙完再去，結果就忘了。|把通知單夾進抽屜裡。}"), mood: 0 }) },
-      ],
-    }),
+    choice: (s, ctx) => {
+      const lead = scene(ctx, [
+        "40 歲了，收到成人健康檢查的通知。",
+        `40 歲生日剛過，${s.year >= 1996 ? "收到健保成人預防保健的通知單" : "公司發了健康檢查的通知"}。`,
+        `同事上個月健檢發現${ctx.rng.pick(["血糖", "血壓", "肝指數"])}紅字，你也收到了健康檢查的通知。`,
+        s.father.alive || s.mother.alive ? "爸媽最近常跑醫院拿藥，你看著手上的健康檢查通知單。" : null,
+      ]);
+      const L = {
+        yearly: ctx.rng.pick([["每年都去", "早期發現比較好治"], ["排進每年的行事曆", "固定檢查比較安心"]]),
+        full: ctx.rng.pick([["自費做全身健檢", "比較仔細，比較貴"], ["做一次高階健檢", "連胃鏡都做"]]),
+        public: s.year >= 1996 ? ctx.rng.pick([["做公費的基本檢查", "三年一次，免費"], ["用健保做成人健檢", "不用花錢"]]) : ["去衛生所做基本檢查", "便宜，項目少一點"],
+        habits: ctx.rng.pick([["先從生活習慣改起", "少吃宵夜、多走路"], ["先戒宵夜、每天走路", "明年再去檢查"]]),
+        later: ctx.rng.pick([["有空再說", "現在身體還不錯"], ["工作忙完再去", "最近真的太忙"]]),
+      };
+      return {
+        prompt: `${lead}${ctx.rng.pick(["要定期去檢查嗎？", "要去做檢查嗎？", "要怎麼安排？"])}`,
+        options: [
+          { id: "checkup.yearly", label: L.yearly[0], hint: L.yearly[1], act: "seeDoctor", style: "health", weight: 0.32, apply: (s2, c) => { s2.health.checkups = true; return { text: c.w("{開始每年做健康檢查，|把健康檢查排進每年的行事曆，}{抽血時還是會怕。|報告上的紅字越來越少。|醫生說繼續保持。}"), mood: 0 }; } },
+          { id: "checkup.full", label: L.full[0], hint: L.full[1], act: "seeDoctor", style: "health", weight: 0.08, apply: (s2, c) => { s2.health.checkups = true; s2.savings = Math.max(0, s2.savings - 0.05); return { text: c.w("自費做了一次全身健康檢查，{連胃鏡大腸鏡都做了，|報告厚得像一本書，}之後每年都去。"), mood: 0 }; } },
+          { id: "checkup.public", label: L.public[0], hint: L.public[1], act: "seeDoctor", style: "safe", weight: 0.15, apply: (s2, c) => { s2.health.checkups = true; return { text: s2.year >= 1996 ? c.w("{去附近的診所|拿著健保卡}做了公費的成人健康檢查，{之後每三年去一次。|醫生說數字都還在標準內。}") : c.w("去衛生所做了基本的健康檢查，{量了血壓、抽了血，|護士阿姨很親切，}之後每隔幾年就去一次。"), mood: 0 }; } },
+          { id: "checkup.habits", label: L.habits[0], hint: L.habits[1], act: "quitHabit", style: "health", weight: 0.12, apply: (s2, c) => { s2.health.hr = Math.max(0.8, s2.health.hr * 0.98); return { text: c.w("收到健康檢查的通知，你決定先{戒掉宵夜|每天走一萬步|早點睡}，明年再去檢查。"), mood: 1 }; } },
+          { id: "checkup.later", label: L.later[0], hint: L.later[1], act: "wait", style: "risk", weight: 0.33, apply: (s2, c) => ({ text: c.w("收到健康檢查的通知，{覺得身體還不錯，先放著。|想說工作忙完再去，結果就忘了。|把通知單夾進抽屜裡。}"), mood: 0 }) },
+        ],
+      };
+    },
   },
   {
     id: "serious", domain: "health", channel: "bad", grave: true, ages: [1, 110], when: s => !s.health.serious, p: (s, ctx) => ctx.R.serious(s.age, s.sex),
@@ -637,9 +828,15 @@ export const CORE = [
       s.flags.offerAbroad = where;
       const family = s.rel === "married";
       return {
-        prompt: `有一個去${where}工作的機會。要去嗎？`,
+        prompt: `${scene(ctx, [
+          `有一個去${where}工作的機會。`,
+          s.employed ? `公司要在${where}開分公司，主管問你願不願意外派。` : null,
+          `以前的同學在${where}工作，介紹你去他們公司。`,
+          s.year >= 1995 ? `獵人頭打電話來，${where}有個職缺，薪水比現在高一截。` : null,
+          s.year >= 2005 ? `${where}的公司在網路上看到你的履歷，寄信問你有沒有興趣。` : null,
+        ])}${ctx.rng.pick(["要去嗎？", "你怎麼決定？", "要接下這個機會嗎？"])}`,
         options: [
-          { id: "abroad.go", label: family ? "自己先去" : "去", hint: "看看外面的世界", act: "workAbroad", style: "risk", weight: 0.32, apply: s2 => { s2.abroad = where; s2.leftAt = s2.age; s2.income *= 1.2; return { text: ctx.w(`到${where}工作，{一切從頭開始。|住進公司安排的宿舍。}${family ? "家人留在台灣，每天視訊。" : ""}`), mood: 4, big: true }; } },
+          { id: "abroad.go", label: family ? "自己先去" : ctx.rng.pick(["去", "接下這份工作", "收拾行李出發"]), hint: ctx.rng.pick(["看看外面的世界", "趁年輕闖一闖"]), act: "workAbroad", style: "risk", weight: 0.32, apply: s2 => { s2.abroad = where; s2.leftAt = s2.age; s2.income *= 1.2; return { text: ctx.w(`到${where}工作，{一切從頭開始。|住進公司安排的宿舍。}${family ? "家人留在台灣，每天視訊。" : ""}`), mood: 4, big: true }; } },
           { id: "abroad.family", label: "帶全家一起去", hint: "孩子要轉學", act: "workAbroad", style: "family", weight: 0.08, when: () => family, apply: s2 => { s2.abroad = where; s2.leftAt = s2.age; s2.income *= 1.15; return { text: `全家一起搬到${where}，孩子進了當地的學校。`, mood: 3, big: true }; } },
           {
             id: "abroad.negotiate", label: "談好條件再去", hint: "加薪或縮短期限", act: "negotiate", style: "social", weight: 0.05,
@@ -651,7 +848,7 @@ export const CORE = [
           },
           { id: "abroad.partner", label: "問另一半要不要一起去", hint: "兩個人的決定", act: "talk", style: "social", weight: 0.05, when: s2 => s2.rel === "dating" && s2.partner, apply: (s2, c) => { if (c.rng() < 0.5) { s2.abroad = where; s2.leftAt = s2.age; s2.income *= 1.2; return { text: `你問${s2.partner.call}要不要一起去${where}，${pronoun(s2.partner)}答應了。兩個人一起搬了過去。`, mood: 5, big: true }; } return { text: `你問${s2.partner.call}要不要一起去${where}，${pronoun(s2.partner)}走不開。你決定留在台灣。`, mood: -1 }; } },
           { id: "abroad.trip", label: "先去出差一趟看看", hint: "了解環境再決定", act: "wait", style: "safe", weight: 0.06, apply: (s2, c) => ({ text: c.w(`你先到${where}出差了兩個星期，{覺得那裡的節奏不適合自己，|吃不慣那裡的食物，|想到家人就捨不得，}最後還是留在台灣。`), mood: 0 }) },
-          { id: "abroad.stay", label: "留在台灣", hint: "家人朋友都在這裡", act: "wait", style: "family", weight: 0.44, apply: () => ({ text: `有去${where}工作的機會，想了想，還是留在台灣。`, mood: 0 }) },
+          { id: "abroad.stay", label: ctx.rng.pick(["留在台灣", "婉拒這個機會"]), hint: ctx.rng.pick(["家人朋友都在這裡", "在台灣也有發展"]), act: "wait", style: "family", weight: 0.44, apply: () => ({ text: `有去${where}工作的機會，想了想，還是留在台灣。`, mood: 0 }) },
         ],
       };
     },

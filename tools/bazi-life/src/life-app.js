@@ -130,6 +130,22 @@ function selectTab(tab) {
 
 // 填到一半的表單 stays through a reload (draft.js: this tab only, gone when it is closed).
 const FORM_DRAFT = draftStore("bazi-life.form"), TAB_DRAFT = draftStore("bazi-life.tab");
+// The kinds of question asked in this tab's last lives (only their ids, nothing about the player), so a replay brings
+// other everyday situations (life.js: seen, NOVELTY). Kept like the drafts: this tab only, gone when it is closed.
+const SEEN = draftStore("bazi-life.seen"), SEEN_LIVES = 2;
+const seenLives = () => { const d = SEEN.load(); return d && Array.isArray(d.lives) ? d.lives.filter(Array.isArray).map(l => l.filter(id => typeof id === "string")) : []; };
+function startSeen() {
+  const lives = seenLives();
+  SEEN.save({ lives: [...lives.slice(-SEEN_LIVES), []] });
+  return lives.slice(-SEEN_LIVES).flat();
+}
+function markSeen(id) {
+  const lives = seenLives();
+  if (!lives.length) lives.push([]);
+  const now = lives[lives.length - 1];
+  if (!now.includes(id)) now.push(id);
+  SEEN.save({ lives: lives.slice(-(SEEN_LIVES + 1)) });
+}
 const ME_FIELDS = ["f-name", "f-date", ...timeFieldIds("f"), "sex-m", "sex-f", "f-place", "family", "f-met", "f-wed", "f-only"];
 const memberValues = el => ({ name: el.querySelector(".m-name").value, date: el.querySelector(".m-date").value, ...memberHourValue(el) });
 function setMember(el, m) { el.querySelector(".m-name").value = m.name || ""; el.querySelector(".m-date").value = m.date || ""; setMemberHour(el, m); }
@@ -260,7 +276,7 @@ function begin(input, born, extra = {}) {
   // A name without Kangxi strokes still appears in the story; it just isn't scored.
   const name = prep.name || (extra.name ? { full: extra.name, effects: null } : null);
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-  run = { input, extra, chart, prep, name, seed, born, life: createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed, name, family: prep.family, majorOnly: $("#c-major").checked }), summary: null };
+  run = { input, extra, chart, prep, name, seed, born, life: createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed, name, family: prep.family, majorOnly: $("#c-major").checked, seen: startSeen() }), summary: null };
   startScene(seed, run.life.state, age => luckAt(prep, age));
   $("#setup").hidden = true; $("#baby").hidden = true; $("#end").hidden = true; $("#play").hidden = false;
   $("#feed").innerHTML = ""; $("#choice").hidden = true; recap = [];
@@ -374,6 +390,7 @@ function updateStatus() {
 function showChoice() {
   stop();
   const p = run.life.pending, box = $("#choice");
+  markSeen(p.id);
   const why = reasonLine(chartReason(p.id, run.life.state.age), "p") + (p.why && p.why.from === "family" ? `<p class="why">合盤：${esc(p.why.text)}</p>` : "");
   const dm = run.prep.analysis.dayMaster, nature = (trait(run.prep.analysis) || "").split("，").pop();
   const leanNote = p.lean >= 0 && !leanNoted ? `<p class="lean-note">標著「個性傾向」的選項，是從你的${esc(dm.stem + dm.element)}日主（${esc(nature)}）和這一生做過的選擇推算的。選哪一個都可以。</p>` : "";

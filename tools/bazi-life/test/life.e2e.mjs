@@ -390,6 +390,10 @@ for (let k = 0; k < 150; k++) {
 const feedText = await rc.textContent("#feed");
 check("a question opens with the big moments since the last answer, as told in the story", recapLines.length > 0 && recapLines.length <= 3 && recapLines.every(t => /^\d+ 歲./.test(t) && feedText.includes(t.replace(/^\d+ 歲/, ""))), JSON.stringify(recapLines));
 check("after an answer the recap starts over", nextRecap !== null && !nextRecap.some(t => recapLines.includes(t)), JSON.stringify(nextRecap));
+// The kinds of question asked are remembered for the next life in this tab: ids only, nothing about the player.
+const seenStore = await rc.evaluate(() => ({ session: sessionStorage.getItem("bazi-life.seen"), local: Object.keys(localStorage) }));
+const seenLives = (JSON.parse(seenStore.session || "{}").lives) || [];
+check("recent lives' question kinds are kept in this tab as ids only, to steer a replay to new questions", seenLives.length >= 1 && seenLives.flat().length >= 2 && seenLives.flat().every(id => /^[A-Za-z][\w]*$/.test(id)) && !seenStore.local.some(k => /seen/.test(k)), JSON.stringify(seenLives).slice(0, 120));
 await rc.close();
 
 const phone = await fresh({ viewport: { width: 400, height: 900 }, colorScheme: "dark", deviceScaleFactor: 2 });
