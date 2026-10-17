@@ -358,7 +358,8 @@ export const YOUNG = [
   {
     // 翹課：早上的課爬不起來、熬夜、打工排太多。大學生活的小事，最多是一門課被當。
     id: "y_skipClass", once: true, domain: "study", channel: "bad", ages: [18, 24],
-    when: s => undergrad(s) && typeof s.flags.uniAt === "number" && uniYear(s) <= 3, p: () => 0.3,
+    // Not for 夜間部 students: their classes are in the evening.
+    when: s => undergrad(s) && !s.flags.nightSchool && typeof s.flags.uniAt === "number" && uniYear(s) <= 3, p: () => 0.3,
     choice: (s, ctx) => {
       const y = s.year, dept = deptOf(s, ctx), alarm = y >= 2003 ? "手機" : "鬧鐘", notes = y >= 1985 ? "共筆" : "筆記";
       const course = ctx.rng.pick(["大一英文", "通識課", ...(/電|機|化|土木|物理|數學|資|材料|工程|生科/.test(dept) ? ["微積分", "普通物理"] : ["大一國文"])]);
@@ -1099,7 +1100,7 @@ export const YOUNG = [
             stay: ["婉拒，留在熟悉的地方", "現在的環境比較安心", "想了想，{現在的店離家近，每天可以回家吃晚飯|現在的同事都很照顧你}"],
             scout: ["先去對方的店看看", "謹慎一點", "先去對方的店裡坐了一個下午"],
           } },
-        { key: "boss", lead: `老${boss}要帶人一起跳槽，`,
+        boss !== "老闆" && { key: "boss", lead: `老${boss}要帶人一起跳槽，`,
           prompt: `一直很照顧你的${boss}要跳槽到${rival}，想帶幾個人一起過去，問你要不要跟，薪水多${more}。要去嗎？`,
           o: {
             go: [`跟著${boss}過去`, "加薪，也要重新適應", `{想了一個週末|跟家人商量後}，決定跟著${boss}過去`],
@@ -1880,7 +1881,7 @@ export const YOUNG = [
             buy: ["時間一到就全部結帳", "辛苦工作就是為了這一刻", "等到半夜十二點，全部結了帳"],
             cut: ["關掉通知，刪掉購物 App", "眼不見為淨", "關掉通知，把購物 App 刪了"],
           } },
-        card && { key: "card", lead: `想要${gadget}很久了，`,
+        y >= 2000 && { key: "card", lead: `想要${gadget}很久了，`,
           prompt: `你想要${gadget}很久了，價錢差不多是一個月的薪水，店員說刷卡可以分{十二|二十四}期零利率。要怎麼辦？`,
           o: { cut: ["把多辦的信用卡剪掉", "眼不見為淨", "回家把多辦的那張信用卡剪了"] } },
         y >= 2018 && { key: "group", lead: "團購群組天天在喊最後三組，",
@@ -2004,7 +2005,8 @@ export const YOUNG = [
       const y = s.year, go = working(s) ? "上班" : "上課", who = parentsWord(s), bike = scooterOf(y), mates = working(s) ? "同事" : "同學";
       const taipei = ["臺北市", "新北市"].includes(s.county);
       const transit = taipei && y >= 2012 ? "搭捷運，再騎一段 YouBike" : taipei && y >= 1997 ? "搭捷運和公車" : "搭公車";
-      const zone = ctx.rng.pick(["工業區", "郊區", "山邊"]), [hill, town2] = ctx.rng.pick([["山上", "下山去市區"], ["郊區", "去市區"]]);
+      const plant = !!s.job && ["製造", "科技"].includes(s.job.field);
+      const zone = ctx.rng.pick(plant ? ["工業區", ...(y >= 1981 ? ["科學園區"] : [])] : ["郊區", "山邊"]), [hill, town2] = ctx.rng.pick([["山上", "下山去市區"], ["郊區", "去市區"]]);
       const base = {
         new: ["分期買一台新機車", "每個月繳一點", `分{十二|二十四}期買了一台${bike}`],
         used: ["買一台二手機車", "便宜，耐騎就好", `在{車行|${y >= 2000 ? "網路上" : "朋友介紹的地方"}}買了一台二手機車`],
@@ -2028,7 +2030,7 @@ export const YOUNG = [
             transit: ["改搭公車就好", "把錢存下來", `算了算修車錢和油錢，決定改成${transit}`],
             electric: ["換一台電動機車", "安靜，不用加油", "換了一台電動機車"],
           } },
-        working(s) && placeOf(s) === "公司" && { key: "far", lead: `公司在${zone}，公車很少，`,
+        working(s) && placeOf(s) === "公司" && (plant || !taipei) && { key: "far", lead: `公司在${zone}，公車很少，`,
           prompt: `公司在${zone}，公車{一個小時才一班|要轉兩次}，{遲到了兩次以後，|看著同事一個個騎車來上班，}你想要一台自己的車。要怎麼辦？`,
           o: { transit: ["早一點出門搭公車", "把錢存下來", "決定每天早一點出門搭公車"] } },
         { key: "peers", lead: `看${mates}都騎車${go}，`,
@@ -2088,7 +2090,7 @@ export const YOUNG = [
       // Why now, and which licence: [scene, 汽車 or 機車].
       const sc = sceneOf(s, ctx, "y_license", [
         { key: "ride", kind: "機車", lead: "騎車騎了好一陣子，駕照卻還沒考，",
-          prompt: `你常常騎家裡的機車${go}，駕照卻一直沒去考，{上個月才在路口被警察攔下來，罰了一筆錢。|${parentsAlive(s) ? who : "朋友"}每天都在唸。}要怎麼辦？` },
+          prompt: `你常常${s.done.has("y_vehicle") ? "騎車" : "騎家裡的機車"}${go}，駕照卻一直沒去考，{上個月才在路口被警察攔下來，罰了一筆錢。|${parentsAlive(s) ? who : "朋友"}每天都在唸。}要怎麼辦？` },
         { key: "mates", kind: y >= 1990 ? "汽車" : "機車", lead: "看大家都考到駕照，",
           prompt: `${mate}一個個都考到駕照了，${y >= 1990 ? "{週末出去玩，只有你不能換手開車。|聊天時大家都在比路考的糗事。}" : "{週末出去玩，只有你要人載。|聊天時大家都在比路考的糗事。}"}要怎麼辦？` },
         inCollege(s) && { key: "campus", kind: y >= 1985 ? "汽車" : "機車", lead: "室友找你一起去考駕照，",

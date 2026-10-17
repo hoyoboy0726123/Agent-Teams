@@ -2,14 +2,14 @@
 // 段考作弊、被誤會、當幹部、筆友和網友、比賽、服儀、排擠、照顧弟妹……
 //
 // 機率都是假設：這些事沒有官方統計，每個事件一年的機率大多在 0.04–0.15，再用 once / max / cooldown 限制次數，
-// 讓一段青春期平均有六、七件故事，其中三件左右要做選擇。選組（高中生每人都要選）是唯一必定發生的，排在最前面。
+// 讓一段青春期平均有五、六件故事，其中三件左右要做選擇。選組（高中生每人都要選）是唯一必定發生的，排在最前面。
 // 常見的抉擇有好幾種情境（sceneOf）：先看年代、年級、家裡的情形挑出合適的，再隨機選一個，問題、按鈕和結果都從
 // 同一個情境寫出來，重玩時同一個抉擇會換一個樣子出現。
 // 這裡不改學歷和升學路線（會考、學測在 core.js），也不碰交往狀態：青春期的戀愛只留在故事和記憶裡，
 // 不會改變 core.js 依統計校準的交往、初婚年齡。
 //
-// The probabilities are assumptions (no statistics exist for these events), set so the teenage years hold six or
-// seven of them, about three of them choices; 選組 is the one every 高中 student meets, so it comes first. The
+// The probabilities are assumptions (no statistics exist for these events), set so the teenage years hold five or
+// six of them, about three of them choices; 選組 is the one every 高中 student meets, so it comes first. The
 // frequent choices come in several scenes (sceneOf), and the prompt, the buttons and the results are written from the
 // same scene. Nothing here changes the school track or s.rel, so the calibrated schooling, dating and marriage figures
 // stay as they are.
@@ -164,7 +164,7 @@ export const TEEN = [
         peers: ["補全科，跟上大家", "怕被拋在後面", "你怕落後，一口氣報了全科，{每天晚上十點才下課，|週末也被考卷塞滿，}{回家的公車上總是睡著。|和同學見面的地方從教室換成了補習班。}"],
         flyer: ["報全科衝刺班", "一次全部顧到", "試聽完你就報了全科班，{每天晚上十點才下課，|週末也被考卷塞滿，}{書包裡的講義越疊越厚。|回家的公車上總是睡著。}"],
         cousin: [`照${cousin}的路補全科`, "一次全部顧到", `你照著${cousin}的路補了全科，{每天晚上十點才下課，|週末也被考卷塞滿，}{${who}說這樣才安心。|回家的公車上總是睡著。}`],
-        teacher: ["數學英文都補", "一次全部顧到", "你去老師家補數學，週末再去補英文，{每天回到家都快十點了，|週末也被考卷塞滿，}{書包重得像磚頭。|回家的路上總是在打瞌睡。}"],
+        teacher: ["數學英文都補", "一次全部顧到", "你去老師家補數學，週末再去補英文，{每天回到家都快十點了，|連星期天都在寫考卷，}{書包重得像磚頭。|回家的路上總是在打瞌睡。}"],
         cost: ["咬牙補全科", "一次全部顧到", `${who}多接了一份工，讓你補了全科，{每天晚上十點才下課，|週末也被考卷塞滿，}{回家的公車上總是睡著。|你連喝一杯飲料都捨不得。}`],
         five: ["每科都找人補", "一次全部顧到", "你每一科都找了地方補，{每天晚上十點才回到家，|週末也被考卷塞滿，}{回家的客運上總是睡著。|書包重得像磚頭。}"],
       };
@@ -267,7 +267,7 @@ export const TEEN = [
       const noneText = {
         form: "你隨便填了一個，{社團課都坐在最後一排寫參考書，|社團時間都拿來自習，}{成績穩穩的，只是偶爾有點羨慕別人。|你把時間留給了自己喜歡的書。}",
         fair: `你拿了一疊傳單就走，${quiet}`,
-        show: `你看完表演就回家了，${quiet}`,
+        show: "你看完表演就回家了，{後來社團時間都在自習教室讀書，|一直沒有參加任何社團，}{成績穩穩的，只是偶爾有點羨慕台上的人。|你把時間留給了自己喜歡的書。}",
         pal: `你跟${pal1}說想把時間留給讀書，${pal1}{自己去了${music}，|一個人去了${team}，}{偶爾回來跟你講社團的趣事。|你有點羨慕，但不後悔。}`,
         coach: "你謝過教練，說想專心讀書，{放學就直接回家，|社團時間都在自習教室讀書，}{偶爾經過操場，看到田徑隊在跑步，你會停下來看一會兒。|成績穩穩的，只是偶爾有點羨慕別人。}",
         choir: "你謝過老師，說想專心讀書，{放學就直接回家，|社團時間都在自習教室讀書，}{合唱比賽那天，你在台下聽得好認真。|成績穩穩的，只是偶爾有點羨慕別人。}",
