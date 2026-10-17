@@ -428,7 +428,7 @@ export const CHILD = [
   },
   {
     // 過年紅包
-    id: "c_redEnvelope", domain: "wealth", channel: "good", max: 2, cooldown: 4, ages: [4, 12], when: s => !s.abroad, p: () => 0.06,
+    id: "c_redEnvelope", domain: "wealth", channel: "good", once: true, ages: [4, 12], when: s => !s.abroad, p: () => 0.06,
     choice: (s, ctx) => {
       const y = s.year, who = grownUp(s, ctx), home = liveWith(s, ctx), keeper = home === "爸媽" ? "媽媽" : home;
       const amount = y < 1950 ? "幾個銅板" : y < 1970 ? "幾十塊" : y < 1980 ? "兩三百塊" : y < 1990 ? "一千多塊" : y < 2000 ? "三四千塊" : y < 2010 ? "五六千塊" : "快一萬塊";
