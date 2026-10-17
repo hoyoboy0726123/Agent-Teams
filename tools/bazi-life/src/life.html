@@ -189,7 +189,10 @@ th:first-child, td:first-child { text-align: left; }
 .paipan .stack small { color: var(--muted); }
 .paipan .star-吉 { color: var(--indigo); } .paipan .star-凶 { color: var(--seal); }
 .report details.sec { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 0 16px; }
-.report details.sec > summary { cursor: pointer; padding: 12px 0; font-weight: 600; font-size: 15px; list-style-position: outside; }
+.report details.sec > summary { cursor: pointer; padding: 12px 0 12px 18px; font-weight: 600; font-size: 15px; display: block; list-style: none; position: relative; }
+.report details.sec > summary::-webkit-details-marker { display: none; }
+.report details.sec > summary::before { content: ""; position: absolute; left: 2px; top: 50%; margin-top: -5px; border-style: solid; border-width: 5px 0 5px 7px; border-color: transparent transparent transparent var(--muted); transition: transform .15s ease; }
+.report details.sec[open] > summary::before { transform: rotate(90deg); }
 .report details.sec[open] > summary { border-bottom: 1px solid var(--wash); margin-bottom: 8px; }
 .report details.sec p { margin: 0 0 10px; line-height: 1.75; }
 .report details.sec ul { margin: 0 0 12px; padding-left: 1.2em; display: grid; gap: 6px; line-height: 1.7; }
