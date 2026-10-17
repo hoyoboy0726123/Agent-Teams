@@ -8,6 +8,7 @@ import { overallReading } from "./core/reading-overall.js";
 import { reportHTML } from "./report.js";
 import { babyCharts, nameCandidates, runSlice, statsOf, gestation, slotRange, checkSlot, slotEntry, rankSlots, MAX_NAMES, MAX_SLOTS, RUNS, EARLIEST_WEEKS } from "./sim/compare.js";
 import { showNursery } from "./pixel-app.js";
+import { draftStore, readIds, writeIds, later } from "./draft.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -25,14 +26,16 @@ let job = 0;        // bumps to cancel a running comparison
 export function initBaby(h) {
   hooks = h;
   $("#b-place").innerHTML = PLACE_GROUPS.map(g => `<optgroup label="${esc(g.group)}">${g.places.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("");
-  $("#b-place").value = "臺北市";
-  const today = new Date(), soon = new Date(today.getTime() + 120 * 86400000);
-  $("#b-date").value = `${soon.getFullYear()}-${pad(soon.getMonth() + 1)}-${pad(soon.getDate())}`;
+  defaults();
   $("#b-nohour").addEventListener("change", () => { $("#b-time").disabled = $("#b-nohour").checked; });
-  $("#b-time").disabled = $("#b-nohour").checked;
-  $("#add-slot").addEventListener("click", () => addSlot());
-  $("#slot-list").addEventListener("click", e => { const b = e.target.closest(".remove"); if (b) b.closest(".slot").remove(); });
-  addSlot(); addSlot();
+  $("#add-slot").addEventListener("click", () => { addSlot(); saveSoon(); });
+  $("#slot-list").addEventListener("click", e => { const b = e.target.closest(".remove"); if (b) { b.closest(".slot").remove(); saveSoon(); } });
+  restore();
+  for (const type of ["input", "change"]) $("#form-baby").addEventListener(type, saveSoon);
+  for (const id of ["#b-parents", "#b-slots"]) $(id).addEventListener("toggle", saveSoon);
+  $("#baby-clear").addEventListener("click", clearForm);
+  addEventListener("pagehide", () => saveSoon.flush());
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveSoon.flush(); });
   $("#form-baby").addEventListener("submit", e => { e.preventDefault(); compare(); });
   $("#baby").addEventListener("click", e => {
     const r = e.target.closest("[data-report]");
@@ -44,13 +47,58 @@ export function initBaby(h) {
   });
 }
 
-function addSlot() {
+function addSlot(value = "") {
   const list = $("#slot-list");
   if (list.children.length >= MAX_SLOTS) return;
   const row = document.createElement("div");
   row.className = "slot";
   row.innerHTML = `<input type="datetime-local" class="s-when" aria-label="可能的出生時段"><button type="button" class="remove" aria-label="移除這個時段">移除</button>`;
+  row.querySelector(".s-when").value = value;
   list.appendChild(row);
+}
+
+// The form as it starts: born in Taipei about four months from now, two empty birth slots.
+function defaults() {
+  $("#b-place").value = "臺北市";
+  const today = new Date(), soon = new Date(today.getTime() + 120 * 86400000);
+  $("#b-date").value = `${soon.getFullYear()}-${pad(soon.getMonth() + 1)}-${pad(soon.getDate())}`;
+  $("#b-time").disabled = $("#b-nohour").checked;
+  $("#slot-list").innerHTML = "";
+  addSlot(); addSlot();
+}
+
+// 填到一半的表單 stays through a reload (draft.js: this tab only, gone when it is closed).
+const DRAFT = draftStore("bazi-life.baby");
+const FIELDS = ["b-surname", "b-sex-m", "b-sex-f", "b-sex-u", "b-date", "b-time", "b-nohour", "b-place", "b-parents", "b-slots", "b-due"];
+function save() {
+  const parents = {};
+  for (const el of document.querySelectorAll("#b-parents .member[data-brole]")) parents[el.dataset.brole] = { name: el.querySelector(".m-name").value, date: el.querySelector(".m-date").value, time: el.querySelector(".m-time").value };
+  DRAFT.save({ v: 1, fields: readIds(FIELDS), givens: [...document.querySelectorAll(".b-given")].map(i => i.value), parents, slots: [...document.querySelectorAll("#slot-list .s-when")].map(i => i.value) });
+}
+const saveSoon = later(save);
+function restore() {
+  const d = DRAFT.load();
+  if (!d || d.v !== 1) return;
+  writeIds(d.fields);
+  [...document.querySelectorAll(".b-given")].forEach((input, i) => { input.value = (d.givens && d.givens[i]) || ""; });
+  for (const el of document.querySelectorAll("#b-parents .member[data-brole]")) {
+    const m = d.parents && d.parents[el.dataset.brole];
+    if (m) { el.querySelector(".m-name").value = m.name || ""; el.querySelector(".m-date").value = m.date || ""; el.querySelector(".m-time").value = m.time || ""; }
+  }
+  if (Array.isArray(d.slots)) {
+    $("#slot-list").innerHTML = "";
+    for (const v of d.slots.slice(0, MAX_SLOTS)) addSlot(typeof v === "string" ? v : "");
+    while ($("#slot-list").children.length < 2) addSlot();
+  }
+  $("#b-time").disabled = $("#b-nohour").checked;
+}
+function clearForm() {
+  if (!confirm("要清空這張表單嗎？填過的資料會刪掉。")) return;
+  $("#form-baby").reset();
+  for (const id of ["#b-parents", "#b-slots"]) $(id).open = false;
+  defaults();
+  DRAFT.clear();
+  hooks.showError("");
 }
 
 const clean = v => String(v || "").replace(/\s+/g, "");

@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { makeApp, MODEL, readRequest, textOf } from "../worker/app.js";
+import { interpretPrompt } from "../src/sim/interpret.js";
 
 const SITE = "https://bazi-life.example.workers.dev";
 const worker = makeApp({ "/": "<p>命盤人生</p>", "/life.html": "<p>命盤人生</p>", "/index.html": "<p>排盤</p>" });
@@ -111,7 +112,16 @@ test("the request is trimmed to what the prompt needs", () => {
   });
   assert.equal(r.text, "去旅行 忽略上面的規則");
   assert.ok(r.options.length <= 8 && r.options.every(o => /^[\w.-]+$/.test(o.id) && o.label));
+  const withHint = readRequest({ ...CHOICE, text: "留下來", options: [{ id: "abroad.go", label: "去", hint: "看看外面的世界，這段提示很長很長很長很長很長很長很長" }] });
+  assert.ok(withHint.options[0].hint.startsWith("看看外面的世界") && withHint.options[0].hint.length <= 24);
   assert.equal(readRequest(null), null);
   assert.equal(readRequest({ text: "" }), null);
   assert.equal(textOf(null), "");
+});
+
+test("the prompt shows each button's hint and asks for a button only when the player means the same thing", () => {
+  const prompt = interpretPrompt({ situation: "有一個去日本工作的機會。要去嗎？", options: [{ id: "abroad.negotiate", label: "談好條件再去", hint: "加薪或縮短期限" }], text: "看能不能加薪留我" });
+  assert.match(prompt, /abroad\.negotiate：談好條件再去（加薪或縮短期限）/);
+  assert.match(prompt, /只有玩家要的結果和某個按鈕一樣時，才選那個按鈕/);
+  assert.doesNotMatch(prompt, /選按鈕的 id/);
 });

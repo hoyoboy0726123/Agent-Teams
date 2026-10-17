@@ -210,13 +210,22 @@ const ai = await servedPage(route => route.fulfill(ok));
 await ai.p.fill("#free-text", "帶家人去花蓮走走，散散心");
 await ai.p.click("#free-go");
 await ai.p.waitForSelector("#free-out [data-free-action]");
-check("the Worker's reading is shown for confirmation with the rule it follows", /你決定帶家人去花蓮走走/.test(await ai.p.textContent("#free-out")) && /照「去旅行」的規則計算/.test(await ai.p.textContent("#free-out")));
+check("the Worker's reading is shown for confirmation with the rule it follows, and a way to keep your own words", /你決定帶家人去花蓮走走/.test(await ai.p.textContent("#free-out")) && /比照「去旅行」/.test(await ai.p.textContent("#free-out")) && await ai.p.isVisible('#free-out [data-free-action="own"]'));
 const req = ai.sent[0], body = req ? JSON.parse(req.postData() || "{}") : {};
 check("the page posts the choice and the sentence, without a name or birth date", req && req.method() === "POST" && body.text === "帶家人去花蓮走走，散散心" && body.situation && Array.isArray(body.options) && !/1988|2 月 15|陳/.test(req.postData() || ""), (req && req.postData() || "").slice(0, 80));
 await ai.p.click("#free-out [data-free-action]");
 await ai.p.waitForTimeout(400);
 check("the confirmed reading continues the story", /你自己的決定：你決定帶家人去花蓮走走/.test(await ai.p.textContent("#feed")));
 await ai.p.close();
+// 照我寫的就好: the words go into the story as written, without a button's outcome.
+const kept = await servedPage(route => route.fulfill(ok));
+await kept.p.fill("#free-text", "帶家人去花蓮走走，散散心");
+await kept.p.click("#free-go");
+await kept.p.waitForSelector('#free-out [data-free-action="own"]');
+await kept.p.click('#free-out [data-free-action="own"]');
+await kept.p.waitForTimeout(400);
+check("照我寫的就好 keeps the player's words and goes on without a button's outcome", /你自己的決定：你決定帶家人去花蓮走走/.test(await kept.p.textContent("#feed")) && /你照自己的意思去做了/.test(await kept.p.textContent("#feed")));
+await kept.p.close();
 // Names typed on the page never reach the Worker: they go out as 伴侶, 你 and the like.
 const named = await servedPage(route => route.fulfill(ok), async p => {
   await p.fill("#f-name", "陳志明");
@@ -236,7 +245,7 @@ for (const [name, answer] of [["busy or over quota (503)", route => route.fulfil
   await fb.p.click("#free-go");
   await fb.p.waitForSelector("#free-out [data-free-action]", { timeout: 10000 });
   const out = await fb.p.textContent("#free-out");
-  check(`a Worker that is ${name} falls back to the local options without a message`, fb.sent.length === 1 && /比較接近哪一個/.test(out) && !/錯誤|失敗|AI|Claude/.test(out), out.slice(0, 60));
+  check(`a Worker that is ${name} falls back to the local options without a message`, fb.sent.length === 1 && /比較接近哪一個/.test(out) && /照我寫的就好/.test(out) && !/錯誤|失敗|AI|Claude/.test(out), out.slice(0, 60));
   await fb.p.close();
 }
 server.close();
@@ -300,6 +309,30 @@ await baby.click('[data-start="1"]');
 await baby.waitForSelector("#play:not([hidden])");
 check("a name starts the baby's life", /林沐希在臺北市出生/.test(await baby.textContent("#born")) && await baby.isHidden("#baby"));
 await baby.close();
+
+// 填到一半重新整理: the forms and the tab come back; 清空重填 clears them; nothing personal stays after the tab.
+const draft = await fresh({ viewport: { width: 400, height: 900 } });
+await draft.goto(url);
+await draft.fill("#f-name", "陳志明");
+await draft.click("#family > summary");
+await draft.fill(".member[data-role=partner] .m-name", "王小美");
+await draft.fill("#f-wed", "2016");
+await draft.click("#add-sibling");
+await draft.fill("#sibling-list .member:last-child .m-name", "陳小華");
+await draft.click("#tab-baby");
+await draft.fill("#b-surname", "林");
+await (await draft.$$(".b-given"))[1].fill("沐希");
+await draft.reload();
+check("after a reload the open tab and the 準爸媽 form come back", await draft.getAttribute("#tab-baby", "aria-selected") === "true" && await draft.inputValue("#b-surname") === "林" && await (await draft.$$(".b-given"))[1].inputValue() === "沐希");
+await draft.click("#tab-me");
+check("after a reload the birth form, the partner and the siblings come back", await draft.inputValue("#f-name") === "陳志明" && await draft.inputValue(".member[data-role=partner] .m-name") === "王小美" && await draft.inputValue("#f-wed") === "2016" && await draft.inputValue("#sibling-list .member:last-child .m-name") === "陳小華" && await draft.evaluate(() => document.querySelector("#family").open));
+const stores = await draft.evaluate(() => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) }));
+check("the half-filled forms are kept in this tab only, with nothing personal in long-term storage", stores.local.every(k => ["bazi-life.welcomed", "bazi-life.majorOnly"].includes(k)) && stores.session.includes("bazi-life.form"), JSON.stringify(stores));
+draft.once("dialog", d => d.accept());
+await draft.click("#me-clear");
+await draft.reload();
+check("清空重填 empties the form for good", await draft.inputValue("#f-name") === "" && (await draft.$$("#sibling-list .member")).length === 0);
+await draft.close();
 
 const phone = await fresh({ viewport: { width: 400, height: 900 }, colorScheme: "dark", deviceScaleFactor: 2 });
 await phone.goto(url);

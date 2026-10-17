@@ -89,6 +89,12 @@ await phone.waitForSelector("#result:not([hidden])");
 const width = await phone.evaluate(() => document.documentElement.scrollWidth);
 check("no sideways scrolling at phone width", width <= 400, `scrollWidth ${width}`);
 if (process.env.SHOTS) await phone.screenshot({ path: `${process.env.SHOTS}/phone-dark.png`, fullPage: true });
+// A reload keeps what was typed (this tab only).
+await page.fill("#f-date", "1995-11-11");
+await page.fill("#f-time", "08:45");
+await page.reload();
+await page.waitForSelector("#result:not([hidden])");
+check("a reload keeps the date and time that were typed", await page.inputValue("#f-date") === "1995-11-11" && await page.inputValue("#f-time") === "08:45" && (await pillarNames()).split(" ").length === 4);
 check("no page errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 await browser.close();
 

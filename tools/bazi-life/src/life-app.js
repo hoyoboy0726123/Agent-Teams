@@ -27,6 +27,7 @@ import { ACTIONS } from "./sim/actions.js";
 import { trait } from "./sim/words.js";
 import { initBaby } from "./baby-app.js";
 import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
+import { draftStore, readIds, writeIds, later } from "./draft.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -52,10 +53,19 @@ function setup() {
   for (const tab of TABS) $(`#tab-${tab}`).addEventListener("click", () => selectTab(tab));
   for (const b of document.querySelectorAll("[data-goto]")) b.addEventListener("click", () => { selectTab(b.dataset.goto); $("#setup").scrollIntoView({ behavior: "smooth", block: "start" }); });
   // The first visit opens on 歡迎; once another tab is opened, later visits start on 我的人生 (this browser only).
+  // A reload goes back to the tab that was open.
   let welcomed = false;
   try { welcomed = localStorage.getItem("bazi-life.welcomed") === "1"; } catch {}
-  selectTab(welcomed ? "me" : "welcome");
+  const lastTab = TAB_DRAFT.load();
+  selectTab(TABS.includes(lastTab) ? lastTab : welcomed ? "me" : "welcome");
   initBaby({ begin, showError });
+  restoreForm();
+  for (const type of ["input", "change"]) $("#form-me").addEventListener(type, saveFormSoon);
+  $("#family").addEventListener("toggle", saveFormSoon);
+  $("#me-clear").addEventListener("click", clearForm);
+  // Save what was typed in the last moment too, before a reload or when the phone switches apps.
+  addEventListener("pagehide", () => saveFormSoon.flush());
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveFormSoon.flush(); });
   initPixels();
   // The sticky status bar (with the pixel scene) is as tall as the screen makes it; scrolling to a choice leaves room for it.
   const status = $(".status");
@@ -88,8 +98,8 @@ function setup() {
     if (e.target.closest("[data-free-cancel]")) { $("#free-out").innerHTML = ""; $("#free-text").focus(); }
   });
   $("#choice").addEventListener("submit", e => { e.preventDefault(); const t = $("#free-text"); if (t && t.value.trim()) interpretFree(t.value.trim()); });
-  $("#add-sibling").addEventListener("click", addSibling);
-  $("#sibling-list").addEventListener("click", e => { const b = e.target.closest(".remove"); if (b) b.closest(".member").remove(); });
+  $("#add-sibling").addEventListener("click", () => { addSibling(); saveFormSoon(); });
+  $("#sibling-list").addEventListener("click", e => { const b = e.target.closest(".remove"); if (b) { b.closest(".member").remove(); saveFormSoon(); } });
   $("#f-only").addEventListener("change", () => {
     const only = $("#f-only").checked;
     $("#sibling-list").hidden = only; $("#add-sibling").hidden = only;
@@ -107,14 +117,67 @@ function selectTab(tab) {
     $(PANEL[t]).hidden = t !== tab;
   }
   if (tab !== "welcome") try { localStorage.setItem("bazi-life.welcomed", "1"); } catch {}
+  TAB_DRAFT.save(tab);
+}
+
+// 填到一半的表單 stays through a reload (draft.js: this tab only, gone when it is closed).
+const FORM_DRAFT = draftStore("bazi-life.form"), TAB_DRAFT = draftStore("bazi-life.tab");
+const ME_FIELDS = ["f-name", "f-date", "f-time", "f-nohour", "sex-m", "sex-f", "f-place", "family", "f-met", "f-wed", "f-only"];
+const memberValues = el => ({ name: el.querySelector(".m-name").value, date: el.querySelector(".m-date").value, time: el.querySelector(".m-time").value });
+function setMember(el, m) { el.querySelector(".m-name").value = m.name || ""; el.querySelector(".m-date").value = m.date || ""; el.querySelector(".m-time").value = m.time || ""; }
+function saveForm() {
+  const members = {};
+  for (const el of document.querySelectorAll("#form-me .member[data-role]")) {
+    members[el.dataset.role] = memberValues(el);
+    if (el.dataset.role === "partner") { const sex = el.querySelector(".m-sex"); Object.assign(members.partner, { sex: sex.value, picked: !!sex.dataset.picked }); }
+  }
+  const siblings = [...document.querySelectorAll("#sibling-list .member")].map(el => ({ rel: el.querySelector(".m-rel").value, ...memberValues(el) }));
+  FORM_DRAFT.save({ v: 1, fields: readIds(ME_FIELDS), members, siblings });
+}
+const saveFormSoon = later(saveForm);
+function restoreForm() {
+  const d = FORM_DRAFT.load();
+  if (!d || d.v !== 1) return;
+  writeIds(d.fields);
+  for (const el of document.querySelectorAll("#form-me .member[data-role]")) {
+    const m = d.members && d.members[el.dataset.role];
+    if (!m) continue;
+    setMember(el, m);
+    if (el.dataset.role === "partner") { const sex = el.querySelector(".m-sex"); if (m.sex) sex.value = m.sex; if (m.picked) sex.dataset.picked = "1"; }
+  }
+  for (const sib of d.siblings || []) {
+    const row = addSibling(false);
+    if (!row) break;
+    if (SIBLINGS.some(([v]) => v === sib.rel)) row.querySelector(".m-rel").value = sib.rel;
+    setMember(row, sib);
+  }
+  applyFormState();
+}
+// The parts of the form that follow other fields.
+function applyFormState() {
+  $("#f-time").disabled = $("#f-nohour").checked;
+  const only = $("#f-only").checked;
+  $("#sibling-list").hidden = only; $("#add-sibling").hidden = only;
+}
+function clearForm() {
+  if (!confirm("要清空這張表單嗎？填過的資料會刪掉。")) return;
+  $("#form-me").reset();
+  $("#f-place").value = "臺北市";
+  $("#sibling-list").innerHTML = "";
+  const sex = $(".member[data-role=partner] .m-sex");
+  delete sex.dataset.picked; sex.value = $("#sex-f").checked ? "male" : "female";
+  $("#family").open = false;
+  applyFormState();
+  FORM_DRAFT.clear();
+  showError("");
 }
 
 function showError(text) { const e = $("#error"); e.textContent = text; e.hidden = !text; }
 
 const SIBLINGS = [["olderBrother", "哥哥"], ["olderSister", "姊姊"], ["youngerBrother", "弟弟"], ["youngerSister", "妹妹"]];
-function addSibling() {
+function addSibling(focus = true) {
   const list = $("#sibling-list");
-  if (list.children.length >= 8) return;
+  if (list.children.length >= 8) return null;
   const row = document.createElement("div");
   row.className = "member";
   row.innerHTML = `<select class="m-rel" aria-label="關係">${SIBLINGS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>
@@ -122,7 +185,8 @@ function addSibling() {
     <span class="when"><input type="date" class="m-date" min="1900-01-01" max="2100-12-31" aria-label="出生日期"><input type="time" class="m-time" aria-label="出生時間（選填）"></span>
     <button type="button" class="remove" aria-label="移除這位兄弟姊妹">移除</button>`;
   list.appendChild(row);
-  row.querySelector(".m-rel").focus();
+  if (focus) row.querySelector(".m-rel").focus();
+  return row;
 }
 
 const cleanName = v => String(v || "").replace(/\s+/g, "");
@@ -377,15 +441,15 @@ function suggestFree(text) {
     if (picks.length === 3) break;
   }
   const summary = `你決定「${text}」`;
-  if (!picks.length) return freeOut(`<p>看不太出來要怎麼做。換個說法寫寫看，或選上面的選項。</p>`);
-  freeOut(`<p>你的意思比較接近哪一個？</p><div class="suggest">${picks.map(x => `<button type="button" data-free-action="${esc(x.id)}" data-summary="${esc(summary)}">${esc(x.label)}</button>`).join("")}<button type="button" class="plain" data-free-cancel>都不是</button></div>`);
+  if (!picks.length) return freeOut(`<p>看不太出來會怎麼發展。可以換個說法，或就照你寫的走。</p><div class="suggest"><button type="button" class="own" data-free-action="own" data-summary="${esc(summary)}">照我寫的就好</button></div>`);
+  freeOut(`<p>你的意思比較接近哪一個？都不像的話，就照你寫的走。</p><div class="suggest">${picks.map(x => `<button type="button" data-free-action="${esc(x.id)}" data-summary="${esc(summary)}">${esc(x.label)}</button>`).join("")}<button type="button" class="own" data-free-action="own" data-summary="${esc(summary)}">照我寫的就好</button></div>`);
 }
 
 function confirmFree(action, summary) {
   const p = run.life.pending;
   const own = p.options.find(o => o.id === action);
   const rule = own ? own.label : ACTIONS[action] ? ACTIONS[action].label : "";
-  freeOut(`<p><b>${esc(summary)}</b>${rule ? `<br><small>照「${esc(rule)}」的規則計算</small>` : ""}</p><div class="suggest"><button type="button" data-free-action="${esc(action)}" data-summary="${esc(summary)}">確定</button><button type="button" class="plain" data-free-cancel>改一下</button></div>`);
+  freeOut(`<p><b>${esc(summary)}</b>${rule ? `<br><small>後面的發展會比照「${esc(rule)}」。</small>` : ""}</p><div class="suggest"><button type="button" data-free-action="${esc(action)}" data-summary="${esc(summary)}">就這樣</button><button type="button" class="own" data-free-action="own" data-summary="${esc(summary)}">照我寫的就好</button><button type="button" class="plain" data-free-cancel>改一下</button></div><p class="free-note">「照我寫的就好」會把你的話原樣寫進故事，不套用任何選項的結果。</p>`);
 }
 
 function applyFree(action, summary) {

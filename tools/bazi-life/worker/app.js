@@ -27,7 +27,7 @@ export function readRequest(body) {
   const text = line(body.text, 200);
   if (!text) return null;
   const options = (Array.isArray(body.options) ? body.options : []).slice(0, 8)
-    .map(o => ({ id: line(o && o.id, 40), label: line(o && o.label, 40) }))
+    .map(o => ({ id: line(o && o.id, 40), label: line(o && o.label, 40), hint: line(o && o.hint, 24) }))
     .filter(o => ID.test(o.id) && o.label);
   return { situation: line(body.situation, 200), context: line(body.context, 120), options, text };
 }

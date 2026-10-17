@@ -1,6 +1,7 @@
 // 命盤人生・排盤引擎預覽：表單 → computeChart → 畫面。所有計算都在瀏覽器裡完成，不連網。
 import { computeChart, SOLAR_MODES, ZI_RULES, YUN_METHODS } from "./core/chart.js";
 import { PLACE_GROUPS, findPlace } from "./core/places.js";
+import { draftStore, readIds, writeIds, later } from "./draft.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -23,6 +24,12 @@ const EXAMPLES = [
 
 let occurrence = 0;
 let selectedDecade = null;
+let example = null;
+
+// The form stays through a reload (draft.js: this tab only, gone when it is closed).
+const DRAFT = draftStore("bazi-chart.form");
+const FIELDS = ["f-date", "f-time", "f-nohour", "sex-m", "sex-f", "f-place", "f-lon", "f-lat", "f-tz", "advanced", "f-solar", "f-zi", "f-yun"];
+const saveSoon = later(() => DRAFT.save({ v: 1, fields: readIds(FIELDS), example, occurrence }));
 
 function setup() {
   const examples = $("#examples");
@@ -36,13 +43,23 @@ function setup() {
 
   examples.addEventListener("click", e => { const b = e.target.closest("[data-example]"); if (b) loadExample(b.dataset.example); });
   $("#form").addEventListener("submit", e => e.preventDefault());
-  $("#form").addEventListener("input", e => { if (["f-date", "f-time", "f-place", "f-tz"].includes(e.target.id)) { occurrence = 0; markExample(null); } if (["sex-m", "sex-f", "f-nohour", "f-lon", "f-lat"].includes(e.target.id)) markExample(null); update(); });
-  $("#warnings").addEventListener("click", e => { const b = e.target.closest("[data-occ]"); if (b) { occurrence = Number(b.dataset.occ); update(); } });
+  $("#form").addEventListener("input", e => { if (["f-date", "f-time", "f-place", "f-tz"].includes(e.target.id)) { occurrence = 0; markExample(null); } if (["sex-m", "sex-f", "f-nohour", "f-lon", "f-lat"].includes(e.target.id)) markExample(null); update(); saveSoon(); });
+  $("#advanced").addEventListener("toggle", saveSoon);
+  $("#warnings").addEventListener("click", e => { const b = e.target.closest("[data-occ]"); if (b) { occurrence = Number(b.dataset.occ); update(); saveSoon(); } });
   $("#decades").addEventListener("click", e => { const b = e.target.closest("[data-decade]"); if (b) { selectedDecade = Number(b.dataset.decade); update(); } });
-  loadExample("dst");
+  addEventListener("pagehide", () => saveSoon.flush());
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveSoon.flush(); });
+  const draft = DRAFT.load();
+  if (draft && draft.v === 1) {
+    writeIds(draft.fields);
+    occurrence = Number.isInteger(draft.occurrence) ? draft.occurrence : 0;
+    markExample(EXAMPLES.some(e => e.id === draft.example) ? draft.example : null);
+    update();
+  } else loadExample("dst");
 }
 
 function markExample(id) {
+  example = id;
   for (const b of document.querySelectorAll("[data-example]")) b.setAttribute("aria-pressed", String(b.dataset.example === id));
 }
 
@@ -56,6 +73,7 @@ function loadExample(id) {
   occurrence = 0; selectedDecade = null;
   markExample(id);
   update();
+  saveSoon();
 }
 
 function readForm() {

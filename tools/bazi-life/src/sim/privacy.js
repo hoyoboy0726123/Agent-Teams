@@ -26,6 +26,6 @@ export function withoutNames(payload, swaps) {
   return {
     ...payload,
     situation: fix(payload.situation), context: fix(payload.context), text: fix(payload.text),
-    options: Array.isArray(payload.options) ? payload.options.map(o => ({ ...o, label: fix(o.label) })) : payload.options,
+    options: Array.isArray(payload.options) ? payload.options.map(o => ({ ...o, label: fix(o.label), ...(o.hint ? { hint: fix(o.hint) } : {}) })) : payload.options,
   };
 }

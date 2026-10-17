@@ -72,6 +72,9 @@ fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; min-width:
 .secondary:hover { border-color: var(--indigo); color: var(--indigo); }
 .error { color: var(--seal); font-size: 14px; }
 #setup form { display: grid; gap: 16px; }
+.form-actions { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.clear { border: 0; background: none; padding: 6px 2px; font-size: 14px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.clear:hover { color: var(--ink); }
 /* Pixel scenes (pixel.js): drawn at 128×44 and scaled up without smoothing. */
 .pixel { display: block; width: 100%; height: auto; aspect-ratio: 128 / 44; image-rendering: pixelated; border-radius: 8px; background: #1c2026; }
 figure { margin: 0; }
@@ -204,6 +207,8 @@ details.family > summary small { font-weight: 400; color: var(--muted); }
 .suggest { display: flex; flex-wrap: wrap; gap: 6px; }
 .suggest button { border: 1px solid var(--indigo); color: var(--indigo); background: var(--indigo-wash); border-radius: 999px; padding: 5px 14px; font-size: 14px; }
 .suggest button.plain { border-color: var(--rule); color: var(--muted); background: transparent; }
+.suggest button.own { border-color: var(--seal); color: var(--seal); background: var(--seal-wash); }
+.free-note { font-size: 12px; color: var(--muted); }
 
 /* the end */
 #end { display: grid; gap: 26px; }
@@ -407,7 +412,7 @@ footer a { color: var(--indigo); }
       </section>
       <section class="welcome-privacy" aria-labelledby="privacy-title">
         <h3 id="privacy-title"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>你的資料只留在你的手機裡</h3>
-        <p>生日、名字、家人和伴侶的資料，全部在你的手機（瀏覽器）裡計算，<strong>不會上傳到網站後台</strong>。這個網站沒有帳號、沒有資料庫，關掉網頁，輸入的資料就跟著消失。</p>
+        <p>生日、名字、家人和伴侶的資料，全部在你的手機（瀏覽器）裡計算，<strong>不會上傳到網站後台</strong>。這個網站沒有帳號、沒有資料庫。填到一半重新整理不會不見：資料只暫存在這個分頁裡，關掉網頁就跟著消失。</p>
         <p class="fine">唯一會送出的，是你在「寫下你自己的決定」裡打的那一句話：它會交給 AI 判讀成選項。送出前，名字會換成「伴侶」「爸爸」這樣的稱呼，判讀完也不會保存。不想送出，點選項按鈕就好。</p>
       </section>
       <div class="welcome-go">
@@ -464,10 +469,10 @@ footer a { color: var(--indigo); }
             <button type="button" class="secondary small" id="add-sibling">＋ 新增兄弟姊妹</button>
             <label class="check" for="f-only"><input type="checkbox" id="f-only"> 我是獨生子女</label>
           </div>
-          <p class="privacy">家人的資料只在這個網頁裡計算，不會上傳，也不會保存。輸入家人的生日之前，最好先讓他們知道。</p>
+          <p class="privacy">家人的資料只在這個網頁裡計算，不會上傳；填到一半只暫存在這個分頁，關掉就清掉。輸入家人的生日之前，最好先讓他們知道。</p>
         </div>
       </details>
-      <button type="submit" class="primary">開始這一生</button>
+      <div class="form-actions"><button type="submit" class="primary">開始這一生</button><button type="button" class="clear" id="me-clear">清空重填</button></div>
     </form>
     <div id="form-random" hidden>
       <div style="display:grid; gap:14px;">
@@ -532,7 +537,7 @@ footer a { color: var(--indigo); }
         </div>
       </details>
       <p class="notice">本模擬依傳統命理規則產生虛構故事，供參考與自我反思，未經科學驗證，不代表寶寶的真實命運，也不構成醫療或生育建議；分娩時間請遵醫囑。</p>
-      <button type="submit" class="primary">開始比較</button>
+      <div class="form-actions"><button type="submit" class="primary">開始比較</button><button type="button" class="clear" id="baby-clear">清空重填</button></div>
     </form>
     <p class="error" id="error" hidden></p>
   </section>

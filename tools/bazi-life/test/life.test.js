@@ -22,6 +22,22 @@ test("a life runs from birth to death and the K-line has one candle per year", (
   assert.equal(life.log[life.log.length - 1].id, "death");
 });
 
+test("a written answer kept as written (照我寫的就好) goes into the story with its words and an even outcome", () => {
+  const life = createLife({ chart, analysis, luck, seed: 3 });
+  let guard = 0;
+  while (!life.pending && !life.done && guard++ < 200) life.step();
+  assert.ok(life.pending && life.pending.free, "a choice that takes a written answer");
+  const mood = life.state.happiness;
+  const r = life.chooseAction({ action: "own", summary: "你決定先去環島一圈" });
+  assert.ok(!r.infeasible && r.entries.length >= 1);
+  const e = r.entries[0];
+  assert.equal(e.free, true);
+  assert.equal(e.choice, "你決定先去環島一圈");
+  assert.match(e.text, /你決定先去環島一圈。你照自己的意思去做了。/);
+  assert.equal(e.mood, 0);
+  assert.ok(Math.abs(life.state.happiness - mood) < 15, "no big swing from the answer itself");
+});
+
 test("the same seed replays the same life", () => {
   const a = runLife({ chart, analysis, luck, seed: 99 }), b = runLife({ chart, analysis, luck, seed: 99 });
   assert.deepEqual(a.log.map(e => e.text), b.log.map(e => e.text));

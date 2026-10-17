@@ -18,6 +18,8 @@ import { chatTool, tripPlace, jobElement } from "./world.js";
 import * as R from "./rates.js";
 
 export const MAX_AGE = 110;
+// The action of a written answer the player keeps as written, without a button's or an action's rules.
+export const OWN = "own";
 
 // Parents and siblings come from the optional family input when given, and are drawn at random otherwise.
 function initialState({ sex, birthYear, county, rng, family, name, analysis }) {
@@ -252,7 +254,7 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
         id: ev.id, prompt: c.prompt, why: explain(ev, l, lnm), lean,
         options: options.map((o, k) => ({ id: o.id || null, label: o.label, hint: o.hint || "", act: o.act || null, style: o.style || null, lean: k === lean })),
         // What the free-text interpreter needs: the question, the protagonist in a few words, and the buttons.
-        free: c.free === false ? null : { situation: c.prompt, context: c.context || situationContext(s), options: options.filter(o => o.id).map(o => ({ id: o.id, label: o.label })) },
+        free: c.free === false ? null : { situation: c.prompt, context: c.context || situationContext(s), options: options.filter(o => o.id).map(o => ({ id: o.id, label: o.label, hint: o.hint || "" })) },
         ev, c, list: options, l, lnm,
       };
       return;
@@ -362,7 +364,8 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     const own = list.find(o => o.id && o.id === action);
     let out;
     if (own) out = applyOption(own, list);
-    else if (ACTIONS[action]) out = act(action, s, ctx, { situation: ev.id, domain: ev.domain, about: ev.about, summary, topic: topicOf(c) });
+    // "own": the player kept their own words (照我寫的就好): the story says what they did, and nothing else changes.
+    else if (ACTIONS[action] || action === OWN) out = act(action, s, ctx, { situation: ev.id, domain: ev.domain, about: ev.about, summary, topic: topicOf(c) });
     else return { infeasible: "看不出要怎麼做，換個說法試試看。", entries: [] };
     if (out && out.infeasible) return { infeasible: out.infeasible, entries: [] };
     // A storyline choice says how a written answer moves it on (work.js: the startup's second year, the exam).
@@ -370,7 +373,7 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     pending = null;
     s.written += 1;
     const from = log.length;
-    const label = summary || (own ? own.label : ACTIONS[action].label);
+    const label = summary || (own ? own.label : ACTIONS[action] ? ACTIONS[action].label : "照自己的意思");
     record(ev, out, l, lnm, { choice: label, asked: true, free: true });
     finishYear();
     return { entries: log.slice(from) };

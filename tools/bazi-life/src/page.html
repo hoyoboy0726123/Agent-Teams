@@ -174,7 +174,7 @@ footer p { max-width: 70ch; }
       <label class="field"><span>緯度（北緯為正）</span><input type="number" id="f-lat" step="0.01" min="-90" max="90" value="25.04"></label>
       <label class="field"><span>時區</span><select id="f-tz"></select></label>
     </div>
-    <details class="advanced">
+    <details class="advanced" id="advanced">
       <summary>進階設定：時間校正、子時、起運算法</summary>
       <div class="fields">
         <label class="field"><span>日柱和時柱用的時間</span><select id="f-solar"></select></label>
@@ -215,7 +215,7 @@ footer p { max-width: 70ch; }
 
   <footer>
     <p>年柱、月柱和起運，用出生的精確時刻比對節氣（壽星天文曆演算法，tyme4ts）；日柱和時柱用出生地的真太陽時。歷史上的時區變動，例如臺灣 1937–1945 年的 UTC+9 和歷年的日光節約時間，依 IANA 時區資料自動換算。</p>
-    <p>年齡是虛歲，流年以立春換年。所有計算都在你的瀏覽器裡完成，輸入的資料不會上傳。</p>
+    <p>年齡是虛歲，流年以立春換年。所有計算都在你的瀏覽器裡完成，輸入的資料不會上傳；重新整理時只暫存在這個分頁，關掉就清掉。</p>
   </footer>
 </div>
 
