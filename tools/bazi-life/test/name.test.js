@@ -82,3 +82,21 @@ test("neither the name nor the family charts ever tilt a death or a serious illn
 test("every random name has Kangxi strokes for each character", () => {
   for (const s of ALL_NAME_PARTS.surnames) for (const g of ALL_NAME_PARTS.given) assert.ok(!analyseName(s + g).error, s + g);
 });
+
+test("a nickname stays in the story but is not read by 姓名學 (小美 is not surname 小)", async () => {
+  const { prepare } = await import("../src/sim/setup.js");
+  const { computeChart } = await import("../src/core/chart.js");
+  const { findPlace } = await import("../src/core/places.js");
+  const chart = computeChart({ date: { y: 1990, m: 5, d: 20 }, time: null, place: findPlace("臺北市"), sex: "female" });
+  for (const nick of ["小美", "阿明", "老王", "美美", "明"]) {
+    const p = prepare(chart, { name: nick });
+    assert.equal(p.name, null, nick);
+    assert.match(p.nameError, /暱稱/, nick);
+  }
+  for (const real of ["王小美", "方明", "歐陽娜娜"]) {
+    const p = prepare(chart, { name: real });
+    assert.equal(p.nameError, null, real);
+    assert.equal(p.name.full, real);
+  }
+  assert.equal(prepare(chart, { name: "王小美" }).name.surname, "王");
+});
