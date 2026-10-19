@@ -24,13 +24,14 @@ import { safetyCheck, matchIntent } from "./sim/intent.js";
 import { readInterpretation } from "./sim/interpret.js";
 import { nameSwaps, withoutNames } from "./sim/privacy.js";
 import { ACTIONS } from "./sim/actions.js";
-import { readingRequest } from "./ai-reading.js";
+import { readingRequest, partsFor, PARTS, toneWord } from "./ai-reading.js";
+import { SHICHEN } from "./core/shichen.js";
 import { trait } from "./sim/words.js";
 import { initBaby } from "./baby-app.js";
 import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
 import { initTimeField, readTimeField, syncTimeField, timeFieldIds } from "./time-field.js";
-import { initMemberHours, syncMemberHours, memberHourHTML, memberHourValue, setMemberHour, readMemberHour } from "./member-time.js";
+import { initMemberHours, syncMemberHours, syncMemberHour, memberHourHTML, memberHourValue, setMemberHour, readMemberHour } from "./member-time.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -116,6 +117,13 @@ function setup() {
   });
   $("#ai-short").addEventListener("click", () => askAI("short"));
   $("#ai-full").addEventListener("click", () => askAI("full"));
+  $("#ai-match-go").addEventListener("click", () => askAI("match"));
+  $("#ai-p-when").innerHTML = memberHourHTML("對方");
+  $("#ai-partner").addEventListener("change", e => { if (e.target.matches(".m-hour")) syncMemberHour($("#ai-partner")); });
+  $("#ai-body").addEventListener("click", e => {
+    const b = e.target.closest("[data-ai-retry]");
+    if (b && aiShown && run) askParts(aiShown, [b.dataset.aiRetry], run);
+  });
   $("#again-same").addEventListener("click", () => begin(run.input, run.born, run.extra));
   $("#again-new").addEventListener("click", () => { stop(); $("#end").hidden = true; $("#play").hidden = true; $("#setup").hidden = false; $("#setup").scrollIntoView({ behavior: "smooth", block: "start" }); });
   window.addEventListener("resize", () => { if (run && run.summary && !$("#end").hidden) drawKline(); });
@@ -715,65 +723,168 @@ function drawReport() {
   $("#report").hidden = false;
 }
 
-// ---------- AI 命理師解讀 ----------
-// Only the birth and this life's milestones are sent (ai-reading.js readingRequest); the Worker recomputes the chart,
-// has Workers AI write the reading and checks it. A reading is kept for this life only.
-const AI_STEPS = ["翻開你的命盤", "看大運和流年", "回顧這一生的大事", "寫下給你的話"];
+// ---------- AI 命理師解讀與 AI 合婚 ----------
+// Only births are sent (ai-reading.js readingRequest): the chart is read as it is, not this game's life. A reading comes
+// in parts, all asked at once and shown as each arrives; a part that fails can be asked again on its own. Readings are
+// kept for this life (合婚 for each partner entered).
 const AI_ERRORS = {
-  429: "AI 命理師現在有點忙，等一分鐘再試試看。",
-  502: "這次寫出來的內容沒有通過自動檢查（例如年份或干支寫錯了），請再按一次。",
+  429: "AI 命理師現在有點忙，等一分鐘再按「重寫這一段」。",
+  502: "這一段寫出來沒有通過自動檢查（例如年份或干支寫錯了）。",
   503: "AI 命理師今天的額度用完了，明天再來找它。",
 };
+const AI_WAIT = {
+  short: "命格一句話與總評", a: "命格、命盤總論、性格與天賦、事業與財運", b: "感情與婚姻、六親與人際、健康與作息、開運建議",
+  decades: "每一步大運", m1: "合婚總評與兩個人的個性", m2: "相處的優點、容易摩擦的地方和建議", myears: "接下來十年兩個人的感情",
+};
+const AI_LAST = ["開運建議", "給你的三句話"];
+const YEAR_PARTS = PARTS.full.filter(p => p.startsWith("years"));
+let aiShown = null;   // the reading on screen
 const setAIStatus = (text, bad = false) => { const el = $("#ai-status"); el.textContent = text; el.classList.toggle("bad", bad); };
+const pad2 = n => String(n).padStart(2, "0");
 
 function drawAI() {
+  aiShown = null;
   $("#ai").hidden = false;
   $("#ai-body").innerHTML = "";
   const off = !READING_URL || !/^https?:$/.test(location.protocol);
-  $("#ai-go").hidden = off;
-  $("#ai-consent").hidden = off;
-  for (const id of ["#ai-short", "#ai-full"]) $(id).disabled = false;
-  setAIStatus(off ? "AI 命理師解讀只在命盤人生的網站上提供，這個預覽版沒有連上。" : "");
+  for (const id of ["#ai-go", "#ai-consent", "#ai-match"]) $(id).hidden = off;
+  setAIStatus(off ? "AI 命理師解讀和 AI 合婚只在命盤人生的網站上提供，這個預覽版沒有連上。" : "");
+  prefillPartner();
+}
+
+// The partner of the family form, when one was entered with a birthday.
+function prefillPartner() {
+  const p = run.extra.family && run.extra.family.partner, row = $("#ai-partner");
+  $("#ai-p-sex").value = p && (p.sex === "male" || p.sex === "female") ? p.sex : run.input.sex === "male" ? "female" : "male";
+  if (p && p.date) {
+    $("#ai-p-date").value = `${p.date.y}-${pad2(p.date.m)}-${pad2(p.date.d)}`;
+    const t = p.time, sc = t && t.branch ? SHICHEN.find(x => x.branch === t.branch && x.h === t.h && x.mi === t.mi) : null;
+    setMemberHour(row, { hour: !t ? "" : sc ? sc.key : "clock", time: t && !sc ? `${pad2(t.h)}:${pad2(t.mi)}` : "" });
+  } else {
+    $("#ai-p-date").value = "";
+    setMemberHour(row, { hour: "", time: "" });
+  }
+  $("#ai-match").open = !!(p && p.date);
+}
+function readPartner() {
+  const [y, m, d] = ($("#ai-p-date").value || "").split("-").map(Number);
+  if (!y) return { error: "請先填另一半的出生日期。" };
+  if (y < 1900 || y > 2100) return { error: "出生年份請在 1900 到 2100 年之間。" };
+  return { date: { y, m, d }, time: readMemberHour($("#ai-partner")), sex: $("#ai-p-sex").value };
 }
 
 async function askAI(kind) {
   const r = run;
   if (!r || !r.life.done) return;
-  r.ai ||= {};
-  if (r.ai[kind]) return showAI(r.ai[kind], kind);
-  const buttons = ["#ai-short", "#ai-full"].map(id => $(id));
-  for (const b of buttons) b.disabled = true;
-  const t0 = Date.now();
-  const tick = () => {
-    if (run !== r) return;
-    const s = Math.floor((Date.now() - t0) / 1000);
-    setAIStatus(`AI 命理師正在${AI_STEPS[Math.min(AI_STEPS.length - 1, Math.floor(s / 3))]}…（${s} 秒）`);
-  };
-  tick();
-  const timer = setInterval(tick, 1000), ctrl = new AbortController(), timeout = setTimeout(() => ctrl.abort(), 90000);
-  let message = "";
-  try {
-    const body = readingRequest({ input: r.input, state: r.life.state, log: r.life.log, kline: r.life.kline, summary: r.summary }, kind);
-    const res = await fetch(READING_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
-    const data = await res.json().catch(() => null);
-    if (res.ok && data && Array.isArray(data.sections) && data.sections.length) r.ai[kind] = data;
-    else message = AI_ERRORS[res.status] || "現在連不上 AI 命理師，請稍後再試。";
-  } catch (e) {
-    message = e && e.name === "AbortError" ? "AI 命理師這次想太久了，請再按一次。" : "現在連不上 AI 命理師，請檢查網路後再試。";
-  } finally {
-    clearInterval(timer);
-    clearTimeout(timeout);
+  let partner = null;
+  if (kind === "match") {
+    partner = readPartner();
+    if (partner.error) return setAIStatus(partner.error, true);
   }
-  if (run !== r) return;   // another life has started meanwhile
-  for (const b of buttons) b.disabled = false;
-  if (r.ai[kind]) showAI(r.ai[kind], kind);
-  else setAIStatus(message, true);
+  const key = kind === "match" ? `match:${JSON.stringify(partner)}` : kind;
+  r.ai ||= {};
+  const job = (r.ai[key] ||= { kind, partner, all: partsFor(kind, r.input.date.y, new Date().getUTCFullYear()), parts: {}, errors: {}, busy: new Set() });
+  aiShown = job;
+  const todo = job.all.filter(p => !job.parts[p] && !job.busy.has(p));
+  renderAI(job);
+  aiStatusOf(job, null);
+  if (todo.length) await askParts(job, todo, r);
 }
 
-function showAI(data, kind) {
-  const secs = data.sections.map(s => `<section class="ai-sec${s.title === "命格一句話" ? " motto" : ""}"><h4>${esc(s.title)}</h4>${String(s.body).split(/\n+/).map(p => `<p>${esc(p)}</p>`).join("")}</section>`).join("");
-  $("#ai-body").innerHTML = `${secs}<p class="fine">AI 依本站排盤引擎算好的命盤資料寫成，送出前已自動檢查干支、喜忌、格局和年份。內容是傳統命理的說法，供娛樂與自我觀察參考，不是預言。</p>`;
-  setAIStatus(kind === "short" ? "這是重點版。想看性格、事業、感情、健康和未來十年的完整解讀，請按「完整解讀」。" : "");
+async function askParts(job, parts, r) {
+  const t0 = Date.now();
+  const tick = () => { if (run === r && aiShown === job) aiStatusOf(job, Math.floor((Date.now() - t0) / 1000)); };
+  for (const p of parts) { job.busy.add(p); delete job.errors[p]; }
+  if (aiShown === job) renderAI(job);
+  tick();
+  const timer = setInterval(tick, 1000);
+  await Promise.all(parts.map(p => askPart(job, p, r)));
+  clearInterval(timer);
+  if (run === r && aiShown === job) aiStatusOf(job, null);
+}
+
+async function askPart(job, part, r) {
+  const ctrl = new AbortController(), timeout = setTimeout(() => ctrl.abort(), 90000);
+  try {
+    const body = readingRequest(r.input, job.kind, { part, partner: job.partner });
+    const res = await fetch(READING_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data && (Array.isArray(data.sections) || Array.isArray(data.items))) job.parts[part] = data;
+    else job.errors[part] = AI_ERRORS[res.status] || "現在連不上 AI 命理師，請稍後再試。";
+  } catch (e) {
+    job.errors[part] = e && e.name === "AbortError" ? "這一段寫太久了。" : "現在連不上 AI 命理師，請檢查網路。";
+  } finally {
+    clearTimeout(timeout);
+    job.busy.delete(part);
+  }
+  if (run === r && aiShown === job) renderAI(job);
+}
+
+// 「正在寫…已完成 3/8（12 秒）」, then what is left to do.
+function aiStatusOf(job, seconds) {
+  const all = job.all, done = all.filter(p => job.parts[p]).length, failed = all.filter(p => job.errors[p]).length;
+  if (job.busy.size) setAIStatus(`AI 命理師正在寫…已完成 ${done}/${all.length}${seconds !== null ? `（${seconds} 秒）` : ""}`);
+  else if (failed) setAIStatus(`有 ${failed} 段沒寫好，可以按「重寫這一段」。`, true);
+  else setAIStatus(job.kind === "short" ? "這是重點版。想看性格、事業、感情、每一步大運和每一歲的好事與要注意的事，請按「完整解讀」。" : "");
+}
+
+const aiSecs = list => list.map(s => `<section class="ai-sec${/一句話$/.test(s.title) ? " motto" : ""}"><h4>${esc(s.title)}</h4>${String(s.body).split(/\n+/).map(p => `<p>${esc(p)}</p>`).join("")}</section>`).join("");
+function aiWait(job, part, what = AI_WAIT[part]) {
+  if (job.errors[part]) return `<p class="ai-wait bad">「${esc(what)}」${esc(job.errors[part])}<button type="button" class="secondary" data-ai-retry="${part}">重寫這一段</button></p>`;
+  return job.busy.has(part) ? `<p class="ai-wait">AI 命理師正在寫：${esc(what)}…</p>` : "";
+}
+const toneTag = t => { const w = toneWord(t); return `<span class="ai-tone t-${w}">${w}</span>`; };
+const aiStar = x => (x.fallback ? '<span class="ai-fb">＊</span>' : "");
+const aiFields = (x, fields) => fields.map(f => `<p><b>${f}</b>${esc(x.fields[f])}</p>`).join("");
+const yearRow = y => `<li><div class="yh"><b>${y.age} 歲</b><span>${y.year} ${esc(y.pillar)}年</span>${toneTag(y.tone)}${aiStar(y)}</div>${aiFields(y, ["好事", "要注意"])}</li>`;
+const yearList = (ys, open) => `<details class="ai-years"${open ? " open" : ""}><summary>逐歲看 ${ys[0].age}–${ys[ys.length - 1].age} 歲</summary><ol>${ys.map(yearRow).join("")}</ol></details>`;
+
+// 大運 cards, each with its years; years before the first 大運 (or before the 大運 arrive) come first.
+function luckHTML(job) {
+  const P = job.parts, decades = (P.decades && P.decades.items) || [];
+  const years = YEAR_PARTS.flatMap(p => (P[p] && P[p].items) || []);
+  const names = new Set(decades.map(d => d.name)), loose = years.filter(y => !names.has(y.decade));
+  const cards = decades.map(d => {
+    const ys = years.filter(y => y.decade === d.name);
+    return `<article class="ai-decade${d.current ? " now" : ""}"><header><h5>${esc(d.name)}大運</h5><span class="span">虛歲 ${d.startAge}–${d.endAge}・${d.startYear}–${d.endYear}</span>${toneTag(d.tone)}${d.current ? '<span class="ai-tone t-now">目前</span>' : ""}${aiStar(d)}</header>${aiFields(d, ["重點", "好事", "要注意"])}${ys.length ? yearList(ys, d.current) : ""}</article>`;
+  });
+  const busyYears = YEAR_PARTS.filter(p => job.busy.has(p)).length;
+  const waits = [
+    aiWait(job, "decades"),
+    busyYears ? `<p class="ai-wait">AI 命理師正在寫每一歲的好事和要注意的事…（還有 ${busyYears} 段）</p>` : "",
+    ...YEAR_PARTS.filter(p => job.errors[p]).map(p => aiWait(job, p, `流年第 ${Number(p.slice(5)) + 1} 段`)),
+  ].join("");
+  if (!decades.length && !years.length && !waits) return "";
+  return `<section class="ai-luck"><h4>大運與流年：每一歲的好事和要注意的事</h4>${loose.length ? `<article class="ai-decade"><header><h5>${decades.length ? "起運之前" : "每一歲"}</h5></header>${yearList(loose, true)}</article>` : ""}${cards.join("")}${waits}</section>`;
+}
+
+function coupleHTML(job) {
+  const d = job.parts.myears;
+  if (!d) return aiWait(job, "myears");
+  if (!d.items.length) return "";
+  const row = y => `<li><div class="yh"><b>${y.year} 年</b><span>${esc(y.pillar)}年</span><span>你 ${y.ages[0]} 歲</span>${toneTag(y.tones[0])}<span>對方 ${y.ages[1]} 歲</span>${toneTag(y.tones[1])}${aiStar(y)}</div>${aiFields(y, ["好事", "要注意"])}</li>`;
+  return `<section class="ai-luck"><h4>接下來十年，你們的感情</h4><div class="ai-decade"><div class="ai-years"><ol>${d.items.map(row).join("")}</ol></div></div></section>`;
+}
+
+function renderAI(job) {
+  const P = job.parts, secs = part => (P[part] && P[part].sections) || [];
+  let html;
+  if (job.kind === "short") html = P.short ? aiSecs(secs("short")) : aiWait(job, "short");
+  else if (job.kind === "full") {
+    const b = secs("b");
+    html = (P.a ? aiSecs(secs("a")) : aiWait(job, "a"))
+      + (P.b ? aiSecs(b.filter(s => !AI_LAST.includes(s.title))) : aiWait(job, "b"))
+      + luckHTML(job)
+      + aiSecs(b.filter(s => AI_LAST.includes(s.title)));
+  } else {
+    const meta = (P.m1 || P.m2 || P.myears || {}).meta;
+    html = (meta ? `<p class="ai-chips"><span class="tone">${esc(meta.tone)}</span>${(meta.highlights || []).map(h => `<span>${esc(h)}</span>`).join("")}</p>` : "")
+      + (P.m1 ? aiSecs(secs("m1")) : aiWait(job, "m1"))
+      + (P.m2 ? aiSecs(secs("m2")) : aiWait(job, "m2"))
+      + coupleHTML(job);
+  }
+  const fb = Object.values(P).some(d => (d.items || []).some(x => x.fallback));
+  $("#ai-body").innerHTML = html + (Object.keys(P).length ? `<p class="fine">${fb ? "標＊的幾項 AI 沒有寫好，改用排盤引擎的原文。" : ""}AI 依本站排盤引擎算好的命盤資料寫成，送出前已自動檢查干支、喜忌、格局、年份和歲數。內容是傳統命理的說法，供娛樂與自我觀察參考，不是預言。</p>` : "");
 }
 
 function drawPersonal() {

@@ -1599,7 +1599,9 @@ function headlineOf(c, W, sigs, tone, dec) {
 }
 
 // ---------- the decade ----------
-export function decadeReading(chart, analysis, index) {
+// keyYears: false leaves out the two key years of the decade (each needs the reading of all ten years), for a reader
+// that lists every year anyway.
+export function decadeReading(chart, analysis, index, { keyYears: withKeyYears = true } = {}) {
   const c = contextOf(chart, analysis);
   const d = chart.luck.decades[index];
   if (!d) return null;
@@ -1638,7 +1640,7 @@ export function decadeReading(chart, analysis, index) {
   const s4 = rise.length || care.length
     ? `${starBit}這十年${rise.length ? `${rise.map(dn).join("、")}較有發揮` : ""}${rise.length && care.length ? "，" : ""}${care.length ? `${care.map(dn).join("、")}要多照顧` : ""}。`
     : `${starBit}這十年各方面起伏不大，穩中求進。`;
-  const keyYears = keyYearsOf(c, d);
+  const keyYears = withKeyYears ? keyYearsOf(c, d) : [];
   const keyBit = keyYears.length ? `；十年中 ${keyYears.map(k => `${k.year} ${k.pillar}年${k.note}`).join("、")}，較為關鍵` : "";
   const s5 = `${d.startYear} 年（虛歲 ${d.startAge}）交運，交運前後生活節奏容易轉換${keyBit}。`;
   const headline = end(`${d.name}大運（${P.gods.stem}／${P.gods.branch}）：${fv.headline}，十年以${theme.base}為主軸`);

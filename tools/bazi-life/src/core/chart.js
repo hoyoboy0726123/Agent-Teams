@@ -88,6 +88,13 @@ function godsOf(sc, dm) {
   return { stem: zh(dm.getTenStar(sc.getHeavenStem()).getName()), branch: zh(dm.getTenStar(sc.getEarthBranch().getHideHeavenStemMain()).getName()) };
 }
 
+// The 節 the birth falls after, and the 節 after that.
+function jieAround(bases) {
+  let jie = solarTimeOf(bases.term).getTerm();
+  if (!jie.isJie()) jie = jie.next(-1);
+  return { prev: jie, next: jie.next(2) };
+}
+
 // How far the birth time can move before each pillar changes, and what it changes to.
 function sensitivity(ctx, bases, pillars) {
   const out = [];
@@ -106,8 +113,7 @@ function sensitivity(ctx, bases, pillars) {
     add("day", t - dPrev, dNext - t);
   }
   const now = fieldsToMs(bases.term);
-  let jie = solarTimeOf(bases.term).getTerm();
-  if (!jie.isJie()) jie = jie.next(-1);
+  const jie = jieAround(bases).prev;
   add("month", (now - termMs(jie)) / MINUTE, (termMs(jie.next(2)) - now) / MINUTE);
   const y = bases.term.y, spring = termMs(SolarTerm.fromIndex(y, 3));
   const [sPrev, sNext] = now < spring ? [termMs(SolarTerm.fromIndex(y - 1, 3)), spring] : [spring, termMs(SolarTerm.fromIndex(y + 1, 3))];
@@ -116,7 +122,10 @@ function sensitivity(ctx, bases, pillars) {
   return { list: out, jie: { prev: jie, next: jie.next(2) } };
 }
 
-export function computeChart({ date, time = null, place, sex = "male", options = {} }) {
+// lean: leave out what only the 排盤 page shows (how far the time can move before a pillar changes, the pillars
+// under the other settings, and the note on a 節 during the day of an unknown hour), about nine tenths of the work. The
+// pillars, the luck, the years and everything the readings use are the same (test/chart.test.js).
+export function computeChart({ date, time = null, place, sex = "male", options = {} }, { lean = false } = {}) {
   const opts = { solar: "true", zi: "early", yun: "default", occurrence: 0, ...options };
   if (!SOLAR_MODES[opts.solar] || !ZI_RULES[opts.zi] || !YUN_METHODS[opts.yun]) throw new Error("unknown option");
   if (!(date.y >= 1801 && date.y <= 2199)) throw new Error("year out of range");
@@ -149,9 +158,9 @@ export function computeChart({ date, time = null, place, sex = "male", options =
   if (byShichen) warnings.push({ kind: "shichen", text: `依你選的${time.branch}時排日柱和時柱，不再做真太陽時校正；起運以這個時辰的中間估算。` });
   if (!hourKnown) warnings.push({ kind: "hour", text: "時辰不詳：只排年、月、日三柱，起運以中午 12 點估算。" });
 
-  const sens = sensitivity(ctx, bases, sc);
+  const sens = lean ? { list: [], jie: jieAround(bases) } : sensitivity(ctx, bases, sc);
   // Unknown hour: a solar term during that day leaves the month (or year) pillar open.
-  if (!hourKnown) {
+  if (!hourKnown && !lean) {
     const at = h => { const r = resolveWallTime({ ...wall, h, mi: h ? 59 : 0, s: h ? 59 : 0 }, place.tz); return r.instants[0]; };
     const p0 = pillarsFrom(basesAt(at(0), fieldsToMs({ ...wall, h: 0, mi: 0 }), place, opts.solar), false, opts.zi, date);
     const p1 = pillarsFrom(basesAt(at(23), fieldsToMs({ ...wall, h: 23, mi: 59, s: 59 }), place, opts.solar), false, opts.zi, date);
@@ -226,7 +235,7 @@ export function computeChart({ date, time = null, place, sex = "male", options =
       next: { name: zh(sens.jie.next.getName()), time: localTermTime(sens.jie.next, place, byShichen ? "true" : opts.solar) },
     },
     sensitivity: sens.list,
-    variants: variants({ date, time, place, sex, options: opts }, names(sc)),
+    variants: lean ? [] : variants({ date, time, place, sex, options: opts }, names(sc)),
     luck: {
       forward: cl.isForward(), method: YUN_METHODS[opts.yun].label,
       start: { years: cl.getYearCount(), months: cl.getMonthCount(), days: cl.getDayCount(), hours: cl.getHourCount(), minutes: cl.getMinuteCount(), date: formatFields({ ...startLocal, h: 0, mi: 0 }).slice(0, 10), age: decades[0].startAge },

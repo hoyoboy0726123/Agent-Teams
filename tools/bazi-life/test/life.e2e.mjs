@@ -5,6 +5,8 @@ import { createRequire } from "node:module";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { makeApp } from "../worker/app.js";
+import { agesOf, partsFor } from "../src/ai-reading.js";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT || "playwright");
@@ -109,7 +111,7 @@ check("the report ends with 綜合論斷 and then 開運建議, once", sectionTi
 await page.hover("#plot svg", { position: { x: 300, y: 120 } });
 check("hovering the K-line shows a tooltip", await page.isVisible("#tip"));
 check("without a name or family only the chart card shows", (await page.$$("#personal-cards .card")).length === 1);
-check("on a page without the Worker the AI reading says where it is offered", await page.isVisible("#ai") && await page.isHidden("#ai-go") && /只在命盤人生的網站上提供/.test(await page.textContent("#ai-status")));
+check("on a page without the Worker the AI reading and 合婚 say where they are offered", await page.isVisible("#ai") && await page.isHidden("#ai-go") && await page.isHidden("#ai-match") && /AI 合婚只在命盤人生的網站上提供/.test(await page.textContent("#ai-status")));
 if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/life-desktop-light.png`, fullPage: true });
 
 await page.click("#again-same");
@@ -249,27 +251,80 @@ for (const [name, answer] of [["busy or over quota (503)", route => route.fulfil
   check(`a Worker that is ${name} falls back to the local options without a message`, fb.sent.length === 1 && /比較接近哪一個/.test(out) && /照我寫的就好/.test(out) && !/錯誤|失敗|AI|Claude/.test(out), out.slice(0, 60));
   await fb.p.close();
 }
-// AI 命理師解讀 over http: the page posts the birth and the milestones, never the name, and shows the sections.
-const SECS = ["命格一句話", "性格與天賦", "這一生的印證", "事業與財運", "感情與家庭", "健康與作息", "未來十年", "給你的三句話"];
-const readingOk = { status: 200, contentType: "application/json", body: JSON.stringify({ v: 1, kind: "full", sections: SECS.map((title, i) => ({ title, body: i ? "命理上看，你細心又有主見。\n路怎麼走，還是你自己決定。" : "像一盞溫暖的燭火。" })) }) };
-const rd = await servedPage(route => route.fulfill(ok), async p => { await p.fill("#f-name", "陳志明"); });
-const readingSent = [];
-let readingAnswer = route => route.fulfill(readingOk);
-await rd.p.route("**/api/reading", route => { readingSent.push(route.request()); return readingAnswer(route); });
+// AI 命理師解讀 and AI 合婚 over http, answered by the Worker itself (worker/app.js) with a stand-in model: the page
+// posts one part at a time with the births only, shows each part as it arrives, and can write a failed part again.
+const FILL = "命理上看，你細心又有主見，這是傾向，不是注定；路怎麼走，還是你自己決定，慢慢來就好。";
+const LINE = { 重點: "這十年以學習與貴人為主軸，適合打好底子。", 好事: "工作上容易遇到合作與貴人，值得好好把握。", 要注意: "理財宜保守，合夥和借貸都要多想一步。" };
+function standIn(prompt) {
+  const titles = [...prompt.matchAll(/^\d+\. 【([^】]+)】/gm)].map(m => m[1]);
+  if (titles.length) return titles.map(t => `【${t}】\n${t.endsWith("一句話") ? "像一盞溫暖的燭火，安靜又堅定。" : FILL}`).join("\n\n");
+  const keys = [...prompt.match(/^標題依序是：(.*)$/m)[1].matchAll(/【([^】]+)】/g)].map(m => m[1]);
+  const lines = [...prompt.matchAll(/一行「(.+?)：」/g)].map(m => m[1]);
+  return keys.map(k => `【${k}】\n${lines.map(f => `${f}：${LINE[f]}`).join("\n")}`).join("\n\n");
+}
+const readingWorker = makeApp({});
+const readingEnv = { AI: { run: async (model, input) => ({ choices: [{ message: { role: "assistant", content: standIn(input.messages[0].content) } }] }) } };
+const siteOrigin = new URL(site).origin, NOW = new Date().getUTCFullYear();
+const readingSent = [], failOnce = new Set();
+const rd = await servedPage(route => route.fulfill(ok), async p => {
+  await p.fill("#f-name", "陳志明");
+  await p.click("#family > summary");
+  await p.fill(".member[data-role=partner] .m-name", "王小美");
+  await p.fill(".member[data-role=partner] .m-date", "1990-05-20");
+  await p.selectOption(".member[data-role=partner] .m-hour", "wu");
+});
+await rd.p.route("**/api/reading", async route => {
+  const body = route.request().postData() || "", part = JSON.parse(body || "{}").part;
+  readingSent.push(body);
+  if (failOnce.delete(part)) return route.fulfill({ status: 502, contentType: "application/json", body: '{"error":"reply"}' });
+  const res = await readingWorker.fetch(new Request(`${siteOrigin}/api/reading`, { method: "POST", headers: { "content-type": "application/json", origin: siteOrigin }, body }), readingEnv);
+  return route.fulfill({ status: res.status, contentType: "application/json", body: await res.text() });
+});
 await rd.p.click("#c-skip");
 await ended(rd.p, 30000);
-check("the AI reading card offers its two buttons under the consent line", await rd.p.isVisible("#ai-full") && await rd.p.isVisible("#ai-short") && /不含姓名、家人和你寫的文字/.test(await rd.p.textContent("#ai-consent")));
+check("the AI card offers both readings and 合婚 under the consent line", await rd.p.isVisible("#ai-full") && await rd.p.isVisible("#ai-short") && await rd.p.isVisible("#ai-match") && /不含姓名和家人/.test(await rd.p.textContent("#ai-consent")));
+check("AI 合婚 starts open, filled in with the partner of the family form", await rd.p.$eval("#ai-match", d => d.open) && await rd.p.inputValue("#ai-p-date") === "1990-05-20" && await rd.p.inputValue("#ai-p-sex") === "female" && await rd.p.inputValue("#ai-p-when .m-hour") === "wu");
+
+// 完整解讀: every part at once, shown as sections, 大運 cards and a list of every age.
+const sentFrom = n => readingSent.slice(n).map(b => JSON.parse(b));
+const ages = agesOf({ age: NOW - 1988 }).length, fullParts = partsFor("full", 1988, NOW);
+const settled = n => rd.p.waitForFunction(n => document.querySelectorAll("#ai-body .ai-years li").length >= n && !document.querySelector("#ai-body .ai-wait") && !/正在寫/.test(document.querySelector("#ai-status").textContent), n, { timeout: 30000 });
 await rd.p.click("#ai-full");
-await rd.p.waitForSelector("#ai-body .ai-sec");
-const readingBody = readingSent[0] ? readingSent[0].postData() || "" : "", readingJson = JSON.parse(readingBody || "{}");
-check("the reading request carries the birth and the milestones, without the name", readingJson.kind === "full" && readingJson.birth && readingJson.birth.y === 1988 && readingJson.birth.place && Array.isArray(readingJson.life && readingJson.life.events) && !/陳志明|志明/.test(readingBody), readingBody.slice(0, 120));
-check("the reading shows as sections, the motto first, with its notice", (await rd.p.$$("#ai-body .ai-sec")).length === 8 && await rd.p.isVisible("#ai-body .ai-sec.motto") && /不是預言/.test(await rd.p.textContent("#ai-body")));
-readingAnswer = route => route.fulfill({ status: 502, contentType: "application/json", body: '{"error":"reply"}' });
+await settled(ages);
+const full = sentFrom(0);
+check("a full reading asks for each part once, with the birth only: no name, no game", full.length === fullParts.length && full.map(b => b.part).sort().join() === [...fullParts].sort().join() && full.every(b => b.v === 2 && b.kind === "full" && b.birth.y === 1988 && b.birth.place && !b.life && !b.partner) && !readingSent.some(b => /陳志明|志明|小美/.test(b)), readingSent[0] && readingSent[0].slice(0, 120));
+const order = await rd.p.$$eval("#ai-body > section", els => els.map(e => (e.classList.contains("ai-luck") ? "大運" : e.querySelector("h4").textContent)));
+check("the reading reads in order: the motto, the chart, love and health, then the 大運 and every age, then advice", order.join("/") === "命格一句話/命盤總論/性格與天賦/事業與財運/感情與婚姻/六親與人際/健康與作息/大運/開運建議/給你的三句話" && await rd.p.isVisible("#ai-body .ai-sec.motto"), order.join("/"));
+const nowCards = await rd.p.$$("#ai-body .ai-decade.now");
+check("the 大運 come as cards from this one on, and this one is open at its years", (await rd.p.$$("#ai-body .ai-decade")).length >= 5 && nowCards.length === 1 && await nowCards[0].$eval("details.ai-years", d => d.open) && /重點/.test(await nowCards[0].textContent()));
+const firstAge = await rd.p.textContent("#ai-body .ai-years li");
+check("every age from now to 85 has its good things and what to watch", (await rd.p.$$("#ai-body .ai-years li")).length === ages && firstAge.includes(`${NOW - 1988} 歲`) && firstAge.includes(`好事${LINE.好事}`) && firstAge.includes(`要注意${LINE.要注意}`), `${(await rd.p.$$("#ai-body .ai-years li")).length} of ${ages}`);
+check("the reading ends with its notice, and nothing is left waiting", /不是預言/.test(await rd.p.textContent("#ai-body")) && (await rd.p.textContent("#ai-status")) === "" && !/＊/.test(await rd.p.textContent("#ai-body")));
+
+// A part that fails the checker can be written again on its own.
+failOnce.add("short");
+let n = readingSent.length;
 await rd.p.click("#ai-short");
-await rd.p.waitForSelector("#ai-status.bad", { timeout: 10000 });
-check("a reading that fails the checker says so, and the buttons work again", /沒有通過自動檢查/.test(await rd.p.textContent("#ai-status")) && !(await rd.p.isDisabled("#ai-short")));
+await rd.p.waitForSelector('#ai-body [data-ai-retry="short"]', { timeout: 10000 });
+check("a part that fails the checker says so, with a button to write it again", /沒有通過自動檢查/.test(await rd.p.textContent("#ai-body")) && /有 1 段沒寫好/.test(await rd.p.textContent("#ai-status")));
+await rd.p.click('#ai-body [data-ai-retry="short"]');
+await rd.p.waitForSelector("#ai-body .ai-sec.motto", { timeout: 10000 });
+check("重寫這一段 asks for that part again, and it shows", readingSent.length === n + 2 && sentFrom(n).every(b => b.part === "short") && (await rd.p.$$("#ai-body .ai-sec")).length === 2 && /這是重點版/.test(await rd.p.textContent("#ai-status")));
+
+// AI 合婚: both births, three parts, the engine's verdict and ten years for the two of them.
+n = readingSent.length;
+await rd.p.click("#ai-match-go");
+await rd.p.waitForFunction(() => document.querySelectorAll("#ai-body .ai-luck li").length === 10 && !document.querySelector("#ai-body .ai-wait"), null, { timeout: 30000 });
+const match = sentFrom(n);
+check("合婚 asks for its three parts with both births and no names", match.length === 3 && match.map(b => b.part).join() === "m1,m2,myears" && match.every(b => b.kind === "match" && b.birth.y === 1988 && JSON.stringify(b.partner) === JSON.stringify({ y: 1990, m: 5, d: 20, time: { shichen: "wu" }, sex: "female" })) && !readingSent.some(b => /陳志明|志明|小美/.test(b)), JSON.stringify(match[0] && match[0].partner));
+const matchText = await rd.p.textContent("#ai-body");
+check("合婚 shows the verdict, its sections and the next ten years for both", await rd.p.isVisible("#ai-body .ai-chips .tone") && (await rd.p.$$("#ai-body .ai-sec")).length === 6 && /合婚一句話/.test(matchText) && /給你們的建議/.test(matchText) && new RegExp(`${NOW} 年.*你 ${NOW - 1988} 歲.*對方 ${NOW - 1990} 歲`).test(matchText));
+n = readingSent.length;
+await rd.p.fill("#ai-p-date", "");
+await rd.p.click("#ai-match-go");
+check("合婚 without the other birthday asks for it and sends nothing", readingSent.length === n && /請先填另一半的出生日期/.test(await rd.p.textContent("#ai-status")) && await rd.p.$eval("#ai-status", el => el.classList.contains("bad")));
 await rd.p.click("#ai-full");
-check("a reading already written comes back without asking again", readingSent.length === 2 && (await rd.p.$$("#ai-body .ai-sec")).length === 8 && !(await rd.p.textContent("#ai-status")));
+check("a reading already written comes back without asking again", readingSent.length === n && (await rd.p.$$("#ai-body .ai-years li")).length === ages && (await rd.p.textContent("#ai-status")) === "");
 await rd.p.close();
 server.close();
 

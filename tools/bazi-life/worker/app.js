@@ -1,5 +1,5 @@
 // 命盤人生的 Cloudflare Worker：放網頁，在 /api/interpret 用 Workers AI 判讀玩家自己寫的選擇，並在 /api/reading 寫
-// 結局頁的「AI 命理師解讀」。worker/index.js 把 public/ 的兩個網頁交給 makeApp()；這個檔案不讀檔案，測試可以直接載入
+// 結局頁的「AI 命理師解讀」和「AI 合婚」。worker/index.js 把 public/ 的兩個網頁交給 makeApp()；這個檔案不讀檔案，測試可以直接載入
 // （test/worker.test.js）。
 //
 // /api/interpret: the page (src/life-app.js) posts { situation, context, options: [{ id, label }], text } for the
@@ -7,10 +7,11 @@
 // way the page checks it, so the answer can only be one of the actions the engine already allows. Any failure answers
 // with an error status and the page quietly reads the words itself; nothing here is needed for the game to work.
 //
-// /api/reading: the page posts the birth and this life's milestones as codes (src/ai-reading.js readingRequest). The
-// chart is recomputed here and the fact sheet written here, so nothing the player typed reaches the prompt. A reading
-// that fails the checker (invented 干支, wrong 喜忌, death or disease, Simplified characters…) is asked for once more,
-// with the problems listed; a second failure answers 502 and the page offers to try again.
+// /api/reading: the page posts one part of an AI reading at a time: the births only (src/ai-reading.js
+// readingRequest). The charts are recomputed and the fact sheet written here, so nothing the player typed reaches the
+// prompt. Text that fails the checker (invented 干支, wrong ages or 喜忌, death or disease, Simplified characters…) is
+// asked for once more with the problems listed; a section part that fails twice answers 502 and the page offers to
+// write that part again, and a list keeps the engine's words for the entries the model missed.
 //
 // Bindings (wrangler.jsonc): AI (Workers AI), INTERPRET_LIMIT and READING_LIMIT (requests per minute per IP).
 // Variables: PROMPT = "compact" for the shorter interpret prompt (fewer neurons, slightly less accurate);
@@ -19,7 +20,7 @@
 // Only the pages this Worker serves may call it (the Origin must be its own: workers.dev or a custom domain routed
 // to it). Nothing the player writes, and no reading, is logged or kept.
 import { interpretPrompt, readInterpretation, jsonFromText } from "../src/sim/interpret.js";
-import { readReadingRequest, readingFacts, readingPrompt, checkReading, READING_VERSION, HALVES } from "../src/ai-reading.js";
+import { readReadingRequest, readingPart, partPrompt, partTokens, checkPart, finishPart, READING_VERSION } from "../src/ai-reading.js";
 
 export const MODEL = "@cf/google/gemma-4-26b-a4b-it";
 const MAX_BODY = 4096;
@@ -106,7 +107,6 @@ export async function interpret(request, env) {
 
 // ---------- /api/reading ----------
 const READING_MAX_BODY = 2048;
-const OUT_TOKENS = { full: 2600, short: 700 };
 // The models a reading can be written with, each with its input shape. Gemma 4 is the default; the others are there
 // for the lab and for READING_MODEL.
 export const READING_MODELS = {
@@ -130,37 +130,35 @@ export async function reading(request, env) {
     if (!success) return answer(429, { error: "busy" });
   }
   if (!env.AI) return answer(503, { error: "unavailable" });
-  let facts;
-  try { facts = readingFacts(ask, { now: new Date().getUTCFullYear() }); } catch { return answer(400, { error: "chart" }); }
+  let part;
+  try { part = readingPart(ask, { now: new Date().getUTCFullYear() }); } catch { return answer(400, { error: "chart" }); }
+  const head = { v: READING_VERSION, kind: ask.kind, part: ask.part };
+  // A list part with nothing in it (no ages left in this third): nothing to write.
+  if (part.type === "list" && !part.items.length) return answer(200, { ...head, items: [], ...(part.meta ? { meta: part.meta } : {}) });
   const opt = lab && got.body.lab && typeof got.body.lab === "object" ? got.body.lab : {};
   const model = Object.hasOwn(READING_MODELS, opt.model) ? opt.model : Object.hasOwn(READING_MODELS, env.READING_MODEL || "") ? env.READING_MODEL : MODEL;
   const extra = opt.params && typeof opt.params === "object" ? opt.params : {};
-  // READING_SPLIT = "1" writes a full reading in one call; by default it is written in two halves at once.
-  const halves = (opt.split !== undefined ? opt.split === 2 : env.READING_SPLIT !== "1") ? HALVES[ask.kind] : [null];
   const tries = [];
-  let check = null;
-  for (let i = 0; i < 2 && !(check && check.ok); i++) {
+  let result = null;
+  for (let i = 0; i < 2 && !(result && result.ok); i++) {
     const t0 = Date.now();
-    let outs;
+    let out;
     try {
-      outs = await Promise.all(halves.map(part => {
-        const max = part && halves.length > 1 ? Math.ceil(OUT_TOKENS[ask.kind] / 2) : OUT_TOKENS[ask.kind];
-        return env.AI.run(model, { ...READING_MODELS[model](readingPrompt(facts, check && check.problems, part), max), ...extra });
-      }));
+      out = await env.AI.run(model, { ...READING_MODELS[model](partPrompt(part, result), partTokens(part, result)), ...extra });
     } catch (e) {
-      // Over the free allocation, or the model is busy.
+      // Over the free allocation, or the model is busy. A list keeps what the first try got right.
       tries.push({ ms: Date.now() - t0, error: String((e && e.message) || e).slice(0, 300) });
       break;
     }
-    const text = outs.map(out => withoutThinking(textOf(out))).join("\n\n");
-    const usage = outs.map(usageOf).reduce((s, u) => ({ in: s.in + ((u && u.in) || 0), out: s.out + ((u && u.out) || 0) }), { in: 0, out: 0 });
-    check = checkReading(text, facts);
-    tries.push({ ms: Date.now() - t0, calls: outs.length, usage, problems: check.problems, warnings: check.warnings, length: check.length, text });
+    const text = withoutThinking(textOf(out));
+    // A list asked again only for the entries it missed keeps the good ones of the first try.
+    result = checkPart(text, part, part.type === "list" ? result : null);
+    tries.push({ ms: Date.now() - t0, usage: usageOf(out), problems: result.problems, warnings: result.warnings, length: result.length, text });
   }
-  const labInfo = lab ? { lab: { model, tries, ...(opt.prompt ? { prompt: readingPrompt(facts) } : {}) } } : {};
-  if (!check) return answer(503, { error: "unavailable", ...labInfo });
-  if (!check.ok) return answer(502, { error: "reply", ...labInfo });
-  return answer(200, { v: READING_VERSION, kind: ask.kind, sections: check.sections, ...labInfo });
+  const labInfo = lab ? { lab: { model, tries, ...(opt.prompt ? { prompt: partPrompt(part) } : {}) } } : {};
+  if (!result) return answer(503, { error: "unavailable", ...labInfo });
+  if (part.type === "sections" && !result.ok) return answer(502, { error: "reply", ...labInfo });
+  return answer(200, { ...head, ...finishPart(part, result), ...labInfo });
 }
 
 // The pages are part of the Worker itself rather than static assets: an asset upload is authorised by a token of its

@@ -118,6 +118,25 @@ test("unknown hour: three pillars, and a solar term that day leaves the month op
   assert.ok(!chart(2024, 2, 10, null, null).warnings.some(w => w.kind === "jie"));
 });
 
+test("a lean chart (for the AI reading) is the same chart without the 排盤 page's extras", () => {
+  const inputs = [
+    [1988, 2, 15, 23, 30], [1990, 6, 21, 12, 0, {}, taipei, "female"], [2024, 2, 4, 16, 20], [1959, 11, 3, null, null],
+    [1979, 7, 10, 6, 45, {}, findPlace("高雄市鳳山")], [1985, 3, 12, 9, 15, {}, findPlace("紐約"), "female"], [2001, 1, 1, 0, 10, { zi: "late" }],
+  ];
+  for (const [y, m, d, h, mi, options = {}, place = taipei, sex = "male"] of inputs) {
+    const input = { date: { y, m, d }, time: h === null ? null : { h, mi }, place, sex, options };
+    const full = computeChart(input), lean = computeChart(input, { lean: true });
+    assert.deepEqual(lean.sensitivity, []);
+    assert.deepEqual(lean.variants, []);
+    const rest = c => ({ ...c, sensitivity: null, variants: null, warnings: c.warnings.filter(w => w.kind !== "jie") });
+    assert.deepEqual(rest(lean), rest(full), `${y}-${m}-${d}`);
+  }
+  // Only the unknown-hour note about a solar term that day is left out.
+  const input = { date: { y: 2024, m: 2, d: 4 }, time: null, place: taipei, sex: "male" };
+  assert.ok(computeChart(input).warnings.some(w => w.kind === "jie"));
+  assert.ok(!computeChart(input, { lean: true }).warnings.some(w => w.kind === "jie"));
+});
+
 test("every place has a working time zone and a sane position", () => {
   for (const p of PLACES) {
     assert.ok(p.lon >= -180 && p.lon <= 180 && p.lat >= -90 && p.lat <= 90, p.name);

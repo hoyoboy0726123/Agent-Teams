@@ -358,6 +358,43 @@ input[type="number"] { width: 100%; box-sizing: border-box; background: var(--sh
 .ai-sec p:last-child { margin-bottom: 0; }
 .ai-sec.motto { border-left: 4px solid var(--seal); }
 .ai-sec.motto p { font-family: var(--display); font-size: 19px; font-weight: 700; line-height: 1.5; }
+.ai-match { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 0 16px; }
+.ai-match > summary { cursor: pointer; padding: 12px 0; font-weight: 600; font-size: 15px; }
+.ai-match[open] { padding-bottom: 14px; }
+.ai-match[open] > summary { border-bottom: 1px solid var(--wash); margin-bottom: 10px; }
+.ai-match > .fine { margin: 0 0 10px; }
+.ai-partner { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 10px 12px; margin-bottom: 12px; }
+.ai-partner .when { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-partner .when > * { flex: 1 1 8em; min-width: 0; }
+.ai-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.ai-chips span { font-size: 12.5px; border-radius: 999px; padding: 2px 10px; background: var(--indigo-wash); color: var(--ink); }
+.ai-chips .tone { background: var(--seal-wash); color: var(--seal); font-weight: 600; }
+.ai-luck { display: grid; gap: 10px; }
+.ai-luck > h4 { font-size: 17px; margin: 6px 0 0; }
+.ai-decade { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 16px; display: grid; gap: 6px; }
+.ai-decade.now { border-color: var(--indigo); box-shadow: 0 0 0 1px var(--indigo) inset; }
+.ai-decade header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.ai-decade h5 { margin: 0; font-family: var(--display); font-size: 17px; }
+.ai-decade .span { font-size: 13px; color: var(--muted); }
+.ai-decade p, .ai-years li p { margin: 0; line-height: 1.75; }
+.ai-decade p b, .ai-years li p b { display: inline-block; min-width: 3.4em; color: var(--muted); font-weight: 600; font-size: 13px; }
+.ai-tone { font-size: 12px; border-radius: 999px; padding: 0 8px; white-space: nowrap; }
+.ai-tone.t-順勢 { background: var(--indigo-wash); color: var(--indigo); }
+.ai-tone.t-平穩 { background: var(--wash); color: var(--muted); }
+.ai-tone.t-宜守 { background: var(--seal-wash); color: var(--seal); }
+.ai-tone.t-now { background: var(--indigo); color: var(--sheet); }
+.ai-years { margin-top: 4px; border-top: 1px solid var(--wash); padding-top: 6px; }
+.ai-years > summary { cursor: pointer; color: var(--indigo); font-size: 14px; width: fit-content; }
+.ai-years ol { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 10px; }
+.ai-years li { display: grid; gap: 2px; padding-bottom: 10px; border-bottom: 1px dashed var(--wash); }
+.ai-years li:last-child { border-bottom: 0; padding-bottom: 0; }
+.ai-years .yh { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.ai-years .yh b { font-family: var(--display); font-size: 16px; }
+.ai-years .yh span { font-size: 13px; color: var(--muted); }
+.ai-wait { margin: 0; padding: 10px 14px; border: 1px dashed var(--rule); border-radius: 10px; font-size: 14px; color: var(--muted); }
+.ai-wait.bad { color: var(--seal); border-color: var(--seal); }
+.ai-wait button { margin-left: 8px; font-size: 13px; padding: 4px 10px; }
+.ai-fb { color: var(--muted); font-size: 12px; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .paipan .el-木 { color: #6fcf97; } :root:not([data-theme="light"]) .paipan .el-火 { color: #ff8a80; } :root:not([data-theme="light"]) .paipan .el-土 { color: #d7b77a; } :root:not([data-theme="light"]) .paipan .el-金 { color: #f2c94c; } :root:not([data-theme="light"]) .paipan .el-水 { color: #7fb3e6; } }
 :root[data-theme="dark"] .paipan .el-木 { color: #6fcf97; } :root[data-theme="dark"] .paipan .el-火 { color: #ff8a80; } :root[data-theme="dark"] .paipan .el-土 { color: #d7b77a; } :root[data-theme="dark"] .paipan .el-金 { color: #f2c94c; } :root[data-theme="dark"] .paipan .el-水 { color: #7fb3e6; }
 .hist { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; align-items: end; height: 70px; }
@@ -439,7 +476,7 @@ footer a { color: var(--indigo); }
       <section class="welcome-privacy" aria-labelledby="privacy-title">
         <h3 id="privacy-title"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>你的資料只留在你的手機裡</h3>
         <p>生日、名字、家人和伴侶的資料，全部在你的手機（瀏覽器）裡計算，<strong>網站後台不保存任何資料</strong>。這個網站沒有帳號、沒有資料庫。填到一半重新整理不會不見：資料只暫存在這個分頁裡，關掉網頁就跟著消失。為了讓你重玩時多遇到沒看過的題目，最近兩局問過哪些題目（只記題目種類）也放在這個分頁裡，一樣關掉就清掉。</p>
-        <p class="fine">只有你自己按下這兩個功能時，才會把資料交給 AI，用完都不保存：一是「寫下你自己的決定」裡打的那一句話，送出前名字會換成「伴侶」「爸爸」這樣的稱呼；二是結局的「AI 命理師解讀」，會送出出生日期、時間、出生地、性別和這一生大事的種類與歲數，不含姓名和家人。不想送出，點選項按鈕、不按解讀就好。</p>
+        <p class="fine">只有你自己按下這兩個功能時，才會把資料交給 AI，用完都不保存：一是「寫下你自己的決定」裡打的那一句話，送出前名字會換成「伴侶」「爸爸」這樣的稱呼；二是結局的「AI 命理師解讀」和「AI 合婚」，會送出出生日期、時間、出生地和性別（合婚還有對方的出生日期、時間和性別），不含姓名和家人。不想送出，點選項按鈕、不按解讀就好。</p>
       </section>
       <div class="welcome-go">
         <button type="button" class="primary" data-goto="me">開始我的人生</button>
@@ -646,12 +683,22 @@ footer a { color: var(--indigo); }
     </div>
 
     <div class="report ai" id="ai" hidden>
-      <div class="report-head"><h3>AI 命理師解讀 <span class="badge">測試版</span></h3><p class="lede">AI 命理師會讀你的命盤和這一生的大事，用白話寫給你。命盤由本站的排盤引擎算好，AI 只負責寫；寫完會自動檢查干支、喜忌和年份有沒有寫錯。</p></div>
-      <p class="fine" id="ai-consent">按下按鈕，會把出生日期、時間、出生地、性別，以及這一生大事的種類和歲數送到伺服器，交給 AI 寫解讀。不含姓名、家人和你寫的文字，寫完不保存。</p>
+      <div class="report-head"><h3>AI 命理師解讀 <span class="badge">測試版</span></h3><p class="lede">AI 命理師直接讀你的八字命盤（不是這一局遊戲），用白話寫給你：命格、性格、事業財運、感情、六親、健康，每一步大運，以及每一歲的好事和要注意的事。命盤由本站的排盤引擎算好，AI 只負責寫；寫完會自動檢查干支、喜忌、年份和歲數有沒有寫錯。</p></div>
+      <p class="fine" id="ai-consent">按下按鈕，會把出生日期、時間、出生地和性別送到伺服器，交給 AI 寫解讀。不含姓名和家人，寫完不保存。</p>
       <div class="ai-go" id="ai-go">
         <button type="button" class="secondary" id="ai-short">先看重點</button>
         <button type="button" class="primary" id="ai-full">完整解讀（測試期間免費）</button>
       </div>
+      <details class="ai-match" id="ai-match">
+        <summary>AI 合婚（免費）</summary>
+        <p class="fine">填另一半的生日，AI 會讀你們兩個人的命盤，寫合婚解讀和接下來十年兩個人的感情走勢。對方的出生地當作和你一樣；會送出兩個人的出生日期、時間和性別，不含姓名，寫完不保存。</p>
+        <div class="ai-partner" id="ai-partner">
+          <label class="field"><span>對方的出生日期</span><input type="date" class="m-date" id="ai-p-date" min="1900-01-01" max="2100-12-31"></label>
+          <div class="field"><span>對方的出生時間</span><span class="when" id="ai-p-when"></span></div>
+          <label class="field"><span>對方的性別</span><select id="ai-p-sex"><option value="female">女</option><option value="male">男</option></select></label>
+        </div>
+        <button type="button" class="secondary" id="ai-match-go">看合婚解讀</button>
+      </details>
       <p class="ai-status" id="ai-status" role="status" aria-live="polite"></p>
       <div class="ai-body" id="ai-body"></div>
     </div>
@@ -670,7 +717,7 @@ footer a { color: var(--indigo); }
 
   <footer>
     <p>年柱、月柱用出生的精確時刻比對節氣，日柱、時柱用出生地的真太陽時。每一年，大運和流年會讓各領域事件的機率傾斜，倍率限制在 0.5 到 2 倍之間；扶抑、調候、格局三派的看法分開計算後再合併。</p>
-    <p>壽命以內政部 114 年簡易生命表的平均餘命為基準（男 77.93 歲、女 84.75 歲）。所有計算都在你的瀏覽器裡完成，網站不保存你的資料。只有兩種情況會把資料交給 AI：「寫下你自己的決定」那一句（名字會先換成稱呼），以及你按下的「AI 命理師解讀」（出生資料和大事的種類、歲數，不含姓名和家人）；用完都不保存。</p>
+    <p>壽命以內政部 114 年簡易生命表的平均餘命為基準（男 77.93 歲、女 84.75 歲）。所有計算都在你的瀏覽器裡完成，網站不保存你的資料。只有兩種情況會把資料交給 AI：「寫下你自己的決定」那一句（名字會先換成稱呼），以及你按下的「AI 命理師解讀」和「AI 合婚」（出生日期、時間、出生地和性別，不含姓名和家人）；用完都不保存。</p>
     <p><a id="chart-link" href="__CHART_URL__">看完整命盤（排盤引擎）</a></p>
   </footer>
 </div>

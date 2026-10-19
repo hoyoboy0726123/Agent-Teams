@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { makeApp, MODEL, READING_MODELS, readRequest, textOf, usageOf } from "../worker/app.js";
 import { interpretPrompt } from "../src/sim/interpret.js";
-import { SECTIONS } from "../src/ai-reading.js";
+import { READING_VERSION, readReadingRequest, readingPart } from "../src/ai-reading.js";
 
 const SITE = "https://bazi-life.example.workers.dev";
 const worker = makeApp({ "/": "<p>命盤人生</p>", "/life.html": "<p>命盤人生</p>", "/index.html": "<p>排盤</p>" });
@@ -146,27 +146,28 @@ test("the prompt shows each button's hint and asks for a button only when the pl
 });
 
 // ---------- /api/reading ----------
-const READING = {
-  v: 1, kind: "full",
-  birth: { y: 1990, m: 6, d: 21, time: { shichen: "wu" }, place: "臺北市", sex: "female" },
-  life: {
-    edu: "大學", home: "own", kids: 1, marriages: 1, divorces: 0, retired: false,
-    events: [["graduate", 22], ["job", 22, "業務"], ["marry", 28], ["kid", 30], ["home", 33]], peak: 30, low: 45, lean: [3, 5], written: 1,
-    runs: { married: 80, university: 70, homeOwner: 60 },
-  },
-};
+const BIRTH = { y: 1990, m: 6, d: 21, time: { shichen: "wu" }, place: "臺北市", sex: "female" };
+const PARTNER = { y: 1992, m: 3, d: 5, time: null, sex: "male" };
+const ask = (kind, part, more = {}) => ({ v: READING_VERSION, kind, part, birth: BIRTH, ...(kind === "match" ? { partner: PARTNER } : {}), ...more });
+// What the Worker builds for a request, to compare with: the same chart, this year.
+const partFor = body => readingPart(readReadingRequest(body), { now: new Date().getUTCFullYear() });
 const postReading = (body, headers = {}) => new Request(`${SITE}/api/reading`, {
   method: "POST",
   headers: { "content-type": "application/json", origin: SITE, "cf-connecting-ip": "203.0.113.8", ...headers },
   body: typeof body === "string" ? body : JSON.stringify(body),
 });
-// A model that writes each section the prompt asks for; `bad` adds a sentence the checker turns away.
+// A model that writes what the prompt asks for: each section, or each entry with its lines. `bad(title, line)` adds
+// words the checker turns away.
 const FILL = "命理上看，這是你的傾向和時機，不是注定；路怎麼走，選擇一直在你自己手上。";
+const LINE = { 重點: "這十年以學習與貴人為主軸，適合打好底子。", 好事: "工作上容易遇到合作與貴人，值得好好把握。", 要注意: "理財宜保守，合夥和借貸都要多想一步。" };
 function writer(bad = () => "") {
   return input => {
     const prompt = input.messages[0].content;
     const titles = [...prompt.matchAll(/^\d+\. 【([^】]+)】/gm)].map(m => m[1]);
-    return openai(titles.map(t => `【${t}】\n${bad(prompt, t)}${FILL}${FILL}`).join("\n\n"));
+    if (titles.length) return openai(titles.map(t => `【${t}】\n${bad(t)}${FILL}${FILL}`).join("\n\n"));
+    const keys = [...prompt.match(/^標題依序是：(.*)$/m)[1].matchAll(/【([^】]+)】/g)].map(m => m[1]);
+    const lines = [...prompt.matchAll(/一行「(.+?)：」/g)].map(m => m[1]);
+    return openai(keys.map(k => `【${k}】\n${lines.map(f => `${f}：${bad(k, f)}${LINE[f]}`).join("\n")}`).join("\n\n"));
   };
 }
 function readingEnv(reply, { allow = true, ...vars } = {}) {
@@ -174,54 +175,131 @@ function readingEnv(reply, { allow = true, ...vars } = {}) {
   return { ...e, READING_LIMIT: { limit: async ({ key }) => { e.limited.push(key); return { success: allow }; } }, ...vars };
 }
 
-test("a reading is written in two halves at once from the fact sheet, and answered as sections", async () => {
+test("each part of a reading is its own request, written from the chart alone", async () => {
   const e = readingEnv(writer());
-  const res = await worker.fetch(postReading(READING), e);
+  const res = await worker.fetch(postReading(ask("full", "a")), e);
   assert.equal(res.status, 200);
   const r = await res.json();
-  assert.deepEqual(r.sections.map(s => s.title), SECTIONS.full.map(([t]) => t));
+  assert.deepEqual([r.v, r.kind, r.part], [READING_VERSION, "full", "a"]);
+  assert.deepEqual(r.sections.map(s => s.title), ["命格一句話", "命盤總論", "性格與天賦", "事業與財運"]);
+  assert.ok(r.sections.every(s => s.body.startsWith(FILL)));
   assert.equal(r.lab, undefined, "no lab details without the lab key");
-  assert.equal(e.calls.length, 2);
-  const [a, b] = e.calls.map(c => c.input.messages[0].content);
-  assert.ok(a.includes("1. 【命格一句話】") && !a.includes("1. 【感情與家庭】"));
-  assert.ok(b.includes("1. 【感情與家庭】"));
-  for (const p of [a, b]) assert.ok(p.includes("庚午") && p.includes("丁巳") && p.includes("開始第一份工作：業務"), "the chart is recomputed and the facts written here");
+  assert.equal(e.calls.length, 1);
+  const prompt = e.calls[0].input.messages[0].content;
+  assert.ok(["庚午", "壬午", "丁巳", "丙午"].every(p => prompt.includes(p)), "the chart is recomputed and its facts written here");
+  assert.match(prompt, /感情與婚姻[^\n]*由別人寫/, "the sections of the other parts are named, so they are not written twice");
   assert.deepEqual(e.calls[0].input.chat_template_kwargs, { enable_thinking: false });
   assert.deepEqual(e.limited, ["203.0.113.8"]);
-  // One call when READING_SPLIT is "1"; a short reading is always one call.
-  const one = readingEnv(writer(), { READING_SPLIT: "1" });
-  assert.equal((await worker.fetch(postReading(READING), one)).status, 200);
-  assert.equal(one.calls.length, 1);
-  const short = readingEnv(writer());
-  const s = await (await worker.fetch(postReading({ ...READING, kind: "short" }), short)).json();
-  assert.deepEqual(s.sections.map(x => x.title), ["命格一句話", "總評"]);
-  assert.equal(short.calls.length, 1);
+  const short = await (await worker.fetch(postReading(ask("short", "short")), readingEnv(writer()))).json();
+  assert.deepEqual(short.sections.map(s => s.title), ["命格一句話", "總評"]);
+
+  // The 大運 and the years are entries under the engine's headings, with the model's lines in them.
+  for (const part of ["decades", "years0", "years4"]) {
+    const body = ask("full", part), want = partFor(body);
+    const got = await (await worker.fetch(postReading(body), readingEnv(writer()))).json();
+    assert.deepEqual(got.items.map(i => i.key), want.items.map(i => i.key), part);
+    for (const [i, it] of got.items.entries()) {
+      assert.deepEqual(it.fields, Object.fromEntries(want.items[i].fields.map(f => [f, LINE[f]])), part);
+      assert.equal(it.fallback, undefined);
+      for (const [k, v] of Object.entries(want.items[i].head)) assert.deepEqual(it[k], v, `${part} ${it.key} ${k}`);
+    }
+  }
+  const decades = partFor(ask("full", "decades"));
+  assert.match(decades.items[0].key, /^..大運$/);
+  assert.equal(decades.items[0].head.current, true, "the 大運 start from the one this year is in");
+  assert.match(partFor(ask("full", "years0")).items[0].key, new RegExp(`^${new Date().getUTCFullYear() - 1990} 歲$`), "the years start from this year's age");
 });
 
-test("a reading that fails the checker is asked for again with the problems, and a second failure is a 502", async () => {
+test("a years part past the last age answers at once, without the model", async () => {
+  const e = readingEnv(writer());
+  const r = await (await worker.fetch(postReading(ask("full", "years1", { birth: { ...BIRTH, y: 1940 } })), e)).json();
+  assert.deepEqual(r.items, []);
+  assert.equal(e.calls.length, 0);
+});
+
+test("a sections part that fails the checker is asked again with the problems; a second failure is a 502", async () => {
   let n = 0;
-  const once = readingEnv(writer((prompt, t) => (t === "性格與天賦" && n++ === 0 ? "你會活到 95 歲。" : "")));
-  const ok = await worker.fetch(postReading(READING), once);
+  const once = readingEnv(writer(t => (t === "性格與天賦" && n++ === 0 ? "你會活到 95 歲。" : "")));
+  const ok = await worker.fetch(postReading(ask("full", "a")), once);
   assert.equal(ok.status, 200);
-  assert.equal(once.calls.length, 4);
-  assert.ok(once.calls.slice(2).every(c => c.input.messages[0].content.includes("上一次寫的內容有這些問題，這次一定要避免：談到死亡或壽命")));
-  const always = readingEnv(writer((prompt, t) => (t === "命格一句話" ? "这是简体字。" : "")));
-  const bad = await worker.fetch(postReading(READING), always);
+  assert.equal(once.calls.length, 2);
+  assert.ok(once.calls[1].input.messages[0].content.includes("上一次寫的內容有這些問題，這次一定要避免：談到死亡或壽命"));
+  const always = readingEnv(writer(t => (t === "命格一句話" ? "这是简体字。" : "")));
+  const bad = await worker.fetch(postReading(ask("full", "a")), always);
   assert.equal(bad.status, 502);
   assert.deepEqual(await bad.json(), { error: "reply" });
-  assert.equal(always.calls.length, 4);
+  assert.equal(always.calls.length, 2);
+});
+
+test("a list part asks again only for the entries that were wrong, and keeps the engine's words for the rest", async () => {
+  const body = ask("full", "years0"), want = partFor(body);
+  const [first, second] = want.items;
+  let call = 0;
+  const e = readingEnv(input => {
+    call++;
+    return writer((k, f) => ((k === second.key && f === "好事") || (call === 1 && k === first.key && f === "要注意") ? "可能要動手術，" : ""))(input);
+  });
+  const r = await (await worker.fetch(postReading(body), e)).json();
+  assert.equal(e.calls.length, 2);
+  const again = e.calls[1].input.messages[0].content;
+  assert.equal(again.match(/^標題依序是：(.*)$/m)[1], `【${first.key}】【${second.key}】`, "only the two wrong entries are asked for again");
+  assert.match(again, /上一次有這些問題，這次一定要避免：【[^】]+】[^；]*手術/);
+  assert.ok(e.calls[1].input.max_completion_tokens < e.calls[0].input.max_completion_tokens);
+  assert.equal(r.items.length, want.items.length);
+  const byKey = Object.fromEntries(r.items.map(i => [i.key, i]));
+  assert.deepEqual(byKey[first.key].fields, { 好事: LINE.好事, 要注意: LINE.要注意 }, "fixed on the second try");
+  assert.equal(byKey[first.key].fallback, undefined);
+  assert.equal(byKey[second.key].fallback, true, "still wrong: the engine's words");
+  assert.deepEqual(byKey[second.key].fields, second.fallback);
+  assert.deepEqual(r.items.filter(i => i.fallback).map(i => i.key), [second.key]);
+
+  // When the second try fails to answer at all, the first answers are kept.
+  let k = 0;
+  const flaky = readingEnv(input => {
+    if (k++) throw new Error("3040: out of capacity");
+    return writer((key, f) => (key === first.key && f === "好事" ? "這是简体字，" : ""))(input);
+  });
+  const res = await worker.fetch(postReading(body), flaky);
+  assert.equal(res.status, 200);
+  assert.deepEqual((await res.json()).items.filter(i => i.fallback).map(i => i.key), [first.key]);
+});
+
+test("合婚 parts are written from both charts, with the engine's verdict and the next ten years for both", async () => {
+  const e = readingEnv(writer());
+  const m1 = await (await worker.fetch(postReading(ask("match", "m1")), e)).json();
+  assert.deepEqual(m1.sections.map(s => s.title), ["合婚一句話", "合婚總評", "兩個人的個性"]);
+  assert.deepEqual(m1.meta, partFor(ask("match", "m1")).meta);
+  assert.equal(typeof m1.meta.tone, "string");
+  const prompt = e.calls[0].input.messages[0].content;
+  assert.ok(prompt.includes("AI 合婚") && prompt.includes("不預言分手") && prompt.includes("對方"));
+  const m2 = await (await worker.fetch(postReading(ask("match", "m2")), readingEnv(writer()))).json();
+  assert.deepEqual(m2.sections.map(s => s.title), ["相處的優點", "容易摩擦的地方", "給你們的建議"]);
+  const my = await (await worker.fetch(postReading(ask("match", "myears")), readingEnv(writer()))).json();
+  assert.equal(my.items.length, 10);
+  const now = new Date().getUTCFullYear();
+  assert.equal(my.items[0].key, `${now} 年`);
+  assert.deepEqual(my.items[0].ages, [now - 1990, now - 1992]);
+  assert.ok(my.items.every(i => !i.fallback && i.fields.好事 === LINE.好事));
 });
 
 test("reading failures answer with an error status", async () => {
+  const body = ask("full", "a");
+  const down = () => readingEnv(new Error("4006: daily free allocation used up"));
   const cases = [
-    ["another site", postReading(READING, { origin: "https://evil.example" }), readingEnv(writer()), 403],
+    ["another site", postReading(body, { origin: "https://evil.example" }), readingEnv(writer()), 403],
     ["GET", new Request(`${SITE}/api/reading`, { headers: { origin: SITE } }), readingEnv(writer()), 405],
     ["not JSON", postReading("hello"), readingEnv(writer()), 400],
-    ["an unknown place", postReading({ ...READING, birth: { ...READING.birth, place: "月球" } }), readingEnv(writer()), 400],
-    ["too large", postReading({ ...READING, pad: "長".repeat(3000) }), readingEnv(writer()), 413],
-    ["rate limited", postReading(READING), readingEnv(writer(), { allow: false }), 429],
-    ["over the free allocation", postReading(READING), readingEnv(new Error("4006: daily free allocation used up")), 503],
-    ["no AI binding", postReading(READING), { ...readingEnv(null), AI: undefined }, 503],
+    ["the first version", postReading({ ...body, v: 1 }), readingEnv(writer()), 400],
+    ["an unknown part", postReading({ ...body, part: "years9" }), readingEnv(writer()), 400],
+    ["a part of another kind", postReading({ ...body, part: "m1" }), readingEnv(writer()), 400],
+    ["合婚 without the other person", postReading({ ...ask("match", "m1"), partner: null }), readingEnv(writer()), 400],
+    ["an unknown place", postReading({ ...body, birth: { ...BIRTH, place: "月球" } }), readingEnv(writer()), 400],
+    ["a day that does not exist", postReading({ ...body, birth: { ...BIRTH, m: 2, d: 30 } }), readingEnv(writer()), 400],
+    ["too large", postReading({ ...body, pad: "長".repeat(3000) }), readingEnv(writer()), 413],
+    ["rate limited", postReading(body), readingEnv(writer(), { allow: false }), 429],
+    ["over the free allocation", postReading(body), down(), 503],
+    ["over the free allocation, for a list", postReading(ask("full", "years0")), down(), 503],
+    ["no AI binding", postReading(body), { ...readingEnv(null), AI: undefined }, 503],
   ];
   for (const [name, req, e, status] of cases) {
     const res = await worker.fetch(req, e);
@@ -233,12 +311,14 @@ test("reading failures answer with an error status", async () => {
 test("only a request with the lab key picks the model and sees the usage, the timing and the text", async () => {
   const usage = input => ({ ...writer()(input), usage: { prompt_tokens: 2900, completion_tokens: 480 } });
   const labEnv = () => readingEnv(usage, { LAB_KEY: "k3y" });
-  const body = { ...READING, lab: { model: "@cf/qwen/qwen3-30b-a3b-fp8", prompt: true } };
+  const body = { ...ask("full", "a"), lab: { model: "@cf/qwen/qwen3-30b-a3b-fp8", prompt: true } };
   const e = labEnv();
   const r = await (await worker.fetch(postReading(body, { "x-lab-key": "k3y" }), e)).json();
   assert.equal(r.lab.model, "@cf/qwen/qwen3-30b-a3b-fp8");
   assert.ok(e.calls.every(c => c.model === "@cf/qwen/qwen3-30b-a3b-fp8"));
-  assert.deepEqual(r.lab.tries[0].usage, { in: 5800, out: 960 });
+  assert.ok(e.calls[0].input.messages[0].content.endsWith("/no_think"));
+  assert.deepEqual(r.lab.tries[0].usage, { in: 2900, out: 480 });
+  assert.equal(typeof r.lab.tries[0].ms, "number");
   assert.ok(r.lab.tries[0].text.includes("【命格一句話】") && r.lab.prompt.includes("命盤資料"));
   assert.deepEqual(e.limited, [], "the lab is not rate limited");
   for (const headers of [{}, { "x-lab-key": "wrong" }]) {
@@ -248,9 +328,13 @@ test("only a request with the lab key picks the model and sees the usage, the ti
     assert.ok(plain.calls.every(c => c.model === MODEL), "the model is not chosen without the key");
   }
   const unknown = labEnv();
-  await worker.fetch(postReading({ ...READING, lab: { model: "@cf/some/other-model" } }, { "x-lab-key": "k3y" }), unknown);
+  await worker.fetch(postReading({ ...ask("full", "a"), lab: { model: "@cf/some/other-model" } }, { "x-lab-key": "k3y" }), unknown);
   assert.ok(unknown.calls.every(c => c.model === MODEL));
   assert.ok(Object.keys(READING_MODELS).includes(MODEL));
+  // READING_MODEL picks the model for everyone, when it is one of the list.
+  const chosen = readingEnv(writer(), { READING_MODEL: "@cf/zai-org/glm-4.7-flash" });
+  await worker.fetch(postReading(ask("full", "a")), chosen);
+  assert.deepEqual(chosen.calls.map(c => c.model), ["@cf/zai-org/glm-4.7-flash"]);
 });
 
 test("text and usage in each model's shape", () => {
