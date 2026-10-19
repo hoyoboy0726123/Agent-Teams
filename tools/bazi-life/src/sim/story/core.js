@@ -8,13 +8,13 @@
 //   apply(s, ctx)     what happens → { text, mood, big }
 //   choice(s, ctx)    instead of apply → { prompt, options: [{ id, label, hint, act, style, weight, when, apply }] }
 import { analyseText, siblingCall, listWords } from "../words.js";
-import { RELATIONS } from "../../core/family.js";
+import { RELATIONS, SAME_SEX_MARRIAGE } from "../../core/family.js";
 import { JOBS, tier, jobsFor, startJob, otherJob, moveTo, yearsMarried, bornSiblings, ABROAD, exam15Name, exam18Name, wage, jobFit, fitsPattern } from "../world.js";
-import { newKid, meetPlace, pronoun, realPartnerDue, realPartnerAhead, realPartnerEngaged, realPartnerWeddingDue, realPartnerPlan, realPartner } from "../people.js";
+import { newKid, meetPlace, pronoun, realPartnerDue, realPartnerAhead, realPartnerEngaged, realPartnerWeddingDue, realPartnerPlan, realPartner, realPartnerWaiting, keptForPartner, realPartnerSteady, surnameIn, sameSexCouple, canMarry, datingSex } from "../people.js";
 import { marry, endRelationship, closeSpell, ownHome } from "../act.js";
 
 // How two people met, as the start of a sentence.
-const MET = { 同學: "在學校認識了同學", 同事: "在公司認識了同事", 朋友介紹: "朋友介紹認識了", 社團活動: "在社團活動認識了", 長輩安排的相親: "長輩安排相親，認識了", 相親: "去相親，認識了", 網路聊天室: "在網路聊天室認識了", 交友軟體: "在交友軟體上認識了", 健身房: "在健身房認識了", 旅行途中: "旅行途中認識了" };
+const MET = { 同學: "在學校認識了同學", 老同學: "在同學會上重遇了老同學", 同事: "在公司認識了同事", 朋友介紹: "朋友介紹認識了", 社團活動: "在社團活動認識了", 長輩安排的相親: "長輩安排相親，認識了", 相親: "去相親，認識了", 網路聊天室: "在網路聊天室認識了", 交友軟體: "在交友軟體上認識了", 健身房: "在健身房認識了", 旅行途中: "旅行途中認識了" };
 const motherAge = s => (s.sex === "female" ? s.age : s.partner ? s.partner.age : 99);
 const kidWord = k => (k.sex === "male" ? "兒子" : "女兒");
 // Leaving school, whichever way. The first job's question reads when (jobSearchLead), so it does not tell the
@@ -437,9 +437,10 @@ export const CORE = [
   {
     // The partner from the family input, when there is one, is the first partner once you are both adults
     // (people.js realPartnerDue); the love events below are tilted by their chart while you are together
-    // (about: "partner", life.js). Everyone else is drawn at random.
-    id: "dating", domain: "love", channel: "good", tags: ["spouse"], ages: [17, 75], when: s => s.rel === "single" || s.rel === "divorced" || s.rel === "widowed",
-    p: (s, ctx) => ctx.R.dating(s.age, s.rel, s.year) * (s.flags.pursueUntil >= s.age ? 1.8 : 1),
+    // (about: "partner", life.js). Everyone else is drawn at random. From the 合婚 tab nobody else comes before them,
+    // and once they are due you meet about twice as fast (people.js keptForPartner).
+    id: "dating", domain: "love", channel: "good", tags: ["spouse"], ages: [17, 75], when: (s, ctx) => (s.rel === "single" || s.rel === "divorced" || s.rel === "widowed") && !realPartnerWaiting(s, ctx),
+    p: (s, ctx) => ctx.R.dating(s.age, s.rel, s.year) * (s.flags.pursueUntil >= s.age ? 1.8 : 1) * (keptForPartner(s, ctx) ? 2 : 1),
     apply: (s, ctx) => {
       s.prevRel = s.rel; s.rel = "dating"; s.datingSince = s.age;
       const real = realPartnerDue(s, ctx);
@@ -448,12 +449,14 @@ export const CORE = [
       else {
         const partnerAge = Math.max(17, s.age + Math.round(ctx.rng.between(-3, 4)) * (s.sex === "male" ? -1 : 1));
         const how = meetPlace(s, ctx);
-        p = ctx.person({ role: "partner", sex: s.sex === "male" ? "female" : "male", birthYear: s.year - partnerAge, how });
+        p = ctx.person({ role: "partner", sex: datingSex(s, ctx), birthYear: s.year - partnerAge, how });
         p.age = partnerAge;
       }
       s.partner = p;
       const ta = pronoun(p), met = MET[p.how] || "認識了";
-      return { text: ctx.w([`${met}{name}，一個${p.nature.word}的人，{開始交往。|兩個人很快就在一起了。}`, `${met}{name}，{聊著聊著就在一起了。|第一次約會就聊到餐廳打烊。}`, `${met}{name}。{你對${ta}的第一印象是：好${p.nature.word}。|兩個人第一次見面就很聊得來。}{沒多久就在一起了。|半年後，你們開始交往。}`], { name: p.call }), mood: 6, big: !!p.real };
+      // Someone you knew before (老同學) gets no first impression.
+      const first = p.how === "老同學" ? [] : [`${met}{name}。{你對${ta}的第一印象是：好${p.nature.word}。|兩個人第一次見面就很聊得來。}{沒多久就在一起了。|半年後，你們開始交往。}`];
+      return { text: ctx.w([`${met}{name}，一個${p.nature.word}的人，{開始交往。|兩個人很快就在一起了。}`, `${met}{name}，{聊著聊著就在一起了。|第一次約會就聊到餐廳打烊。}`, ...first], { name: p.call }), mood: 6, big: !!p.real };
     },
   },
   {
@@ -477,7 +480,7 @@ export const CORE = [
     // The wedding year given for the real partner: you marry that year (the proposal choice is not asked). Only in
     // lives with such a partner.
     id: "realPartnerWedding", domain: "love", channel: "good", tags: ["spouse"], about: "partner", rare: true, once: true, ages: [16, 95],
-    when: (s, ctx) => realPartnerWeddingDue(s, ctx),
+    when: (s, ctx) => realPartnerWeddingDue(s, ctx) && canMarry(s),
     p: () => 1,
     apply: (s, ctx) => {
       const name = s.partner.call;
@@ -486,8 +489,9 @@ export const CORE = [
     },
   },
   {
-    // A couple that talked things through (s.guard) breaks up less often; one in a crisis more often.
-    id: "breakup", domain: "love", channel: "bad", tags: ["spouse"], about: "partner", cooldown: 1, when: (s, ctx) => s.rel === "dating" && s.age > s.datingSince && !realPartnerEngaged(s, ctx),
+    // A couple that talked things through (s.guard) breaks up less often; one in a crisis more often. Not with the
+    // partner from the 合婚 tab (people.js realPartnerSteady): only your own choices end that.
+    id: "breakup", domain: "love", channel: "bad", tags: ["spouse"], about: "partner", cooldown: 1, when: (s, ctx) => s.rel === "dating" && s.age > s.datingSince && !realPartnerEngaged(s, ctx) && !realPartnerSteady(s, ctx),
     p: (s, ctx) => ctx.R.breakup(s.age) * (s.guard > 0 ? 0.6 : 1) * (s.crisis > 0 ? 1.5 : 1),
     apply: (s, ctx) => {
       const name = s.partner ? s.partner.call : "對方";
@@ -496,7 +500,8 @@ export const CORE = [
     },
   },
   {
-    id: "proposal", calibrated: true, domain: "love", channel: "good", tags: ["spouse"], about: "partner", when: (s, ctx) => s.rel === "dating" && s.age > s.datingSince && !realPartnerAhead(s, ctx) && !realPartnerEngaged(s, ctx) && !realPartnerWeddingDue(s, ctx), p: (s, ctx) => ctx.R.proposal(s.age, s.sex, s.year, s.marriages),
+    // A same-sex couple can marry from 2019 (people.js canMarry); many who had waited married in the first two years.
+    id: "proposal", calibrated: true, domain: "love", channel: "good", tags: ["spouse"], about: "partner", when: (s, ctx) => s.rel === "dating" && s.age > s.datingSince && !realPartnerAhead(s, ctx) && !realPartnerEngaged(s, ctx) && !realPartnerWeddingDue(s, ctx) && canMarry(s), p: (s, ctx) => (sameSexCouple(s) && s.year <= SAME_SEX_MARRIAGE + 1 ? Math.max(0.5, ctx.R.proposal(s.age, s.sex, s.year, s.marriages)) : ctx.R.proposal(s.age, s.sex, s.year, s.marriages)),
     choice: (s, ctx) => {
       const name = s.partner ? s.partner.call : "對方";
       const again = s.marriages > 0, years = Math.max(1, s.age - s.datingSince);
@@ -538,7 +543,7 @@ export const CORE = [
     p: (s, ctx) => ctx.R.crisis(yearsMarried(s)) * (s.partner && s.partner.nature ? s.partner.nature.crisis : 1),
     choice: (s, ctx) => {
       const name = s.partner ? s.partner.call : "另一半";
-      const topic = ctx.rng.pick(s.kids.length ? ["孩子的教養", "家事分工", "錢", "婆家和娘家", "工作太忙"] : ["家事分工", "錢", "要不要生小孩", "工作太忙", "婆家和娘家"]);
+      const topic = ctx.rng.pick(sameSexCouple(s) ? ["家事分工", "錢", "兩邊的家人", "工作太忙"] : s.kids.length ? ["孩子的教養", "家事分工", "錢", "婆家和娘家", "工作太忙"] : ["家事分工", "錢", "要不要生小孩", "工作太忙", "婆家和娘家"]);
       const little = s.kids.find(k => k.age >= 4 && k.age <= 15);
       const lead = scene(ctx, [
         `和${name}為了${topic}越來越常吵架，婚姻出現危機。`,
@@ -588,7 +593,8 @@ export const CORE = [
 
   // ---------- family ----------
   {
-    id: "baby", domain: "family", channel: "good", tags: ["children"], when: s => s.rel === "married" && !s.flags.noMoreKids,
+    // Not for two people of the same sex (people.js sameSexCouple).
+    id: "baby", domain: "family", channel: "good", tags: ["children"], when: s => s.rel === "married" && !s.flags.noMoreKids && !sameSexCouple(s),
     p: (s, ctx) => Math.min(0.9, ctx.R.birth(motherAge(s), s.kids.length, s.year) * (s.flags.tryUntil >= s.age ? 1.8 : 1)),
     apply: (s, ctx) => {
       const kid = newKid(s, ctx);
@@ -703,10 +709,10 @@ export const CORE = [
       s.flags.grandkids = (s.flags.grandkids || 0) + 1;
       const k = ctx.rng.pick(s.kids.filter(x => x.age >= 26 && x.age <= 45));
       const sex = ctx.rng() < 0.512 ? "male" : "female";
-      const g = ctx.person({ role: "grandkid", sex, birthYear: s.year, surname: k.sex === "male" ? [...k.name][0] : null });
+      const g = ctx.person({ role: "grandkid", sex, birthYear: s.year, surname: k.sex === "male" ? surnameIn(k.name) : null });
       g.parent = k.call; (s.grandkids = s.grandkids || []).push(g);
       const w = sex === "male" ? "孫子" : "孫女";
-      return { text: s.flags.grandkids === 1 ? ctx.w(`{name}的孩子{g}出生了，你當{grand}了！{第一次抱{w}，手都在抖。|你把{w}的照片設成手機桌布。}`, { name: k.call, g: g.call, w }) : ctx.w(`{name}的{w}{g}出生了，家裡又多了一個小{w}。`, { name: k.call, g: g.call, w }), mood: 7 };
+      return { text: s.flags.grandkids === 1 ? ctx.w(`{name}的孩子{g}出生了，你當{grand}了！{第一次抱{w}，手都在抖。|你把{w}的照片設成手機桌布。}`, { name: k.call, g: g.call, w }) : ctx.w(`{name}的{kid}{g}出生了，你又多了一個{w}。`, { name: k.call, kid: sex === "male" ? "兒子" : "女兒", g: g.call, w }), mood: 7 };
     },
   },
   {

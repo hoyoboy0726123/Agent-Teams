@@ -3,6 +3,7 @@
 import { PLACE_GROUPS, findPlace } from "./core/places.js";
 import { computeChart } from "./core/chart.js";
 import { hehunReading } from "./core/hehun.js";
+import { checkFamily } from "./core/family.js";
 import { readingRequest, PARTS, toneWord } from "./ai-reading.js";
 import { SHICHEN } from "./core/shichen.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
@@ -82,8 +83,11 @@ function setPerson(p, x) {
   syncTimeField(p);
 }
 
-// 你 from the 我的人生 form, 對方 from its partner (when a birthday was entered). `force` overwrites what is here.
+// 你 from the 我的人生 form, 對方 from its partner (when a birthday was entered). `force` (the button) overwrites what
+// is here; opening the tab fills in only what was typed in 我的人生, never the form's example birthday.
+const LIFE_DRAFT = draftStore("bazi-life.form");
 function fillFromLife(force) {
+  if (!force && !LIFE_DRAFT.load()) return;
   if (force || !$("#ma-date").value) {
     $("#ma-name").value = $("#f-name").value;
     $("#ma-date").value = $("#f-date").value;
@@ -147,6 +151,9 @@ function compute() {
   shown = { a, b, r };
   ai = null;
   $("#hh-body").innerHTML = resultHTML(r);
+  $("#hh-life-name").value = b.name || "";
+  $("#hh-life-same").hidden = a.sex !== b.sex;
+  lifeError("");
   drawAI();
   $("#match").hidden = false;
   $("#match").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -201,12 +208,25 @@ function radar(dims) {
 }
 
 // ---------- 用這對伴侶過一生 ----------
+// Your life with the other person as the partner (core/family.js, sim/people.js): `only` keeps everyone else out of
+// your love life until you meet them and keeps you together while you date; the years are the ones typed here, or
+// none (then you meet once both are 22). Two people of the same sex can marry from 2019 (checkFamily says so).
+const lifeError = text => { const el = $("#hh-life-error"); el.textContent = text; el.hidden = !text; };
+const yearIn = id => { const v = $(id).value.trim(); return v ? Number(v) : undefined; };
 function startLife() {
   if (!shown) return;
   const { a, b } = shown;
-  hooks.begin({ date: a.date, time: a.time, place: a.place, sex: a.sex }, null, {
-    name: a.name, family: { siblings: [], onlyChild: false, partner: { name: b.name, date: b.date, time: b.time, sex: b.sex } },
-  });
+  const name = clean($("#hh-life-name").value);
+  if (!name) { lifeError("請幫對方取個名字，故事裡會用這個名字稱呼對方。"); $("#hh-life-name").focus(); return; }
+  const partner = { name, date: b.date, time: b.time, sex: b.sex, only: true };
+  const met = yearIn("#hh-life-met"), wed = yearIn("#hh-life-wed");
+  if (met !== undefined) partner.metYear = Number.isInteger(met) ? met : NaN;
+  if (wed !== undefined) partner.marriedYear = Number.isInteger(wed) ? wed : NaN;
+  const family = { siblings: [], onlyChild: false, partner };
+  const problems = checkFamily(family, a.date, a.sex);
+  if (problems.length) { lifeError(problems.join(" ")); return; }
+  lifeError("");
+  hooks.begin({ date: a.date, time: a.time, place: a.place, sex: a.sex }, null, { name: a.name, family });
 }
 
 // ---------- AI 深度合婚 ----------

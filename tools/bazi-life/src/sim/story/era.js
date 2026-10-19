@@ -4,6 +4,7 @@
 // were touched). Only facts with well-known dates are used, and the wording stays with what a person saw at home,
 // at school or at work; no opinions about politics. These events change mood and a little money only.
 import { regionOf } from "../world.js";
+import { sameSexCouple } from "../people.js";
 
 const at = (year, ages, more = () => true) => s => s.year === year && s.age >= ages[0] && s.age <= ages[1] && !s.abroad && more(s);
 const field = s => (s.job ? s.job.field : "");
@@ -142,8 +143,11 @@ export const ERA = [
     apply: (s, ctx) => { s.savings = Math.max(0, s.savings - 0.2); return { text: ctx.w(["公教年金改革上路，{你的退休金每個月少了一些，|你重新算了一次退休後的開銷，}{和老同事聚會時，大家聊的都是這件事。|你決定生活再省一點。}"]), mood: -3 }; },
   },
   {
-    id: "e_2019marriage", once: true, when: at(2019, [18, 90]), p: () => 0.3,
-    apply: (s, ctx) => ({ text: ctx.w(["五月，同性婚姻專法通過，{新聞上，第一批登記的新人在戶政事務所前合照。|你的同事開心地說，他終於可以和交往十年的伴侶結婚了。}"]), mood: 1 }),
+    // For a same-sex couple it is their own news: from now on they can marry (story/core.js proposal).
+    id: "e_2019marriage", once: true, when: at(2019, [18, 90]), p: s => (sameSexCouple(s) ? 1 : 0.3),
+    apply: (s, ctx) => (sameSexCouple(s)
+      ? { text: ctx.w("五月，同性婚姻專法通過。{你和{partner}在電視前看著新聞，紅了眼眶。|你和{partner}在立法院外的人群裡，緊緊抱在一起。}終於，你們也可以結婚了。"), mood: 6 }
+      : { text: ctx.w(["五月，同性婚姻專法通過，{新聞上，第一批登記的新人在戶政事務所前合照。|你的同事開心地說，他終於可以和交往十年的伴侶結婚了。}"]), mood: 1 }),
   },
   {
     id: "e_2020covid", once: true, when: at(2020, [3, 100]), p: () => 1,

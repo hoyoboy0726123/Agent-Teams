@@ -110,7 +110,7 @@ export function buildFamily(input, me, place) {
   }
   if (!members.length && !input.onlyChild) return null;
   const out = members.map(m => {
-    const base = { relation: m.relation, label: RELATIONS[m.relation], name: m.name || "", date: m.date || null, sex: m.relation === "partner" ? m.sex : sexOf(m.relation), ...(m.relation === "partner" ? { metYear: Number.isInteger(m.metYear) ? m.metYear : null, marriedYear: Number.isInteger(m.marriedYear) ? m.marriedYear : null } : {}) };
+    const base = { relation: m.relation, label: RELATIONS[m.relation], name: m.name || "", date: m.date || null, sex: m.relation === "partner" ? m.sex : sexOf(m.relation), ...(m.relation === "partner" ? { metYear: Number.isInteger(m.metYear) ? m.metYear : null, marriedYear: Number.isInteger(m.marriedYear) ? m.marriedYear : null, only: !!m.only } : {}) };
     if (!m.date) return { ...base, chart: null, bond: null };
     const chart = memberChart(m, place);
     return { ...base, chart, bond: relate(me, chart) };
@@ -120,7 +120,11 @@ export function buildFamily(input, me, place) {
 
 // Problems with the family input, for the form: parents born well before the protagonist, older siblings before
 // and younger ones after (twins may share the date), a partner born within 30 years of you.
-export function checkFamily(input, birth) {
+// Same-sex marriage is legal in Taiwan from 24 May 2019 (司法院釋字第七四八號解釋施行法).
+export const SAME_SEX_MARRIAGE = 2019;
+
+// `sex` is yours: with a partner of the same sex, a wedding year before SAME_SEX_MARRIAGE is turned away.
+export function checkFamily(input, birth, sex = null) {
   if (!input) return [];
   const key = d => d.y * 10000 + d.m * 100 + d.d;
   const me = key(birth), errors = [];
@@ -147,6 +151,7 @@ export function checkFamily(input, birth) {
     const earliest = Math.max(birth.y, p.date ? p.date.y : birth.y) + 18;
     if (!Number.isInteger(p.marriedYear) || p.marriedYear < earliest || p.marriedYear > birth.y + 95) errors.push(`和${RELATIONS.partner}的結婚年份要在你們都滿 18 歲以後（${earliest} 年以後）。`);
     else if (Number.isInteger(p.metYear) && p.marriedYear < p.metYear) errors.push(`結婚年份不能早於開始交往的年份。`);
+    else if (sex && p.sex === sex && p.marriedYear < SAME_SEX_MARRIAGE) errors.push(`同性婚姻在 ${SAME_SEX_MARRIAGE} 年 5 月才合法，結婚年份請填 ${SAME_SEX_MARRIAGE} 年以後，或留空。`);
   }
   return errors;
 }

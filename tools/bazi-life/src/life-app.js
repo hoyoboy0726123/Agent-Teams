@@ -141,6 +141,7 @@ function selectTab(tab) {
   }
   if (tab !== "welcome") try { localStorage.setItem("bazi-life.welcomed", "1"); } catch {}
   TAB_DRAFT.save(tab);
+  saveFormSoon.flush();   // what was just typed in 我的人生 is saved before 合婚 reads it (hehun-app.js fillFromLife)
   onMatchTab(tab);
 }
 
@@ -266,7 +267,7 @@ function startFromForm() {
   const family = readFamily();
   const members = family ? [family.father, family.mother, family.partner, ...family.siblings].filter(Boolean) : [];
   if (members.some(x => x.date && (x.date.y < 1900 || x.date.y > 2100))) return showError("家人的出生年份請在 1900 到 2100 年之間。");
-  const problems = checkFamily(family, { y, m, d });
+  const problems = checkFamily(family, { y, m, d }, $("#sex-f").checked ? "female" : "male");
   if (problems.length) { $("#family").open = true; return showError(problems.join(" ")); }
   showError("");
   const input = { date: { y, m, d }, time: hour.time, place: findPlace($("#f-place").value), sex: $("#sex-f").checked ? "female" : "male" };

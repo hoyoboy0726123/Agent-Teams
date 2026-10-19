@@ -519,6 +519,9 @@ footer a { color: var(--indigo); }
 .hh-years .yh { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 13px; color: var(--muted); }
 .hh-years .yh b { font-family: var(--display); font-size: 16px; color: var(--ink); }
 .ai-tone.t-wed { background: var(--seal); color: var(--sheet); }
+.hh-life-box { display: grid; gap: 12px; padding: 14px 16px; border: 1px solid var(--rule); border-radius: 10px; background: var(--paper); }
+.hh-life-box .fine { font-size: 13px; color: var(--muted); }
+.hh-life-box input[type="text"] { background: var(--sheet); }
 </style>
 
 <div class="wrap">
@@ -785,10 +788,21 @@ footer a { color: var(--indigo); }
       <p class="ai-status" id="hh-ai-status" role="status" aria-live="polite"></p>
       <div class="ai-body" id="hh-ai-body"></div>
     </div>
-    <div class="form-actions">
-      <button type="button" class="primary" id="hh-life">用這對伴侶過一生</button>
-      <button type="button" class="secondary" id="hh-edit">修改兩個人的資料</button>
-    </div>
+    <section class="hh-life-box" id="hh-life-box" aria-labelledby="hh-life-title">
+      <h3 id="hh-life-title">用這對伴侶過一生</h3>
+      <p class="fine">用你的命盤過一生，對方就是故事裡的伴侶：在你們開始交往之前，不會有別的戀愛對象；交往期間也不會無故分手。要不要結婚、婚後怎麼走，由你的選擇、你們的合盤和人生的起伏決定。</p>
+      <p class="fine" id="hh-life-same" hidden>你們是同性伴侶：故事照台灣的法律走，2019 年 5 月同婚專法通過以後才能登記結婚，故事裡也不會有生小孩的情節。</p>
+      <div class="fields">
+        <label class="field"><span>對方在故事裡的名字</span><input type="text" id="hh-life-name" maxlength="8" placeholder="例如：王小美" lang="zh-Hant" spellcheck="false"></label>
+        <label class="field"><span>開始交往的年份（選填）</span><input type="number" id="hh-life-met" min="1900" max="2100" step="1" inputmode="numeric" placeholder="不填：兩人都滿 22 歲以後"></label>
+        <label class="field"><span>結婚的年份（選填）</span><input type="number" id="hh-life-wed" min="1900" max="2100" step="1" inputmode="numeric" placeholder="例如：2018"></label>
+      </div>
+      <p class="error" id="hh-life-error" hidden></p>
+      <div class="form-actions">
+        <button type="button" class="primary" id="hh-life">開始這一生</button>
+        <button type="button" class="secondary" id="hh-edit">修改兩個人的資料</button>
+      </div>
+    </section>
     <p class="notice">合婚依傳統命理規則推算，供參考與自我觀察，不是預言。命理說的是傾向，不是注定；兩個人怎麼相處、怎麼選擇，影響更大。</p>
   </section>
 

@@ -21,7 +21,7 @@
 //   s.flags.cadre        the class or club job you took on (班長, 風紀股長, 社長, 隊長, 總召, 畢冊總編輯, 學生會長)
 //   memory kinds "crush" ({ name, call, sex }: the first love) and "admirer" (someone who confessed to you)
 import { exam15Name, exam18Name, COUNTIES, bornSiblings } from "../world.js";
-import { pronoun } from "../people.js";
+import { pronoun, keptForPartner } from "../people.js";
 import { siblingCall } from "../words.js";
 import { bestFriend, friendName, makeFriend, grownUp, liveWith, youngerSibs, homeMoney, snackOf, pad } from "./child.js";
 
@@ -357,8 +357,9 @@ export const TEEN = [
     },
   },
   {
-    // 初戀：記下名字（memory kind "crush"），之後的人生可以回頭提起；結局在 t_heartbreak
-    id: "t_firstLove", domain: "love", channel: "good", once: true, ages: [13, 15], when: s => s.studying && s.rel === "single" && !s.abroad && !s.arcs.t_love, p: () => 0.1,
+    // 初戀：記下名字（memory kind "crush"），之後的人生可以回頭提起；結局在 t_heartbreak。從合婚分頁開始的人生不會有
+    // （people.js keptForPartner：遇到那個人之前，不會和別人談戀愛）。
+    id: "t_firstLove", domain: "love", channel: "good", once: true, ages: [13, 15], when: (s, ctx) => s.studying && s.rel === "single" && !s.abroad && !s.arcs.t_love && !keptForPartner(s, ctx), p: () => 0.1,
     choice: (s, ctx) => {
       const y = s.year, sex = ctx.rng() < 0.95 ? (s.sex === "male" ? "female" : "male") : s.sex;
       const p = ctx.person({ role: "friend", sex, birthYear: s.birthYear + ctx.rng.int(3) - 1, how: "同學" });
@@ -422,8 +423,8 @@ export const TEEN = [
     },
   },
   {
-    // 被告白
-    id: "t_confession", domain: "love", channel: "good", once: true, ages: [14, 17], when: s => s.studying && s.rel === "single" && !s.abroad && !s.arcs.t_love, p: () => 0.05,
+    // 被告白（從合婚分頁開始的人生不會有，同 t_firstLove）
+    id: "t_confession", domain: "love", channel: "good", once: true, ages: [14, 17], when: (s, ctx) => s.studying && s.rel === "single" && !s.abroad && !s.arcs.t_love && !keptForPartner(s, ctx), p: () => 0.05,
     choice: (s, ctx) => {
       const y = s.year;
       const p = ctx.person({ role: "friend", sex: s.sex === "male" ? "female" : "male", birthYear: s.birthYear + ctx.rng.int(3) - 1, how: "同學" });

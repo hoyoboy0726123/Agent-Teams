@@ -8,6 +8,7 @@
 import { ACTIONS } from "./actions.js";
 import { startJob, otherJob, moveTo, wage, ABROAD, bornSiblings, yearsMarried } from "./world.js";
 import { siblingCall } from "./words.js";
+import { sameSexCouple, canMarry } from "./people.js";
 
 // The situation in a few words, then the player's own words, so the line reads on its own in the story.
 const lead = sit => [sit.topic, sit.summary].filter(Boolean).map(x => `${x.replace(/[。，,.!！？?\s]+$/, "")}。`).join("");
@@ -290,6 +291,7 @@ const HANDLERS = {
   marry(s, ctx, sit) {
     if (s.rel === "married") return no("你已經結婚了。");
     if (s.rel !== "dating" || !s.partner) return no("現在沒有交往的對象。");
+    if (!canMarry(s)) return no("同性婚姻在 2019 年才合法，現在還不能登記結婚。");
     marry(s);
     return { text: lead(sit) + ctx.w("和{partner}結婚了！{婚禮上爸媽哭得比你還兇。|簡單登記，請兩邊家人吃了一頓飯。}"), mood: 9, big: true };
   },
@@ -304,6 +306,7 @@ const HANDLERS = {
   },
   haveChild(s, ctx, sit) {
     if (s.rel !== "married") return no("現在還沒有結婚的另一半。");
+    if (sameSexCouple(s)) return no("故事裡還沒有同性伴侶生養孩子的情節。");
     const motherAge = s.sex === "female" ? s.age : s.partner ? s.partner.age : 99;
     if (motherAge > 45) return no("已經過了適合生育的年紀。");
     s.flags.noMoreKids = false; s.flags.tryUntil = s.age + 3;

@@ -1,17 +1,18 @@
 // The partner from the family input (伴侶): their member and tilts, the first relationship once you are both adults,
 // the love events their chart tilts while you are together, 生活節奏不同 when the day branches clash, the 同盤重跑
-// counts, and lives without a partner left exactly as they were.
+// counts, and lives without a partner left exactly as they were. From the 合婚 tab (only): nobody before them and no
+// breakup at random; surnames from a nickname; same-sex couples (a wedding from 2019, no births).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { computeChart, fourPillars } from "../src/core/chart.js";
 import { findPlace } from "../src/core/places.js";
-import { buildFamily, checkFamily, familyTilts, describeFamilyTilts, partnerNote, RELATIONS } from "../src/core/family.js";
+import { buildFamily, checkFamily, familyTilts, describeFamilyTilts, partnerNote, RELATIONS, SAME_SEX_MARRIAGE } from "../src/core/family.js";
 import { clash } from "../src/core/detail.js";
 import { DOMAINS, CHANNELS } from "../src/core/luck.js";
 import { prepare } from "../src/sim/setup.js";
 import { createLife, runLife, personalTilt } from "../src/sim/life.js";
 import { rerun } from "../src/sim/monte.js";
-import { realPartnerOutcome, REAL_PARTNER_AGE as A } from "../src/sim/people.js";
+import { realPartnerOutcome, REAL_PARTNER_AGE as A, surnameIn } from "../src/sim/people.js";
 import { hashSeed } from "../src/sim/rng.js";
 import { ALL_EVENTS, deathEvent } from "../src/sim/story/index.js";
 
@@ -50,7 +51,9 @@ test("the family input takes a partner: a 伴侶 member with a chart and a bond,
   const me = { pillars: PREP.natal, analysis: PREP.analysis, sex: "female" };
   const fam = buildFamily({ partner: { name: "王小明", date: { y: 1986, m: 6, d: 1 }, time: null } }, me, place);
   const m = fam.members[0];
-  assert.deepEqual(Object.keys(m).sort(), ["bond", "chart", "date", "label", "marriedYear", "metYear", "name", "relation", "sex"]);
+  assert.deepEqual(Object.keys(m).sort(), ["bond", "chart", "date", "label", "marriedYear", "metYear", "name", "only", "relation", "sex"]);
+  assert.equal(m.only, false);
+  assert.equal(buildFamily({ partner: { name: "王小明", date: { y: 1986, m: 6, d: 1 }, only: true } }, me, place).members[0].only, true);
   assert.deepEqual([m.relation, m.label, m.name, m.sex], ["partner", "伴侶", "王小明", "male"]);   // the opposite of yours
   assert.deepEqual(m.date, { y: 1986, m: 6, d: 1 });
   assert.equal(m.chart.pillars.length, 3);                                                         // no birth time
@@ -312,4 +315,142 @@ test("without a partner nothing changes: no tilt, partner: null, and a partner w
     assert.deepEqual(b.kline, a.kline);
     assert.equal(b.state.flags.realPartnerMet, undefined);
   }
+});
+
+test("from the 合婚 tab (only): nobody comes before them, you meet soon after you are both 22, and no breakup at random", () => {
+  const him = chartOf(1988, "male"), partner = { name: "王小美", date: { y: 1990, m: 5, d: 20 }, sex: "female" };
+  const prep = prepare(him, { family: { partner: { ...partner, only: true } } });
+  const from = partner.date.y + A - 1988;   // your age in the first year both are A
+  let grown = 0, met = 0, soon = 0, married = 0, chose = 0;
+  for (let i = 0; i < 150; i++) {
+    let withThem = false;
+    const life = live({
+      chart: him, prep, family: prep.family, seed: 9000 + i,
+      after: (entries, l) => {
+        // A breakup while you were dating them at the start of the year would be at random: there is none.
+        for (const e of entries) assert.ok(!(e.id === "breakup" && withThem), `${e.age}: ${e.text}`);
+        const s = l.state;
+        withThem = s.rel === "dating" && !!s.partner && s.partner.real;
+      },
+    });
+    const s = life.state, dated = life.log.filter(e => e.id === "dating");
+    assert.ok(!life.log.some(e => e.id === "t_firstLove" || e.id === "t_confession"), "no first love with someone else");
+    if (dated.length) assert.ok(dated[0].text.includes("小美") && dated[0].age === s.flags.realPartnerMet, dated[0].text);
+    assert.ok(realOf(s).length <= 1);
+    if (s.flags.realPartnerMet !== undefined) assert.ok(s.flags.realPartnerMet >= from, `met at ${s.flags.realPartnerMet}`);
+    if (s.age < from + 8) continue;
+    grown++;
+    if (s.flags.realPartnerMet !== undefined) met++;
+    if (s.flags.realPartnerMet <= from + 3) soon++;
+    if (s.flags.realPartnerWed !== undefined) married++;
+    else if (life.log.some(e => e.id === "proposal" && e.text.includes("小美") && /分手|分開/.test(e.text))) chose++;
+  }
+  assert.ok(grown >= 130, `${grown} lives reached ${from + 8}`);
+  assert.equal(met, grown, `met them in ${met} of ${grown}`);
+  assert.ok(soon >= grown * 0.85, `met within three years in ${soon} of ${grown}`);
+  assert.ok(married >= grown * 0.8, `married them in ${married} of ${grown} (${chose} said no at the proposal)`);
+  // The same seeds without only: other people first in many lives (the 我的人生 form keeps that).
+  const free = prepare(him, { family: { partner } });
+  let first = 0;
+  for (let i = 0; i < 150; i++) {
+    const life = runLife({ chart: him, analysis: free.analysis, luck: free.luck, seed: 9000 + i, family: free.family });
+    const d = life.log.find(e => e.id === "dating");
+    if (d && !d.text.includes("小美")) first++;
+  }
+  assert.ok(first >= 50, `someone else first in ${first} of 150 without only`);
+});
+
+test("from the 合婚 tab with the years: you meet that year, marry in the wedding year, and nobody comes before", () => {
+  const him = chartOf(1988, "male"), partner = { name: "王小美", date: { y: 1990, m: 5, d: 20 }, sex: "female", only: true };
+  for (const years of [{ metYear: 2006 }, { metYear: 2008, marriedYear: 2014 }, { marriedYear: 2016 }]) {
+    const prep = prepare(him, { family: { partner: { ...partner, ...years } } });
+    const meet = years.metYear || years.marriedYear - 2, wed = years.marriedYear || null, at = y => y - 1988;
+    let alive = 0, wedded = 0;
+    for (let i = 0; i < 100; i++) {
+      const life = runLife({ chart: him, analysis: prep.analysis, luck: prep.luck, seed: 9300 + i, family: prep.family });
+      const s = life.state;
+      if (s.age < at(wed || meet)) continue;
+      alive++;
+      assert.equal(s.flags.realPartnerMet, at(meet), `${JSON.stringify(years)}: met at ${s.flags.realPartnerMet}`);
+      const first = life.log.find(e => e.id === "dating" || e.id === "realPartnerMeet");
+      assert.ok(first.text.includes("小美") && !/分手之後/.test(first.text), first.text);
+      if (wed && s.flags.realPartnerWed === at(wed)) wedded++;
+    }
+    assert.ok(alive >= 85, `${alive} alive`);
+    if (wed) assert.ok(wedded >= alive * 0.95, `${JSON.stringify(years)}: married in ${wed} in ${wedded} of ${alive}`);
+  }
+});
+
+test("surnameIn reads a surname, never a nickname's 小, 阿 or 老, so the children's surname is a real one", () => {
+  assert.deepEqual(["王小美", "方明", "歐陽娜娜", "陳 志明", "小美", "阿明", "老王", "美美", "陳", "", null].map(surnameIn), ["王", "方", "歐陽", "陳", null, null, null, null, null, null, null]);
+  // A woman whose partner is called 小明, and a man called 小明: the children share one surname, never 小.
+  const cases = [
+    { chart: ME, name: null, partner: { name: "小明", date: { y: 1986, m: 6, d: 1 }, sex: "male", only: true } },
+    { chart: chartOf(1988, "male"), name: "小明", partner: { name: "林語柔", date: { y: 1989, m: 3, d: 9 }, sex: "female", only: true } },
+  ];
+  for (const c of cases) {
+    const prep = prepare(c.chart, { name: c.name || "", family: { partner: c.partner } });
+    let families = 0;
+    for (let i = 0; i < 80; i++) {
+      const s = runLife({ chart: c.chart, analysis: prep.analysis, luck: prep.luck, seed: 9600 + i, name: c.name, family: prep.family }).state;
+      if (s.marriages !== 1 || s.flags.realPartnerWed === undefined || s.kids.length < 2) continue;
+      families++;
+      const names = s.kids.map(k => surnameIn(k.name));
+      assert.ok(names.every(n => n && n === names[0] && n !== "小"), `${c.partner.name}: ${s.kids.map(k => k.name).join("、")}`);
+    }
+    assert.ok(families >= 10, `${families} families`);
+  }
+});
+
+test("a same-sex couple: a wedding only from 2019, no births, the 2019 news is theirs, and everyone you date shares your sex", () => {
+  assert.equal(SAME_SEX_MARRIAGE, 2019);
+  const birth = { y: 1985, m: 2, d: 15 }, partner = { name: "林志明", date: { y: 1986, m: 5, d: 20 }, sex: "male" };
+  assert.deepEqual(checkFamily({ partner: { ...partner, marriedYear: 2015 } }, birth, "male"), ["同性婚姻在 2019 年 5 月才合法，結婚年份請填 2019 年以後，或留空。"]);
+  assert.deepEqual(checkFamily({ partner: { ...partner, marriedYear: 2019 } }, birth, "male"), []);
+  assert.deepEqual(checkFamily({ partner: { ...partner, marriedYear: 2015 } }, birth, "female"), []);
+  assert.deepEqual(checkFamily({ partner: { ...partner, marriedYear: 2015 } }, birth), []);   // your sex not given
+  const him = chartOf(1985, "male");
+  for (const only of [true, false]) {
+    const prep = prepare(him, { family: { partner: { ...partner, only } } });
+    let wed = 0, soon = 0, news = 0, together = 0;
+    for (let i = 0; i < 100; i++) {
+      const life = runLife({ chart: him, analysis: prep.analysis, luck: prep.luck, seed: 9700 + i, family: prep.family });
+      const s = life.state;
+      assert.ok([...s.exes, s.partner].filter(Boolean).every(p => p.sex === "male"), "everyone you date is a man");
+      assert.equal(s.kids.length, 0);
+      assert.ok(!life.log.some(e => ["baby", "a_inlaws", "a_confinement"].includes(e.id)));
+      assert.ok(s.spells.every(x => 1985 + x.from >= 2019), "no wedding before 2019");
+      for (const e of life.log.filter(x => x.id === "crisis")) assert.ok(!e.text.includes("婆家和娘家"), e.text);
+      const e = life.log.find(x => x.id === "e_2019marriage");
+      if (e && e.text.includes("終於，你們也可以結婚了")) { news++; assert.ok((!only || e.text.includes("志明")) && !BROKEN.test(e.text), e.text); }
+      const real = realOf(s)[0];
+      if (real && s.flags.realPartnerMet <= 2019 - 1985 && (s.rel !== "single" || s.flags.realPartnerWed !== undefined) && s.age > 2019 - 1985) together++;
+      if (s.flags.realPartnerWed !== undefined) { wed++; if (1985 + s.flags.realPartnerWed <= 2020) soon++; }
+    }
+    if (only) {
+      assert.ok(wed >= 80, `married ${wed}`);
+      assert.ok(soon >= wed * 0.6, `in 2019 or 2020: ${soon} of ${wed}`);
+      assert.ok(news >= together * 0.8 && news >= 60, `the news in ${news} lives (${together} together then)`);
+    }
+  }
+  // The news for everyone else is unchanged.
+  const prep = prepare(him);
+  for (let i = 0; i < 60; i++) {
+    const e = runLife({ chart: him, analysis: prep.analysis, luck: prep.luck, seed: 9800 + i }).log.find(x => x.id === "e_2019marriage");
+    if (e) assert.match(e.text, /^五月，同性婚姻專法通過，/);
+  }
+});
+
+test("a second grandchild is the son or daughter of your child, and your grandchild", () => {
+  const prep = prepare(chartOf(1950, "female"));
+  let seen = 0;
+  for (let i = 0; i < 80 && seen < 5; i++) {
+    const life = runLife({ chart: chartOf(1950, "female"), analysis: prep.analysis, luck: prep.luck, seed: 9900 + i });
+    for (const e of life.log.filter(x => x.id === "grandchild").slice(1)) {
+      seen++;
+      assert.match(e.text, /^\S+的(兒子|女兒)\S+出生了，你又多了一個孫(子|女)。$/, e.text);
+      assert.ok(!/的孫(子|女)\S+出生了/.test(e.text), e.text);
+    }
+  }
+  assert.ok(seen >= 3, `${seen} second grandchildren`);
 });

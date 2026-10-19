@@ -415,9 +415,13 @@ check("a name starts the baby's life", /林沐希在臺北市出生/.test(await 
 await baby.close();
 
 // 合婚分頁: two birthdays, the full 合婚 from the engine at once (no network): the type and score, six dimensions, nine
-// checks, the two people, the guide and ten years. The AI part says where it is offered; the pair can start a life.
+// checks, the two people, the guide and ten years. The AI part says where it is offered; the pair can start a life
+// with the other person as the only partner before you meet.
 const hh = await fresh({ viewport: { width: 400, height: 900 } });
 await hh.goto(url);
+await hh.click("#tab-match");
+check("with nothing typed in 我的人生, the 合婚 form starts empty instead of the example birthday", await hh.inputValue("#ma-date") === "" && await hh.inputValue("#mb-date") === "" && await hh.inputValue("#ma-name") === "");
+await hh.click("#tab-me");
 await hh.fill("#f-name", "陳志明");
 await hh.click("#family > summary");
 await hh.fill(".member[data-role=partner] .m-name", "王小美");
@@ -446,6 +450,7 @@ await hh.check("#mb-sex-m");
 await hh.click("#form-match button[type=submit]");
 await hh.waitForFunction(() => /伴侶星/.test(document.querySelector("#hh-body").textContent));
 check("two people of the same sex read 伴侶星, and the 行嫁月 says it does not apply", /這裡不適用/.test(await hh.textContent("#hh-body")));
+check("the life panel tells a same-sex couple about 2019", await hh.isVisible("#hh-life-same") && /2019 年 5 月/.test(await hh.textContent("#hh-life-same")));
 await hh.check("#mb-sex-f");
 await hh.click("#tab-me");
 const hhHiddenElsewhere = await hh.isHidden("#match");
@@ -455,9 +460,24 @@ await hh.reload();
 check("after a reload the 合婚 tab and form come back", await hh.getAttribute("#tab-match", "aria-selected") === "true" && await hh.inputValue("#mb-date") === "1990-05-20" && await hh.inputValue("#ma-name") === "陳志明" && await hh.isChecked("#mb-sex-f"));
 await hh.click("#form-match button[type=submit]");
 await hh.waitForSelector("#match:not([hidden]) .hh-hero");
+check("the life panel has the other person's name and says nobody else comes first", await hh.inputValue("#hh-life-name") === "王小美" && /不會有別的戀愛對象/.test(await hh.textContent("#hh-life-box")) && await hh.isHidden("#hh-life-same"));
+await hh.fill("#hh-life-name", "");
+await hh.click("#hh-life");
+check("the life asks for a name for the other person", /請幫對方取個名字/.test(await hh.textContent("#hh-life-error")) && await hh.isVisible("#match") && await hh.isHidden("#play"));
+await hh.fill("#hh-life-name", "王小美");
+await hh.fill("#hh-life-met", "1999");
+await hh.click("#hh-life");
+check("a year you got together before you were both 14 is turned away", /開始交往的年份要在你們都滿 14 歲以後（2004 年以後）/.test(await hh.textContent("#hh-life-error")) && await hh.isHidden("#play"), await hh.textContent("#hh-life-error"));
+await hh.fill("#hh-life-met", "2012");
 await hh.click("#hh-life");
 await hh.waitForSelector("#play:not([hidden])");
 check("用這對伴侶過一生 starts your life with the other person as the partner", await hh.isHidden("#match") && await hh.isHidden("#setup") && /1988 年 2 月 15 日/.test(await hh.textContent("#born")));
+await hh.click("#c-skip");
+await ended(hh, 20000);
+const hhLife = await hh.$$eval("#feed li", els => els.map(e => [Number(e.dataset.age), e.textContent]));
+const hhMet = hhLife.find(([age, t]) => age === 24 && /小美/.test(t));
+const hhLast = Math.max(...hhLife.map(([age]) => age));
+check("小美 comes into the story in 2012 (at 24), and nobody before", hhLast < 24 || (!!hhMet && !hhLife.some(([age, t]) => age < 24 && /開始交往|就在一起了|跟你告白/.test(t))), hhMet ? hhMet[1] : `ended at ${hhLast}`);
 await hh.close();
 
 // 填到一半重新整理: the forms and the tab come back; 清空重填 clears them; nothing personal stays after the tab.

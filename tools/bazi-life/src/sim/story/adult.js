@@ -10,7 +10,7 @@
 //
 // Probabilities in this file are design assumptions, not statistics (see above). Event ids start with "a_".
 import { yearsMarried, bornSiblings, otherJob, startJob, exam15Name, exam18Name } from "../world.js";
-import { pronoun, partnerMember } from "../people.js";
+import { pronoun, partnerMember, sameSexCouple } from "../people.js";
 import { siblingCall } from "../words.js";
 import { clash } from "../../core/detail.js";
 
@@ -79,7 +79,7 @@ function friendOf(s, ctx, how = "同學") {
 function oldFlame(s) {
   const now = s.partner ? s.partner.call : null;
   if (!s.divorces) {
-    const ex = s.exes.find(x => x && x.alive !== false && x.call && x.how === "同學" && x.call !== now);
+    const ex = s.exes.find(x => x && x.alive !== false && x.call && (x.how === "同學" || x.how === "老同學") && x.call !== now);
     if (ex) return { kind: "ex", name: ex.call, school: UNI.includes(s.edu) ? "大學" : "高中" };
   }
   const m = [...s.memory].reverse().find(x => x && x.kind === "crush");
@@ -422,7 +422,7 @@ export const ADULT = [
   {
     // 婆媳、岳家：結了婚，多了一整個家要相處。
     id: "a_inlaws", domain: "family", channel: "bad", tags: ["spouse"], ages: [27, 55], cooldown: 6, max: 2,
-    when: s => married(s) && !s.abroad,
+    when: s => married(s) && !s.abroad && !sameSexCouple(s),
     p: () => 0.04,
     choice: (s, ctx) => {
       const p = s.partner.call, ta = pronoun(s.partner), kids = s.kids.length > 0;
