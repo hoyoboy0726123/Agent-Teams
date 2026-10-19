@@ -280,6 +280,9 @@ test("合婚 parts are written from both charts, with the engine's verdict and t
   assert.equal(my.items[0].key, `${now} 年`);
   assert.deepEqual(my.items[0].ages, [now - 1990, now - 1992]);
   assert.ok(my.items.every(i => !i.fallback && i.fields.好事 === LINE.好事));
+  // The other person's own birthplace is read (the 合婚 tab sends it).
+  const there = readingEnv(writer());
+  assert.equal((await worker.fetch(postReading(ask("match", "m1", { partner: { ...PARTNER, place: "高雄市鳳山" } })), there)).status, 200);
 });
 
 test("reading failures answer with an error status", async () => {
@@ -293,6 +296,7 @@ test("reading failures answer with an error status", async () => {
     ["an unknown part", postReading({ ...body, part: "years9" }), readingEnv(writer()), 400],
     ["a part of another kind", postReading({ ...body, part: "m1" }), readingEnv(writer()), 400],
     ["合婚 without the other person", postReading({ ...ask("match", "m1"), partner: null }), readingEnv(writer()), 400],
+    ["合婚 with an unknown birthplace for the other person", postReading({ ...ask("match", "m1"), partner: { ...PARTNER, place: "月球" } }), readingEnv(writer()), 400],
     ["an unknown place", postReading({ ...body, birth: { ...BIRTH, place: "月球" } }), readingEnv(writer()), 400],
     ["a day that does not exist", postReading({ ...body, birth: { ...BIRTH, m: 2, d: 30 } }), readingEnv(writer()), 400],
     ["too large", postReading({ ...body, pad: "長".repeat(3000) }), readingEnv(writer()), 413],

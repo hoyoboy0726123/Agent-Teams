@@ -28,6 +28,7 @@ import { readingRequest, partsFor, PARTS, toneWord } from "./ai-reading.js";
 import { SHICHEN } from "./core/shichen.js";
 import { trait } from "./sim/words.js";
 import { initBaby } from "./baby-app.js";
+import { initMatch, onMatchTab, openMatch } from "./hehun-app.js";
 import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
 import { initTimeField, readTimeField, syncTimeField, timeFieldIds } from "./time-field.js";
@@ -72,6 +73,7 @@ function setup() {
   initMemberHours($("#form-me"));
   initBaby({ begin, showError });
   restoreForm();
+  initMatch({ begin, showError, selectTab });
   for (const type of ["input", "change"]) $("#form-me").addEventListener(type, saveFormSoon);
   $("#family").addEventListener("toggle", saveFormSoon);
   $("#me-clear").addEventListener("click", clearForm);
@@ -118,6 +120,7 @@ function setup() {
   $("#ai-short").addEventListener("click", () => askAI("short"));
   $("#ai-full").addEventListener("click", () => askAI("full"));
   $("#ai-match-go").addEventListener("click", () => askAI("match"));
+  $("#ai-match-tab").addEventListener("click", toMatchTab);
   $("#ai-p-when").innerHTML = memberHourHTML("對方");
   $("#ai-partner").addEventListener("change", e => { if (e.target.matches(".m-hour")) syncMemberHour($("#ai-partner")); });
   $("#ai-body").addEventListener("click", e => {
@@ -129,8 +132,8 @@ function setup() {
   window.addEventListener("resize", () => { if (run && run.summary && !$("#end").hidden) drawKline(); });
 }
 
-const TABS = ["welcome", "me", "random", "baby"];
-const PANEL = { welcome: "#welcome", me: "#form-me", random: "#form-random", baby: "#form-baby" };
+const TABS = ["welcome", "me", "random", "baby", "match"];
+const PANEL = { welcome: "#welcome", me: "#form-me", random: "#form-random", baby: "#form-baby", match: "#form-match" };
 function selectTab(tab) {
   for (const t of TABS) {
     $(`#tab-${t}`).setAttribute("aria-selected", String(t === tab));
@@ -138,6 +141,7 @@ function selectTab(tab) {
   }
   if (tab !== "welcome") try { localStorage.setItem("bazi-life.welcomed", "1"); } catch {}
   TAB_DRAFT.save(tab);
+  onMatchTab(tab);
 }
 
 // 填到一半的表單 stays through a reload (draft.js: this tab only, gone when it is closed).
@@ -290,7 +294,7 @@ function begin(input, born, extra = {}) {
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
   run = { input, extra, chart, prep, name, seed, born, life: createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed, name, family: prep.family, majorOnly: $("#c-major").checked, seen: startSeen() }), summary: null };
   startScene(seed, run.life.state, age => luckAt(prep, age));
-  $("#setup").hidden = true; $("#baby").hidden = true; $("#end").hidden = true; $("#play").hidden = false;
+  $("#setup").hidden = true; $("#baby").hidden = true; $("#match").hidden = true; $("#end").hidden = true; $("#play").hidden = false;
   $("#feed").innerHTML = ""; $("#choice").hidden = true; recap = [];
   $("#born").textContent = born || `${input.date.y} 年 ${input.date.m} 月 ${input.date.d} 日在${input.place.name}出生。`;
   paused = false; $("#c-pause").textContent = "暫停";
@@ -765,6 +769,15 @@ function prefillPartner() {
     setMemberHour(row, { hour: "", time: "" });
   }
   $("#ai-match").open = !!(p && p.date);
+}
+// From the end of a life to the 合婚 tab: you, and the partner typed in the AI card (when a birthday is there).
+function toMatchTab() {
+  if (!run) return;
+  const partner = readPartner();
+  stop();
+  $("#end").hidden = true; $("#play").hidden = true; $("#setup").hidden = false;
+  openMatch({ me: { ...run.input, name: run.extra.name || "" }, partner: partner.error ? null : partner });
+  if (partner.error) $("#setup").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 function readPartner() {
   const [y, m, d] = ($("#ai-p-date").value || "").split("-").map(Number);

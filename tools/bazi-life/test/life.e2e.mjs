@@ -47,7 +47,7 @@ async function ended(p, timeout) {
 const page = await fresh({ viewport: { width: 1100, height: 1300 } }, { welcomed: false });
 await page.goto(url);
 const welcome = await page.textContent("#welcome");
-check("a first visit opens on 歡迎: how to play, what is fun, and that the data stays on the phone", await page.isVisible("#welcome") && await page.isHidden("#form-me") && /怎麼玩/.test(welcome) && /好玩的地方/.test(welcome) && /網站後台不保存任何資料/.test(welcome) && /沒有帳號、沒有資料庫/.test(welcome) && /AI 命理師解讀.+不含姓名和家人/.test(welcome));
+check("a first visit opens on 歡迎: how to play, what is fun, and that the data stays on the phone", await page.isVisible("#welcome") && await page.isHidden("#form-me") && /怎麼玩/.test(welcome) && /好玩的地方/.test(welcome) && /網站後台不保存任何資料/.test(welcome) && /沒有帳號、沒有資料庫/.test(welcome) && /AI 命理師解讀.+不含姓名、暱稱和家人/.test(welcome) && /合婚分頁的合婚結果在手機上算，不會上傳/.test(welcome));
 await page.click('[data-goto="me"]');
 await page.waitForTimeout(250);
 check("the welcome page walks through a life in pixels", await painted(page, "#welcome-scene") && (await page.$$("#welcome-stages span")).length === 6);
@@ -325,6 +325,17 @@ await rd.p.click("#ai-match-go");
 check("合婚 without the other birthday asks for it and sends nothing", readingSent.length === n && /請先填另一半的出生日期/.test(await rd.p.textContent("#ai-status")) && await rd.p.$eval("#ai-status", el => el.classList.contains("bad")));
 await rd.p.click("#ai-full");
 check("a reading already written comes back without asking again", readingSent.length === n && (await rd.p.$$("#ai-body .ai-years li")).length === ages && (await rd.p.textContent("#ai-status")) === "");
+// From the end page to the 合婚 tab: you and the partner of the AI card, the full 合婚 at once, then AI 深度合婚.
+await rd.p.fill("#ai-p-date", "1990-05-20");
+await rd.p.click("#ai-match-tab");
+await rd.p.waitForSelector("#match:not([hidden]) .hh-hero", { timeout: 10000 });
+check("到「合婚」分頁 opens the 合婚 tab with you and the partner, and the 合婚 at once", await rd.p.getAttribute("#tab-match", "aria-selected") === "true" && await rd.p.isHidden("#end") && await rd.p.inputValue("#ma-date") === "1988-02-15" && await rd.p.inputValue("#mb-date") === "1990-05-20" && await rd.p.inputValue("#mb-shichen") === "wu");
+n = readingSent.length;
+await rd.p.click("#hh-ai-btn");
+await rd.p.waitForFunction(() => document.querySelectorAll("#hh-ai-body .ai-luck li").length === 10 && !document.querySelector("#hh-ai-body .ai-wait"), null, { timeout: 30000 });
+const deep = sentFrom(n);
+check("AI 深度合婚 sends both births with the other person's birthplace, and no names", deep.length === 3 && deep.map(b => b.part).join() === "m1,m2,myears" && deep.every(b => b.kind === "match" && b.partner && b.partner.place === "臺北市" && b.partner.y === 1990) && !readingSent.slice(n).some(b => /陳志明|志明|小美/.test(b)), JSON.stringify(deep[0] && deep[0].partner));
+check("AI 深度合婚 shows its sections and the ten years", (await rd.p.$$("#hh-ai-body .ai-sec")).length === 6 && /不是預言/.test(await rd.p.textContent("#hh-ai-body")) && (await rd.p.textContent("#hh-ai-status")) === "");
 await rd.p.close();
 server.close();
 
@@ -403,6 +414,52 @@ await baby.waitForSelector("#play:not([hidden])");
 check("a name starts the baby's life", /林沐希在臺北市出生/.test(await baby.textContent("#born")) && await baby.isHidden("#baby"));
 await baby.close();
 
+// 合婚分頁: two birthdays, the full 合婚 from the engine at once (no network): the type and score, six dimensions, nine
+// checks, the two people, the guide and ten years. The AI part says where it is offered; the pair can start a life.
+const hh = await fresh({ viewport: { width: 400, height: 900 } });
+await hh.goto(url);
+await hh.fill("#f-name", "陳志明");
+await hh.click("#family > summary");
+await hh.fill(".member[data-role=partner] .m-name", "王小美");
+await hh.fill(".member[data-role=partner] .m-date", "1990-05-20");
+await hh.selectOption(".member[data-role=partner] .m-hour", "wu");
+await hh.click("#tab-match");
+check("the 合婚 tab shows its own form, filled in from 我的人生 and its partner", await hh.isVisible("#form-match") && await hh.isHidden("#form-me") && await hh.inputValue("#ma-date") === "1988-02-15" && await hh.inputValue("#ma-time") === "23:30" && await hh.inputValue("#ma-name") === "陳志明" && await hh.inputValue("#mb-date") === "1990-05-20" && await hh.inputValue("#mb-shichen") === "wu" && await hh.isChecked("#mb-sex-f") && await hh.inputValue("#mb-name") === "王小美");
+await hh.fill("#mb-date", "");
+await hh.click("#form-match button[type=submit]");
+check("合婚 without the other birthday asks for it", /請填對方的出生日期/.test(await hh.textContent("#error")) && await hh.isHidden("#match"));
+await hh.fill("#mb-date", "1990-05-20");
+await hh.click("#form-match button[type=submit]");
+await hh.waitForSelector("#match:not([hidden]) .hh-hero");
+const hhText = await hh.textContent("#hh-body");
+check("the 合婚 opens with the type, the score and three chips, with the names typed", /型$/.test(await hh.textContent(".hh-label")) && /^\d+$/.test(await hh.textContent(".hh-num")) && (await hh.$$(".hh-chips span")).length === 3 && /陳志明/.test(hhText) && /王小美/.test(hhText));
+check("the score is shown part by part, eight parts", (await hh.$$(".hh-bar")).length === 8 && /夫妻宮・日柱/.test(hhText) && /命卦/.test(hhText));
+check("six dimensions on a radar, each with what fits, what to watch and something to try", (await hh.$$(".hh-dim")).length === 6 && await hh.isVisible(".hh-radar") && await hh.$$eval(".hh-dim", els => els.every(e => /優勢/.test(e.textContent) && /要留意/.test(e.textContent) && /這週試試/.test(e.textContent))));
+const hhChecks = await hh.$$eval(".hh-check", els => els.map(e => [e.querySelector(".t").textContent, e.querySelector(".hh-tag").textContent]));
+check("nine traditional checks, 主要 first and 民俗 last", hhChecks.length === 9 && hhChecks[0][0] === "夫妻宮（日支）" && hhChecks.slice(0, 3).every(c => c[1] === "主要") && hhChecks.slice(6).every(c => c[1] === "民俗") && hhChecks[8][0] === "命卦（呂才合婚）", hhChecks.map(c => c.join(":")).join(" "));
+check("the two people, the guide and the ten years", (await hh.$$(".hh-love")).length === 2 && (await hh.$$(".hh-guide > div")).length === 5 && (await hh.$$(".hh-strip .yr")).length === 10 && (await hh.$$(".hh-years li")).length === 10);
+check("宜婚年份, the months, luck together and the age note", /大利月是/.test(hhText) && /不需要買任何開運物品/.test(hhText) && /年齡差小知識/.test(hhText));
+check("nothing in the 合婚 judges the couple", !/剋夫|剋妻|下等婚|上等婚|不宜|大凶|離婚|外遇|化解|改運/.test(hhText));
+check("on a page without the Worker the AI part says where it is offered", await hh.isHidden("#hh-ai-btn") && /只在命盤人生的網站上提供/.test(await hh.textContent("#hh-ai-status")));
+check("the 合婚 page fits a phone", await hh.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth));
+await hh.check("#mb-sex-m");
+await hh.click("#form-match button[type=submit]");
+await hh.waitForFunction(() => /伴侶星/.test(document.querySelector("#hh-body").textContent));
+check("two people of the same sex read 伴侶星, and the 行嫁月 says it does not apply", /這裡不適用/.test(await hh.textContent("#hh-body")));
+await hh.check("#mb-sex-f");
+await hh.click("#tab-me");
+const hhHiddenElsewhere = await hh.isHidden("#match");
+await hh.click("#tab-match");
+check("the 合婚 result shows only under its tab", hhHiddenElsewhere && await hh.isVisible("#match"));
+await hh.reload();
+check("after a reload the 合婚 tab and form come back", await hh.getAttribute("#tab-match", "aria-selected") === "true" && await hh.inputValue("#mb-date") === "1990-05-20" && await hh.inputValue("#ma-name") === "陳志明" && await hh.isChecked("#mb-sex-f"));
+await hh.click("#form-match button[type=submit]");
+await hh.waitForSelector("#match:not([hidden]) .hh-hero");
+await hh.click("#hh-life");
+await hh.waitForSelector("#play:not([hidden])");
+check("用這對伴侶過一生 starts your life with the other person as the partner", await hh.isHidden("#match") && await hh.isHidden("#setup") && /1988 年 2 月 15 日/.test(await hh.textContent("#born")));
+await hh.close();
+
 // 填到一半重新整理: the forms and the tab come back; 清空重填 clears them; nothing personal stays after the tab.
 const draft = await fresh({ viewport: { width: 400, height: 900 } });
 await draft.goto(url);
@@ -478,7 +535,7 @@ const phone = await fresh({ viewport: { width: 400, height: 900 }, colorScheme: 
 await phone.goto(url);
 await phone.setViewportSize({ width: 360, height: 900 });
 const tabRows = await phone.$eval(".tabs", t => new Set([...t.children].map(b => Math.round(b.getBoundingClientRect().top))).size);
-check("the four tabs fit in one row at 360px", tabRows === 1, `${tabRows} rows`);
+check("the five tabs fit in one row at 360px", tabRows === 1, `${tabRows} rows`);
 await phone.setViewportSize({ width: 400, height: 900 });
 await phone.click("#family > summary");
 await phone.click("#add-sibling");

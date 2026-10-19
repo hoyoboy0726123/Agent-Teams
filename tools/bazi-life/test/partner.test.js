@@ -168,15 +168,41 @@ test("配偶星: a 辛 day master man and a 甲 / 乙 day master woman — her d
     assert.match(star.items[1].text, /對方是女命，日干[甲乙]木的夫星是金/);
     assert.ok(r.highlights.includes("互為配偶星"));
   }
-  // Each person reads the star by their own sex: two women, 辛 and 丙 — 丙火 is the 辛 woman's 夫星 (火), not the reverse.
+  // Two people of the same sex read both 財 and 官殺 (伴侶星): two women, 辛 and 丙 — each is in the other's.
   const r = partnerReading({ me: person(["戊辰", "甲寅", "辛丑", "戊子"], "female"), partner: person(["辛未", "庚寅", "丙午", "戊子"], "female") });
   const star = sectionOf(r, "star");
-  assert.match(star.items[0].text, /你是女命，日干辛金的夫星是火/);
-  assert.match(star.items[0].text, /對方的日干丙火是你的正官/);
-  assert.match(star.items[1].text, /對方是女命，日干丙火的夫星是水.*你的日干辛金不是水/);
-  assert.match(star.paragraphs[0], /對方的日干丙火正是你的夫星，是傳統合婚裡的好兆頭/);
-  assert.ok(r.highlights.includes("配偶星相應"));
+  assert.equal(r.neutral, true);
+  assert.equal(star.items[0].label, "你的伴侶星");
+  assert.match(star.items[0].text, /你的日干辛金，伴侶星是木（財星）和火（官殺）/);
+  assert.match(star.items[0].text, /對方的日干丙火是你的正官(（[^）]*）)?，傳統上視為正緣/);
+  assert.match(star.items[1].text, /對方的日干丙火，伴侶星是金（財星）和水（官殺）.*你的日干辛金是對方的正財/);
+  assert.match(star.paragraphs[0], /兩位的性別相同，這裡兩種都看/);
+  assert.match(star.paragraphs[0], /兩人互為伴侶星/);
+  assert.ok(r.highlights.includes("互為伴侶星"));
+  assert.ok(star.items.every(it => !/男命|女命|妻星|夫星/.test(it.text)), "each person is read the same way");
   assert.ok(!/同性|同志|兩位女性|兩位男性/.test(prose(r).join("")));
+  // A man and a woman keep the traditional reading.
+  assert.equal(partnerReading({ me, partner: person(["庚午", "癸未", "甲申", "己巳"], "female") }).neutral, false);
+});
+
+test("the sections can be shown in another order, glossed in that order, with the chips' kinds", () => {
+  const me = person(["庚午", "壬午", "丁巳", "丙午"], "female"), partner = person(["壬申", "庚戌", "癸亥", "壬子"], "male");
+  const order = ["palace", "useful", "star", "day", "elements", "zodiac", "nayin"];
+  const r = partnerReading({ me, partner, order });
+  assert.deepEqual(r.sections.map(s => s.id), [...order.filter(id => r.sections.some(s => s.id === id)), "closing"]);
+  // A term is explained where it is first read: the summary, then the sections in the order shown.
+  const firstUseGlossed = (x, term) => {
+    const text = [x.summary, ...x.sections.flatMap(s => [...s.paragraphs, ...s.items.map(i => i.text)])].join("\n");
+    const open = i => (text.slice(0, i).match(/（/g) || []).length > (text.slice(0, i).match(/）/g) || []).length;
+    let i = text.indexOf(term);
+    while (i >= 0 && open(i)) i = text.indexOf(term, i + 1);   // a use inside another gloss does not count
+    return i >= 0 && text[i + term.length] === "（";
+  };
+  for (const x of [r, partnerReading({ me, partner })]) for (const term of ["日干", "日支", "夫妻宮", "財星"]) assert.ok(firstUseGlossed(x, term), term);
+  assert.deepEqual(r.chips.map(c => c.text), r.highlights);
+  for (const chip of r.chips) assert.ok(["good", "care", "mid"].includes(chip.kind));
+  assert.equal(r.chips.find(c => c.text === "日支相沖").kind, "care");
+  assert.equal(r.chips.find(c => c.text === "用神互補").kind, "good");
 });
 
 test("用神互補 in both directions, and in one", () => {

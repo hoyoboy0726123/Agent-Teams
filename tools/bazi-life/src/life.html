@@ -53,6 +53,7 @@ input, select { font: inherit; color: inherit; }
 .tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--rule); }
 .tabs button { border: 0; background: none; padding: 8px 10px; font-size: 15px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--seal); font-weight: 500; }
+@media (max-width: 420px) { .tabs button { padding: 8px 6px; font-size: 14px; } }
 .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px 16px; }
 .field { display: grid; gap: 6px; min-width: 0; }
 .field > span, .field > .name, legend { font-size: 13px; font-weight: 500; color: var(--muted); }
@@ -426,6 +427,98 @@ footer { display: grid; gap: 8px; font-size: 13px; color: var(--muted); border-t
 footer p { max-width: 70ch; }
 footer a { color: var(--indigo); }
 @media (prefers-reduced-motion: reduce) { .mood .track i { transition: none; } }
+/* 合婚: the two people side by side, then a result read top-down like a 合婚書: the type and the score, the six parts,
+   the nine traditional checks, the two people, the guide, the ten years. */
+.match-people { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 14px; }
+.match-person { border: 1px solid var(--rule); border-radius: 10px; padding: 10px 14px 14px; margin: 0; display: grid; gap: 12px; min-width: 0; }
+.match-person > legend { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--ink); padding: 0 4px; }
+.match-person fieldset { border: 0; padding: 0; margin: 0; }
+.match-result { gap: 22px; }
+#hh-body { display: grid; gap: 22px; }
+.hh-hero { display: grid; gap: 12px; padding: 16px; border-radius: 12px; background: var(--seal-wash); }
+.hh-pair { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; text-align: center; }
+.hh-who { display: grid; gap: 2px; min-width: 0; }
+.hh-who b { font-family: var(--display); font-size: 18px; }
+.hh-who span { font-size: 12.5px; color: var(--muted); }
+.hh-who .num { font-size: 12.5px; letter-spacing: 0.04em; word-break: keep-all; }
+.hh-heart { color: var(--seal); font-size: 24px; line-height: 1; }
+.hh-type { display: grid; justify-items: center; gap: 4px; text-align: center; }
+.hh-kicker { font-size: 12px; letter-spacing: 0.1em; color: var(--muted); }
+.hh-label { font-family: var(--display); font-size: 30px; font-weight: 700; color: var(--seal); line-height: 1.2; }
+.hh-type p { max-width: 36em; }
+.hh-score { display: flex; justify-content: center; align-items: baseline; gap: 6px; }
+.hh-score .hh-num { font-family: var(--mono); font-size: 34px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.hh-score .hh-of { font-size: 14px; color: var(--muted); }
+.hh-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0; }
+.hh-chips span { font-size: 13px; border-radius: 999px; padding: 2px 10px; background: var(--sheet); color: var(--ink); }
+.hh-chips .c-good { color: var(--down); }
+.hh-chips .c-care { color: var(--seal); }
+.hh-hero .hh-summary { font-size: 14px; line-height: 1.8; }
+.hh-hero .fine { font-size: 12.5px; color: var(--muted); text-align: center; }
+.hh-sec { display: grid; gap: 10px; min-width: 0; }
+.hh-sec > h3 { font-size: 20px; }
+.hh-sec > .fine { font-size: 13px; color: var(--muted); }
+.hh-bars { display: grid; gap: 8px; }
+.hh-bar { display: grid; grid-template-columns: 7.2em minmax(0, 1fr) 3.4em; grid-template-areas: "l track n" ". why why"; align-items: center; gap: 2px 10px; font-size: 14px; }
+.hh-bar .l { grid-area: l; }
+.hh-bar .track { grid-area: track; height: 8px; border-radius: 99px; background: var(--wash); overflow: hidden; }
+.hh-bar .fill { display: block; height: 100%; border-radius: 99px; background: var(--seal); }
+.hh-bar .n { grid-area: n; text-align: right; font-family: var(--mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hh-bar .why { grid-area: why; font-size: 12.5px; color: var(--muted); }
+.hh-radar { width: 100%; max-width: 320px; justify-self: center; }
+.hh-radar .grid { fill: none; stroke: var(--rule); stroke-width: 1; }
+.hh-radar .axis { stroke: var(--rule); stroke-width: 1; }
+.hh-radar .area { fill: var(--seal); fill-opacity: 0.16; stroke: var(--seal); stroke-width: 2; stroke-linejoin: round; }
+.hh-radar .dot { fill: var(--seal); }
+.hh-radar text { fill: var(--muted); font-size: 12px; font-family: var(--body); }
+.hh-radar .v { fill: var(--ink); font-family: var(--mono); font-size: 11px; }
+.hh-dims { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; }
+.hh-dim { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.hh-dim header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.hh-dim header b { font-family: var(--display); font-size: 17px; }
+.hh-dim header .num { font-size: 15px; }
+.hh-meter { height: 6px; border-radius: 99px; background: var(--wash); overflow: hidden; }
+.hh-meter span { display: block; height: 100%; border-radius: 99px; background: var(--indigo); }
+.hh-dim p, .hh-love p, .hh-years p { margin: 0; line-height: 1.75; font-size: 14px; }
+.hh-dim p b, .hh-years p b { display: inline-block; min-width: 4.2em; color: var(--muted); font-weight: 600; font-size: 13px; }
+.hh-check { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 0 14px; }
+.hh-check > summary { cursor: pointer; padding: 11px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; list-style: none; }
+.hh-check > summary::-webkit-details-marker { display: none; }
+.hh-check > summary .t { font-weight: 600; margin-right: auto; }
+.hh-check[open] > summary { border-bottom: 1px solid var(--wash); margin-bottom: 8px; }
+.hh-check p { margin: 0 0 10px; line-height: 1.8; font-size: 14px; }
+.hh-check .item b { color: var(--muted); font-size: 13px; }
+.hh-tag { font-size: 12px; border-radius: 999px; padding: 0 8px; white-space: nowrap; }
+.lv-主要 { background: var(--seal-wash); color: var(--seal); }
+.lv-輔助 { background: var(--indigo-wash); color: var(--indigo); }
+.lv-民俗 { background: var(--wash); color: var(--muted); }
+.vd-契合 { color: var(--down); border: 1px solid currentColor; }
+.vd-中性 { color: var(--muted); border: 1px solid currentColor; }
+.vd-需要磨合 { color: var(--seal); border: 1px solid currentColor; }
+.hh-loves { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 10px; }
+.hh-love { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.hh-love h4 { margin: 0; font-family: var(--display); font-size: 17px; }
+.hh-love .seen { color: var(--indigo); }
+.hh-guide { margin: 0; display: grid; gap: 10px; }
+.hh-guide div { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 14px; }
+.hh-guide dt { font-weight: 600; margin-bottom: 4px; }
+.hh-guide dd { margin: 0; font-size: 14px; line-height: 1.8; }
+.hh-advice { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; font-size: 14px; }
+.hh-strip { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+@media (max-width: 600px) { .hh-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.hh-strip .yr { border-radius: 8px; padding: 4px 2px; text-align: center; font-size: 11.5px; line-height: 1.4; display: grid; }
+.hh-strip .yr b { font-family: var(--mono); font-weight: 500; font-size: 12px; }
+.hh-strip .s-good { background: var(--indigo-wash); color: var(--indigo); }
+.hh-strip .s-mid { background: var(--wash); color: var(--muted); }
+.hh-strip .s-care { background: var(--seal-wash); color: var(--seal); }
+.hh-strip .wed { box-shadow: 0 0 0 2px var(--seal) inset; }
+.hh-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.hh-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.hh-years { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.hh-years li { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 14px; display: grid; gap: 4px; }
+.hh-years .yh { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 13px; color: var(--muted); }
+.hh-years .yh b { font-family: var(--display); font-size: 16px; color: var(--ink); }
+.ai-tone.t-wed { background: var(--seal); color: var(--sheet); }
 </style>
 
 <div class="wrap">
@@ -443,6 +536,7 @@ footer a { color: var(--indigo); }
       <button type="button" role="tab" id="tab-me" aria-selected="false" aria-controls="form-me">我的人生</button>
       <button type="button" role="tab" id="tab-random" aria-selected="false" aria-controls="form-random">隨機投胎</button>
       <button type="button" role="tab" id="tab-baby" aria-selected="false" aria-controls="form-baby">準爸媽</button>
+      <button type="button" role="tab" id="tab-match" aria-selected="false" aria-controls="form-match">合婚</button>
     </div>
     <div id="welcome" class="welcome" role="tabpanel" aria-labelledby="tab-welcome">
       <figure class="welcome-scene">
@@ -469,6 +563,7 @@ footer a { color: var(--indigo); }
           <li><b>人生 K 線</b>一生的起伏畫成像股票的走勢圖，高點、低點和關卡年，一眼就看到。</li>
           <li><b>台灣的時代背景</b>九二一、SARS、金融海嘯、新冠疫情……依出生的年份，你會在不同的年紀遇上它們。</li>
           <li><b>家人和另一半都在故事裡</b>填上爸媽、兄弟姊妹和伴侶的生日，看你們合不合。另一半會真的走進你的人生，還能指定你們結婚的那一年。</li>
+          <li><b>合婚</b>填兩個人的生日，馬上看契合度、關係類型、傳統合婚九項、相處說明書和未來十年的感情走勢；想看白話長文，再按「AI 深度合婚」。</li>
           <li><b>準爸媽模式</b>幫寶寶比較候選名字和出生時段，每個名字都過同樣的 100 次人生，比得公平。</li>
           <li><b>看得懂的八字詳批</b>四柱、十神、大運流年、神煞和姓名學，每一步怎麼算的都寫出來。</li>
         </ul>
@@ -476,11 +571,12 @@ footer a { color: var(--indigo); }
       <section class="welcome-privacy" aria-labelledby="privacy-title">
         <h3 id="privacy-title"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>你的資料只留在你的手機裡</h3>
         <p>生日、名字、家人和伴侶的資料，全部在你的手機（瀏覽器）裡計算，<strong>網站後台不保存任何資料</strong>。這個網站沒有帳號、沒有資料庫。填到一半重新整理不會不見：資料只暫存在這個分頁裡，關掉網頁就跟著消失。為了讓你重玩時多遇到沒看過的題目，最近兩局問過哪些題目（只記題目種類）也放在這個分頁裡，一樣關掉就清掉。</p>
-        <p class="fine">只有你自己按下這兩個功能時，才會把資料交給 AI，用完都不保存：一是「寫下你自己的決定」裡打的那一句話，送出前名字會換成「伴侶」「爸爸」這樣的稱呼；二是結局的「AI 命理師解讀」和「AI 合婚」，會送出出生日期、時間、出生地和性別（合婚還有對方的出生日期、時間和性別），不含姓名和家人。不想送出，點選項按鈕、不按解讀就好。</p>
+        <p class="fine">只有你自己按下這兩個功能時，才會把資料交給 AI，用完都不保存：一是「寫下你自己的決定」裡打的那一句話，送出前名字會換成「伴侶」「爸爸」這樣的稱呼；二是「AI 命理師解讀」和「AI 合婚」（結局頁或合婚分頁），會送出出生日期、時間、出生地和性別（合婚還有對方的這些資料），不含姓名、暱稱和家人。合婚分頁的合婚結果在手機上算，不會上傳。不想送出，點選項按鈕、不按解讀就好。</p>
       </section>
       <div class="welcome-go">
         <button type="button" class="primary" data-goto="me">開始我的人生</button>
         <button type="button" class="secondary" data-goto="random">隨機投胎</button>
+        <button type="button" class="secondary" data-goto="match">看兩個人合不合</button>
         <button type="button" class="secondary" data-goto="baby">準爸媽模式</button>
       </div>
     </div>
@@ -612,6 +708,59 @@ footer a { color: var(--indigo); }
       <p class="notice">本模擬依傳統命理規則產生虛構故事，供參考與自我反思，未經科學驗證，不代表寶寶的真實命運，也不構成醫療或生育建議；分娩時間請遵醫囑。</p>
       <div class="form-actions"><button type="submit" class="primary">開始比較</button><button type="button" class="clear" id="baby-clear">清空重填</button></div>
     </form>
+    <form id="form-match" autocomplete="off" hidden>
+      <p class="fine">填兩個人的生日，排盤引擎馬上算出合婚：契合度、關係類型、傳統合婚九項、相處說明書，以及未來十年兩個人的感情走勢。全部在你的手機上算，不會上傳。不知道出生時間也可以，勾著「時辰不詳」就好。</p>
+      <div class="match-people">
+      <fieldset class="match-person" id="ma">
+        <legend>你</legend>
+        <label class="field"><span>暱稱（選填，只留在手機上）</span><input type="text" id="ma-name" maxlength="8" placeholder="例如：阿明" lang="zh-Hant" spellcheck="false"></label>
+        <label class="field"><span>出生日期（國曆）</span><input type="date" id="ma-date" min="1900-01-01" max="2100-12-31"></label>
+        <div class="field">
+          <span class="name" id="ma-time-label">出生時間</span>
+          <div class="tmode" role="radiogroup" aria-labelledby="ma-time-label">
+            <label><input type="radio" name="ma-tmode" id="ma-tmode-clock" value="clock" checked> 時間</label>
+            <label><input type="radio" name="ma-tmode" id="ma-tmode-shichen" value="shichen"> 時辰</label>
+          </div>
+          <input type="time" id="ma-time" aria-labelledby="ma-time-label">
+          <select id="ma-shichen" hidden aria-label="你的出生時辰"></select>
+          <label class="check" for="ma-nohour"><input type="checkbox" id="ma-nohour" checked> 時辰不詳</label>
+        </div>
+        <fieldset>
+          <legend>性別</legend>
+          <div class="inline">
+            <label for="ma-sex-m"><input type="radio" name="ma-sex" id="ma-sex-m" value="male" checked> 男</label>
+            <label for="ma-sex-f"><input type="radio" name="ma-sex" id="ma-sex-f" value="female"> 女</label>
+          </div>
+        </fieldset>
+        <label class="field"><span>出生地</span><select id="ma-place"></select></label>
+      </fieldset>
+      <fieldset class="match-person" id="mb">
+        <legend>對方</legend>
+        <label class="field"><span>暱稱（選填，只留在手機上）</span><input type="text" id="mb-name" maxlength="8" placeholder="例如：小美" lang="zh-Hant" spellcheck="false"></label>
+        <label class="field"><span>出生日期（國曆）</span><input type="date" id="mb-date" min="1900-01-01" max="2100-12-31"></label>
+        <div class="field">
+          <span class="name" id="mb-time-label">出生時間</span>
+          <div class="tmode" role="radiogroup" aria-labelledby="mb-time-label">
+            <label><input type="radio" name="mb-tmode" id="mb-tmode-clock" value="clock" checked> 時間</label>
+            <label><input type="radio" name="mb-tmode" id="mb-tmode-shichen" value="shichen"> 時辰</label>
+          </div>
+          <input type="time" id="mb-time" aria-labelledby="mb-time-label">
+          <select id="mb-shichen" hidden aria-label="對方的出生時辰"></select>
+          <label class="check" for="mb-nohour"><input type="checkbox" id="mb-nohour" checked> 時辰不詳</label>
+        </div>
+        <fieldset>
+          <legend>性別</legend>
+          <div class="inline">
+            <label for="mb-sex-m"><input type="radio" name="mb-sex" id="mb-sex-m" value="male"> 男</label>
+            <label for="mb-sex-f"><input type="radio" name="mb-sex" id="mb-sex-f" value="female" checked> 女</label>
+          </div>
+        </fieldset>
+        <label class="field"><span>出生地</span><select id="mb-place"></select></label>
+      </fieldset>
+      </div>
+      <p class="privacy">對方的生日是個人資料，輸入之前最好先問過對方。暱稱只用來在結果裡稱呼你們，不會送出。</p>
+      <div class="form-actions"><button type="submit" class="primary">開始合婚</button><button type="button" class="secondary" id="match-fill">帶入「我的人生」的資料</button><button type="button" class="clear" id="match-clear">清空重填</button></div>
+    </form>
     <p class="error" id="error" hidden></p>
   </section>
 
@@ -625,6 +774,22 @@ footer a { color: var(--indigo); }
     <div id="baby-parents"></div>
     <div id="baby-slots"></div>
     <div id="baby-report"></div>
+  </section>
+
+  <section class="panel match-result" id="match" hidden aria-label="合婚結果">
+    <div id="hh-body"></div>
+    <div class="report ai" id="hh-ai">
+      <div class="report-head"><h3>AI 深度合婚 <span class="badge">免費</span></h3><p class="lede">AI 命理師讀你們兩個人的命盤，寫成白話長文：合婚總評、兩個人的個性、相處的優點、容易摩擦的地方、給你們的建議，以及接下來十年每一年的感情。命盤和合婚由本站的排盤引擎算好，AI 只負責寫，寫完會自動檢查。</p></div>
+      <p class="fine" id="hh-ai-consent">按下按鈕，會把兩個人的出生日期、時間、出生地和性別送到伺服器，交給 AI 寫解讀。不含暱稱，寫完不保存。</p>
+      <div class="ai-go" id="hh-ai-go"><button type="button" class="primary" id="hh-ai-btn">AI 深度合婚</button></div>
+      <p class="ai-status" id="hh-ai-status" role="status" aria-live="polite"></p>
+      <div class="ai-body" id="hh-ai-body"></div>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="primary" id="hh-life">用這對伴侶過一生</button>
+      <button type="button" class="secondary" id="hh-edit">修改兩個人的資料</button>
+    </div>
+    <p class="notice">合婚依傳統命理規則推算，供參考與自我觀察，不是預言。命理說的是傾向，不是注定；兩個人怎麼相處、怎麼選擇，影響更大。</p>
   </section>
 
   <section id="play" hidden aria-label="人生">
@@ -697,7 +862,7 @@ footer a { color: var(--indigo); }
           <div class="field"><span>對方的出生時間</span><span class="when" id="ai-p-when"></span></div>
           <label class="field"><span>對方的性別</span><select id="ai-p-sex"><option value="female">女</option><option value="male">男</option></select></label>
         </div>
-        <button type="button" class="secondary" id="ai-match-go">看合婚解讀</button>
+        <div class="ai-go"><button type="button" class="secondary" id="ai-match-go">看合婚解讀</button><button type="button" class="secondary" id="ai-match-tab">到「合婚」分頁看完整合婚</button></div>
       </details>
       <p class="ai-status" id="ai-status" role="status" aria-live="polite"></p>
       <div class="ai-body" id="ai-body"></div>
@@ -717,7 +882,7 @@ footer a { color: var(--indigo); }
 
   <footer>
     <p>年柱、月柱用出生的精確時刻比對節氣，日柱、時柱用出生地的真太陽時。每一年，大運和流年會讓各領域事件的機率傾斜，倍率限制在 0.5 到 2 倍之間；扶抑、調候、格局三派的看法分開計算後再合併。</p>
-    <p>壽命以內政部 114 年簡易生命表的平均餘命為基準（男 77.93 歲、女 84.75 歲）。所有計算都在你的瀏覽器裡完成，網站不保存你的資料。只有兩種情況會把資料交給 AI：「寫下你自己的決定」那一句（名字會先換成稱呼），以及你按下的「AI 命理師解讀」和「AI 合婚」（出生日期、時間、出生地和性別，不含姓名和家人）；用完都不保存。</p>
+    <p>壽命以內政部 114 年簡易生命表的平均餘命為基準（男 77.93 歲、女 84.75 歲）。所有計算都在你的瀏覽器裡完成，網站不保存你的資料。只有兩種情況會把資料交給 AI：「寫下你自己的決定」那一句（名字會先換成稱呼），以及你按下的「AI 命理師解讀」和「AI 合婚」（出生日期、時間、出生地和性別，不含姓名、暱稱和家人）；用完都不保存。合婚分頁的合婚結果在手機上算，不會上傳。</p>
     <p><a id="chart-link" href="__CHART_URL__">看完整命盤（排盤引擎）</a></p>
   </footer>
 </div>

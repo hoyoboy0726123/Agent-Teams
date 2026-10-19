@@ -80,9 +80,10 @@ const timeOut = t => {
 };
 const birthOut = (b, withPlace) => ({ y: b.date.y, m: b.date.m, d: b.date.d, time: timeOut(b.time), ...(withPlace ? { place: b.place.name } : {}), sex: b.sex });
 
-// input: the page's birth { date, time, place, sex }; partner: { date, time, sex } for 合婚.
+// input: the page's birth { date, time, place, sex }; partner: { date, time, sex, place? } for 合婚 (without a place,
+// the Worker takes yours).
 export function readingRequest(input, kind = "full", { part = PARTS[kind][0], partner = null } = {}) {
-  return { v: READING_VERSION, kind, part, birth: birthOut(input, true), ...(kind === "match" ? { partner: birthOut(partner, false) } : {}) };
+  return { v: READING_VERSION, kind, part, birth: birthOut(input, true), ...(kind === "match" ? { partner: birthOut(partner, !!(partner && partner.place)) } : {}) };
 }
 
 // ---------- the Worker: what is accepted ----------
@@ -115,8 +116,9 @@ export function readReadingRequest(body) {
   const birth = birthIn(body.birth, true);
   if (!birth) return null;
   if (body.kind !== "match") return { kind: body.kind, part, birth };
-  const partner = birthIn(body.partner, false);
-  return partner ? { kind: "match", part, birth, partner: { ...partner, place: birth.place } } : null;
+  const own = body.partner && typeof body.partner === "object" && body.partner.place !== undefined;
+  const partner = birthIn(body.partner, own);
+  return partner ? { kind: "match", part, birth, partner: { place: birth.place, ...partner } } : null;
 }
 
 // ---------- the people ----------

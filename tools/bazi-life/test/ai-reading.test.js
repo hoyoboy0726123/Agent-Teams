@@ -23,6 +23,17 @@ test("the page sends only births: no name, no game, one part at a time", () => {
   assert.deepEqual(match.partner, { y: 1992, m: 3, d: 8, time: { h: 7, mi: 45 }, sex: "male" }, "the partner is sent without a place");
   assert.ok(JSON.stringify(match).length < 300);
   assert.equal(readingRequest({ ...input, time: null }, "full").birth.time, null);
+  // From the 合婚 tab the other person has a birthplace of their own.
+  const own = readingRequest(input, "match", { part: "m1", partner: { ...partner, place: findPlace("高雄市鳳山") } });
+  assert.equal(own.partner.place, "高雄市鳳山");
+});
+
+test("the other person's birthplace: their own when sent, else yours; an unknown one is turned away", () => {
+  const body = readingRequest(input, "match", { part: "m1", partner: { ...partner, place: findPlace("高雄市鳳山") } });
+  assert.equal(readReadingRequest(body).partner.place.name, "高雄市鳳山");
+  assert.equal(readReadingRequest(readingRequest(input, "match", { part: "m1", partner })).partner.place.name, "臺北市");
+  assert.equal(readReadingRequest({ ...body, partner: { ...body.partner, place: "月球" } }), null);
+  assert.equal(readReadingRequest({ ...body, partner: { ...body.partner, place: 7 } }), null);
 });
 
 test("the Worker accepts only what the page could send", () => {

@@ -10,9 +10,14 @@
 //     sections: [{ id, title, paragraphs: [string], items: [{ label, text }] }]   in the order of SECTION_IDS; 五行互補
 //                             only when one chart has two or more of an element the other lacks (and does not dislike)
 //     advice: [string],       2–4 practical suggestions for getting along
+//     chips: [{ text, kind }],  the highlights with "good", "care" or "mid" (a quiet one such as 生肖無刑沖)
 //   }
 //   me, partner: { pillars: [names], analysis: analyse(pillars), sex: "male" | "female", name?: string }
 //   Pillars are 60-cycle names, year first; without a birth time there are three.
+//   order: section ids in the order they are shown (the 合婚 tab leads with 夫妻宮); glosses follow that order.
+//
+// Two people of the same sex get the neutral reading of the 配偶星: both 財 and 官殺, called 伴侶星, since the
+// traditional rule reads a man's and a woman's star differently.
 //
 // The score is relate(): the simulation tilts partner events by 0.15 × net, so this reading explains that score and
 // never re-scores it. What relate() counts (生肖六合、三合、沖、害、刑；日干相合與生剋；日支六合、相沖；對方最旺的五行
@@ -40,6 +45,7 @@ const TITLE = Object.fromEntries(SECTIONS);
 // 專有名詞第一次出現時的白話說明。生肖的合沖刑害、三合、六合在句子裡直接說明意思，不另加註。
 export const GLOSSARY = {
   天合地合: "日干、日支都相合",
+  伴侶星: "財星和官殺都看",
   用神互補: "各自帶著另一方需要的五行",
   夫妻宮: "日支，代表配偶與婚姻",
   配偶星: "男命看財星、女命看官殺",
@@ -61,9 +67,9 @@ export const GLOSSARY = {
   納音: "六十甲子各自配上的五行意象",
 };
 // A use that explains the term in the same sentence: it counts as glossed, and takes no （）.
-const EXPLAINED = { 配偶星: (t, i) => t.slice(Math.max(0, i - 2), i) === "合稱" };
+const EXPLAINED = { 配偶星: (t, i) => t.slice(Math.max(0, i - 2), i) === "合稱", 伴侶星: (t, i) => t.slice(Math.max(0, i - 2), i) === "合稱" };
 
-const ZODIAC = { 子: "鼠", 丑: "牛", 寅: "虎", 卯: "兔", 辰: "龍", 巳: "蛇", 午: "馬", 未: "羊", 申: "猴", 酉: "雞", 戌: "狗", 亥: "豬" };
+export const ZODIAC = { 子: "鼠", 丑: "牛", 寅: "虎", 卯: "兔", 辰: "龍", 巳: "蛇", 午: "馬", 未: "羊", 申: "猴", 酉: "雞", 戌: "狗", 亥: "豬" };
 const GENERATES = { 木: "火", 火: "土", 土: "金", 金: "水", 水: "木" };
 const CONTROLS = { 木: "土", 土: "水", 水: "火", 火: "金", 金: "木" };
 const CONTROLLED_BY = { 土: "木", 水: "土", 火: "水", 金: "火", 木: "金" };
@@ -89,7 +95,7 @@ const GIFT = {
 };
 const EXCESS = { 木: "想法多、凡事想往前衝", 火: "性子急、情緒來得快", 土: "穩重保守、步調偏慢", 金: "講原則、說話直接", 水: "想法多變、不容易捉摸" };
 // Something two people can do together for an element both of them like.
-const TOGETHER = {
+export const TOGETHER = {
   木: "一起去爬山、逛植物園，或在家種些花草", 火: "一起運動流汗、曬曬太陽，或安排熱鬧的聚會", 土: "一起下廚、訂下存錢的目標，或到郊外走走",
   金: "一起整理家裡、斷捨離，或養成固定的運動習慣", 水: "一起去海邊、游泳或旅行",
 };
@@ -119,7 +125,7 @@ const section = (id, paragraphs, items = []) => ({ id, title: TITLE[id], paragra
 
 // Every relation between two branches, the main one first: 六合 or 三合, then 沖、害、刑、破; or the same branch (自刑
 // when it is one of 辰午酉亥).
-function branchRelations(a, b) {
+export function branchRelations(a, b) {
   if (a === b) return punish(a, b) === "自刑" ? [{ kind: "同支" }, { kind: "自刑" }] : [{ kind: "同支" }];
   const out = [];
   if (sixCombine(a, b)) out.push({ kind: "六合", element: SIX_COMBINE_EL[a], pair: ordered(a, b, PAIR_ORDER.六合) });
@@ -154,8 +160,9 @@ function personOf(x, name) {
   };
 }
 // 配偶星: a man reads 財 (the element his day master controls) as the wife star, a woman 官殺 (the element that controls
-// hers) as the husband star, each by their own sex.
-const spouseOf = X => (X.male ? { el: CONTROLS[X.el], word: "妻星" } : { el: CONTROLLED_BY[X.el], word: "夫星" });
+// hers) as the husband star, each by their own sex. Two people of the same sex read both (伴侶星).
+export const spouseElements = (X, neutral) => (neutral ? [CONTROLS[X.el], CONTROLLED_BY[X.el]] : [X.male ? CONTROLS[X.el] : CONTROLLED_BY[X.el]]);
+const spouseOf = (X, neutral) => (neutral ? { els: spouseElements(X, true), word: "伴侶星" } : { els: spouseElements(X, false), word: X.male ? "妻星" : "夫星" });
 const usefulStrong = (X, Y) => !!X.useful && (Y.top === X.useful || Y.share[X.useful] >= STRONG);
 
 // The gloss pass: each term gets its gloss at its first use in reading order. A short term never matches inside a
@@ -291,8 +298,8 @@ function palaceSection(c) {
     body = `${main.pair}同在${main.triad}${main.element}局裡，屬於三合，兩人對未來的想像容易一致，一起規畫、一起打拚時特別有勁`;
     fact = { score: 0.3, chip: "日支三合", phrase: "夫妻宮三合，對未來的想像一致" };
   } else if (main.kind === "相沖") {
-    body = `${main.pair}相沖，兩人的生活節奏、作息習慣不同，例如一個習慣早睡、一個習慣晚睡，一個愛往外跑、一個喜歡待在家；約定好共同的作息，也保留各自的時間，多溝通就能化解`;
-    fact = { score: -0.8, chip: "日支相沖", phrase: `夫妻宮${main.pair}相沖，作息與生活節奏不同`, focus: "約好共同的作息就能化解", advice: "作息不同時，約定幾個固定的共同時段（一起吃晚餐、睡前聊十分鐘），其餘時間尊重各自的步調。" };
+    body = `${main.pair}相沖，兩人的生活節奏、作息習慣不同，例如一個習慣早睡、一個習慣晚睡，一個愛往外跑、一個喜歡待在家；約定好共同的作息，也保留各自的時間，多溝通就能改善`;
+    fact = { score: -0.8, chip: "日支相沖", phrase: `夫妻宮${main.pair}相沖，作息與生活節奏不同`, focus: "約好共同的作息就能改善", advice: "作息不同時，約定幾個固定的共同時段（一起吃晚餐、睡前聊十分鐘），其餘時間尊重各自的步調。" };
   } else if (main.kind === "相害") {
     body = `${main.pair}相害，生活中容易悶著不說、累積小誤會，養成有事當天說開的習慣就好`;
     fact = { score: -0.3, chip: "日支相害", phrase: `夫妻宮${main.pair}相害，要防誤會悶在心裡`, focus: "有話直說就好", advice: "有不舒服的事當天說開，不讓另一半猜心，小誤會就不會累積。" };
@@ -313,34 +320,39 @@ function palaceSection(c) {
 
 // ---------- 4 配偶星 ----------
 function starSection(c) {
-  const { A, B } = c;
+  const { A, B, neutral } = c;
   const line = (X, Y) => {
-    const sp = spouseOf(X), s = X.share[sp.el], match = Y.el === sp.el;
+    const sp = spouseOf(X, neutral), s = sp.els.reduce((t, e) => t + X.share[e], 0), match = sp.els.includes(Y.el);
     const strength = s >= STRONG ? `在${X.n}的命盤裡約佔 ${pct(s)}，力量明顯` : s >= 0.15 ? `在${X.n}的命盤裡約佔 ${pct(s)}，力量適中`
       : s >= 0.005 ? `在${X.n}的命盤裡只佔約 ${pct(s)}，力量偏弱` : `在${X.n}的命盤裡幾乎看不到`;
-    let t = `${X.n}是${X.male ? "男命" : "女命"}，日干${X.day.stem}${X.el}的${sp.word}是${sp.el}，${strength}`;
+    let t = neutral
+      ? `${X.n}的日干${X.day.stem}${X.el}，伴侶星是${sp.els[0]}（財星）和${sp.els[1]}（官殺），${strength}`
+      : `${X.n}是${X.male ? "男命" : "女命"}，日干${X.day.stem}${X.el}的${sp.word}是${sp.els[0]}，${strength}`;
     if (match) {
-      const god = tenGod(X.day.stem, Y.day.stem);   // 正財、偏財 for a man, 正官、七殺 for a woman
+      const god = tenGod(X.day.stem, Y.day.stem);   // 正財、偏財 for 財, 正官、七殺 for 官殺
       t += `；${Y.n}的日干${Y.day.stem}${Y.el}是${X.n}的${god}${god === "正財" || god === "正官" ? "，傳統上視為正緣" : ""}`;
       if (s < 0.15) t += `。${X.n}命中的${sp.word}本來偏弱，${Y.n}正好補上這一塊`;
       else if (s >= STRONG) t += `。${sp.word}在${X.n}命中本來就有力，${Y.n}又正是這個五行，緣分明朗`;
     } else {
-      t += `；${Y.n}的日干${Y.day.stem}${Y.el}不是${sp.el}`;
+      t += `；${Y.n}的日干${Y.day.stem}${Y.el}不是${sp.els.join("或")}`;
       if (s < 0.15) t += `。${sp.word}偏弱的人感情上比較含蓄，多把心意說出口會更好`;
     }
     return { label: `${X.n}的${sp.word}`, text: end(t), match, word: sp.word };
   };
   const la = line(A, B), lb = line(B, A);
-  const intro = "傳統上，男命以財星為妻星、女命以官殺為夫星，合稱配偶星；合婚時會看一方的日干是不是落在另一方的配偶星上，以及配偶星在自己命盤裡的強弱。";
+  const intro = neutral
+    ? "傳統合婚依男女來看：男命看財星、女命看官殺，合稱配偶星。兩位的性別相同，這裡兩種都看，合稱伴侶星；合婚時看一方的日干是不是落在另一方的伴侶星上，以及伴侶星在自己命盤裡的強弱。"
+    : "傳統上，男命以財星為妻星、女命以官殺為夫星，合稱配偶星；合婚時會看一方的日干是不是落在另一方的配偶星上，以及配偶星在自己命盤裡的強弱。";
+  const words = neutral ? "伴侶星" : "配偶星";
   let verdict;
   if (la.match && lb.match) {
-    verdict = `${B.n}的日干${B.day.stem}${B.el}正是${A.n}的${la.word}，${A.n}的日干${A.day.stem}${A.el}也正是${B.n}的${lb.word}，兩人互為配偶星，是傳統合婚裡的好兆頭。`;
-    c.facts.push({ score: 0.4, chip: "互為配偶星", phrase: "兩人互為配偶星" });
+    verdict = `${B.n}的日干${B.day.stem}${B.el}正是${A.n}的${la.word}，${A.n}的日干${A.day.stem}${A.el}也正是${B.n}的${lb.word}，兩人互為${words}，是傳統合婚裡的好兆頭。`;
+    c.facts.push({ score: 0.4, chip: `互為${words}`, phrase: `兩人互為${words}` });
   } else if (la.match || lb.match) {
     const [X, Y, l] = la.match ? [A, B, la] : [B, A, lb];
     verdict = `${Y.n}的日干${Y.day.stem}${Y.el}正是${X.n}的${l.word}，是傳統合婚裡的好兆頭。`;
-    c.facts.push({ score: 0.3, chip: "配偶星相應", phrase: `${Y.n}的日干正是${X.n}的${l.word}` });
-  } else verdict = "兩人的日干都不落在彼此的配偶星上，這在合婚裡很常見，配偶星只是參考之一。";
+    c.facts.push({ score: 0.3, chip: `${words}相應`, phrase: `${Y.n}的日干正是${X.n}的${l.word}` });
+  } else verdict = `兩人的日干都不落在彼此的${words}上，這在合婚裡很常見，${words}只是參考之一。`;
   return section("star", [intro + verdict], [{ label: la.label, text: la.text }, { label: lb.label, text: lb.text }]);
 }
 
@@ -482,6 +494,11 @@ function highlightsOf(c) {
   for (const f of all) if (chips.length < 2 && !chips.includes(f.chip)) chips.push(f.chip);
   return chips;
 }
+// The same chips with what they mean for the pair: good, care (a tension to work on) or mid (a quiet fallback).
+const chipKinds = (c, chips) => chips.map(text => {
+  const f = c.facts.find(x => x.chip === text);
+  return { text, kind: !f || f.fallback ? "mid" : f.score > 0 ? "good" : f.score < 0 ? "care" : "mid" };
+});
 
 function adviceOf(c) {
   const { A, B } = c;
@@ -508,19 +525,23 @@ function adviceOf(c) {
 }
 
 // ---------- 主程式 ----------
-export function partnerReading({ me, partner }) {
+export function partnerReading({ me, partner, order = SECTION_IDS }) {
   me = { ...me, analysis: me.analysis || analyse(me.pillars) };
   partner = { ...partner, analysis: partner.analysis || analyse(partner.pillars) };
   const bond = relate({ pillars: me.pillars, analysis: me.analysis }, { pillars: partner.pillars, analysis: partner.analysis });
   let an = cleanName(me.name), bn = cleanName(partner.name);
   if (an && an === bn) an = bn = null;
-  const c = { A: personOf(me, an || "你"), B: personOf(partner, bn || "對方"), facts: [] };
-  const sections = [zodiacSection(c), daySection(c), palaceSection(c), starSection(c), usefulSection(c), elementsSection(c), nayinSection(c)].filter(Boolean);
+  const neutral = !!me.sex && me.sex === partner.sex;
+  const c = { A: personOf(me, an || "你"), B: personOf(partner, bn || "對方"), facts: [], neutral };
+  // Facts are gathered in the usual order (the summary and the chips rank them), then shown in `order`.
+  const built = [zodiacSection(c), daySection(c), palaceSection(c), starSection(c), usefulSection(c), elementsSection(c), nayinSection(c)].filter(Boolean);
   mergeBurdens(c);
-  sections.push(closingSection(c, bond.tone));
+  built.push(closingSection(c, bond.tone));
+  const rank = id => { const i = order.indexOf(id); return i < 0 ? order.length + SECTION_IDS.indexOf(id) : i; };
+  const sections = built.slice().sort((x, y) => rank(x.id) - rank(y.id));
   const summary = summaryOf(c, bond.tone), advice = adviceOf(c), highlights = highlightsOf(c);
   const gloss = glosser();
   const glossedSummary = gloss(summary);
   const glossed = sections.map(s => ({ ...s, paragraphs: s.paragraphs.map(gloss), items: s.items.map(it => ({ label: it.label, text: gloss(it.text) })) }));
-  return { net: bond.net, tone: bond.tone, title: "伴侶合盤", summary: glossedSummary, highlights, sections: glossed, advice: advice.map(gloss) };
+  return { net: bond.net, tone: bond.tone, title: "伴侶合盤", summary: glossedSummary, highlights, chips: chipKinds(c, highlights), sections: glossed, advice: advice.map(gloss), neutral };
 }
