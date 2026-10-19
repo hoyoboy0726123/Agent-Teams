@@ -285,6 +285,7 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 | 解讀 | 等待（各段同時寫） | token（進／出，各段加總） | neurons | 結果 |
 | --- | --- | --- | --- | --- |
 | 完整解讀，1990 年生女命（8 段） | 約 19 秒，最快的一段 5 秒就出來 | 約 22,300／5,600 | 約 355 | 8 段都第一次就過，沒有一項改用引擎原文 |
+| 正式網站抽查，1986 年生男命（部署後） | 最慢的一段 35 秒；大運 4 秒、命盤和感情 6–7 秒就出來 | — | — | 8 段都過，沒有一項改用引擎原文 |
 | 完整解讀，1959、2015 年生 | 15、17.5 秒 | — | — | 都過 |
 | AI 合婚（3 段） | 約 15 秒 | 約 5,400／1,450 | 約 90 | 都過 |
 | 重點版 | 4–7 秒 | 約 1,950／240 | 約 24 | 都過 |
@@ -390,7 +391,7 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 
 網站：**https://bazi-life.mingpan.workers.dev**（Cloudflare 帳號 Agent-Teams）。首頁是「命盤人生」，排盤引擎在 `/index.html`。
 
-一個 Worker（`worker/index.js`、`worker/app.js`）同時放兩個網頁、判讀 API（`/api/interpret`）和 AI 命理師解讀與 AI 合婚（`/api/reading`，Worker 裡也包了一份排盤引擎），設定在 `wrangler.jsonc`。兩個網頁是建置好的 `public/*.html`，當成文字模組包進 Worker（整個 Worker 壓縮後約 950 KB，免費方案上限 3 MB），沒有用 Workers 的靜態資源：上傳靜態資源要用 Cloudflare 另外發的一次性金鑰，Claude Code 雲端環境的代理會把它換成帳號的 API 金鑰，上傳就會失敗。
+一個 Worker（`worker/index.js`、`worker/app.js`）同時放兩個網頁、判讀 API（`/api/interpret`）和 AI 命理師解讀與 AI 合婚（`/api/reading`，Worker 裡也包了一份排盤引擎），設定在 `wrangler.jsonc`。兩個網頁是建置好的 `public/*.html`，當成文字模組包進 Worker（整個 Worker 壓縮後約 1,010 KB，免費方案上限 3 MB），沒有用 Workers 的靜態資源：上傳靜態資源要用 Cloudflare 另外發的一次性金鑰，Claude Code 雲端環境的代理會把它換成帳號的 API 金鑰，上傳就會失敗。
 
 在自己的電腦部署：
 
