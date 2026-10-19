@@ -40,7 +40,6 @@ p { margin: 0; }
 .eyebrow { font-size: 12px; letter-spacing: 0.12em; color: var(--muted); }
 .lede { color: var(--muted); max-width: 60ch; }
 .notice { font-size: 13px; color: var(--muted); border-left: 3px solid var(--rule); padding-left: 10px; max-width: 70ch; }
-.data-note { font-size: 13px; color: var(--seal); background: var(--seal-wash); border-radius: 6px; padding: 6px 10px; }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 header { display: grid; gap: 10px; }
 button { font: inherit; color: inherit; cursor: pointer; }
@@ -530,7 +529,6 @@ footer a { color: var(--indigo); }
     <h1>命盤人生</h1>
     <p class="lede">輸入生辰，依照八字的大運和流年走完一生。每件事發生的機率以台灣統計為基礎，命盤只讓機率傾斜，人生的方向由你選擇。</p>
     <p class="notice">這是依傳統命理規則和台灣統計產生的模擬故事，不是預言。命理推演僅供參考，不能當作醫療、法律或重大決定的依據。</p>
-    <p class="data-note" id="data-note" hidden>測試版：壽命和疾病的年齡曲線，是依官方總數擬合的；之後會換成官方的完整統計表。</p>
   </header>
 
   <section class="panel" id="setup">
@@ -896,7 +894,7 @@ footer a { color: var(--indigo); }
 
   <footer>
     <p>年柱、月柱用出生的精確時刻比對節氣，日柱、時柱用出生地的真太陽時。每一年，大運和流年會讓各領域事件的機率傾斜，倍率限制在 0.5 到 2 倍之間；扶抑、調候、格局三派的看法分開計算後再合併。</p>
-    <p>壽命以內政部 114 年簡易生命表的平均餘命為基準（男 77.93 歲、女 84.75 歲）。所有計算都在你的瀏覽器裡完成，網站不保存你的資料。只有兩種情況會把資料交給 AI：「寫下你自己的決定」那一句（名字會先換成稱呼），以及你按下的「AI 命理師解讀」和「AI 合婚」（出生日期、時間、出生地和性別，不含姓名、暱稱和家人）；用完都不保存。合婚分頁的合婚結果在手機上算，不會上傳。</p>
+    <p>壽命用內政部歷年的簡易生命表（每一歲的死亡機率，1956 到 2025 年；之後依國發會人口推估）；癌症、中風、心臟病在各年齡的死亡人數用衛福部的死因統計，癌症再對齊國健署癌症登記的發生率；三高用健保的年齡別就醫統計。所有計算都在你的瀏覽器裡完成，網站不保存你的資料。只有兩種情況會把資料交給 AI：「寫下你自己的決定」那一句（名字會先換成稱呼），以及你按下的「AI 命理師解讀」和「AI 合婚」（出生日期、時間、出生地和性別，不含姓名、暱稱和家人）；用完都不保存。合婚分頁的合婚結果在手機上算，不會上傳。</p>
     <p><a id="chart-link" href="__CHART_URL__">看完整命盤（排盤引擎）</a></p>
   </footer>
 </div>

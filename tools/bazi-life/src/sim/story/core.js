@@ -806,9 +806,9 @@ export const CORE = [
     },
   },
   {
-    id: "serious", domain: "health", channel: "bad", grave: true, ages: [1, 110], when: s => !s.health.serious, p: (s, ctx) => ctx.R.serious(s.age, s.sex),
+    id: "serious", domain: "health", channel: "bad", grave: true, ages: [1, 110], when: s => !s.health.serious, p: (s, ctx) => ctx.R.serious(s.age, s.sex, s.year),
     apply: (s, ctx) => {
-      const type = ctx.R.seriousType(s.age, s.sex, ctx.rng);
+      const type = ctx.R.seriousType(s.age, s.sex, s.year, ctx.rng);
       s.health.serious = { type, since: s.age }; s.health.everSerious = (s.health.everSerious || 0) + 1;
       return { text: ctx.w([`被診斷出${type}，開始治療。家人輪流陪你回診。`, `${type}來得突然，你住進了醫院。`, `醫生拿著檢查報告，說是${type}。{你走出診間，在走廊坐了很久。|回家的路上，你一句話也沒說。}`]) + (s.health.checkups && type === "癌症" ? "還好是定期檢查發現的，發現得早。" : ""), mood: -15, big: true };
     },
@@ -894,7 +894,7 @@ export const deathEvent = {
   apply: (s, ctx) => {
     const age = s.age;
     let text;
-    if (s.health.serious) text = `在 ${age} 歲因為${s.health.serious.type}離開人世。`;
+    if (s.health.diedOf) text = `在 ${age} 歲因為${s.health.diedOf}離開人世。`;
     else if (age >= 85) text = ctx.w([`在 ${age} 歲那年，安詳地離開了。`, `${age} 歲，在家人陪伴下安靜地走完這一生。`]);
     else if (age < 40) text = `一場意外，讓這段人生停在 ${age} 歲。`;
     else text = ctx.w([`在 ${age} 歲因病離開人世。`, `${age} 歲那年，身體撐不住了，離開了大家。`]);

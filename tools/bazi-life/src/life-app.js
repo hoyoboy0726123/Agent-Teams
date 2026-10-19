@@ -4,7 +4,6 @@ import { PLACE_GROUPS, findPlace } from "./core/places.js";
 import { prepare } from "./sim/setup.js";
 import { createLife } from "./sim/life.js";
 import { rerun } from "./sim/monte.js";
-import { PROVISIONAL } from "./sim/rates.js";
 import { COUNTIES } from "./sim/world.js";
 import { makeRng } from "./sim/rng.js";
 import { randomName } from "./sim/random-name.js";
@@ -58,7 +57,6 @@ const READING_URL = (document.querySelector('meta[name="reading-endpoint"]') || 
 let remoteOff = !INTERPRET_URL || !/^https?:$/.test(location.protocol);
 
 function setup() {
-  $("#data-note").hidden = !PROVISIONAL;
   $("#f-place").innerHTML = PLACE_GROUPS.map(g => `<optgroup label="${esc(g.group)}">${g.places.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("");
   $("#f-place").value = "臺北市";
   for (const tab of TABS) $(`#tab-${tab}`).addEventListener("click", () => selectTab(tab));

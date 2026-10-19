@@ -301,8 +301,12 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     const ill = s.health.serious ? R.seriousFatality(s.health.serious.type, s.age - s.health.serious.since, s.health.checkups, s.health.serious.since, s.sex) : 0;
     const q = Math.min(0.999, R.death(s.age, s.sex, s.year) * s.health.hr + ill);
     const lnm = l && s.age > 0 ? l.m.health.bad : 0;
-    if (s.age >= MAX_AGE || fate() < tilt(q, lnm)) {
+    let u = null, cut = 1;
+    if (s.age >= MAX_AGE || (u = fate()) < (cut = tilt(q, lnm))) {
       s.alive = false;
+      // The illness is named as the cause when the draw falls in its part of the year's risk (ill out of q), so the
+      // causes follow 死因統計; otherwise the death is told as any other (story/core.js deathEvent). Same draws.
+      s.health.diedOf = s.health.serious && (u === null || u < cut * ill / q) ? s.health.serious.type : null;
       closeSpell(s, "death");
       record(deathEvent, deathEvent.apply(s, ctx), l, lnm);
     }
