@@ -7,8 +7,9 @@
 //   --fragment <file>        the 排盤 page without the skeleton, tyme4ts from unpkg (the same npm file)
 //   --life-fragment <file>   the same for the 人生 page
 //   --chart-url <url>        where the 人生 fragment links to the 排盤 page
-// The full 人生 page asks the site's Worker (worker/index.js) at /api/interpret to read what the player writes; the
-// fragment has no Worker behind it, so it leaves the address empty and the page reads the words itself.
+// The full 人生 page asks the site's Worker (worker/index.js) at /api/interpret to read what the player writes, and at
+// /api/reading for the AI 命理師解讀; the fragment has no Worker behind it, so it leaves both addresses empty: the page
+// reads the words itself and says the AI reading is on the site.
 import { build } from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -46,7 +47,7 @@ await page({ html: "src/page.html", js: "src/app.js", out: "public/index.html", 
 await page({
   html: "src/life.html", js: "src/life-app.js", out: "public/life.html", fragment: arg("--life-fragment"),
   links: {
-    standalone: { __CHART_URL__: "index.html", __INTERPRET_URL__: "/api/interpret" },
-    artifact: { __CHART_URL__: arg("--chart-url") || "https://claude.ai/artifact/3a3ezBHmLKeKBxGaNveAV2", __INTERPRET_URL__: "" },
+    standalone: { __CHART_URL__: "index.html", __INTERPRET_URL__: "/api/interpret", __READING_URL__: "/api/reading" },
+    artifact: { __CHART_URL__: arg("--chart-url") || "https://claude.ai/artifact/3a3ezBHmLKeKBxGaNveAV2", __INTERPRET_URL__: "", __READING_URL__: "" },
   },
 });

@@ -24,6 +24,7 @@ import { safetyCheck, matchIntent } from "./sim/intent.js";
 import { readInterpretation } from "./sim/interpret.js";
 import { nameSwaps, withoutNames } from "./sim/privacy.js";
 import { ACTIONS } from "./sim/actions.js";
+import { readingRequest } from "./ai-reading.js";
 import { trait } from "./sim/words.js";
 import { initBaby } from "./baby-app.js";
 import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
@@ -51,6 +52,7 @@ const recapWorthy = e => (e.big || RECAP_IDS.has(e.id)) && e.id !== "birth" && e
 // build puts its address in <meta name="interpret-endpoint"> (empty for the Claude artifact). Without it, or when it
 // does not answer, the page matches the words itself; the player sees the same choice box either way.
 const INTERPRET_URL = (document.querySelector('meta[name="interpret-endpoint"]') || {}).content || "";
+const READING_URL = (document.querySelector('meta[name="reading-endpoint"]') || {}).content || "";
 let remoteOff = !INTERPRET_URL || !/^https?:$/.test(location.protocol);
 
 function setup() {
@@ -112,6 +114,8 @@ function setup() {
     const only = $("#f-only").checked;
     $("#sibling-list").hidden = only; $("#add-sibling").hidden = only;
   });
+  $("#ai-short").addEventListener("click", () => askAI("short"));
+  $("#ai-full").addEventListener("click", () => askAI("full"));
   $("#again-same").addEventListener("click", () => begin(run.input, run.born, run.extra));
   $("#again-new").addEventListener("click", () => { stop(); $("#end").hidden = true; $("#play").hidden = true; $("#setup").hidden = false; $("#setup").scrollIntoView({ behavior: "smooth", block: "start" }); });
   window.addEventListener("resize", () => { if (run && run.summary && !$("#end").hidden) drawKline(); });
@@ -517,6 +521,7 @@ function finish() {
   drawCards();
   drawPersonal();
   drawReport();
+  drawAI();
   drawShare(peak);
   $("#end").scrollIntoView({ block: "start" });
   openStory(s, age => luckAt(prep, age), () => { $("#end").scrollIntoView({ block: "start" }); $("#end-title").focus({ preventScroll: true }); });
@@ -708,6 +713,67 @@ function drawReport() {
   const born = chart.time.shichen ? `出生日期與${chart.time.shichen}時` : chart.hourKnown ? "出生時刻（真太陽時）" : "出生日期（時辰不詳）";
   $("#report-lede").textContent = `依${prep.name ? `「${prep.name.full}」的姓名與` : ""}${born}排出的命盤，用傳統子平八字${prep.name ? "與姓名學" : ""}的方法逐項分析。傳統命理的說法，僅供參考。`;
   $("#report").hidden = false;
+}
+
+// ---------- AI 命理師解讀 ----------
+// Only the birth and this life's milestones are sent (ai-reading.js readingRequest); the Worker recomputes the chart,
+// has Workers AI write the reading and checks it. A reading is kept for this life only.
+const AI_STEPS = ["翻開你的命盤", "看大運和流年", "回顧這一生的大事", "寫下給你的話"];
+const AI_ERRORS = {
+  429: "AI 命理師現在有點忙，等一分鐘再試試看。",
+  502: "這次寫出來的內容沒有通過自動檢查（例如年份或干支寫錯了），請再按一次。",
+  503: "AI 命理師今天的額度用完了，明天再來找它。",
+};
+const setAIStatus = (text, bad = false) => { const el = $("#ai-status"); el.textContent = text; el.classList.toggle("bad", bad); };
+
+function drawAI() {
+  $("#ai").hidden = false;
+  $("#ai-body").innerHTML = "";
+  const off = !READING_URL || !/^https?:$/.test(location.protocol);
+  $("#ai-go").hidden = off;
+  $("#ai-consent").hidden = off;
+  for (const id of ["#ai-short", "#ai-full"]) $(id).disabled = false;
+  setAIStatus(off ? "AI 命理師解讀只在命盤人生的網站上提供，這個預覽版沒有連上。" : "");
+}
+
+async function askAI(kind) {
+  const r = run;
+  if (!r || !r.life.done) return;
+  r.ai ||= {};
+  if (r.ai[kind]) return showAI(r.ai[kind], kind);
+  const buttons = ["#ai-short", "#ai-full"].map(id => $(id));
+  for (const b of buttons) b.disabled = true;
+  const t0 = Date.now();
+  const tick = () => {
+    if (run !== r) return;
+    const s = Math.floor((Date.now() - t0) / 1000);
+    setAIStatus(`AI 命理師正在${AI_STEPS[Math.min(AI_STEPS.length - 1, Math.floor(s / 3))]}…（${s} 秒）`);
+  };
+  tick();
+  const timer = setInterval(tick, 1000), ctrl = new AbortController(), timeout = setTimeout(() => ctrl.abort(), 90000);
+  let message = "";
+  try {
+    const body = readingRequest({ input: r.input, state: r.life.state, log: r.life.log, kline: r.life.kline, summary: r.summary }, kind);
+    const res = await fetch(READING_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data && Array.isArray(data.sections) && data.sections.length) r.ai[kind] = data;
+    else message = AI_ERRORS[res.status] || "現在連不上 AI 命理師，請稍後再試。";
+  } catch (e) {
+    message = e && e.name === "AbortError" ? "AI 命理師這次想太久了，請再按一次。" : "現在連不上 AI 命理師，請檢查網路後再試。";
+  } finally {
+    clearInterval(timer);
+    clearTimeout(timeout);
+  }
+  if (run !== r) return;   // another life has started meanwhile
+  for (const b of buttons) b.disabled = false;
+  if (r.ai[kind]) showAI(r.ai[kind], kind);
+  else setAIStatus(message, true);
+}
+
+function showAI(data, kind) {
+  const secs = data.sections.map(s => `<section class="ai-sec${s.title === "命格一句話" ? " motto" : ""}"><h4>${esc(s.title)}</h4>${String(s.body).split(/\n+/).map(p => `<p>${esc(p)}</p>`).join("")}</section>`).join("");
+  $("#ai-body").innerHTML = `${secs}<p class="fine">AI 依本站排盤引擎算好的命盤資料寫成，送出前已自動檢查干支、喜忌、格局和年份。內容是傳統命理的說法，供娛樂與自我觀察參考，不是預言。</p>`;
+  setAIStatus(kind === "short" ? "這是重點版。想看性格、事業、感情、健康和未來十年的完整解讀，請按「完整解讀」。" : "");
 }
 
 function drawPersonal() {

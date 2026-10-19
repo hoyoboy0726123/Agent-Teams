@@ -55,7 +55,7 @@
 
 ## 驗證
 
-`npm test` 一共 156 項，大約一分半跑完。和排盤有關的有 35 項：
+`npm test` 一共 168 項，大約一分半跑完。和排盤有關的有 35 項：
 
 - **節氣：** tyme4ts（壽星天文曆演算法）算出的 1900–2100 年每一個「節」（共 2,412 個），和獨立星曆 astronomy-engine 比對。最大差 62 秒，測試門檻 90 秒。
 - **四柱：** 不用 tyme4ts，改用 astronomy-engine 的節氣時刻加上教科書規則，重算 2,000 個隨機時刻的四柱，結果和引擎完全一致。使用的規則是立春換年、五虎遁、儒略日、五鼠遁。另外用 5,000 個時刻跑過一次，也全部一致。
@@ -250,6 +250,33 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
    - 綜合論斷（`src/core/reading-overall.js`）：命格、一生運勢、最旺與宜謹慎的大運、姓名與八字合看，最後是用神可以借力的方向。
    - 開運建議：喜用五行的顏色、方位、數字、行業、生活習慣和相合的生肖。
 
+### AI 命理師解讀（測試版）
+
+結局頁在八字命理詳批前面有一張「AI 命理師解讀」：按「先看重點」或「完整解讀（測試期間免費）」，由 Workers AI 的 Gemma 4 用白話寫一份解讀。收費的評估在「AI 命理師解讀：設計與收費評估」（見下面「還沒做的」）。
+
+1. **AI 只負責寫，事實由引擎算**（`src/ai-reading.js`）
+   - 頁面只送出生日期、時間（或時辰）、出生地、性別，以及這一生大事的代號和歲數：畢業、第一份工作和換工作（職稱只送工作清單裡有的）、自己當老闆、升遷、裁員、交往、分手、結婚、婚姻低潮、離婚、孩子出生、買房、照顧爸媽、退休；另外是學歷、婚姻和孩子的數目、心情最好和最低潮的歲數、100 次重跑裡結婚、讀大學、買房的次數。不送姓名、家人、自己寫的句子和故事的文字；生病、意外和死亡不送。一份請求約 500 bytes。
+   - Worker 用同一個排盤引擎重算命盤，在伺服器端寫「命盤資料」：四柱和十神、日主（《滴天髓》的意象、長處、盲點）、強弱與格局、五行力量、喜忌與用神的行業、最多的十神、吉神、傳統的健康說法、九步大運、接下來十年的流年、這一生的大事和引擎算出的命理說明（`eventReason`）。提示詞裡沒有一個字來自玩家，這個 API 不能被拿去當聊天機器人。
+   - 寫作規則：只用資料裡的干支、年份和歲數；繁體中文、臺灣用語；模擬的人生要說「在這次模擬裡」；不談死亡、壽命和災難，不點名疾病或檢查項目；不用恐嚇的說法，不建議改運商品、法會、點燈、符咒；命理說的是傾向，不是注定。
+2. **寫完先檢查**（`checkReading`）：段落齊全；沒有資料裡沒有的干支；年份和干支、年份和歲數（足歲或虛歲）、大運的歲數和年份都對得上；日主、天干的五行、喜用和忌神、命中缺什麼、身強身弱（以及專旺、從弱）、格局都和引擎一致；沒有談到死亡壽命、沒有恐嚇、沒有點名疾病、沒有改運；沒有簡體字。沒過就把問題列給模型重寫一次，再沒過回 502，頁面請玩家再按一次。只當參考的（大陸用語、資料裡沒有的歲數、同一句裡大運和不在它裡面的年份）不擋。
+3. **兩半同時寫**：完整解讀 8 段（命格一句話、性格與天賦、這一生的印證、事業與財運、感情與家庭、健康與作息、未來十年、給你的三句話），前 4 段和後 4 段由兩個請求同時寫，等待從約 17 秒降到約 10 秒（`READING_SPLIT = "1"` 改回一次寫完）。重點版 2 段（命格一句話、總評），一個請求，約 5 秒。
+4. **限速與失敗**：每個 IP 每分鐘最多 3 份（`READING_LIMIT`）。忙碌（429）、檢查沒過（502）、額度用完（503）、逾時 90 秒和斷線，卡片上都會說明，按鈕可以再按。同一局寫過的解讀會留著，再按不會重寫。直接開檔案或在 Claude Artifact 預覽時，卡片只說這個功能在網站上提供。
+5. **實驗用 Worker**：`wrangler deploy --name bazi-life-lab --var LAB_KEY:<隨機字串>` 部署的另一個 Worker。請求帶 `x-lab-key` 時，可以在 `lab` 指定 `READING_MODELS` 裡的模型和 `split`，並拿回每次的時間、token、檢查結果和全文，不受限速。正式網站沒有 `LAB_KEY`，這些都不會出現。
+
+實測（2026-10-19，實驗用 Worker，用 `readingRequest` 從模擬人生產生的請求；前 4 張是指定的命盤，後 12 張是隨機出生）：
+
+| 模型（Workers AI） | 通過檢查 | 等待 | 每份 token（進／出） | 文字 |
+| --- | --- | --- | --- | --- |
+| Gemma 4 26B，兩半同時寫（**採用**） | 16/16，都是第一次就過 | 9–12 秒（16 份裡 1 份 23 秒） | 約 5,800／970 | 臺灣口語最自然；逐句對照命盤資料讀了其中 4 份，沒有找到寫錯的事實 |
+| Gemma 4 26B，一次寫完 | 4/4 | 15–21 秒 | 約 2,900／870 | 同上 |
+| Gemma 4 26B，重點版 | 4/4 | 約 5 秒（4 份裡 2 份 19、34 秒） | 約 2,750／235 | — |
+| Qwen3 30B A3B | 一次寫完 4/4；兩半 1/8（後半常漏掉「給你的三句話」） | 5–7 秒 | 約 2,950／950 | 偏大陸用語（「敢衝敢拼」），比喻較生硬 |
+| gpt-oss-120b | 4/4；後來加嚴的檢查擋下 2 份（寫了檢查項目） | 8–21 秒 | 約 3,150／1,080 | 內容多，但有錯字（「象徨」），把 18 歲放進 33–42 歲的大運 |
+| GLM-4.7-Flash | 4/4；加嚴的檢查擋下 1 份（2034 年寫成 54 歲） | 24–42 秒 | 約 2,980／930 | 太慢 |
+| GLM-5.3-Flash、DeepSeek V4 Flash | 免費方案不能用 | — | — | — |
+
+成本：Gemma 4 每百萬 token 輸入 0.10 美元、輸出 0.30 美元。完整解讀一份約 0.0009 美元（約 79 neurons），重點版約 0.00035 美元（約 32 neurons），都不到新台幣 1 毛。免費方案每天 10,000 neurons，和 `/api/interpret` 共用，大約夠 120 份完整解讀；超過要升級 Workers 付費方案（每月 5 美元），之後每份照上面的價錢算。
+
 ### 像素場景
 
 和寵物版一樣用像素畫（`src/pixel.js`），但鏡頭拉近、人物畫大：畫面 128×44 點，大人 10×21 點，有眼睛、嘴巴、髮型，衣服跟著身分換（制服、西裝、白袍、圍裙、工作服、婚紗）。
@@ -270,7 +297,9 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 歡迎頁說的「資料只留在手機裡」要和程式一致：
 
 - 排盤、模擬、同盤重跑、詳批、姓名學、家人和伴侶合盤、準爸媽比較，全部在瀏覽器裡算。網站沒有帳號，也沒有資料庫。
-- 唯一送出去的是「寫下你自己的決定」那一句，連同這個抉擇的題目、按鈕和年齡、工作、感情狀態這些情境（見「自己寫選項」）。送出前，玩家輸入的名字都換成稱呼（`src/sim/privacy.js`，`test/privacy.test.js`）；Worker 不記錄句子。
+- 只有玩家自己按下時才會送出資料，用完都不保存：
+  - 「寫下你自己的決定」那一句，連同這個抉擇的題目、按鈕和年齡、工作、感情狀態這些情境（見「自己寫選項」）。送出前，玩家輸入的名字都換成稱呼（`src/sim/privacy.js`，`test/privacy.test.js`）；Worker 不記錄句子。
+  - 結局的「AI 命理師解讀」：出生日期、時間、出生地、性別和這一生大事的代號與歲數，不含姓名和家人（見「AI 命理師解讀」）。按鈕上方寫著會送出什麼。
 - `localStorage` 只存兩個設定：「只問人生大事」和看過歡迎頁。
 - 填到一半的表單（我的人生、準爸媽、排盤頁，連同開著的分頁）邊打邊存在這個分頁的 `sessionStorage`（`src/draft.js`）：重新整理會回來，關掉分頁就清掉；「清空重填」會馬上刪掉。
 - 網頁的字型從 Google Fonts 載入。
@@ -333,7 +362,7 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 
 網站：**https://bazi-life.mingpan.workers.dev**（Cloudflare 帳號 Agent-Teams）。首頁是「命盤人生」，排盤引擎在 `/index.html`。
 
-一個 Worker（`worker/index.js`、`worker/app.js`）同時放兩個網頁和判讀 API（`/api/interpret`），設定在 `wrangler.jsonc`。兩個網頁是建置好的 `public/*.html`，當成文字模組包進 Worker（壓縮後約 612 KB，免費方案上限 3 MB），沒有用 Workers 的靜態資源：上傳靜態資源要用 Cloudflare 另外發的一次性金鑰，Claude Code 雲端環境的代理會把它換成帳號的 API 金鑰，上傳就會失敗。
+一個 Worker（`worker/index.js`、`worker/app.js`）同時放兩個網頁、判讀 API（`/api/interpret`）和 AI 命理師解讀（`/api/reading`，Worker 裡也包了一份排盤引擎），設定在 `wrangler.jsonc`。兩個網頁是建置好的 `public/*.html`，當成文字模組包進 Worker（整個 Worker 壓縮後約 950 KB，免費方案上限 3 MB），沒有用 Workers 的靜態資源：上傳靜態資源要用 Cloudflare 另外發的一次性金鑰，Claude Code 雲端環境的代理會把它換成帳號的 API 金鑰，上傳就會失敗。
 
 在自己的電腦部署：
 
@@ -352,11 +381,11 @@ CLOUDFLARE_API_TOKEN=proxy-injected CLOUDFLARE_ACCOUNT_ID=a535bb4f35cdac784e0806
 
 - **Workers AI**：Gemma 4 26B（`@cf/google/gemma-4-26b-a4b-it`，關閉思考）。免費方案每個帳號每天 10,000 neurons，台灣時間早上 8 點重置；每句約 1,070 個 token 進、22 個 token 出，約 10 neurons，一天大約 950 句。用完會回錯誤、不會收費，頁面改用本機比對。付費方案每月 5 美元，超過免費額度的部分每句約 0.0001 美元。
 - **精簡版提示詞**：`wrangler.jsonc` 的 `PROMPT` 改成 `"compact"`，每句約 6 neurons、一天約 1,500 句，準確度從 99.4% 降到 97.5%（`free-text-heldout.json`）。
-- **限速**：每個 IP 每分鐘最多 12 句（Workers Rate Limiting，`INTERPRET_LIMIT`）。
+- **限速**：每個 IP 每分鐘最多 12 句（Workers Rate Limiting，`INTERPRET_LIMIT`）；AI 命理師解讀每分鐘最多 3 份（`READING_LIMIT`）。
 - **只接受自己網站的請求**：`Origin` 必須是這個 Worker 自己的網址（workers.dev 或接到它的自訂網域），其他網站和 curl 都會被拒絕。
 - **隱私**：Worker 不記錄玩家寫的句子；回覆只有行動代號、15 字以內的摘要和信心值。
 - **網頁快取**：`cache-control: no-cache`，瀏覽器每次開網頁都向網站確認，部署之後馬上看得到新版。以前是 `max-age=600`，手機在部署後還會顯示舊版最多 10 分鐘。Worker 也送 ETag，沒改過可以回 304；但 workers.dev 的 HTML 開著 Email Obfuscation 等功能，Cloudflare 會把 ETag 拿掉（[說明](https://developers.cloudflare.com/cache/reference/etag-headers/)），所以目前每次開網頁都重新下載一次（壓縮後約 560 KB）。改用自訂網域並關掉這些功能後，304 就會生效。
-- `test/worker.test.js` 用替身測 Worker：正常回答、各種回覆格式、不允許的行動、來源不對、太大、限速、額度用完都會回錯誤狀態。
+- `test/worker.test.js` 用替身測 Worker：正常回答、各種回覆格式、不允許的行動、來源不對、太大、限速、額度用完都會回錯誤狀態；AI 解讀兩半同時寫、檢查沒過重寫一次再回 502、只有帶實驗金鑰的請求能換模型。
 
 ### 檔案
 
@@ -381,7 +410,9 @@ CLOUDFLARE_API_TOKEN=proxy-injected CLOUDFLARE_ACCOUNT_ID=a535bb4f35cdac784e0806
 | `src/sim/grammar.js` | 句子模板 |
 | `src/sim/actions.js`、`src/sim/act.js` | 行動的清單與結果（按鈕和自己寫的選擇共用） |
 | `src/sim/intent.js`、`src/sim/interpret.js` | 判讀玩家自己寫的選擇：本機比對與安全檢查、給 Workers AI 的提示詞與回覆檢查 |
-| `worker/index.js`、`worker/app.js`、`wrangler.jsonc` | Cloudflare Worker：放網頁（`index.js` 把建置好的網頁交給 `app.js`），並在 `/api/interpret` 用 Workers AI 判讀玩家寫的選擇 |
+| `worker/index.js`、`worker/app.js`、`wrangler.jsonc` | Cloudflare Worker：放網頁（`index.js` 把建置好的網頁交給 `app.js`），在 `/api/interpret` 用 Workers AI 判讀玩家寫的選擇，在 `/api/reading` 寫 AI 命理師解讀 |
+| `src/ai-reading.js` | AI 命理師解讀：頁面送出的內容、Worker 接受的內容、命盤資料、提示詞和寫完的檢查 |
+| `src/core/simplified.js` | 常見的簡體字（姓名解說和 AI 解讀的檢查共用） |
 | `src/sim/life.js` | 模擬引擎 |
 | `src/sim/monte.js` | 同盤重跑 100 次 |
 | `src/sim/setup.js` | 從命盤到模擬需要的資料 |
@@ -396,6 +427,7 @@ CLOUDFLARE_API_TOKEN=proxy-injected CLOUDFLARE_ACCOUNT_ID=a535bb4f35cdac784e0806
 | `public/life.html` | 產生出來的網頁 |
 | `test/life.e2e.mjs` | 人生模擬頁的瀏覽器測試（包括姓名、家人、自己寫選項；Worker 的回答、503 和斷線都用替身測） |
 | `test/worker.test.js` | Cloudflare Worker 的單元測試（Workers AI 用替身） |
+| `test/ai-reading.test.js` | AI 解讀：不送姓名和故事文字、Worker 只接受頁面會送的內容、命盤資料和引擎一致、檢查擋得下常見的錯 |
 | `test/pixel.test.js` | 像素場景：人生的每個時刻選哪個地方、誰在畫面裡、天氣和時代，以及每個場景都畫得出來 |
 | `test/privacy.test.js` | 送出前名字都換成稱呼 |
 | `test/reading-natal.test.js`、`test/reading-year.test.js`、`test/reading-overall.test.js` | 詳批的文字沒有破洞；流年的重點和吉凶一致；大事的理由只引用這一年真的有的訊號、方向一致，而且從不解釋死亡 |
@@ -463,5 +495,6 @@ node scripts/make-name-texts.mjs <shunshi-naming 的 data 資料夾>
 
 - 第 0 步的門檻：拿幾個生日和壽星萬年曆網頁版抽查四柱。
 - 第 1 步的門檻：換成官方完整統計表；請命理顧問看過規則與詳批的文字。
+- AI 命理師解讀的收費：金流、發票、付費後保存解讀都還沒做，設計與評估在「AI 命理師解讀：設計與收費評估」。
 - 研究文件「商業模式與分享設計」裡的其他功能：伴侶合盤、AI 一生回顧信、每年的流年更新、名字 PK 卡、邀請家人解鎖合盤、網頁收款。
 - 出生地目前到縣市與主要鄉鎮。經度差 0.01° 只影響 2.4 秒，所以對時柱影響很小。

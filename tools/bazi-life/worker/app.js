@@ -1,16 +1,25 @@
-// 命盤人生的 Cloudflare Worker：放網頁，並在 /api/interpret 用 Workers AI 判讀玩家自己寫的選擇。worker/index.js 把
-// public/ 的兩個網頁交給 makeApp()；這個檔案不讀檔案，測試可以直接載入（test/worker.test.js）。
+// 命盤人生的 Cloudflare Worker：放網頁，在 /api/interpret 用 Workers AI 判讀玩家自己寫的選擇，並在 /api/reading 寫
+// 結局頁的「AI 命理師解讀」。worker/index.js 把 public/ 的兩個網頁交給 makeApp()；這個檔案不讀檔案，測試可以直接載入
+// （test/worker.test.js）。
 //
-// The page (src/life-app.js) posts { situation, context, options: [{ id, label }], text } for the choice in front of
-// the player. The prompt is built here, from src/sim/interpret.js, and the reply is checked the same way the page
-// checks it, so the answer can only be one of the actions the engine already allows. Any failure answers with an
-// error status and the page quietly reads the words itself; nothing here is needed for the game to work.
+// /api/interpret: the page (src/life-app.js) posts { situation, context, options: [{ id, label }], text } for the
+// choice in front of the player. The prompt is built here, from src/sim/interpret.js, and the reply is checked the same
+// way the page checks it, so the answer can only be one of the actions the engine already allows. Any failure answers
+// with an error status and the page quietly reads the words itself; nothing here is needed for the game to work.
 //
-// Bindings (wrangler.jsonc): AI (Workers AI), INTERPRET_LIMIT (requests per minute per IP).
-// Variable: PROMPT = "compact" for the shorter prompt (fewer neurons, slightly less accurate).
+// /api/reading: the page posts the birth and this life's milestones as codes (src/ai-reading.js readingRequest). The
+// chart is recomputed here and the fact sheet written here, so nothing the player typed reaches the prompt. A reading
+// that fails the checker (invented 干支, wrong 喜忌, death or disease, Simplified characters…) is asked for once more,
+// with the problems listed; a second failure answers 502 and the page offers to try again.
+//
+// Bindings (wrangler.jsonc): AI (Workers AI), INTERPRET_LIMIT and READING_LIMIT (requests per minute per IP).
+// Variables: PROMPT = "compact" for the shorter interpret prompt (fewer neurons, slightly less accurate);
+// READING_MODEL to write readings with another model of READING_MODELS; LAB_KEY (only on a separate lab Worker) lets a
+// request that carries it in x-lab-key pick the model and get the usage, the timing and the checker's notes back.
 // Only the pages this Worker serves may call it (the Origin must be its own: workers.dev or a custom domain routed
-// to it). Nothing the player writes is logged.
+// to it). Nothing the player writes, and no reading, is logged or kept.
 import { interpretPrompt, readInterpretation, jsonFromText } from "../src/sim/interpret.js";
+import { readReadingRequest, readingFacts, readingPrompt, checkReading, READING_VERSION, HALVES } from "../src/ai-reading.js";
 
 export const MODEL = "@cf/google/gemma-4-26b-a4b-it";
 const MAX_BODY = 4096;
@@ -32,7 +41,8 @@ export function readRequest(body) {
   return { situation: line(body.situation, 200), context: line(body.context, 120), options, text };
 }
 
-// Workers AI answers this model in the OpenAI shape (choices[0].message.content); older models answer { response }.
+// Workers AI answers this model in the OpenAI shape (choices[0].message.content); older models answer { response },
+// and gpt-oss the Responses shape (output: [{ type: "message", content: [{ text }] }]).
 export function textOf(out) {
   if (!out) return "";
   if (typeof out === "string") return out;
@@ -42,20 +52,35 @@ export function textOf(out) {
   const m = c && (c.message || c.delta);
   if (m && typeof m.content === "string") return m.content;
   if (c && typeof c.text === "string") return c.text;
+  if (Array.isArray(out.output)) {
+    return out.output.filter(o => o && o.type === "message").flatMap(o => o.content || []).filter(x => x && typeof x.text === "string").map(x => x.text).join("");
+  }
   return "";
+}
+
+// Tokens in and out, whichever shape the model reports them in.
+export function usageOf(out) {
+  const u = out && out.usage;
+  if (!u) return null;
+  return { in: u.prompt_tokens ?? u.input_tokens ?? null, out: u.completion_tokens ?? u.output_tokens ?? null };
 }
 
 const sameOrigin = request => request.headers.get("origin") === new URL(request.url).origin;
 
-export async function interpret(request, env) {
-  if (request.method !== "POST") return answer(405, { error: "method" });
-  if (!sameOrigin(request)) return answer(403, { error: "origin" });
-  if (Number(request.headers.get("content-length") || 0) > MAX_BODY) return answer(413, { error: "size" });
+// The JSON body of a POST from this Worker's own pages: { body } (null when it is not JSON), or { error } to answer.
+async function readBody(request, max) {
+  if (request.method !== "POST") return { error: answer(405, { error: "method" }) };
+  if (!sameOrigin(request)) return { error: answer(403, { error: "origin" }) };
+  if (Number(request.headers.get("content-length") || 0) > max) return { error: answer(413, { error: "size" }) };
   const raw = await request.text();
-  if (raw.length > MAX_BODY) return answer(413, { error: "size" });
-  let body = null;
-  try { body = JSON.parse(raw); } catch { /* answered below */ }
-  const ask = readRequest(body);
+  if (raw.length > max) return { error: answer(413, { error: "size" }) };
+  try { return { body: JSON.parse(raw) }; } catch { return { body: null }; }
+}
+
+export async function interpret(request, env) {
+  const got = await readBody(request, MAX_BODY);
+  if (got.error) return got.error;
+  const ask = readRequest(got.body);
   if (!ask) return answer(400, { error: "request" });
   if (env.INTERPRET_LIMIT) {
     const { success } = await env.INTERPRET_LIMIT.limit({ key: request.headers.get("cf-connecting-ip") || "unknown" });
@@ -77,6 +102,65 @@ export async function interpret(request, env) {
   const reply = jsonFromText(textOf(out));
   if (!reply) return answer(502, { error: "reply" });
   return answer(200, readInterpretation(reply, { options: ask.options }));
+}
+
+// ---------- /api/reading ----------
+const READING_MAX_BODY = 2048;
+const OUT_TOKENS = { full: 2600, short: 700 };
+// The models a reading can be written with, each with its input shape. Gemma 4 is the default; the others are there
+// for the lab and for READING_MODEL.
+export const READING_MODELS = {
+  [MODEL]: (prompt, max) => ({ messages: [{ role: "user", content: prompt }], max_completion_tokens: max, temperature: 0.7, chat_template_kwargs: { enable_thinking: false } }),
+  "@cf/qwen/qwen3-30b-a3b-fp8": (prompt, max) => ({ messages: [{ role: "user", content: `${prompt}\n/no_think` }], max_tokens: max, temperature: 0.7 }),
+  "@cf/zai-org/glm-4.7-flash": (prompt, max) => ({ messages: [{ role: "user", content: prompt }], max_tokens: max, temperature: 0.7, chat_template_kwargs: { enable_thinking: false } }),
+  "@cf/openai/gpt-oss-120b": (prompt, max) => ({ input: [{ role: "user", content: prompt }], reasoning: { effort: "low" }, max_output_tokens: max }),
+  "@cf/zai-org/glm-5.3-flash": (prompt, max) => ({ messages: [{ role: "user", content: prompt }], max_tokens: max, temperature: 0.7 }),
+  "@cf/deepseek-ai/deepseek-v4-flash-0731": (prompt, max) => ({ messages: [{ role: "user", content: prompt }], max_tokens: max, temperature: 0.7 }),
+};
+const withoutThinking = t => t.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+
+export async function reading(request, env) {
+  const got = await readBody(request, READING_MAX_BODY);
+  if (got.error) return got.error;
+  const ask = readReadingRequest(got.body);
+  if (!ask) return answer(400, { error: "request" });
+  const lab = !!env.LAB_KEY && request.headers.get("x-lab-key") === env.LAB_KEY;
+  if (env.READING_LIMIT && !lab) {
+    const { success } = await env.READING_LIMIT.limit({ key: request.headers.get("cf-connecting-ip") || "unknown" });
+    if (!success) return answer(429, { error: "busy" });
+  }
+  if (!env.AI) return answer(503, { error: "unavailable" });
+  let facts;
+  try { facts = readingFacts(ask, { now: new Date().getUTCFullYear() }); } catch { return answer(400, { error: "chart" }); }
+  const opt = lab && got.body.lab && typeof got.body.lab === "object" ? got.body.lab : {};
+  const model = Object.hasOwn(READING_MODELS, opt.model) ? opt.model : Object.hasOwn(READING_MODELS, env.READING_MODEL || "") ? env.READING_MODEL : MODEL;
+  const extra = opt.params && typeof opt.params === "object" ? opt.params : {};
+  // READING_SPLIT = "1" writes a full reading in one call; by default it is written in two halves at once.
+  const halves = (opt.split !== undefined ? opt.split === 2 : env.READING_SPLIT !== "1") ? HALVES[ask.kind] : [null];
+  const tries = [];
+  let check = null;
+  for (let i = 0; i < 2 && !(check && check.ok); i++) {
+    const t0 = Date.now();
+    let outs;
+    try {
+      outs = await Promise.all(halves.map(part => {
+        const max = part && halves.length > 1 ? Math.ceil(OUT_TOKENS[ask.kind] / 2) : OUT_TOKENS[ask.kind];
+        return env.AI.run(model, { ...READING_MODELS[model](readingPrompt(facts, check && check.problems, part), max), ...extra });
+      }));
+    } catch (e) {
+      // Over the free allocation, or the model is busy.
+      tries.push({ ms: Date.now() - t0, error: String((e && e.message) || e).slice(0, 300) });
+      break;
+    }
+    const text = outs.map(out => withoutThinking(textOf(out))).join("\n\n");
+    const usage = outs.map(usageOf).reduce((s, u) => ({ in: s.in + ((u && u.in) || 0), out: s.out + ((u && u.out) || 0) }), { in: 0, out: 0 });
+    check = checkReading(text, facts);
+    tries.push({ ms: Date.now() - t0, calls: outs.length, usage, problems: check.problems, warnings: check.warnings, length: check.length, text });
+  }
+  const labInfo = lab ? { lab: { model, tries, ...(opt.prompt ? { prompt: readingPrompt(facts) } : {}) } } : {};
+  if (!check) return answer(503, { error: "unavailable", ...labInfo });
+  if (!check.ok) return answer(502, { error: "reply", ...labInfo });
+  return answer(200, { v: READING_VERSION, kind: ask.kind, sections: check.sections, ...labInfo });
 }
 
 // The pages are part of the Worker itself rather than static assets: an asset upload is authorised by a token of its
@@ -105,6 +189,7 @@ export function makeApp(pages) {
     async fetch(request, env) {
       const { pathname } = new URL(request.url);
       if (pathname === "/api/interpret") return interpret(request, env);
+      if (pathname === "/api/reading") return reading(request, env);
       if (pathname.startsWith("/api/")) return answer(404, { error: "not found" });
       const html = Object.hasOwn(pages, pathname) ? pages[pathname] : null;
       if (html === null) return new Response("找不到這個頁面。", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });

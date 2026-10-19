@@ -45,7 +45,7 @@ async function ended(p, timeout) {
 const page = await fresh({ viewport: { width: 1100, height: 1300 } }, { welcomed: false });
 await page.goto(url);
 const welcome = await page.textContent("#welcome");
-check("a first visit opens on 歡迎: how to play, what is fun, and that the data stays on the phone", await page.isVisible("#welcome") && await page.isHidden("#form-me") && /怎麼玩/.test(welcome) && /好玩的地方/.test(welcome) && /不會上傳到網站後台/.test(welcome) && /沒有帳號、沒有資料庫/.test(welcome));
+check("a first visit opens on 歡迎: how to play, what is fun, and that the data stays on the phone", await page.isVisible("#welcome") && await page.isHidden("#form-me") && /怎麼玩/.test(welcome) && /好玩的地方/.test(welcome) && /網站後台不保存任何資料/.test(welcome) && /沒有帳號、沒有資料庫/.test(welcome) && /AI 命理師解讀.+不含姓名和家人/.test(welcome));
 await page.click('[data-goto="me"]');
 await page.waitForTimeout(250);
 check("the welcome page walks through a life in pixels", await painted(page, "#welcome-scene") && (await page.$$("#welcome-stages span")).length === 6);
@@ -109,6 +109,7 @@ check("the report ends with 綜合論斷 and then 開運建議, once", sectionTi
 await page.hover("#plot svg", { position: { x: 300, y: 120 } });
 check("hovering the K-line shows a tooltip", await page.isVisible("#tip"));
 check("without a name or family only the chart card shows", (await page.$$("#personal-cards .card")).length === 1);
+check("on a page without the Worker the AI reading says where it is offered", await page.isVisible("#ai") && await page.isHidden("#ai-go") && /只在命盤人生的網站上提供/.test(await page.textContent("#ai-status")));
 if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/life-desktop-light.png`, fullPage: true });
 
 await page.click("#again-same");
@@ -248,6 +249,28 @@ for (const [name, answer] of [["busy or over quota (503)", route => route.fulfil
   check(`a Worker that is ${name} falls back to the local options without a message`, fb.sent.length === 1 && /比較接近哪一個/.test(out) && /照我寫的就好/.test(out) && !/錯誤|失敗|AI|Claude/.test(out), out.slice(0, 60));
   await fb.p.close();
 }
+// AI 命理師解讀 over http: the page posts the birth and the milestones, never the name, and shows the sections.
+const SECS = ["命格一句話", "性格與天賦", "這一生的印證", "事業與財運", "感情與家庭", "健康與作息", "未來十年", "給你的三句話"];
+const readingOk = { status: 200, contentType: "application/json", body: JSON.stringify({ v: 1, kind: "full", sections: SECS.map((title, i) => ({ title, body: i ? "命理上看，你細心又有主見。\n路怎麼走，還是你自己決定。" : "像一盞溫暖的燭火。" })) }) };
+const rd = await servedPage(route => route.fulfill(ok), async p => { await p.fill("#f-name", "陳志明"); });
+const readingSent = [];
+let readingAnswer = route => route.fulfill(readingOk);
+await rd.p.route("**/api/reading", route => { readingSent.push(route.request()); return readingAnswer(route); });
+await rd.p.click("#c-skip");
+await ended(rd.p, 30000);
+check("the AI reading card offers its two buttons under the consent line", await rd.p.isVisible("#ai-full") && await rd.p.isVisible("#ai-short") && /不含姓名、家人和你寫的文字/.test(await rd.p.textContent("#ai-consent")));
+await rd.p.click("#ai-full");
+await rd.p.waitForSelector("#ai-body .ai-sec");
+const readingBody = readingSent[0] ? readingSent[0].postData() || "" : "", readingJson = JSON.parse(readingBody || "{}");
+check("the reading request carries the birth and the milestones, without the name", readingJson.kind === "full" && readingJson.birth && readingJson.birth.y === 1988 && readingJson.birth.place && Array.isArray(readingJson.life && readingJson.life.events) && !/陳志明|志明/.test(readingBody), readingBody.slice(0, 120));
+check("the reading shows as sections, the motto first, with its notice", (await rd.p.$$("#ai-body .ai-sec")).length === 8 && await rd.p.isVisible("#ai-body .ai-sec.motto") && /不是預言/.test(await rd.p.textContent("#ai-body")));
+readingAnswer = route => route.fulfill({ status: 502, contentType: "application/json", body: '{"error":"reply"}' });
+await rd.p.click("#ai-short");
+await rd.p.waitForSelector("#ai-status.bad", { timeout: 10000 });
+check("a reading that fails the checker says so, and the buttons work again", /沒有通過自動檢查/.test(await rd.p.textContent("#ai-status")) && !(await rd.p.isDisabled("#ai-short")));
+await rd.p.click("#ai-full");
+check("a reading already written comes back without asking again", readingSent.length === 2 && (await rd.p.$$("#ai-body .ai-sec")).length === 8 && !(await rd.p.textContent("#ai-status")));
+await rd.p.close();
 server.close();
 
 // 伴侶合盤: a partner with a birthday gets a bond on the family card, counts over the 100 lives and a report section.

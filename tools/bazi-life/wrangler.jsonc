@@ -11,8 +11,10 @@
   "ai": { "binding": "AI" },
   // At most 12 readings a minute from one IP, counted per Cloudflare location. namespace_id must be unique in the
   // account (a binding with the same id in another Worker would share these counters).
+  // At most 3 AI readings (/api/reading) a minute from one IP.
   "ratelimits": [
-    { "name": "INTERPRET_LIMIT", "namespace_id": "4721", "simple": { "limit": 12, "period": 60 } }
+    { "name": "INTERPRET_LIMIT", "namespace_id": "4721", "simple": { "limit": 12, "period": 60 } },
+    { "name": "READING_LIMIT", "namespace_id": "4722", "simple": { "limit": 3, "period": 60 } }
   ],
   "vars": {
     // "compact" sends the shorter prompt: about 6 instead of 10 neurons a reading, slightly less accurate.
