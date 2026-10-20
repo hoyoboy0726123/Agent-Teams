@@ -23,7 +23,7 @@ import { safetyCheck, matchIntent } from "./sim/intent.js";
 import { readInterpretation } from "./sim/interpret.js";
 import { nameSwaps, withoutNames } from "./sim/privacy.js";
 import { ACTIONS } from "./sim/actions.js";
-import { readingRequest, partsFor, PARTS, toneWord } from "./ai-reading.js";
+import { readingRequest, readingError, partsFor, PARTS, toneWord } from "./ai-reading.js";
 import { SHICHEN } from "./core/shichen.js";
 import { trait } from "./sim/words.js";
 import { initBaby } from "./baby-app.js";
@@ -736,13 +736,9 @@ function drawReport() {
 // ---------- AI 命理師解讀與 AI 合婚 ----------
 // Only births are sent (ai-reading.js readingRequest): the chart is read as it is, not this game's life. A reading comes
 // in parts, all asked at once and shown as each arrives; a part that fails can be asked again on its own. The full
-// reading starts by itself when the end page opens, unless 結局自動 AI 解讀 was turned off in the play bar. Readings are
-// kept while the page is open, by birth (合婚 also by partner), so living the same chart again asks for nothing.
-const AI_ERRORS = {
-  429: "AI 命理師現在有點忙，等一分鐘再按「重寫這一段」。",
-  502: "這一段寫出來沒有通過自動檢查（例如年份或干支寫錯了）。",
-  503: "AI 命理師今天的額度用完了，明天再來找它。",
-};
+// reading starts by itself when the end page opens, unless 結局自動 AI 解讀 was turned off at the top of the play screen.
+// Readings are kept while the page is open, by birth (合婚 also by partner), so living the same chart again sends only
+// what is not written yet.
 const AI_QUOTA = "AI 命理師今天的額度用完了，明天再來找它；下面的八字命理詳批一樣可以看。";
 const AI_CONSENT = {
   click: "按下按鈕，會把出生日期、時間、出生地和性別送到伺服器，交給 AI 寫解讀。不含姓名和家人，寫完不保存。",
@@ -757,7 +753,22 @@ const YEAR_PARTS = PARTS.full.filter(p => p.startsWith("years"));
 const aiJobs = new Map();   // every reading asked for while the page is open
 let aiShown = null;         // the reading on screen
 let aiAuto = false;         // this end page started the full reading by itself
-const setAIStatus = (text, bad = false) => { const el = $("#ai-status"); el.textContent = text; el.classList.toggle("bad", bad); };
+// The Worker takes 20 parts a minute from one player (READING_LIMIT in wrangler.jsonc). An end page starts by itself
+// only if its parts fit in what is left of the minute; lives skipped through quickly wait for a button instead.
+const PARTS_PER_MINUTE = 20, sentAt = [];
+function sentLastMinute() {
+  while (sentAt.length && Date.now() - sentAt[0] >= 60000) sentAt.shift();
+  return sentAt.length;
+}
+// The words go to the live region only when they change; the seconds tick beside it, not read out.
+function setAIStatus(text, bad = false, seconds = null) {
+  const el = $("#ai-status");
+  if (el.textContent !== text) el.textContent = text;
+  el.classList.toggle("bad", bad);
+  $("#ai-secs").textContent = seconds === null ? "" : `（${seconds} 秒）`;
+}
+const aiKey = (input, kind, partner) => `${new Date().getUTCFullYear()}|${JSON.stringify(readingRequest(input, kind, { partner }))}`;
+const aiTodo = job => job.all.filter(p => !job.parts[p] && !job.busy.has(p));
 const pad2 = n => String(n).padStart(2, "0");
 
 function drawAI() {
@@ -766,18 +777,25 @@ function drawAI() {
   $("#ai-body").innerHTML = "";
   const off = aiOff();
   aiAuto = !off && $("#c-ai").checked;
+  const cached = aiAuto && aiJobs.get(aiKey(run.input, "full", null));
+  const todo = cached ? aiTodo(cached).length : partsFor("full", run.input.date.y, new Date().getUTCFullYear()).length;
+  const tooMany = aiAuto && todo > 0 && sentLastMinute() + todo > PARTS_PER_MINUTE;
+  if (tooMany) aiAuto = false;
   for (const id of ["#ai-go", "#ai-consent", "#ai-match"]) $(id).hidden = off;
   $("#ai-consent").textContent = AI_CONSENT[aiAuto ? "auto" : "click"];
-  setAIStatus(off ? "AI 命理師解讀和 AI 合婚只在命盤人生的網站上提供，這個預覽版沒有連上。" : "");
+  $("#ai-p-error").hidden = true;
+  setAIStatus(off ? "AI 命理師解讀和 AI 合婚只在命盤人生的網站上提供，這個預覽版沒有連上。"
+    : tooMany ? "這一分鐘已經寫了好幾份解讀，這一張命盤等你按「完整解讀」再寫。" : "");
   prefillPartner();
   aiButtons();
   if (aiAuto) askAI("full");
 }
 
-// When the full reading started by itself, 先看重點 is not offered, and 完整解讀 is there only to come back from 合婚.
+// When the full reading started by itself, 先看重點 is not offered, and 完整解讀 is there only to come back from 合婚, or
+// to try again once the day's quota stopped it.
 function aiButtons() {
   $("#ai-short").hidden = aiAuto;
-  $("#ai-full").hidden = aiAuto && (!aiShown || aiShown.kind === "full");
+  $("#ai-full").hidden = aiAuto && (!aiShown || (aiShown.kind === "full" && !outOfQuota(aiShown)));
 }
 
 // The partner of the family form, when one was entered with a birthday.
@@ -792,7 +810,8 @@ function prefillPartner() {
     $("#ai-p-date").value = "";
     setMemberHour(row, { hour: "", time: "" });
   }
-  $("#ai-match").open = !!(p && p.date);
+  // Open with the partner filled in, except when the reading is writing itself: that is read first.
+  $("#ai-match").open = !aiAuto && !!(p && p.date);
 }
 // From the end of a life to the 合婚 tab: you, and the partner typed in the AI card (when a birthday is there).
 function toMatchTab() {
@@ -814,31 +833,36 @@ async function askAI(kind) {
   const r = run;
   if (!r || !r.life.done) return;
   let partner = null;
+  // The 合婚 form says what is missing next to itself, where the progress of a reading cannot write over it.
+  $("#ai-p-error").hidden = true;
   if (kind === "match") {
     partner = readPartner();
-    if (partner.error) return setAIStatus(partner.error, true);
+    if (partner.error) { $("#ai-p-error").textContent = partner.error; $("#ai-p-error").hidden = false; return; }
   }
   // The key is what would be sent (births only), so the same chart in another life finds its reading.
-  const now = new Date().getUTCFullYear(), key = `${now}|${JSON.stringify(readingRequest(r.input, kind, { partner }))}`;
+  const key = aiKey(r.input, kind, partner);
   let job = aiJobs.get(key);
-  if (!job) aiJobs.set(key, (job = { kind, partner, input: r.input, all: partsFor(kind, r.input.date.y, now), parts: {}, errors: {}, codes: {}, busy: new Set() }));
+  if (!job) aiJobs.set(key, (job = { kind, partner, input: r.input, all: partsFor(kind, r.input.date.y, new Date().getUTCFullYear()), parts: {}, errors: {}, codes: {}, busy: new Set(), t0: 0, timer: null }));
   aiShown = job;
   aiButtons();
-  const todo = job.all.filter(p => !job.parts[p] && !job.busy.has(p));
+  const todo = aiTodo(job);
   renderAI(job);
   aiStatusOf(job, null);
   if (todo.length) await askParts(job, todo);
 }
 
+// One clock per reading: parts asked again while others are still being written join the running count.
 async function askParts(job, parts) {
-  const t0 = Date.now();
-  const tick = () => { if (aiShown === job) aiStatusOf(job, Math.floor((Date.now() - t0) / 1000)); };
   for (const p of parts) { job.busy.add(p); delete job.errors[p]; delete job.codes[p]; }
-  if (aiShown === job) renderAI(job);
-  tick();
-  const timer = setInterval(tick, 1000);
+  if (!job.timer) {
+    job.t0 = Date.now();
+    job.timer = setInterval(() => { if (aiShown === job) aiStatusOf(job, Math.floor((Date.now() - job.t0) / 1000)); }, 1000);
+  }
+  if (aiShown === job) { renderAI(job); aiStatusOf(job, Math.floor((Date.now() - job.t0) / 1000)); }
   await Promise.all(parts.map(p => askPart(job, p)));
-  clearInterval(timer);
+  if (job.busy.size) return;
+  clearInterval(job.timer);
+  job.timer = null;
   if (aiShown === job) aiStatusOf(job, null);
 }
 
@@ -846,10 +870,11 @@ async function askPart(job, part) {
   const ctrl = new AbortController(), timeout = setTimeout(() => ctrl.abort(), 90000);
   try {
     const body = readingRequest(job.input, job.kind, { part, partner: job.partner });
+    sentAt.push(Date.now());
     const res = await fetch(READING_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
     const data = await res.json().catch(() => null);
     if (res.ok && data && (Array.isArray(data.sections) || Array.isArray(data.items))) job.parts[part] = data;
-    else { job.errors[part] = AI_ERRORS[res.status] || "現在連不上 AI 命理師，請稍後再試。"; job.codes[part] = res.status; }
+    else { job.errors[part] = readingError(res.status, data); job.codes[part] = res.status === 503 && data && data.error === "quota" ? "quota" : res.status; }
   } catch (e) {
     job.errors[part] = e && e.name === "AbortError" ? "這一段寫太久了。" : "現在連不上 AI 命理師，請檢查網路。";
   } finally {
@@ -860,12 +885,12 @@ async function askPart(job, part) {
 }
 
 // Today's quota ran out before anything was written: one calm line instead of a failed row for every part.
-const outOfQuota = job => !job.busy.size && job.all.every(p => job.codes[p] === 503);
+const outOfQuota = job => !job.busy.size && job.all.every(p => job.codes[p] === "quota");
 
 // 「正在寫…已完成 3/8（12 秒）」, then what is left to do.
 function aiStatusOf(job, seconds) {
   const all = job.all, done = all.filter(p => job.parts[p]).length, failed = all.filter(p => job.errors[p]).length;
-  if (job.busy.size) setAIStatus(`AI 命理師正在寫…已完成 ${done}/${all.length}${seconds !== null ? `（${seconds} 秒）` : ""}`);
+  if (job.busy.size) setAIStatus(`AI 命理師正在寫…已完成 ${done}/${all.length}`, false, seconds);
   else if (outOfQuota(job)) setAIStatus(AI_QUOTA, true);
   else if (failed) setAIStatus(`有 ${failed} 段沒寫好，可以按「重寫這一段」。`, true);
   else setAIStatus(job.kind === "short" ? "這是重點版。想看性格、事業、感情、每一步大運和每一歲的好事與要注意的事，請按「完整解讀」。" : "");
@@ -910,6 +935,7 @@ function coupleHTML(job) {
 }
 
 function renderAI(job) {
+  aiButtons();
   if (outOfQuota(job)) { $("#ai-body").innerHTML = ""; return; }
   const P = job.parts, secs = part => (P[part] && P[part].sections) || [];
   let html;

@@ -233,3 +233,15 @@ test("titles and years", () => {
   assert.equal(yearPillar(2026), "丙午");
   assert.equal(yearPillar(1990), "庚午");
 });
+
+test("a failed part says what happened, and only a used-up day says come back tomorrow", async () => {
+  const { readingError } = await import("../src/ai-reading.js");
+  assert.match(readingError(503, { error: "quota" }), /今天的額度用完了/);
+  for (const data of [{ error: "unavailable" }, null]) {
+    assert.doesNotMatch(readingError(503, data), /額度|明天/);
+    assert.match(readingError(503, data), /重寫這一段/);
+  }
+  assert.match(readingError(429, {}), /有點忙/);
+  assert.match(readingError(502, {}), /自動檢查/);
+  assert.match(readingError(500, null), /連不上/);
+});

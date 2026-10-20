@@ -118,6 +118,8 @@ export const READING_MODELS = {
   "@cf/deepseek-ai/deepseek-v4-flash-0731": (prompt, max) => ({ messages: [{ role: "user", content: prompt }], max_tokens: max, temperature: 0.7 }),
 };
 const withoutThinking = t => t.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+// Workers AI's error once the day's free allocation is used up (code 4006). Any other failure is worth another try.
+export const isQuotaError = message => /\b4006\b|daily free allocation/i.test(message);
 
 export async function reading(request, env) {
   const got = await readBody(request, READING_MAX_BODY);
@@ -139,7 +141,7 @@ export async function reading(request, env) {
   const model = Object.hasOwn(READING_MODELS, opt.model) ? opt.model : Object.hasOwn(READING_MODELS, env.READING_MODEL || "") ? env.READING_MODEL : MODEL;
   const extra = opt.params && typeof opt.params === "object" ? opt.params : {};
   const tries = [];
-  let result = null;
+  let result = null, quota = false;
   for (let i = 0; i < 2 && !(result && result.ok); i++) {
     const t0 = Date.now();
     let out;
@@ -147,7 +149,9 @@ export async function reading(request, env) {
       out = await env.AI.run(model, { ...READING_MODELS[model](partPrompt(part, result), partTokens(part, result)), ...extra });
     } catch (e) {
       // Over the free allocation, or the model is busy. A list keeps what the first try got right.
-      tries.push({ ms: Date.now() - t0, error: String((e && e.message) || e).slice(0, 300) });
+      const message = String((e && e.message) || e);
+      quota = isQuotaError(message);
+      tries.push({ ms: Date.now() - t0, error: message.slice(0, 300) });
       break;
     }
     const text = withoutThinking(textOf(out));
@@ -156,7 +160,8 @@ export async function reading(request, env) {
     tries.push({ ms: Date.now() - t0, usage: usageOf(out), problems: result.problems, warnings: result.warnings, length: result.length, text });
   }
   const labInfo = lab ? { lab: { model, tries, ...(opt.prompt ? { prompt: partPrompt(part) } : {}) } } : {};
-  if (!result) return answer(503, { error: "unavailable", ...labInfo });
+  // "quota" tells the page the day is used up; "unavailable" that this one try failed.
+  if (!result) return answer(503, { error: quota ? "quota" : "unavailable", ...labInfo });
   if (part.type === "sections" && !result.ok) return answer(502, { error: "reply", ...labInfo });
   return answer(200, { ...head, ...finishPart(part, result), ...labInfo });
 }

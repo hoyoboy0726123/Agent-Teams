@@ -80,6 +80,15 @@ const timeOut = t => {
 };
 const birthOut = (b, withPlace) => ({ y: b.date.y, m: b.date.m, d: b.date.d, time: timeOut(b.time), ...(withPlace ? { place: b.place.name } : {}), sex: b.sex });
 
+// What the page says for a part that came back without text: the Worker's status, and for 503 whether the day's
+// Workers AI allocation is used up ("quota") or the model failed this once ("unavailable", worth another try).
+export function readingError(status, data) {
+  if (status === 429) return "AI 命理師現在有點忙，等一分鐘再按「重寫這一段」。";
+  if (status === 502) return "這一段寫出來沒有通過自動檢查（例如年份或干支寫錯了）。";
+  if (status === 503) return data && data.error === "quota" ? "AI 命理師今天的額度用完了，明天再來找它。" : "AI 命理師現在寫不了，請稍後再按「重寫這一段」。";
+  return "現在連不上 AI 命理師，請稍後再試。";
+}
+
 // input: the page's birth { date, time, place, sex }; partner: { date, time, sex, place? } for 合婚 (without a place,
 // the Worker takes yours).
 export function readingRequest(input, kind = "full", { part = PARTS[kind][0], partner = null } = {}) {

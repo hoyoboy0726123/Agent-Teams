@@ -4,7 +4,7 @@ import { PLACE_GROUPS, findPlace } from "./core/places.js";
 import { computeChart } from "./core/chart.js";
 import { hehunReading } from "./core/hehun.js";
 import { checkFamily } from "./core/family.js";
-import { readingRequest, PARTS, toneWord } from "./ai-reading.js";
+import { readingRequest, readingError, PARTS, toneWord } from "./ai-reading.js";
 import { SHICHEN } from "./core/shichen.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
 import { initTimeField, readTimeField, syncTimeField, timeFieldIds } from "./time-field.js";
@@ -230,11 +230,6 @@ function startLife() {
 }
 
 // ---------- AI 深度合婚 ----------
-const AI_ERRORS = {
-  429: "AI 命理師現在有點忙，等一分鐘再按「重寫這一段」。",
-  502: "這一段寫出來沒有通過自動檢查（例如年份或干支寫錯了）。",
-  503: "AI 命理師今天的額度用完了，明天再來找它。",
-};
 const AI_WAIT = { m1: "合婚總評與兩個人的個性", m2: "相處的優點、容易摩擦的地方和建議", myears: "接下來十年兩個人的感情" };
 const setStatus = (text, bad = false) => { const el = $("#hh-ai-status"); el.textContent = text; el.classList.toggle("bad", bad); };
 
@@ -272,7 +267,7 @@ async function askPart(job, part) {
     const res = await fetch(READING_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
     const data = await res.json().catch(() => null);
     if (res.ok && data && (Array.isArray(data.sections) || Array.isArray(data.items))) job.parts[part] = data;
-    else job.errors[part] = AI_ERRORS[res.status] || "現在連不上 AI 命理師，請稍後再試。";
+    else job.errors[part] = readingError(res.status, data);
   } catch (e) {
     job.errors[part] = e && e.name === "AbortError" ? "這一段寫太久了。" : "現在連不上 AI 命理師，請檢查網路。";
   } finally {

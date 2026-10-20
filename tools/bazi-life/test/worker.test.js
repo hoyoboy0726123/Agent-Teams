@@ -310,6 +310,11 @@ test("reading failures answer with an error status", async () => {
     assert.equal(res.status, status, name);
     assert.ok((await res.json()).error, name);
   }
+  // A 503 says whether the day's allocation is used up, so the page knows if another try can help.
+  const error = async e => (await (await worker.fetch(postReading(body), e)).json()).error;
+  assert.equal(await error(down()), "quota");
+  assert.equal(await error(readingEnv(new Error("AiError: 3040: Capacity temporarily exceeded"))), "unavailable");
+  assert.equal(await error({ ...readingEnv(null), AI: undefined }), "unavailable");
 });
 
 test("only a request with the lab key picks the model and sees the usage, the timing and the text", async () => {
