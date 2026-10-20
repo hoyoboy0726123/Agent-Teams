@@ -163,7 +163,8 @@ details.family > summary small { font-weight: 400; color: var(--muted); }
 .status .pill { font-size: 13px; color: var(--muted); }
 .status .pill b { font-family: var(--display); font-size: 16px; color: var(--ink); font-weight: 700; }
 .status .pill small { margin-left: 4px; font-size: 12px; color: var(--muted); }
-.mood { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 10px; align-items: center; font-size: 12px; color: var(--muted); }
+.mood { display: grid; grid-template-columns: auto minmax(48px, 1fr) auto; gap: 8px 10px; align-items: center; font-size: 12px; color: var(--muted); }
+.mood .opts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 14px; }
 .mood .track { height: 6px; border-radius: 3px; background: var(--wash); overflow: hidden; }
 .mood .track i { display: block; height: 100%; background: var(--indigo); border-radius: 3px; transition: width 0.3s; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -554,7 +555,7 @@ footer a { color: var(--indigo); }
         <ol class="steps">
           <li><b>輸入生日</b>填國曆的出生日期、時間和出生地；名字、家人和伴侶都可以選填。不想填？按「隨機投胎」就好。</li>
           <li><b>過一生</b>從出生開始一年一年長大。升學、工作、戀愛、結婚、買房……關鍵時刻由你決定，也可以寫下你自己的決定。</li>
-          <li><b>看結局</b>走完一生，看你的人生 K 線、同一張命盤重跑 100 次的結果，還有一份完整的八字命理詳批。</li>
+          <li><b>看結局</b>走完一生，看你的人生 K 線、同一張命盤重跑 100 次的結果。AI 命理師會自動讀你的命盤，用白話寫一份解讀；想看更細的排法，後面還有一份完整的八字命理詳批。</li>
         </ol>
       </section>
       <section>
@@ -572,7 +573,7 @@ footer a { color: var(--indigo); }
       <section class="welcome-privacy" aria-labelledby="privacy-title">
         <h3 id="privacy-title"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>你的資料只留在你的手機裡</h3>
         <p>生日、名字、家人和伴侶的資料，全部在你的手機（瀏覽器）裡計算，<strong>網站後台不保存任何資料</strong>。這個網站沒有帳號、沒有資料庫。填到一半重新整理不會不見：資料只暫存在這個分頁裡，關掉網頁就跟著消失。為了讓你重玩時多遇到沒看過的題目，最近兩局問過哪些題目（只記題目種類）也放在這個分頁裡，一樣關掉就清掉。</p>
-        <p class="fine">只有你自己按下這兩個功能時，才會把資料交給 AI，用完都不保存：一是「寫下你自己的決定」裡打的那一句話，送出前名字會換成「伴侶」「爸爸」這樣的稱呼；二是「AI 命理師解讀」和「AI 合婚」（結局頁或合婚分頁），會送出出生日期、時間、出生地和性別（合婚還有對方的這些資料），不含姓名、暱稱和家人。合婚分頁的合婚結果在手機上算，不會上傳。不想送出，點選項按鈕、不按解讀就好。</p>
+        <p class="fine">只有兩種功能會把資料交給 AI，用完都不保存：一是「寫下你自己的決定」裡打的那一句話，送出前名字會換成「伴侶」「爸爸」這樣的稱呼；二是「AI 命理師解讀」和「AI 合婚」（結局頁或合婚分頁），會送出出生日期、時間、出生地和性別（合婚還有對方的這些資料），不含姓名、暱稱和家人。走完一生時，結局頁會自動請 AI 命理師解讀；不想送出，在遊戲畫面上方取消勾選「結局自動 AI 解讀」，改成自己按才送。AI 合婚和寫下的決定，都要你自己按了才送出。合婚分頁的合婚結果在手機上算，不會上傳。</p>
       </section>
       <div class="welcome-go">
         <button type="button" class="primary" data-goto="me">開始我的人生</button>
@@ -816,7 +817,7 @@ footer a { color: var(--indigo); }
         <span class="pill">大運 <b id="s-decade">童限</b><small id="s-decade-god"></small></span>
         <span class="pill">流年 <b id="s-pillar"></b><small id="s-pillar-god"></small></span>
       </div>
-      <div class="mood"><span>心情</span><span class="track"><i id="s-mood" style="width:60%"></i></span><label class="major"><input type="checkbox" id="c-major"> 只問人生大事</label></div>
+      <div class="mood"><span>心情</span><span class="track"><i id="s-mood" style="width:60%"></i></span><span class="opts"><label class="major"><input type="checkbox" id="c-major"> 只問人生大事</label><label class="major" id="c-ai-wrap"><input type="checkbox" id="c-ai" checked> 結局自動 AI 解讀</label></span></div>
       <div class="controls">
         <button type="button" id="c-pause">暫停</button>
         <button type="button" data-speed="1" aria-pressed="true">慢慢看</button>
@@ -894,7 +895,7 @@ footer a { color: var(--indigo); }
 
   <footer>
     <p>年柱、月柱用出生的精確時刻比對節氣，日柱、時柱用出生地的真太陽時。每一年，大運和流年會讓各領域事件的機率傾斜，倍率限制在 0.5 到 2 倍之間；扶抑、調候、格局三派的看法分開計算後再合併。</p>
-    <p>壽命用內政部歷年的簡易生命表（每一歲的死亡機率，1956 到 2025 年；之後依國發會人口推估）；癌症、中風、心臟病在各年齡的死亡人數用衛福部的死因統計，癌症再對齊國健署癌症登記的發生率；三高用健保的年齡別就醫統計。所有計算都在你的瀏覽器裡完成，網站不保存你的資料。只有兩種情況會把資料交給 AI：「寫下你自己的決定」那一句（名字會先換成稱呼），以及你按下的「AI 命理師解讀」和「AI 合婚」（出生日期、時間、出生地和性別，不含姓名、暱稱和家人）；用完都不保存。合婚分頁的合婚結果在手機上算，不會上傳。</p>
+    <p>壽命用內政部歷年的簡易生命表（每一歲的死亡機率，1956 到 2025 年；之後依國發會人口推估）；癌症、中風、心臟病在各年齡的死亡人數用衛福部的死因統計，癌症再對齊國健署癌症登記的發生率；三高用健保的年齡別就醫統計。所有計算都在你的瀏覽器裡完成，網站不保存你的資料。只有兩種情況會把資料交給 AI：「寫下你自己的決定」那一句（名字會先換成稱呼），以及「AI 命理師解讀」和「AI 合婚」（出生日期、時間、出生地和性別，不含姓名、暱稱和家人；結局頁的解讀預設自動開始，可以在遊戲畫面上方關掉）；用完都不保存。合婚分頁的合婚結果在手機上算，不會上傳。</p>
     <p><a id="chart-link" href="__CHART_URL__">看完整命盤（排盤引擎）</a></p>
   </footer>
 </div>

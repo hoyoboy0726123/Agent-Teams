@@ -111,7 +111,7 @@ check("the report ends with 綜合論斷 and then 開運建議, once", sectionTi
 await page.hover("#plot svg", { position: { x: 300, y: 120 } });
 check("hovering the K-line shows a tooltip", await page.isVisible("#tip"));
 check("without a name or family only the chart card shows", (await page.$$("#personal-cards .card")).length === 1);
-check("on a page without the Worker the AI reading and 合婚 say where they are offered", await page.isVisible("#ai") && await page.isHidden("#ai-go") && await page.isHidden("#ai-match") && /AI 合婚只在命盤人生的網站上提供/.test(await page.textContent("#ai-status")));
+check("on a page without the Worker the AI reading and 合婚 say where they are offered, and the play bar has no AI box", await page.isVisible("#ai") && await page.isHidden("#ai-go") && await page.isHidden("#ai-match") && /AI 合婚只在命盤人生的網站上提供/.test(await page.textContent("#ai-status")) && await page.$eval("#c-ai-wrap", el => el.hidden));
 if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/life-desktop-light.png`, fullPage: true });
 
 await page.click("#again-same");
@@ -178,11 +178,18 @@ await page.waitForSelector("#play:not([hidden])");
 await page.check("#c-major");
 await page.click('[data-speed="10"]');
 let asked = 0;
-for (let i = 0; i < 60 && !(await page.isVisible("#end")); i++) {
-  await page.waitForSelector("#choice:not([hidden]), #end:not([hidden])", { timeout: 45000 });
-  if (await page.isVisible("#choice .options button")) { asked++; await page.click("#choice .options button"); }
+// A random birth can die in childhood (a 1950s birth before 18 about one time in eleven, by the life tables) and never
+// reach a big decision; then the same chart lives again.
+for (let lives = 0; lives < 4; lives++) {
+  if (lives) { await page.click("#again-same"); await page.waitForSelector("#play:not([hidden])"); }
+  asked = 0;
+  for (let i = 0; i < 60 && !(await page.isVisible("#end")); i++) {
+    await page.waitForSelector("#choice:not([hidden]), #end:not([hidden])", { timeout: 45000 });
+    if (await page.isVisible("#choice .options button")) { asked++; await page.click("#choice .options button"); }
+  }
+  await ended(page, 20000);
+  if (Number(((await page.textContent("#end-title")).match(/活到 (\d+) 歲/) || [])[1]) >= 30) break;
 }
-await ended(page, 20000);
 const majorFeed = await page.textContent("#feed");
 check("with 只問人生大事 the big decisions are asked and the rest follow the personality", asked >= 3 && /依你的個性：/.test(majorFeed), `${asked} asked`);
 await page.uncheck("#c-major");
@@ -280,16 +287,17 @@ await rd.p.route("**/api/reading", async route => {
   const res = await readingWorker.fetch(new Request(`${siteOrigin}/api/reading`, { method: "POST", headers: { "content-type": "application/json", origin: siteOrigin }, body }), readingEnv);
   return route.fulfill({ status: res.status, contentType: "application/json", body: await res.text() });
 });
+check("the play bar offers 結局自動 AI 解讀, on unless it was turned off", await rd.p.isVisible("#c-ai") && await rd.p.isChecked("#c-ai"));
 await rd.p.click("#c-skip");
 await ended(rd.p, 30000);
-check("the AI card offers both readings and 合婚 under the consent line", await rd.p.isVisible("#ai-full") && await rd.p.isVisible("#ai-short") && await rd.p.isVisible("#ai-match") && /不含姓名和家人/.test(await rd.p.textContent("#ai-consent")));
+const consent = await rd.p.textContent("#ai-consent");
+check("the end page starts the full reading by itself, under a consent line that says so and how to turn it off", await rd.p.isHidden("#ai-short") && await rd.p.isHidden("#ai-full") && await rd.p.isVisible("#ai-match") && /自動/.test(consent) && /不含姓名和家人/.test(consent) && /結局自動 AI 解讀/.test(consent), consent);
 check("AI 合婚 starts open, filled in with the partner of the family form", await rd.p.$eval("#ai-match", d => d.open) && await rd.p.inputValue("#ai-p-date") === "1990-05-20" && await rd.p.inputValue("#ai-p-sex") === "female" && await rd.p.inputValue("#ai-p-when .m-hour") === "wu");
 
-// 完整解讀: every part at once, shown as sections, 大運 cards and a list of every age.
+// 完整解讀, started by itself: every part at once, shown as sections, 大運 cards and a list of every age.
 const sentFrom = n => readingSent.slice(n).map(b => JSON.parse(b));
 const ages = agesOf({ age: NOW - 1988 }).length, fullParts = partsFor("full", 1988, NOW);
 const settled = n => rd.p.waitForFunction(n => document.querySelectorAll("#ai-body .ai-years li").length >= n && !document.querySelector("#ai-body .ai-wait") && !/正在寫/.test(document.querySelector("#ai-status").textContent), n, { timeout: 30000 });
-await rd.p.click("#ai-full");
 await settled(ages);
 const full = sentFrom(0);
 check("a full reading asks for each part once, with the birth only: no name, no game", full.length === fullParts.length && full.map(b => b.part).sort().join() === [...fullParts].sort().join() && full.every(b => b.v === 2 && b.kind === "full" && b.birth.y === 1988 && b.birth.place && !b.life && !b.partner) && !readingSent.some(b => /陳志明|志明|小美/.test(b)), readingSent[0] && readingSent[0].slice(0, 120));
@@ -301,30 +309,46 @@ const firstAge = await rd.p.textContent("#ai-body .ai-years li");
 check("every age from now to 85 has its good things and what to watch", (await rd.p.$$("#ai-body .ai-years li")).length === ages && firstAge.includes(`${NOW - 1988} 歲`) && firstAge.includes(`好事${LINE.好事}`) && firstAge.includes(`要注意${LINE.要注意}`), `${(await rd.p.$$("#ai-body .ai-years li")).length} of ${ages}`);
 check("the reading ends with its notice, and nothing is left waiting", /不是預言/.test(await rd.p.textContent("#ai-body")) && (await rd.p.textContent("#ai-status")) === "" && !/＊/.test(await rd.p.textContent("#ai-body")));
 
-// A part that fails the checker can be written again on its own.
-failOnce.add("short");
-let n = readingSent.length;
-await rd.p.click("#ai-short");
-await rd.p.waitForSelector('#ai-body [data-ai-retry="short"]', { timeout: 10000 });
-check("a part that fails the checker says so, with a button to write it again", /沒有通過自動檢查/.test(await rd.p.textContent("#ai-body")) && /有 1 段沒寫好/.test(await rd.p.textContent("#ai-status")));
-await rd.p.click('#ai-body [data-ai-retry="short"]');
-await rd.p.waitForSelector("#ai-body .ai-sec.motto", { timeout: 10000 });
-check("重寫這一段 asks for that part again, and it shows", readingSent.length === n + 2 && sentFrom(n).every(b => b.part === "short") && (await rd.p.$$("#ai-body .ai-sec")).length === 2 && /這是重點版/.test(await rd.p.textContent("#ai-status")));
-
 // AI 合婚: both births, three parts, the engine's verdict and ten years for the two of them.
-n = readingSent.length;
+let n = readingSent.length;
 await rd.p.click("#ai-match-go");
 await rd.p.waitForFunction(() => document.querySelectorAll("#ai-body .ai-luck li").length === 10 && !document.querySelector("#ai-body .ai-wait"), null, { timeout: 30000 });
 const match = sentFrom(n);
 check("合婚 asks for its three parts with both births and no names", match.length === 3 && match.map(b => b.part).join() === "m1,m2,myears" && match.every(b => b.kind === "match" && b.birth.y === 1988 && JSON.stringify(b.partner) === JSON.stringify({ y: 1990, m: 5, d: 20, time: { shichen: "wu" }, sex: "female" })) && !readingSent.some(b => /陳志明|志明|小美/.test(b)), JSON.stringify(match[0] && match[0].partner));
 const matchText = await rd.p.textContent("#ai-body");
+check("after 合婚, 完整解讀 is offered to come back to the reading, and 先看重點 still is not", await rd.p.isVisible("#ai-full") && await rd.p.isHidden("#ai-short"));
 check("合婚 shows the verdict, its sections and the next ten years for both", await rd.p.isVisible("#ai-body .ai-chips .tone") && (await rd.p.$$("#ai-body .ai-sec")).length === 6 && /合婚一句話/.test(matchText) && /給你們的建議/.test(matchText) && new RegExp(`${NOW} 年.*你 ${NOW - 1988} 歲.*對方 ${NOW - 1990} 歲`).test(matchText));
 n = readingSent.length;
 await rd.p.fill("#ai-p-date", "");
 await rd.p.click("#ai-match-go");
 check("合婚 without the other birthday asks for it and sends nothing", readingSent.length === n && /請先填另一半的出生日期/.test(await rd.p.textContent("#ai-status")) && await rd.p.$eval("#ai-status", el => el.classList.contains("bad")));
 await rd.p.click("#ai-full");
-check("a reading already written comes back without asking again", readingSent.length === n && (await rd.p.$$("#ai-body .ai-years li")).length === ages && (await rd.p.textContent("#ai-status")) === "");
+check("a reading already written comes back without asking again", readingSent.length === n && (await rd.p.$$("#ai-body .ai-years li")).length === ages && (await rd.p.textContent("#ai-status")) === "" && await rd.p.isHidden("#ai-full"));
+// The same chart lived again: its reading is there at once, and nothing is asked again.
+async function liveAgain(p, before = null) {
+  await p.click("#again-same");
+  await p.waitForSelector("#play:not([hidden])");
+  if (before) await before();
+  await p.click("#c-skip");
+  await ended(p, 30000);
+  await p.waitForTimeout(300);
+}
+await liveAgain(rd.p);
+check("living the same chart again shows its reading at once and asks for nothing", readingSent.length === n && (await rd.p.$$("#ai-body .ai-years li")).length === ages && (await rd.p.textContent("#ai-status")) === "" && await rd.p.isHidden("#ai-full"));
+// Turned off in the play bar: the end page sends nothing until a button is pressed, and remembers the choice.
+await liveAgain(rd.p, () => rd.p.uncheck("#c-ai"));
+check("with 結局自動 AI 解讀 off, the end page sends nothing and offers both readings under the button consent line", readingSent.length === n && await rd.p.isVisible("#ai-short") && await rd.p.isVisible("#ai-full") && /按下按鈕/.test(await rd.p.textContent("#ai-consent")) && (await rd.p.textContent("#ai-body")) === "" && (await rd.p.textContent("#ai-status")) === "" && await rd.p.evaluate(() => localStorage.getItem("bazi-life.aiAuto")) === "0");
+// A part that fails the checker can be written again on its own.
+failOnce.add("short");
+await rd.p.click("#ai-short");
+await rd.p.waitForSelector('#ai-body [data-ai-retry="short"]', { timeout: 10000 });
+check("a part that fails the checker says so, with a button to write it again", /沒有通過自動檢查/.test(await rd.p.textContent("#ai-body")) && /有 1 段沒寫好/.test(await rd.p.textContent("#ai-status")));
+await rd.p.click('#ai-body [data-ai-retry="short"]');
+await rd.p.waitForSelector("#ai-body .ai-sec.motto", { timeout: 10000 });
+check("重寫這一段 asks for that part again, and it shows", readingSent.length === n + 2 && sentFrom(n).every(b => b.part === "short") && (await rd.p.$$("#ai-body .ai-sec")).length === 2 && /這是重點版/.test(await rd.p.textContent("#ai-status")));
+n = readingSent.length;
+await rd.p.click("#ai-full");
+check("with it off, 完整解讀 still brings back the reading already written", readingSent.length === n && (await rd.p.$$("#ai-body .ai-years li")).length === ages);
 // From the end page to the 合婚 tab: you and the partner of the AI card, the full 合婚 at once, then AI 深度合婚.
 await rd.p.fill("#ai-p-date", "1990-05-20");
 await rd.p.click("#ai-match-tab");
@@ -337,6 +361,15 @@ const deep = sentFrom(n);
 check("AI 深度合婚 sends both births with the other person's birthplace, and no names", deep.length === 3 && deep.map(b => b.part).join() === "m1,m2,myears" && deep.every(b => b.kind === "match" && b.partner && b.partner.place === "臺北市" && b.partner.y === 1990) && !readingSent.slice(n).some(b => /陳志明|志明|小美/.test(b)), JSON.stringify(deep[0] && deep[0].partner));
 check("AI 深度合婚 shows its sections and the ten years", (await rd.p.$$("#hh-ai-body .ai-sec")).length === 6 && /不是預言/.test(await rd.p.textContent("#hh-ai-body")) && (await rd.p.textContent("#hh-ai-status")) === "");
 await rd.p.close();
+// Out of today's quota: one calm line that points to 詳批, not a failed row for every part.
+const quota = await servedPage(route => route.fulfill(ok));
+let quotaAsked = 0;
+await quota.p.route("**/api/reading", route => { quotaAsked++; return route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"unavailable"}' }); });
+await quota.p.click("#c-skip");
+await ended(quota.p, 30000);
+await quota.p.waitForFunction(() => /額度用完/.test(document.querySelector("#ai-status").textContent), null, { timeout: 10000 });
+check("when today's quota is used up, the card says so once and points to 詳批, with no failed rows", quotaAsked === partsFor("full", 1988, NOW).length && (await quota.p.textContent("#ai-body")) === "" && await quota.p.$eval("#ai-status", el => el.classList.contains("bad")) && /八字命理詳批/.test(await quota.p.textContent("#ai-status")), `${quotaAsked} asked`);
+await quota.p.close();
 server.close();
 
 // 伴侶合盤: a partner with a birthday gets a bond on the family card, counts over the 100 lives and a report section.
@@ -501,7 +534,7 @@ await draft.click("#tab-me");
 check("after a reload the family's 時辰 and exact times come back", await draft.inputValue(".member[data-role=father] .m-hour") === "wu" && await draft.inputValue("#sibling-list .member:last-child .m-hour") === "clock" && await draft.inputValue("#sibling-list .member:last-child .m-time") === "06:15" && await draft.isVisible("#sibling-list .member:last-child .m-time") && await draft.isHidden(".member[data-role=father] .m-time"));
 check("after a reload the birth form, the partner and the siblings come back", await draft.inputValue("#f-name") === "陳志明" && await draft.inputValue(".member[data-role=partner] .m-name") === "王小美" && await draft.inputValue("#f-wed") === "2016" && await draft.inputValue("#sibling-list .member:last-child .m-name") === "陳小華" && await draft.evaluate(() => document.querySelector("#family").open));
 const stores = await draft.evaluate(() => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) }));
-check("the half-filled forms are kept in this tab only, with nothing personal in long-term storage", stores.local.every(k => ["bazi-life.welcomed", "bazi-life.majorOnly"].includes(k)) && stores.session.includes("bazi-life.form"), JSON.stringify(stores));
+check("the half-filled forms are kept in this tab only, with nothing personal in long-term storage", stores.local.every(k => ["bazi-life.welcomed", "bazi-life.majorOnly", "bazi-life.aiAuto"].includes(k)) && stores.session.includes("bazi-life.form"), JSON.stringify(stores));
 draft.once("dialog", d => d.accept());
 await draft.click("#me-clear");
 await draft.reload();
