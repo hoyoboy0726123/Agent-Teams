@@ -808,7 +808,18 @@ function drawAI() {
 }
 
 // When the full reading started by itself, 先看重點 is not offered, and 完整解讀 is there only to come back from 合婚.
+// Once today's quota is used up nothing more can be written: no buttons, no 合婚 form and no consent line, except
+// 完整解讀 to come back to this chart's full reading when it was written before.
 function aiButtons() {
+  if (!aiOff() && aiOutToday()) {
+    const full = run && aiJobs.get(aiKey(run.input, "full", null));
+    const back = !!full && full !== aiShown && full.all.every(p => full.parts[p]);
+    $("#ai-short").hidden = true;
+    $("#ai-full").hidden = !back;
+    $("#ai-match").hidden = true;
+    $("#ai-consent").hidden = true;
+    return;
+  }
   $("#ai-short").hidden = aiAuto;
   $("#ai-full").hidden = aiAuto && (!aiShown || aiShown.kind === "full");
 }
@@ -857,6 +868,12 @@ async function askAI(kind, { auto = false } = {}) {
   // The key is what would be sent (births only), so the same chart in another life finds its reading.
   const key = aiKey(r.input, kind, partner);
   let job = aiJobs.get(key);
+  // Nothing more is written today: what is on screen stays; with nothing on screen, one line says why.
+  if (aiOutToday() && !(job && job.all.every(p => job.parts[p]))) {
+    if (!aiShown) setAIStatus(AI_QUOTA, true);
+    aiButtons();
+    return;
+  }
   if (!job) aiJobs.set(key, (job = { kind, partner, input: r.input, all: partsFor(kind, r.input.date.y, new Date().getUTCFullYear()), parts: {}, errors: {}, codes: {}, busy: new Set(), t0: 0, timer: null }));
   aiShown = job;
   if (auto) aiAutoJob = job;
@@ -914,7 +931,8 @@ const quotaBlank = job => !job.busy.size && !job.all.some(p => job.parts[p]) && 
 // only a calm line.
 function aiStatusOf(job, seconds) {
   const all = job.all, done = all.filter(p => job.parts[p]).length;
-  const failed = all.filter(p => job.errors[p] && job.codes[p] !== "quota").length;
+  // Once the day is out nothing can be written again, so any part not written counts as missing, not as failed.
+  const failed = aiOutToday() ? 0 : all.filter(p => job.errors[p] && job.codes[p] !== "quota").length;
   const missing = all.length - done - failed - job.busy.size;
   if (job.busy.size) setAIStatus(`AI 命理師正在寫…已完成 ${done}/${all.length}`, false, seconds);
   else if (failed) setAIStatus(`有 ${failed} 段沒寫好，可以按「重寫這一段」。`, true);
@@ -924,7 +942,7 @@ function aiStatusOf(job, seconds) {
 
 const aiSecs = list => list.map(s => `<section class="ai-sec${/一句話$/.test(s.title) ? " motto" : ""}"><h4>${esc(s.title)}</h4>${String(s.body).split(/\n+/).map(p => `<p>${esc(p)}</p>`).join("")}</section>`).join("");
 function aiWait(job, part, what = AI_WAIT[part]) {
-  if (job.codes[part] === "quota") return "";
+  if (job.codes[part] === "quota" || (job.errors[part] && aiOutToday())) return "";
   if (job.errors[part]) return `<p class="ai-wait bad">「${esc(what)}」${esc(job.errors[part])}<button type="button" class="secondary" data-ai-retry="${part}">重寫這一段</button></p>`;
   return job.busy.has(part) ? `<p class="ai-wait">AI 命理師正在寫：${esc(what)}…</p>` : "";
 }

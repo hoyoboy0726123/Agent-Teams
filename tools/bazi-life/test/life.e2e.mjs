@@ -423,9 +423,7 @@ await toEnd(asked2.p);
 await asked2.p.click("#ai-full");
 await asked2.p.waitForFunction(() => /額度用完/.test(document.querySelector("#ai-status").textContent), null, { timeout: 10000 });
 check("a reading the player asked for says the day's quota is used up in one line, with no failed rows", asked2.bodies.length === FULL && await asked2.p.isVisible("#ai") && (await asked2.p.textContent("#ai-body")) === "" && await asked2.p.$eval("#ai-status", el => el.classList.contains("bad")) && /八字命理詳批/.test(await asked2.p.textContent("#ai-status")));
-await asked2.p.click("#ai-short");
-await asked2.p.waitForTimeout(300);
-check("pressing again the same day sends nothing and says so", asked2.bodies.length === FULL && /額度用完/.test(await asked2.p.textContent("#ai-status")));
+check("after that the card offers nothing more today: no buttons, no AI 合婚, no consent line", await asked2.p.isHidden("#ai-short") && await asked2.p.isHidden("#ai-full") && await asked2.p.isHidden("#ai-match") && await asked2.p.isHidden("#ai-consent") && asked2.bodies.length === FULL);
 await asked2.p.evaluate(() => localStorage.removeItem("bazi-life.aiAuto"));
 await asked2.p.close();
 // The quota runs out partway: the written parts stay, the rest get no red rows, only a calm line.
@@ -433,8 +431,58 @@ const partway = await readingPage((route, body) => (/"part":"years/.test(body) ?
 await partway.p.click("#c-skip");
 await ended(partway.p, 30000);
 await partway.p.waitForFunction(() => /還有 \d+ 段沒寫到/.test(document.querySelector("#ai-status").textContent), null, { timeout: 30000 });
-check("when the quota runs out partway, the written parts stay and the rest are named in one calm line", await partway.p.isVisible("#ai") && /命盤總論/.test(await partway.p.textContent("#ai-body")) && (await partway.p.$$("#ai-body .ai-decade")).length >= 5 && (await partway.p.$$("#ai-body [data-ai-retry], #ai-body .ai-wait.bad")).length === 0 && !(await partway.p.$eval("#ai-status", el => el.classList.contains("bad"))));
+const YEARS = partsFor("full", 1988, NOW).filter(x => x.startsWith("years")).length;
+check("when the quota runs out partway, the written parts stay and the rest are named in one calm line", await partway.p.isVisible("#ai") && /命盤總論/.test(await partway.p.textContent("#ai-body")) && (await partway.p.$$("#ai-body .ai-decade")).length >= 5 && (await partway.p.$$("#ai-body [data-ai-retry], #ai-body .ai-wait.bad")).length === 0 && !(await partway.p.$eval("#ai-status", el => el.classList.contains("bad"))) && new RegExp(`還有 ${YEARS} 段沒寫到`).test(await partway.p.textContent("#ai-status")));
+check("and the card offers nothing that could not be written today: no AI 合婚, no buttons, no consent line", await partway.p.isHidden("#ai-match") && await partway.p.isHidden("#ai-short") && await partway.p.isHidden("#ai-full") && await partway.p.isHidden("#ai-consent"));
 await partway.p.close();
+// Another failure in the same batch as the quota: no 重寫這一段 that could not send, just the calm line for all of them.
+const mixed = await readingPage((route, body) => (/"part":"years/.test(body) ? QUOTA(route) : /"part":"a"/.test(body) ? route.fulfill({ status: 502, contentType: "application/json", body: '{"error":"reply"}' }) : viaWorker(route, body)));
+await mixed.p.click("#c-skip");
+await ended(mixed.p, 30000);
+await mixed.p.waitForFunction(() => /還有 \d+ 段沒寫到/.test(document.querySelector("#ai-status").textContent), null, { timeout: 30000 });
+check("a part that failed for another reason in the same batch gets no dead 重寫這一段, and is counted in the calm line", (await mixed.p.$$("#ai-body [data-ai-retry], #ai-body .ai-wait.bad")).length === 0 && new RegExp(`還有 ${YEARS + 1} 段沒寫到`).test(await mixed.p.textContent("#ai-status")) && /感情與婚姻/.test(await mixed.p.textContent("#ai-body")));
+await mixed.p.close();
+// A full reading written before the quota ran out still shows for its chart, with nothing else offered; other charts
+// get no card. A 合婚 shown before then loses AI 深度合婚 when its tab is opened again.
+const earlier = await readingPage(viaWorker);
+await earlier.p.click("#c-skip");
+await ended(earlier.p, 30000);
+await earlier.p.waitForFunction(() => document.querySelectorAll("#ai-body .ai-years li").length > 10 && !/正在寫/.test(document.querySelector("#ai-status").textContent), null, { timeout: 30000 });
+const written = earlier.bodies.length, wroteAges = (await earlier.p.$$("#ai-body .ai-years li")).length;
+await earlier.p.click("#again-new");
+await earlier.p.click("#tab-match");
+await earlier.p.fill("#ma-date", "1988-02-15");
+await earlier.p.fill("#mb-date", "1990-05-20");
+await earlier.p.click("#form-match button[type=submit]");
+await earlier.p.waitForSelector("#match:not([hidden]) .hh-hero", { timeout: 10000 });
+const offered = await earlier.p.isVisible("#hh-ai-btn");
+await earlier.p.evaluate(() => sessionStorage.setItem("bazi-life.aiOut", new Date().toISOString().slice(0, 10)));
+await earlier.p.click("#tab-me");
+await earlier.p.click("#tab-match");
+check("a 合婚 shown before the quota ran out drops AI 深度合婚 when its tab is opened again", offered && await earlier.p.isHidden("#hh-ai"));
+await earlier.p.click("#tab-me");
+await earlier.p.click("#form-me button[type=submit]");
+await toEnd(earlier.p);
+check("the same chart's full reading, written earlier, still shows with nothing else offered and nothing sent", await earlier.p.isVisible("#ai") && (await earlier.p.$$("#ai-body .ai-years li")).length === wroteAges && await earlier.p.isHidden("#ai-go") && await earlier.p.isHidden("#ai-consent") && await earlier.p.isHidden("#ai-match") && earlier.bodies.length === written);
+await earlier.p.click("#again-new");
+await earlier.p.click("#tab-random");
+await earlier.p.click("#go-random");
+await toEnd(earlier.p);
+check("another chart the same day gets no AI card and sends nothing", await earlier.p.isHidden("#ai") && earlier.bodies.length === written);
+await earlier.p.close();
+// AI 深度合婚 meeting the quota partway: what was written stays, one calm line, the button goes, the day is marked.
+const deepq = await readingPage((route, body) => (/"part":"m1"/.test(body) ? viaWorker(route, body) : QUOTA(route)));
+await toEnd(deepq.p, () => deepq.p.uncheck("#c-ai"));
+await deepq.p.click("#again-new");
+await deepq.p.click("#tab-match");
+await deepq.p.fill("#ma-date", "1988-02-15");
+await deepq.p.fill("#mb-date", "1990-05-20");
+await deepq.p.click("#form-match button[type=submit]");
+await deepq.p.waitForSelector("#match:not([hidden]) .hh-hero", { timeout: 10000 });
+await deepq.p.click("#hh-ai-btn");
+await deepq.p.waitForFunction(() => /還有 \d+ 段沒寫到/.test(document.querySelector("#hh-ai-status").textContent), null, { timeout: 30000 });
+check("AI 深度合婚 meeting the quota keeps what was written, says the rest in one calm line, and puts the button away", /合婚一句話/.test(await deepq.p.textContent("#hh-ai-body")) && (await deepq.p.$$("#hh-ai-body [data-ai-retry], #hh-ai-body .ai-wait.bad")).length === 0 && /還有 2 段沒寫到/.test(await deepq.p.textContent("#hh-ai-status")) && await deepq.p.isHidden("#hh-ai-btn") && await deepq.p.evaluate(() => sessionStorage.getItem("bazi-life.aiOut")) === new Date().toISOString().slice(0, 10));
+await deepq.p.close();
 // A model that fails for a moment (503 without "quota") on some parts: the written parts stay, the others can be
 // written again, and nobody is told to come back tomorrow.
 const flaky = await readingPage((route, body) => (/"part":"years/.test(body) ? route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"unavailable"}' }) : viaWorker(route, body)));

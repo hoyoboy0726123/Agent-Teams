@@ -48,6 +48,11 @@ export function onMatchTab(tab) {
   if (!hooks) return;
   if (tab === "match") fillFromLife(false);
   $("#match").hidden = tab !== "match" || !shown;
+  // A 合婚 shown before today's AI quota ran out: AI 深度合婚 goes away unless some of it was written.
+  if (tab === "match" && shown && onSite() && aiOutToday()) {
+    if (!(ai && PARTS.match.some(x => ai.parts[x]))) $("#hh-ai").hidden = true;
+    aiOutControls();
+  }
 }
 
 // ---------- 表單 ----------
@@ -245,9 +250,15 @@ function drawAI() {
 }
 
 const QUOTA_LINE = "AI 命理師今天的額度用完了，明天再來找它。";
+// Once today's quota is used up the button and its consent line go; what was written stays.
+function aiOutControls() {
+  if (!onSite() || !aiOutToday()) return;
+  $("#hh-ai-go").hidden = true;
+  $("#hh-ai-consent").hidden = true;
+}
 async function askAI() {
   if (!shown || !onSite()) return;
-  if (aiOutToday() && !(ai && PARTS.match.every(x => ai.parts[x]))) return setStatus(QUOTA_LINE, true);
+  if (aiOutToday() && !(ai && PARTS.match.every(x => ai.parts[x]))) { aiOutControls(); return setStatus(QUOTA_LINE, true); }
   const job = (ai ||= { shown, parts: {}, errors: {}, codes: {}, busy: new Set() });
   const todo = PARTS.match.filter(x => !job.parts[x] && !job.busy.has(x));
   if (todo.length) await askParts(job, todo);
@@ -288,7 +299,8 @@ async function askPart(job, part) {
 }
 // Parts the day's quota kept from being written get no failed row, only one line.
 function statusOf(job, seconds) {
-  const all = PARTS.match, done = all.filter(x => job.parts[x]).length, failed = all.filter(x => job.errors[x] && job.codes[x] !== "quota").length;
+  const all = PARTS.match, done = all.filter(x => job.parts[x]).length;
+  const failed = aiOutToday() ? 0 : all.filter(x => job.errors[x] && job.codes[x] !== "quota").length;
   const missing = all.length - done - failed - job.busy.size;
   if (job.busy.size) setStatus(`AI 命理師正在寫…已完成 ${done}/${all.length}${seconds !== null ? `（${seconds} 秒）` : ""}`);
   else if (failed) setStatus(`有 ${failed} 段沒寫好，可以按「重寫這一段」。`, true);
@@ -296,11 +308,12 @@ function statusOf(job, seconds) {
   else setStatus("");
 }
 function waitHTML(job, part) {
-  if (job.codes[part] === "quota") return "";
+  if (job.codes[part] === "quota" || (job.errors[part] && aiOutToday())) return "";
   if (job.errors[part]) return `<p class="ai-wait bad">「${esc(AI_WAIT[part])}」${esc(job.errors[part])}<button type="button" class="secondary" data-ai-retry="${part}">重寫這一段</button></p>`;
   return job.busy.has(part) ? `<p class="ai-wait">AI 命理師正在寫：${esc(AI_WAIT[part])}…</p>` : "";
 }
 function renderAI(job) {
+  aiOutControls();
   const P = job.parts;
   const secs = part => (P[part] ? P[part].sections.map(s => `<section class="ai-sec${/一句話$/.test(s.title) ? " motto" : ""}"><h4>${esc(s.title)}</h4>${String(s.body).split(/\n+/).map(t => `<p>${esc(t)}</p>`).join("")}</section>`).join("") : waitHTML(job, part));
   const tone = t => { const w = toneWord(t); return `<span class="ai-tone t-${w}">${w}</span>`; };
