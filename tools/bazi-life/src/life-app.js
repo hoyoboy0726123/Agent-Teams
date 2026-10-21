@@ -24,6 +24,7 @@ import { readInterpretation } from "./sim/interpret.js";
 import { nameSwaps, withoutNames } from "./sim/privacy.js";
 import { ACTIONS } from "./sim/actions.js";
 import { readingRequest, readingError, partsFor, PARTS, toneWord } from "./ai-reading.js";
+import { aiOutToday, markAiOut } from "./ai-quota.js";
 import { SHICHEN } from "./core/shichen.js";
 import { trait } from "./sim/words.js";
 import { initBaby } from "./baby-app.js";
@@ -101,7 +102,7 @@ function setup() {
   // so no box either.
   try { $("#c-ai").checked = localStorage.getItem(AI_AUTO) !== "0"; } catch {}
   $("#c-ai").addEventListener("change", () => { try { localStorage.setItem(AI_AUTO, $("#c-ai").checked ? "1" : "0"); } catch {} });
-  $("#c-ai-wrap").hidden = aiOff();
+  $("#c-ai-wrap").hidden = aiOff() || aiOutToday();
   for (const b of document.querySelectorAll("[data-speed]")) b.addEventListener("click", () => {
     speed = Number(b.dataset.speed);
     for (const x of document.querySelectorAll("[data-speed]")) x.setAttribute("aria-pressed", String(x === b));
@@ -303,6 +304,7 @@ function begin(input, born, extra = {}) {
   $("#setup").hidden = true; $("#baby").hidden = true; $("#match").hidden = true; $("#end").hidden = true; $("#play").hidden = false;
   $("#feed").innerHTML = ""; $("#choice").hidden = true; recap = [];
   $("#born").textContent = born || `${input.date.y} 年 ${input.date.m} 月 ${input.date.d} 日在${input.place.name}出生。`;
+  $("#c-ai-wrap").hidden = aiOff() || aiOutToday();   // nothing to switch on while today's AI quota is used up
   paused = false; $("#c-pause").textContent = "暫停";
   updateStatus();
   window.scrollTo({ top: 0 });
@@ -753,6 +755,7 @@ const YEAR_PARTS = PARTS.full.filter(p => p.startsWith("years"));
 const aiJobs = new Map();   // every reading asked for while the page is open
 let aiShown = null;         // the reading on screen
 let aiAuto = false;         // this end page started the full reading by itself
+let aiAutoJob = null;       // the reading it started
 // The Worker takes 20 parts a minute from one player (READING_LIMIT in wrangler.jsonc). An end page starts by itself
 // only if its parts fit in what is left of the minute; lives skipped through quickly wait for a button instead.
 const PARTS_PER_MINUTE = 20, sentAt = [];
@@ -773,9 +776,22 @@ const pad2 = n => String(n).padStart(2, "0");
 
 function drawAI() {
   aiShown = null;
+  aiAutoJob = null;
   $("#ai").hidden = false;
   $("#ai-body").innerHTML = "";
   const off = aiOff();
+  // Today's AI quota is used up (ai-quota.js): no AI card at all until it starts again, unless this chart's full
+  // reading was written earlier on this page, which still shows (nothing is sent, nothing else is offered).
+  if (!off && aiOutToday()) {
+    const kept = aiJobs.get(aiKey(run.input, "full", null));
+    if (!kept || !kept.all.every(p => kept.parts[p])) { $("#ai").hidden = true; return; }
+    aiAuto = true;
+    for (const id of ["#ai-go", "#ai-consent", "#ai-match", "#ai-p-error"]) $(id).hidden = true;
+    aiShown = kept;
+    renderAI(kept);
+    setAIStatus("");
+    return;
+  }
   aiAuto = !off && $("#c-ai").checked;
   const cached = aiAuto && aiJobs.get(aiKey(run.input, "full", null));
   const todo = cached ? aiTodo(cached).length : partsFor("full", run.input.date.y, new Date().getUTCFullYear()).length;
@@ -788,14 +804,13 @@ function drawAI() {
     : tooMany ? "這一分鐘已經寫了好幾份解讀，這一張命盤等你按「完整解讀」再寫。" : "");
   prefillPartner();
   aiButtons();
-  if (aiAuto) askAI("full");
+  if (aiAuto) askAI("full", { auto: true });
 }
 
-// When the full reading started by itself, 先看重點 is not offered, and 完整解讀 is there only to come back from 合婚, or
-// to try again once the day's quota stopped it.
+// When the full reading started by itself, 先看重點 is not offered, and 完整解讀 is there only to come back from 合婚.
 function aiButtons() {
   $("#ai-short").hidden = aiAuto;
-  $("#ai-full").hidden = aiAuto && (!aiShown || (aiShown.kind === "full" && !outOfQuota(aiShown)));
+  $("#ai-full").hidden = aiAuto && (!aiShown || aiShown.kind === "full");
 }
 
 // The partner of the family form, when one was entered with a birthday.
@@ -829,7 +844,7 @@ function readPartner() {
   return { date: { y, m, d }, time: readMemberHour($("#ai-partner")), sex: $("#ai-p-sex").value };
 }
 
-async function askAI(kind) {
+async function askAI(kind, { auto = false } = {}) {
   const r = run;
   if (!r || !r.life.done) return;
   let partner = null;
@@ -844,6 +859,7 @@ async function askAI(kind) {
   let job = aiJobs.get(key);
   if (!job) aiJobs.set(key, (job = { kind, partner, input: r.input, all: partsFor(kind, r.input.date.y, new Date().getUTCFullYear()), parts: {}, errors: {}, codes: {}, busy: new Set(), t0: 0, timer: null }));
   aiShown = job;
+  if (auto) aiAutoJob = job;
   aiButtons();
   const todo = aiTodo(job);
   renderAI(job);
@@ -853,6 +869,8 @@ async function askAI(kind) {
 
 // One clock per reading: parts asked again while others are still being written join the running count.
 async function askParts(job, parts) {
+  // Once today's quota is known to be used up, nothing more is sent.
+  if (aiOutToday()) { if (aiShown === job) { renderAI(job); aiStatusOf(job, null); } return; }
   for (const p of parts) { job.busy.add(p); delete job.errors[p]; delete job.codes[p]; }
   if (!job.timer) {
     job.t0 = Date.now();
@@ -874,7 +892,11 @@ async function askPart(job, part) {
     const res = await fetch(READING_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
     const data = await res.json().catch(() => null);
     if (res.ok && data && (Array.isArray(data.sections) || Array.isArray(data.items))) job.parts[part] = data;
-    else { job.errors[part] = readingError(res.status, data); job.codes[part] = res.status === 503 && data && data.error === "quota" ? "quota" : res.status; }
+    else if (res.status === 503 && data && data.error === "quota") {
+      job.errors[part] = readingError(res.status, data); job.codes[part] = "quota";
+      markAiOut();
+      $("#c-ai-wrap").hidden = true;
+    } else { job.errors[part] = readingError(res.status, data); job.codes[part] = res.status; }
   } catch (e) {
     job.errors[part] = e && e.name === "AbortError" ? "這一段寫太久了。" : "現在連不上 AI 命理師，請檢查網路。";
   } finally {
@@ -884,20 +906,25 @@ async function askPart(job, part) {
   if (aiShown === job) renderAI(job);
 }
 
-// Today's quota ran out before anything was written: one calm line instead of a failed row for every part.
-const outOfQuota = job => !job.busy.size && job.all.every(p => job.codes[p] === "quota");
+// Today's quota is used up and nothing of this reading was written. The reading the end page started by itself then
+// takes the whole card away (renderAI); one a player asked for says so in one line.
+const quotaBlank = job => !job.busy.size && !job.all.some(p => job.parts[p]) && aiOutToday();
 
-// 「正在寫…已完成 3/8（12 秒）」, then what is left to do.
+// 「正在寫…已完成 3/8（12 秒）」, then what is left to do. Parts the day's quota kept from being written get no failed row,
+// only a calm line.
 function aiStatusOf(job, seconds) {
-  const all = job.all, done = all.filter(p => job.parts[p]).length, failed = all.filter(p => job.errors[p]).length;
+  const all = job.all, done = all.filter(p => job.parts[p]).length;
+  const failed = all.filter(p => job.errors[p] && job.codes[p] !== "quota").length;
+  const missing = all.length - done - failed - job.busy.size;
   if (job.busy.size) setAIStatus(`AI 命理師正在寫…已完成 ${done}/${all.length}`, false, seconds);
-  else if (outOfQuota(job)) setAIStatus(AI_QUOTA, true);
   else if (failed) setAIStatus(`有 ${failed} 段沒寫好，可以按「重寫這一段」。`, true);
+  else if (missing && aiOutToday()) setAIStatus(done ? `今天的 AI 額度用完了，還有 ${missing} 段沒寫到，明天再來看完整的解讀。` : AI_QUOTA, !done);
   else setAIStatus(job.kind === "short" ? "這是重點版。想看性格、事業、感情、每一步大運和每一歲的好事與要注意的事，請按「完整解讀」。" : "");
 }
 
 const aiSecs = list => list.map(s => `<section class="ai-sec${/一句話$/.test(s.title) ? " motto" : ""}"><h4>${esc(s.title)}</h4>${String(s.body).split(/\n+/).map(p => `<p>${esc(p)}</p>`).join("")}</section>`).join("");
 function aiWait(job, part, what = AI_WAIT[part]) {
+  if (job.codes[part] === "quota") return "";
   if (job.errors[part]) return `<p class="ai-wait bad">「${esc(what)}」${esc(job.errors[part])}<button type="button" class="secondary" data-ai-retry="${part}">重寫這一段</button></p>`;
   return job.busy.has(part) ? `<p class="ai-wait">AI 命理師正在寫：${esc(what)}…</p>` : "";
 }
@@ -936,7 +963,7 @@ function coupleHTML(job) {
 
 function renderAI(job) {
   aiButtons();
-  if (outOfQuota(job)) { $("#ai-body").innerHTML = ""; return; }
+  if (quotaBlank(job)) { if (job === aiAutoJob) $("#ai").hidden = true; $("#ai-body").innerHTML = ""; return; }
   const P = job.parts, secs = part => (P[part] && P[part].sections) || [];
   let html;
   if (job.kind === "short") html = P.short ? aiSecs(secs("short")) : aiWait(job, "short");

@@ -5,6 +5,7 @@ import { computeChart } from "./core/chart.js";
 import { hehunReading } from "./core/hehun.js";
 import { checkFamily } from "./core/family.js";
 import { readingRequest, readingError, PARTS, toneWord } from "./ai-reading.js";
+import { aiOutToday, markAiOut } from "./ai-quota.js";
 import { SHICHEN } from "./core/shichen.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
 import { initTimeField, readTimeField, syncTimeField, timeFieldIds } from "./time-field.js";
@@ -235,22 +236,27 @@ const setStatus = (text, bad = false) => { const el = $("#hh-ai-status"); el.tex
 
 function drawAI() {
   const off = !onSite();
+  // While today's AI quota is used up (ai-quota.js), AI 深度合婚 is not offered at all.
+  $("#hh-ai").hidden = !off && aiOutToday();
   $("#hh-ai-go").hidden = off;
   $("#hh-ai-consent").hidden = off;
   $("#hh-ai-body").innerHTML = "";
   setStatus(off ? "AI 深度合婚只在命盤人生的網站上提供，這個預覽版沒有連上。" : "");
 }
 
+const QUOTA_LINE = "AI 命理師今天的額度用完了，明天再來找它。";
 async function askAI() {
   if (!shown || !onSite()) return;
-  const job = (ai ||= { shown, parts: {}, errors: {}, busy: new Set() });
+  if (aiOutToday() && !(ai && PARTS.match.every(x => ai.parts[x]))) return setStatus(QUOTA_LINE, true);
+  const job = (ai ||= { shown, parts: {}, errors: {}, codes: {}, busy: new Set() });
   const todo = PARTS.match.filter(x => !job.parts[x] && !job.busy.has(x));
   if (todo.length) await askParts(job, todo);
   else renderAI(job);
 }
 async function askParts(job, parts) {
   const t0 = Date.now();
-  for (const x of parts) { job.busy.add(x); delete job.errors[x]; }
+  if (aiOutToday()) { if (ai === job) { renderAI(job); statusOf(job, null); } return; }
+  for (const x of parts) { job.busy.add(x); delete job.errors[x]; delete job.codes[x]; }
   const tick = () => { if (ai === job) statusOf(job, Math.floor((Date.now() - t0) / 1000)); };
   renderAI(job);
   tick();
@@ -267,7 +273,11 @@ async function askPart(job, part) {
     const res = await fetch(READING_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
     const data = await res.json().catch(() => null);
     if (res.ok && data && (Array.isArray(data.sections) || Array.isArray(data.items))) job.parts[part] = data;
-    else job.errors[part] = readingError(res.status, data);
+    else {
+      job.errors[part] = readingError(res.status, data);
+      job.codes[part] = res.status === 503 && data && data.error === "quota" ? "quota" : res.status;
+      if (job.codes[part] === "quota") markAiOut();
+    }
   } catch (e) {
     job.errors[part] = e && e.name === "AbortError" ? "這一段寫太久了。" : "現在連不上 AI 命理師，請檢查網路。";
   } finally {
@@ -276,13 +286,17 @@ async function askPart(job, part) {
   }
   if (ai === job) renderAI(job);
 }
+// Parts the day's quota kept from being written get no failed row, only one line.
 function statusOf(job, seconds) {
-  const all = PARTS.match, done = all.filter(x => job.parts[x]).length, failed = all.filter(x => job.errors[x]).length;
+  const all = PARTS.match, done = all.filter(x => job.parts[x]).length, failed = all.filter(x => job.errors[x] && job.codes[x] !== "quota").length;
+  const missing = all.length - done - failed - job.busy.size;
   if (job.busy.size) setStatus(`AI 命理師正在寫…已完成 ${done}/${all.length}${seconds !== null ? `（${seconds} 秒）` : ""}`);
   else if (failed) setStatus(`有 ${failed} 段沒寫好，可以按「重寫這一段」。`, true);
+  else if (missing && aiOutToday()) setStatus(done ? `今天的 AI 額度用完了，還有 ${missing} 段沒寫到，明天再來看完整的合婚。` : QUOTA_LINE, !done);
   else setStatus("");
 }
 function waitHTML(job, part) {
+  if (job.codes[part] === "quota") return "";
   if (job.errors[part]) return `<p class="ai-wait bad">「${esc(AI_WAIT[part])}」${esc(job.errors[part])}<button type="button" class="secondary" data-ai-retry="${part}">重寫這一段</button></p>`;
   return job.busy.has(part) ? `<p class="ai-wait">AI 命理師正在寫：${esc(AI_WAIT[part])}…</p>` : "";
 }
