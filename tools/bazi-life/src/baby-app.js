@@ -217,7 +217,7 @@ function chartBlock(charts) {
   const roles = `用神${a.useful[0] || "（不明顯）"}${a.useful.length > 1 ? `，喜${a.useful.slice(1).join("、")}` : ""}${a.avoid.length ? `；忌${a.avoid.join("、")}` : ""}`;
   return `<div class="baby-chart">
     <div class="pillars">${pillars.map(p => `<div><small>${esc(p.label)}</small><b>${esc(p.name)}</b></div>`).join("")}</div>
-    <p>日主${esc(a.dayMaster.stem + a.dayMaster.element)}・${esc(a.strength)}・${esc(a.pattern)}；${esc(roles)}。名字的用字五行落在用神、喜神上，傳統上叫「補八字」。</p>
+    <p>日主${esc(a.dayMaster.stem + a.dayMaster.element)}・${esc(a.strength)}・${esc(a.special ? a.special.name : a.pattern)}；${esc(roles)}。名字的用字五行落在用神、喜神上，傳統上叫「補八字」。</p>
     ${charts.length > 1 ? `<p class="fine">性別還不知道：男寶寶和女寶寶的四柱一樣，只有大運的方向相反，模擬時一半用男寶寶、一半用女寶寶。</p>` : ""}
   </div>`;
 }
@@ -281,7 +281,7 @@ function renderSlots(name) {
     return `<article class="slot-card">
       <h4>${ranked ? `<span class="rank">第 ${i + 1} 名</span>` : ""}${esc(when)}<small>（${esc(g.label)}）</small></h4>
       <p class="pillars-line">${c.chart.pillars.map(p => esc(p.name)).join("　")}</p>
-      <p>日主${esc(a.dayMaster.stem + a.dayMaster.element)}・${esc(a.strength)}・${esc(a.pattern)}，用神${esc(a.useful[0] || "不明顯")}。${esc(luck)}。</p>
+      <p>日主${esc(a.dayMaster.stem + a.dayMaster.element)}・${esc(a.strength)}・${esc(a.special ? a.special.name : a.pattern)}，用神${esc(a.useful[0] || "不明顯")}。${esc(luck)}。</p>
       <p class="fine">${e.stats ? `${RUNS} 次人生的平均心情 ${e.stats.mood}；大學以上 ${e.stats.university} 次、結婚 ${e.stats.married} 次、有自己的房子 ${e.stats.home} 次。` : "計算中…"}</p>
     </article>`;
   };

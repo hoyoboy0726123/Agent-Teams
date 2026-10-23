@@ -80,25 +80,40 @@ function fuyi(dm, support, rooted) {
   return { verdict: "中和", note: "日主強弱適中，只有輕微偏好", votes: { 比劫: -0.5 * lean, 印: -0.5 * lean, 食傷: 0.5 * lean, 財: 0.5 * lean, 官殺: 0.5 * lean } };
 }
 
-// 從弱 follows what drains it most (子平 從兒、從財、從殺; 從勢 when no one of them clearly leads), and 專旺 takes its
-// classical name only in its own element's season (曲直 in 寅卯辰 and so on); out of season it is just 專旺. In both, the
-// day master is no longer balanced, so 調候 and 格局 step aside (when 扶抑 takes part in the blend) and these votes rule.
+// 從弱 follows what drains it most (子平 從兒、從財、從殺). When the top two drains are close, the third decides: if it
+// is weak too, the pair's flow names the structure (食傷生財 is 從兒, 財官相生 follows the heavier one); only when all
+// three are heavy is it 從勢, which 《滴天髓》 says needs 財 to make peace between 食傷 and 官殺. 專旺 takes its classical
+// name (曲直 in 寅卯辰 and so on) only in its own season and only when the day master's own element outweighs 印;
+// when 印 is heavier it is 從強, which fears 財 and 官殺 and does not want 食傷 either. In all of these the day master
+// is no longer balanced, so 調候 and 格局 step aside (when 扶抑 takes part in the blend) and these votes rule.
 export const FOLLOW = {
   從兒: { votes: { 比劫: 0, 印: -1, 食傷: 1, 財: 0.8, 官殺: -0.5 }, note: "順從食傷，喜財星流通；最怕印星奪食，也不喜官殺" },
   從財: { votes: { 比劫: -1, 印: -1, 食傷: 0.8, 財: 1, 官殺: 0.5 }, note: "順從財星，喜食傷生財；最怕比劫奪財、印星生身" },
   從殺: { votes: { 比劫: -1, 印: -1, 食傷: -1, 財: 0.8, 官殺: 1 }, note: "順從官殺，喜財星生殺；最怕食傷制殺、印比扶身" },
-  從勢: { votes: { 比劫: -1, 印: -1, 食傷: 0.5, 財: 1, 官殺: 1 }, note: "食傷、財、官殺都重而不分高下，順勢而行；最怕印比扶身" },
+  從勢: { votes: { 比劫: -1, 印: -1, 食傷: 0.5, 財: 1, 官殺: 0.7 }, note: "食傷、財、官殺都有勢力而不從一神，宜行財運居中調和；最怕印比扶身" },
 };
+// 財 and 官殺 close with little 食傷: 財官相生, and 食傷 would only fight the 官殺.
+const CAI_GUAN = { votes: { 比劫: -1, 印: -1, 食傷: 0, 財: 1, 官殺: 0.8 }, note: "順從財星，財官相生；最怕比劫奪財、印星生身" };
+export const CONGQIANG = { votes: { 比劫: 0.8, 印: 1, 食傷: -0.5, 財: -1, 官殺: -1 }, note: "印星與比劫成勢，順其強勢；最怕財星壞印、官殺觸怒，也不宜食傷洩氣" };
 const FOLLOW_OF = { 食傷: "從兒", 財: "從財", 官殺: "從殺" };
 const ZHUANWANG = { 木: ["曲直格", "寅卯辰"], 火: ["炎上格", "巳午未"], 土: ["稼穡格", "辰戌丑未"], 金: ["從革格", "申酉戌"], 水: ["潤下格", "亥子丑"] };
 const LEAD = 1.25;   // a drain leads when it is a quarter heavier than the next one
+const THIRD = 0.6;   // the third drain counts as heavy when it reaches 60 % of the second
 function special(verdict, dm, monthBranch, scores) {
   if (verdict === "從弱") {
     const ranked = ["食傷", "財", "官殺"].map(g => [g, scores[elementOf(dm, g)]]).sort((x, y) => y[1] - x[1]);
-    const kind = ranked[0][1] >= LEAD * ranked[1][1] ? FOLLOW_OF[ranked[0][0]] : "從勢";
-    return { kind, name: `${kind}格`, note: FOLLOW[kind].note, votes: FOLLOW[kind].votes, follows: kind === "從勢" ? null : ranked[0][0] };
+    const [[top, a], [second, b], [, c]] = ranked;
+    let kind, rule;
+    if (a >= LEAD * b) kind = FOLLOW_OF[top];
+    else if (c >= THIRD * b) kind = "從勢";
+    else if (top !== "官殺" && second !== "官殺") kind = "從兒";               // 食傷生財
+    else if (top !== "食傷" && second !== "食傷") { kind = FOLLOW_OF[top]; if (kind === "從財") rule = CAI_GUAN; }
+    else kind = "從勢";                                                        // 食傷 and 官殺 face each other
+    rule = rule || FOLLOW[kind];
+    return { kind, name: `${kind}格`, note: rule.note, votes: rule.votes, follows: Object.keys(FOLLOW_OF).find(g => FOLLOW_OF[g] === kind) || null };
   }
   if (verdict === "專旺") {
+    if (scores[elementOf(dm, "印")] > scores[dm]) return { kind: "從強", name: "從強格", note: CONGQIANG.note, votes: CONGQIANG.votes, follows: null };
     const [name, season] = ZHUANWANG[dm];
     return { kind: "專旺", name: season.includes(monthBranch) ? name : "專旺格", note: "順其旺氣、喜食傷洩秀；最怕官殺逆勢剋制", votes: null, follows: null };
   }

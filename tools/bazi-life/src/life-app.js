@@ -698,10 +698,12 @@ function chartCard() {
   const peak = life.kline.reduce((x, y) => (y.close > x.close ? y : x), life.kline[0]);
   const top = prep.luck.slice(0, s.age + 1).slice().sort((x, y) => y.score - x.score).slice(0, 5).sort((x, y) => x.age - y.age);
   const inTop = top.some(y => Math.abs(y.age - peak.age) <= 1);
-  const view = describeViews(a).find(v => a.useful[0] && v.includes(`喜${a.useful[0]}`)) || "";
+  // With one school voting (a 從格 sets the other two aside) 「1 派中有 1 派」 says nothing.
+  const voting = a.useful[0] ? a.views[a.useful[0]].voting : 0;
+  const view = voting > 1 ? describeViews(a).find(v => v.includes(`喜${a.useful[0]}`)) || "" : "";
   return `<div class="card"><h3>命盤與這一生</h3>
     <p class="count">${esc(dm)}日主，<em>${esc(nature)}</em></p>
-    <p>命盤${a.useful.length ? `喜${esc(a.useful.join("、"))}` : "喜忌不明顯"}${a.avoid.length ? `，忌${esc(a.avoid.join("、"))}` : ""}，格局是${esc(a.pattern)}。${view ? `${esc(view)}。` : ""}</p>
+    <p>命盤${a.useful.length ? `喜${esc(a.useful.join("、"))}` : "喜忌不明顯"}${a.avoid.length ? `，忌${esc(a.avoid.join("、"))}` : ""}，格局是${esc(a.special ? `${a.special.name}（月令${a.pattern}）` : a.pattern)}。${view ? `${esc(view)}。` : ""}</p>
     ${jobs.length ? `<p>做過的工作：${jobs.join("、")}。${fit ? `其中 ${fit} 份屬於你的喜用五行。` : "沒有一份屬於你的喜用五行。"}</p>` : ""}
     ${s.lean.offered ? `<p>${s.lean.offered} 次抉擇裡有明顯的個性傾向，你有 ${s.lean.followed} 次選了它。</p>` : ""}
     ${s.written ? `<p>你自己寫了 ${s.written} 個決定。</p>` : ""}

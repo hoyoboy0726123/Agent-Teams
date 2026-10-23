@@ -22,7 +22,8 @@ function frame(analysis) {
   const dm = analysis.dayMaster, [u, ...us] = analysis.useful, [a, ...as] = analysis.avoid;
   const likes = u ? `用神${u}${us.length ? `，喜${us.join("、")}` : ""}` : "喜忌不明顯";
   const dislikes = a ? `；忌${a}${as.length ? `，仇${as.join("、")}` : ""}` : "";
-  return `${dm.stem}${dm.element}日主，${analysis.strength}，${analysis.pattern}；${likes}${dislikes}。`;
+  const pattern = analysis.special ? `月令${analysis.pattern}，以${analysis.special.name}論` : analysis.pattern;
+  return `${dm.stem}${dm.element}日主，${analysis.strength}，${pattern}；${likes}${dislikes}。`;
 }
 
 // Consecutive 大運 of the same tone, read as one stretch of life.

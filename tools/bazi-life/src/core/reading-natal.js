@@ -100,7 +100,7 @@ const VERSES = {
     { line: "熱則喜母，寒則喜丁", when: c => c.a.useful.includes("土") || c.a.useful.includes("火"), text: "生在熱天喜歡土（印）來滋養，生在冷天喜歡丁火來暖" },
   ],
   壬: [
-    { line: "通根透癸，沖天奔地", when: c => c.a.avoid.includes("水"), text: "壬水通根又見癸水時氣勢奔騰，需要疏導而不宜再添" },
+    { line: "通根透癸，沖天奔地", when: c => c.a.rooted && !c.a.special && c.a.avoid.includes("水"), text: "壬水通根又見癸水時氣勢奔騰，需要疏導而不宜再添" },
     { line: "化則有情，從則相濟", when: c => c.a.strength === "從弱" || c.a.strength === "專旺", text: "壬水能合能從，順勢而行時最見智慧" },
   ],
   癸: [
@@ -483,7 +483,7 @@ function basics(c) {
   out.push({ label: "胎元", value: `${fetal}（${nayinOf(fetal)}）`, note: "受胎的月份，看先天的稟賦" });
   if (x.fetalBreath) out.push({ label: "胎息", value: `${x.fetalBreath}（${nayinOf(x.fetalBreath)}）`, note: "日柱的暗合，看內在的氣質" });
   const a = c.a;
-  out.push({ label: "命局", value: `${c.dm}${c.de}日主・${a.strength}・${a.pattern}${a.useful.length ? `・用神${a.useful[0]}` : ""}` });
+  out.push({ label: "命局", value: `${c.dm}${c.de}日主・${a.strength}・${a.special ? `${a.special.name}（月令${a.pattern}）` : a.pattern}${a.useful.length ? `・用神${a.useful[0]}` : ""}` });
   out.push({ label: "五行", value: `${ELEMENTS.map(e => `${e} ${chart.elements[e]}`).join("、")}${chart.missing.length ? `（缺${chart.missing.join("、")}）` : "（五行俱全）"}` });
   return out;
 }
@@ -544,6 +544,8 @@ function useFunction(c, e) {
 function excessLine(c) {
   const g = GROUPS.slice().sort((x, y) => c.share[c.ge[y]] - c.share[c.ge[x]])[0], e = c.ge[g];
   if (c.share[e] < HEAVY) return null;
+  // A 從格 likes the very element that is heavy, and 專旺／從強 like 印: the warning would contradict its 用神.
+  if (c.a.strength === "從弱" || (c.a.special && g === "印")) return null;
   const line = EXCESS[g][c.de];
   if (g === "印") return { group: g, element: e, line };
   if ((g === "食傷" || g === "財") && !isStrong(c)) return { group: g, element: e, line };
@@ -577,7 +579,7 @@ function strengthSentence(c) {
   const g = drainGroup(c), drain = `${GROUP_WORD[g]}（${c.ge[g]}）${DRAIN_WORD[g]}較重`;
   if (s === "身強" || s === "專旺") {
     const deep = f.ling || f.roots.some(r => r.strength === "本氣");
-    const verdict = s === "專旺" ? "日主極旺，近於專旺" : "身強";
+    const verdict = s !== "專旺" ? "身強" : c.a.special && c.a.special.kind === "從強" ? "印比成勢，近於從強" : "日主極旺，近於專旺";
     return `${root}，${help ? `${deep ? "又有" : "但"}${help}` : "又得月令之氣"}，綜合下來${verdict}，強在${strongSource(c) === "印" ? "印星" : "比劫"}。`;
   }
   if (s === "身弱") return `${root}${help ? `，雖有${help}` : ""}，但${drain}，綜合下來身弱。`;
@@ -594,7 +596,7 @@ function summary(c) {
   const s2 = strengthSentence(c);
   const main = c.P.month.branch.hidden[0];
   const shown = c.pillars.filter(p => p.role !== "day" && p.stem.name === main.name).map(p => p.role);
-  const s3 = `月令${mb}的本氣${main.name}${main.element}是${main.god}，${shown.length ? `透出${rolesWord(shown, "干")}` : "藏而不透"}，取${a.pattern}。`;
+  const s3 = `月令${mb}的本氣${main.name}${main.element}是${main.god}，${shown.length ? `透出${rolesWord(shown, "干")}` : "藏而不透"}，${a.special ? `月令取${a.pattern}，但全局改以${a.special.name}論` : `取${a.pattern}`}。`;
   const ex = excessLine(c);
   const lead = ex ? `全局${ex.element}重，正應了古訣「${ex.line}」；` : "";
   const u = a.useful;
@@ -734,8 +736,10 @@ function strengthSection(c) {
     const g = drainGroup(c);
     s2 = `最耗日主的是${GROUP_WORD[g]}（${c.ge[g]}），屬於「${{ 食傷: "洩多身弱", 財: "財多身弱", 官殺: "殺重身輕" }[g]}」，凡事宜先求穩、再求進。`;
   } else if (a.strength === "中和") s2 = `生扶與剋洩大致平衡，喜忌也就較溫和，整體${leansStrong(c) ? "略偏強" : "略偏弱"}一些。`;
-  else if (a.strength === "從弱") s2 = `日主幾乎無根、生扶極少，傳統上可視為${a.special.name}：不再扶身，${a.special.follows ? `而是順從最旺的${GROUP_WORD[a.special.follows]}` : "而是順從食傷、財、官殺的整體旺勢"}。`;
-  else if (a.strength === "專旺") s2 = `日主之氣佔了全局大半，傳統上可視為${a.special.name}：順其旺氣，忌強行剋制。`;
+  else if (a.strength === "從弱") s2 = `日主幾乎無根、生扶極少，傳統上可視為${a.special.name}：不再扶身，${a.special.follows ? `而是順從${GROUP_WORD[a.special.follows]}的旺勢` : "而是順從食傷、財、官殺的整體旺勢"}。`;
+  else if (a.strength === "專旺") s2 = a.special.kind === "從強"
+    ? `印星與比劫佔了全局大半，而印星更重，傳統上可視為${a.special.name}：順其強勢，忌財星、官殺逆勢。`
+    : `日主之氣佔了全局大半，傳統上可視為${a.special.name}：順其旺氣，忌強行剋制。`;
   else s2 = `${leansStrong(c) ? "整體偏強，宜洩、宜耗" : "整體偏弱，宜生、宜扶"}，取用以平衡為原則。`;
   return section("strength", [s1 + s2, schoolsSentence(c)], items);
 }
@@ -776,9 +780,9 @@ function whereHidden(c, group) {
 function patternCheck(c) {
   const a = c.a, s = a.strength, pat = a.pattern;
   // A 從 or 專旺 chart is read as that special structure: the ordinary 成格／破格 rules assume a balanced day master.
-  // analysis.js special: 從兒、從財、從殺、從勢, or 專旺 (曲直、炎上… in its season), each with its own likes and fears.
-  if (s === "從弱") return { good: [], hidden: "", bad: [], verdict: `日主從勢，改以${a.special.name}論：${a.special.note}，順勢時格局反而清` };
-  if (s === "專旺") return { good: [], hidden: "", bad: [], verdict: `日主一氣獨旺，改以${a.special.name}論：${a.special.note}` };
+  // analysis.js special: 從兒、從財、從殺、從勢, 從強, or 專旺 (曲直、炎上… in its season), each with its own likes and fears.
+  if (s === "從弱") return { good: [], hidden: "", bad: [], verdict: `日主從弱，改以${a.special.name}論：${a.special.note}，順勢時格局反而清` };
+  if (s === "專旺") return { good: [], hidden: "", bad: [], verdict: `${a.special.kind === "從強" ? "印比成勢" : "日主一氣獨旺"}，改以${a.special.name}論：${a.special.note}` };
   const vis = g => visibleOf(c, g).length > 0, hid = g => hiddenOf(c, g, ["本氣", "中氣"]).length > 0;
   const okStrength = s === "身強" || s === "中和" || s === "專旺";
   const good = [], hidden = [], bad = [];
@@ -800,7 +804,7 @@ function patternCheck(c) {
       support("印", "印星化殺");
       if (s === "身強") good.push("身強能敵殺");
       if (vis("財") && !vis("食傷") && !vis("印")) bad.push("財星生殺而無制");
-      if (isWeak(c) && !vis("印") && !vis("食傷")) bad.push("身弱殺重而無制化");
+      if (isWeak(c) && !vis("印") && !vis("食傷")) bad.push("身弱殺重而無制化（殺重身輕）");
       if (visGod(c, "正官")) bad.push("正官也透出，官殺混雜");
       break;
     case "正財格": case "偏財格":
@@ -808,14 +812,14 @@ function patternCheck(c) {
       if (okStrength) good.push(s === "中和" ? "日主能任財" : "日主身強能任財");
       else if (vis("印") || vis("比劫")) good.push("身弱而有印比相扶，仍能任財");
       else bad.push("財多身弱，力不從心");
-      if (vis("比劫") && !vis("官殺")) bad.push("比劫透出，有奪財之憂");
+      if (vis("比劫") && !vis("官殺")) bad.push("比劫透出，有奪財之憂（比劫奪財）");
       else if (!vis("比劫")) good.push("比劫不透，財星不被爭奪");
       break;
     case "正印格": case "偏印格":
       support("官殺", "官殺生印");
       if (s === "身弱" || s === "中和") good.push("日主得印生扶");
       if (s === "身強" && vis("財")) good.push("印旺身強，有財星制印");
-      if (vis("財") && isWeak(c)) bad.push("財星透出壞印");
+      if (vis("財") && isWeak(c)) bad.push("財星透出壞印（財星壞印）");
       if (pat === "偏印格" && visGod(c, "食神") && !vis("財")) bad.push("偏印與食神同透（梟神奪食）");
       if (s === "身強" && !vis("財") && !vis("食傷")) bad.push("印多身旺而缺少出口");
       break;
@@ -860,6 +864,7 @@ function schoolReason(c, school, e, like) {
   const g = c.eg[e], s = c.a.strength, pat = c.a.pattern;
   if (school === "扶抑") {
     if (s === "從弱") return like ? `${c.a.special.kind}宜順從旺勢` : { 印: `${c.a.special.kind}忌印星生身`, 比劫: `${c.a.special.kind}忌比劫幫身`, 食傷: "從殺忌食傷制殺", 官殺: "從兒忌官殺剋身" }[g] || null;
+    if (s === "專旺" && c.a.special.kind === "從強") return like ? "從強宜順其強勢" : { 食傷: "從強忌食傷洩氣", 財: "從強忌財星壞印", 官殺: "從強忌官殺觸怒" }[g] || null;
     if (s === "專旺") return like ? "專旺宜順其旺氣" : "專旺忌逆勢剋耗";
     const mild = s === "中和" ? "略" : "";
     if (leansStrong(c)) return (like ? { 食傷: `身${mild}強宜洩，食傷洩秀`, 財: `身${mild}強能任財`, 官殺: `身${mild}強宜剋，官殺制身` } : { 比劫: `身${mild}強忌再幫身`, 印: `身${mild}強忌再生身` })[g] || null;
@@ -941,6 +946,10 @@ function patternSection(c) {
 function tiaohouText(c) {
   const { a, dm, de, mb } = c, th = a.schools.調候, stems = th.stems || [];
   if (!stems.length) return `${th.note}。`;
+  if (a.special && th.abstain) {
+    const bad = stems.filter(s => a.avoid.includes(STEM_EL[s]));
+    return `依《窮通寶鑑》，${dm}${de}生於${mb}月，一般以${stems.join("、")}調候；但這張命盤以${a.special.name}論，調候讓位給順勢取用${bad.length ? `，其中${bad.map(s => `${s}${STEM_EL[s]}`).join("、")}反而是忌，不宜強求` : ""}。`;
+  }
   const present = [], absent = [];
   for (const s of stems) {
     const vis = c.pillars.filter(p => p.role !== "day" && p.stem.name === s).map(p => p.role);
@@ -976,14 +985,15 @@ function godCombo(c) {
   const list = [
     [visGod(c, "傷官") && visGod(c, "正官"), "傷官與正官同時透出（傷官見官），才華與規範互相拉扯，個性直、不服權威，和上司溝通時要多留餘地"],
     [visGod(c, "偏印") && visGod(c, "食神"), "偏印與食神同透（梟神奪食），想法多而容易互相打架，做事宜專注一項、有始有終"],
+    [c.a.strength === "從弱", "日主順從旺勢，懂得借環境與他人之力成事，順勢時如魚得水，硬撐著逆勢而為反而辛苦"],
     [visGod(c, "七殺") && vis("印") && !isStrong(c), "七殺有印星化解（殺印相生），能把壓力轉成成長，有擔當也有權威感"],
     [visGod(c, "七殺") && visGod(c, "食神"), "食神制住七殺，有智慧化解壓力，越難的局面越能展現能力"],
     [visGod(c, "傷官") && vis("印") && !isStrong(c), "傷官配上印星（傷官佩印），才華有學養約束，適合走專業與學術"],
     [visGod(c, "正官") && visGod(c, "七殺"), "正官、七殺同時透出（官殺混雜），選擇多、方向容易搖擺，宜先定下主軸"],
     [vis("財") && visGod(c, "正官") && !isWeak(c), "財星與正官相生（財官雙美），務實又重名譽，在組織裡容易被重用"],
     [vis("食傷") && vis("財") && !isWeak(c), "食傷生財，腦筋靈活、懂得把想法變成收入"],
-    [c.share[c.ge.財] >= HEAVY && isWeak(c), "財多身弱，機會多、壓力也多，容易為責任與金錢操心"],
-    [c.share[c.ge.官殺] >= HEAVY && isWeak(c), "官殺重而身弱，責任感強、自我要求高，也容易把壓力往肚裡吞"],
+    [c.share[c.ge.財] >= HEAVY && c.a.strength === "身弱", "財多身弱，機會多、壓力也多，容易為責任與金錢操心"],
+    [c.share[c.ge.官殺] >= HEAVY && c.a.strength === "身弱", "官殺重而身弱，責任感強、自我要求高，也容易把壓力往肚裡吞"],
     [c.share[c.ge.比劫] >= HEAVY && isStrong(c), "比劫成群，自我意識與競爭心都強，講義氣也好勝"],
     [c.share[c.ge.印] >= HEAVY && isStrong(c), "印星重而身強，思慮周全、重視安全感，也要提醒自己少一點顧慮、多一點行動"],
     [c.share[c.ge.食傷] >= HEAVY && !isStrong(c), "食傷洩氣重，才華與表達欲旺盛，付出多也容易累，要懂得保留精力"],

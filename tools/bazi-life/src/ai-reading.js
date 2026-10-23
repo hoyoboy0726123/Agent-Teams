@@ -19,7 +19,7 @@
 import { computeChart } from "./core/chart.js";
 import { findPlace } from "./core/places.js";
 import { analyse, ELEMENTS } from "./core/analysis.js";
-import { natalStars, STARS } from "./core/detail.js";
+import { natalStars, STARS, SPIRITS } from "./core/detail.js";
 import { natalReading, patternFacts, DAY_MASTER_TEXT, TEN_GOD_TEXT, PATTERN_TEXT, ELEMENT_INDUSTRIES, ELEMENT_ORGANS, ELEMENT_LUCK } from "./core/reading-natal.js";
 import { decadeReading, yearReading, DOMAIN_NAME } from "./core/reading-year.js";
 import { partnerReading } from "./core/partner.js";
@@ -180,7 +180,7 @@ function chartLines(P, { full = true, of = "" } = {}) {
   const lines = [];
   if (full) lines.push(`【${of}四柱】${c.pillars.map(p => `${p.label}${p.name}（天干${p.stem.name}${p.role === "day" ? "是日主" : `為${p.stem.god}`}，地支${p.branch.name}藏${p.branch.hidden.map(h => `${h.name}${h.god}`).join("、")}）`).join("；")}。`);
   lines.push(`【${of}日主】${dm.stem}${dm.element}，${t.yinyang}，意象是${t.image}。長處：${t.nature}。盲點：${t.blind}。`);
-  lines.push(`【${of}強弱與格局】日主${a.strength}${a.special ? `（${a.special.name}）` : ""}（生扶日主的力量約占 ${Math.round(a.support * 100)}%），${a.season}；格局是${a.pattern}${pt ? `：${pt.nature}` : ""}。`);
+  lines.push(`【${of}強弱與格局】日主${a.strength}${a.special ? `（${a.special.name}）` : ""}（生扶日主的力量約占 ${Math.round(a.support * 100)}%），${a.season}；${a.special ? `月令取${a.pattern}，但全局以${a.special.name}論` : `格局是${a.pattern}${pt ? `：${pt.nature}` : ""}`}。`);
   // Only what holds for this chart (reading-natal.js patternFacts), never the list of what could break a structure.
   if (full) lines.push(`【${of}格局成敗】${patternLine(P)}`);
   if (full) lines.push(`【${of}五行力量】${ELEMENTS.map(e => `${e} ${a.scores[e]}`).join("、")}；最旺是${order[4]}，最弱是${order[0]}；${c.missing.length ? `天干地支裡沒有${c.missing.join("、")}（命中缺${c.missing.join("、")}）` : "五行俱全"}。`);
@@ -279,9 +279,12 @@ const sectionsPart = (kind, id, people, lines, max) => {
   const facts = lines.filter(Boolean).join("\n");
   return { kind, id, type: "sections", titles: PART_TITLES[id], elsewhere: ELSEWHERE[id] || [], facts, max, check: checkOf(people, facts) };
 };
+// Each entry of a list is held to the shared lines plus its own line (it.line), so one year's 神煞 or 破格 does not
+// pass on another year.
 const listPart = (kind, id, people, lines, items, max) => {
   const facts = lines.filter(Boolean).join("\n");
-  return { kind, id, type: "list", items, facts, max, check: checkOf(people, facts) };
+  const own = new Set(items.map(it => it.line).filter(Boolean)), shared = lines.filter(l => l && !own.has(l)).join("\n");
+  return { kind, id, type: "list", items, facts, shared, max, check: checkOf(people, facts) };
 };
 
 // ---------- the parts ----------
@@ -306,7 +309,7 @@ export function readingPart(ask, { now = new Date().getUTCFullYear() } = {}) {
       const items = list.map(d => {
         const levels = Object.entries(d.domains || {});
         return {
-          key: `${d.name}大運`, fields: ["重點", "好事", "要注意"],
+          key: `${d.name}大運`, fields: ["重點", "好事", "要注意"], line: decadeDetail(d, P),
           head: { name: d.name, startAge: d.startAge, endAge: d.endAge, startYear: d.startYear, endYear: d.endYear, tone: d.tone, current: isCurrent(d, P) },
           fallback: {
             重點: cut(strip(d.headline), 40),
@@ -315,18 +318,18 @@ export function readingPart(ask, { now = new Date().getUTCFullYear() } = {}) {
           },
         };
       });
-      return listPart("full", "decades", [P], [...core({ full: false }), "【大運】（歲數是虛歲，出生那年算 1 歲）", ...list.map(d => decadeDetail(d, P))], items, 300 + 170 * items.length);
+      return listPart("full", "decades", [P], [...core({ full: false }), "【大運】（歲數是虛歲，出生那年算 1 歲）", ...items.map(it => it.line)], items, 300 + 170 * items.length);
     }
     default: {
       const k = Number(ask.part.slice(5));
       const years = agesOf(P).slice(k * 10, (k + 1) * 10).map(age => yearOf(P, age)).filter(Boolean);
       const items = years.map(y => ({
-        key: `${y.age} 歲`, fields: ["好事", "要注意"],
+        key: `${y.age} 歲`, fields: ["好事", "要注意"], line: yearLine(y),
         head: { age: y.age, year: y.year, pillar: y.pillar, tone: y.favor.tone, decade: y.decade ? y.decade.name : null },
         fallback: fallbackOf(sortedDomains(y)),
       }));
       const spans = [...new Set(years.map(y => y.decade && y.decade.name).filter(Boolean))];
-      return listPart("full", ask.part, [P], [...core({ full: false }), spans.length ? `【這段時間的大運】${spans.join("、")}` : "", "【流年】（歲數是足歲）", ...years.map(y => yearLine(y))], items, 300 + 120 * items.length);
+      return listPart("full", ask.part, [P], [...core({ full: false }), spans.length ? `【這段時間的大運】${spans.join("、")}` : "", "【流年】（歲數是足歲）", ...items.map(it => it.line)], items, 300 + 120 * items.length);
     }
   }
 }
@@ -346,15 +349,15 @@ function matchPart(id, A, B, now) {
     if (ya && yb) years.push({ year, ya, yb });
   }
   const love = y => sortedDomains(y).filter(([d]) => d === "love" || d === "family");
-  const items = years.map(({ year, ya, yb }) => ({
-    key: `${year} 年`, fields: ["好事", "要注意"],
-    head: { year, pillar: ya.pillar, ages: [ya.age, yb.age], tones: [ya.favor.tone, yb.favor.tone] },
-    fallback: fallbackOf([...love(ya), ...love(yb)], { good: "這一年感情起伏不大，適合一起規劃生活。", watch: "沒有特別要擔心的地方，多花時間相處就好。" }),
-  }));
   const lines = years.map(({ year, ya, yb }) => {
     const side = (who, y) => `${who} ${y.age} 歲（${y.favor.tone}）${love(y).length ? `：${love(y).map(([d, v]) => `${DOMAIN_NAME[d]}${signed(v.level)}：${cut(soften(v.text), 70)}`).join("；")}` : "：感情、家庭沒有明顯的起伏"}`;
     return `- ${year} 年 ${ya.pillar}年：${side("你", ya)}；${side("對方", yb)}。`;
   });
+  const items = years.map(({ year, ya, yb }, k) => ({
+    key: `${year} 年`, fields: ["好事", "要注意"], line: lines[k],
+    head: { year, pillar: ya.pillar, ages: [ya.age, yb.age], tones: [ya.favor.tone, yb.favor.tone] },
+    fallback: fallbackOf([...love(ya), ...love(yb)], { good: "這一年感情起伏不大，適合一起規劃生活。", watch: "沒有特別要擔心的地方，多花時間相處就好。" }),
+  }));
   return { ...listPart("match", "myears", [A, B], [...core, ...result, "【接下來十年，兩個人的感情與家庭】", ...lines], items, 300 + 120 * items.length), meta };
 }
 
@@ -439,26 +442,50 @@ const FORBIDDEN = [
   [/改運|消災|法會|點燈|安太歲|符咒|護身符|開光|收驚|斬桃花|風水物|付費化解|化解儀式|購買.{0,8}(?:水晶|手鍊|飾品|吉祥物)/, "建議了改運商品或儀式"],
 ];
 const PAIR_FORBIDDEN = [/外遇|劈腿|出軌|小三|離婚收場|一定會分手|注定分開/, "預言了外遇或分手"];
-// Names the reading may only repeat from its facts: 神煞 (longest first, so 天德合 is not read as 天德), the books, the
-// lines quoted from them, and the named ways a structure breaks. 桃花 and 驛馬 are everyday words too, so only warned.
-const STAR_NAMES = Object.keys(STARS).sort((x, y) => y.length - x.length);
-const LOOSE_STARS = new Set(["桃花", "驛馬"]);
+// Names the reading may only repeat from its facts: 神煞 and the 太歲 spirits (longest first, so 天德合 is not read as
+// 天德), the books, the lines quoted from them or from 古訣, and the named ways a structure breaks. Words that are also
+// everyday Chinese (桃花, 驛馬, 學堂, 太歲, and the idioms 陰差陽錯, 天羅地網) are only warned about; 太陽, 太陰 and 福德
+// are left out, and 天喜 and 華蓋 are not counted inside ordinary words (每天喜歡、歡天喜地、才華蓋世).
+const STAR_NAMES = [...new Set([...Object.keys(STARS), ...Object.keys(SPIRITS).filter(x => !["太陽", "太陰", "福德"].includes(x))])].sort((x, y) => y.length - x.length);
+const LOOSE_STARS = new Set(["桃花", "驛馬", "學堂", "太歲", "陰差陽錯", "天羅地網"]);
+const NOT_STARS = /歡天喜地|[每今昨明當春夏秋冬整白聊]天喜|天喜(?=[歡愛好樂悅])|才華蓋/g;
+// Short names of a 神煞, counted only where they read as one (命帶文昌、逢天乙、紅艷星); the facts use the full name.
+const SHORT_STARS = { 文昌: "文昌貴人", 天乙: "天乙貴人", 紅艷: "紅艷煞", 孤鸞: "孤鸞煞", 陽刃: "羊刃" };
+const SHORT_RE = new RegExp(`(?:命帶|命中有|帶有?|逢|遇到?|見|坐)(${Object.keys(SHORT_STARS).join("|")})|(${Object.keys(SHORT_STARS).join("|")})星`, "g");
 const BOOKS = ["滴天髓", "窮通寶鑑", "子平真詮"];
 const BREAKS = ["傷官見官", "官殺混雜", "梟神奪食", "財多身弱", "殺重身輕", "比劫奪財", "財星壞印", "財星透出壞印", "身弱難以任官", "身弱殺重", "印多身旺"];
+// A quote after a book or 古訣, in 「」 or 『』, compared without spaces and closing stops, and with 、 read as ，.
+const QUOTE = /(?:《[^》]{1,12}》|古訣|古書|古籍|古人|古語|古云|古諺|命書)[^「『。]{0,20}[「『]([^」』]{2,40})[」』]/g;
+const quoteKey = t => t.replace(/[\s　]/g, "").replace(/、/g, "，").replace(/[。！，；]+$/, "");
+// A clause that denies or explains a break (「沒有傷官見官」「正官格忌傷官見官」) does not claim it.
+const NOT_CLAIMED = /沒有|並無|並沒|毫無|不是|不算|不怕|不會|避開|免於|忌|怕/;
 function groundingProblems(all, facts, add, problems, warnings) {
-  let rest = all;
+  let rest = all.replace(NOT_STARS, m => "　".repeat(m.length));
   for (const name of STAR_NAMES) {
     if (!rest.includes(name)) continue;
     rest = rest.split(name).join("　".repeat(name.length));
     if (!facts.includes(name)) add(LOOSE_STARS.has(name) ? warnings : problems, `寫了命盤資料裡沒有的神煞：${name}`);
   }
+  for (const m of rest.matchAll(SHORT_RE)) {
+    const short = m[1] || m[2];
+    if (!facts.includes(SHORT_STARS[short])) add(problems, `寫了命盤資料裡沒有的神煞：${SHORT_STARS[short]}`);
+  }
   for (const m of all.matchAll(/《([^》]{1,12})》/g)) {
     if (!BOOKS.includes(m[1]) || !facts.includes(`《${m[1]}》`)) add(problems, `引了命盤資料裡沒有的書：《${m[1]}》`);
   }
-  for (const m of all.matchAll(/《[^》]{1,12}》[^「。]{0,16}「([^」]{2,40})」/g)) {
-    if (!facts.includes(m[1])) add(problems, `引文「${m[1]}」不在命盤資料裡`);
+  const quotable = quoteKey(facts);
+  for (const m of all.matchAll(QUOTE)) {
+    if (!quotable.includes(quoteKey(m[1]))) add(problems, `引文「${m[1]}」不在命盤資料裡`);
   }
-  for (const b of BREAKS) if (all.includes(b) && !facts.includes(b)) add(problems, `說了這張命盤沒有的破格：${b}`);
+  // The 喜忌 reasons say what a structure fears (「正官格忌傷官見官（格局）」); that does not make it this chart's break.
+  const claimed = facts.replace(/格忌[^；。（\n]{1,12}（格局）/g, "格忌（格局）");
+  for (const b of BREAKS) {
+    if (claimed.includes(b)) continue;
+    for (let at = all.indexOf(b); at >= 0; at = all.indexOf(b, at + b.length)) {
+      const clause = all.slice(0, at).split(/[。！？；，\n]/).pop();
+      if (!NOT_CLAIMED.test(clause)) { add(problems, `說了這張命盤沒有的破格：${b}`); break; }
+    }
+  }
 }
 const MAINLAND = /質量|信息|視頻|網絡|軟件|屏幕|打印|博客|鼠標|硬件|反饋|早上好/g;
 const SIMPLIFIED = new Set(SIMPLIFIED_ONLY);
@@ -559,7 +586,8 @@ function checkList(text, part, previous) {
     for (const line of b.body.split("\n")) { const m = line.trim().match(FIELD_LINE); if (m && it.fields.includes(m[1]) && !fields[m[1]]) fields[m[1]] = m[2].trim(); }
     const short = it.fields.filter(f => !fields[f] || fields[f].length < (f === "重點" ? 6 : 8));
     if (short.length) { bad.push({ key: it.key, why: `少了「${short.join("」「")}」` }); continue; }
-    const c = contentProblems(it.fields.map(f => fields[f]).join("\n"), part.check);
+    const check = it.line ? { ...part.check, facts: `${part.shared}\n${it.line}` } : part.check;
+    const c = contentProblems(it.fields.map(f => fields[f]).join("\n"), check);
     for (const w of c.warnings) if (!warnings.includes(w)) warnings.push(w);
     if (c.problems.length) { bad.push({ key: it.key, why: c.problems.join("、") }); continue; }
     items.set(it.key, fields);

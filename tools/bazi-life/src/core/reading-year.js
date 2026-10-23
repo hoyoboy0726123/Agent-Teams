@@ -87,6 +87,8 @@ function contextOf(chart, analysis) {
     dayStem: chart.dayMaster.name, dm: chart.dayMaster.element, dayYang: chart.dayMaster.yang,
     roles: elementRoles(analysis), favor: analysis.favor, useful: analysis.useful[0] || null, avoid: analysis.avoid[0] || null,
     weak: analysis.strength === "身弱" || analysis.strength === "從弱",
+    // 從格 and 專旺 like the opposite of what 身弱／身強 would, so the wording of 祿、刃 and 比劫 follows the strength itself.
+    strength: analysis.strength,
     stars: natalStars(chart), starCtx: starContext(chart), years: new Map(), decades: new Map(),
     yearBranch: byRole.year.branch, zodiac: ZODIAC[byRole.year.branch],
   };
@@ -292,7 +294,7 @@ function godSignal(c, W, group, xs) {
       shorts.family = "比劫手足星被引動";
       shorts.wealth = `${lbl}${isBad ? "，競爭與破耗多" : ""}`;
       if (grown(stage) && (isGood || isBad)) notes.career = isGood ? "同事朋友相挺，適合團隊合作" : "同輩競爭多，功勞容易被分走，宜把成果留下紀錄";
-      if (isGood) { notes.health = "身弱得比劫幫身，精神與體力較好"; domains.health = 0.2; }
+      if (isGood) { notes.health = c.strength === "專旺" ? "專旺喜比劫順勢，精神與體力較好" : "身弱得比劫幫身，精神與體力較好"; domains.health = 0.2; }
       break;
     }
     default: break;
@@ -1233,8 +1235,11 @@ function starSignals(c, W, stars) {
       else { t = `逢${name}：人緣好、社交活動多，夫妻感情也容易回溫`; d = { love: 0.2, family: 0.1 }; tags = ["romance"]; w -= 2; notes = null; }
     }
     // 祿 and 羊刃 are the day master's own element: a strong chart takes them as more 比劫, a weak one as help.
-    if (name === "祿神" && !o && bad(c, c.dm)) { t = `${t}；不過祿也是比劫，身強逢之也主開銷與競爭`; d = { career: 0.2, wealth: 0 }; tone = "中"; notes = { career: "逢祿，工作有著落，但身強逢祿也主開銷與競爭" }; }
-    if (name === "羊刃" && !o && good(c, c.dm)) { t = "逢羊刃：身弱逢刃，反能扛事、敢做決定；但也要防衝動與受傷"; tone = "中"; d = { health: -0.2 }; notes = { health: "逢羊刃，敢做決定，但也要防衝動與受傷" }; }
+    if (name === "祿神" && !o && bad(c, c.dm)) {
+      const who = c.strength === "從弱" ? "從格忌比劫幫身，逢祿反" : "身強逢之也";
+      t = `${t}；不過祿也是比劫，${who}主開銷與競爭`; d = { career: 0.2, wealth: 0 }; tone = "中"; notes = { career: `逢祿，工作有著落，但${c.strength === "從弱" ? "從格逢祿反" : "身強逢祿也"}主開銷與競爭` };
+    }
+    if (name === "羊刃" && !o && good(c, c.dm)) { t = `逢羊刃：${c.strength === "專旺" ? "旺上加旺，順勢敢衝" : "身弱逢刃，反能扛事"}、敢做決定；但也要防衝動與受傷`; tone = "中"; d = { health: -0.2 }; notes = { health: "逢羊刃，敢做決定，但也要防衝動與受傷" }; }
     if (name === "流霞" && c.sex === "female" && stage === "adult") t = `${t}；女命也要留意生產`;
     if ((name === "文昌貴人" || name === "學堂") && student) w += 1.5;
     const body = t.split("：").slice(1).join("：");

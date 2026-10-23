@@ -158,13 +158,17 @@ export function computeChart({ date, time = null, place, sex = "male", options =
   // Summer time is taken off the entered time. Some families already took it off when they wrote the time down; for
   // them the clock said dst minutes later, so say which time to enter instead and which pillars that would change.
   if (clock.dst > 0 && hourKnown && !byShichen && resolved.status !== "gap" && opts.solar !== "clock") {
-    const alt = msToFields(wallMs + clock.dst * MINUTE), pad = n => String(n).padStart(2, "0");
-    const altNames = fourPillars({ date: { y: alt.y, m: alt.m, d: alt.d }, time: { h: alt.h, mi: alt.mi }, place, options: opts });
+    // The moment they meant is dst minutes after the one used here: read the pillars and the local clock at it. In the
+    // hour repeated when summer time ends, that clock shows the same time again, so the hint is to pick the 2nd one.
+    const later = utc + clock.dst * MINUTE, alt = fieldsAt(later, place.tz), pad = n => String(n).padStart(2, "0");
+    const altNames = names(ctx.pillarsAtShift(clock.dst));
     const cur = names(sc), changed = Object.keys(cur).filter(k => altNames[k] !== cur[k]);
     const ROLE = { year: "年柱", month: "月柱", day: "日柱", hour: "時柱" };
-    const day = alt.d !== date.d ? `${alt.m} 月 ${alt.d} 日 ` : "";
-    warnings.push({ kind: "dst-entered", time: alt, changed: Object.fromEntries(changed.map(k => [k, altNames[k]])),
-      text: `如果家裡記下的已經是扣掉夏令時間的標準時間，請改填 ${day}${pad(alt.h)}:${pad(alt.mi)}：${changed.length ? changed.map(k => `${ROLE[k]}${cur[k]}會變成${altNames[k]}`).join("、") : "四柱都不會變"}。` });
+    const again = resolved.status === "ambiguous" && alt.y === date.y && alt.m === date.m && alt.d === date.d && alt.h === wall.h && alt.mi === wall.mi;
+    const day = alt.y !== date.y ? `${alt.y} 年 ${alt.m} 月 ${alt.d} 日 ` : alt.m !== date.m || alt.d !== date.d ? `${alt.m} 月 ${alt.d} 日 ` : "";
+    const what = again ? "請改選第 2 次出現的時間" : `請改填 ${day}${pad(alt.h)}:${pad(alt.mi)}`;
+    warnings.push({ kind: "dst-entered", time: { y: alt.y, m: alt.m, d: alt.d, h: alt.h, mi: alt.mi }, ...(again ? { occurrence: 1 } : {}), changed: Object.fromEntries(changed.map(k => [k, altNames[k]])),
+      text: `如果家裡記下的已經是扣掉夏令時間的標準時間，${what}：${changed.length ? changed.map(k => `${ROLE[k]}${cur[k]}會變成${altNames[k]}`).join("、") : "四柱都不會變"}。` });
   }
   if (byShichen) warnings.push({ kind: "shichen", text: `依你選的${time.branch}時排日柱和時柱，不再做真太陽時校正；起運以這個時辰的中間估算。` });
   if (!hourKnown) warnings.push({ kind: "hour", text: "時辰不詳：只排年、月、日三柱，起運以中午 12 點估算。" });
