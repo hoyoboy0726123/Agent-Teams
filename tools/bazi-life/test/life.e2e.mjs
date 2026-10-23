@@ -688,6 +688,10 @@ await zi.fill("#f-date", "2000-01-01");
 await zi.fill("#f-time", "22:30");
 const ziEarly = await zi.isHidden("#f-latezi-wrap");
 check("夜子時 shows when true solar time is after 23:00, wherever the clock says", ziFar && ziEarly);
+// An empty time box is not midnight: it asks for the time.
+await zi.fill("#f-time", "");
+await zi.click("#form-me button[type=submit]");
+check("an empty birth time asks for the time instead of using 00:00", /請輸入出生時間/.test(await zi.textContent("#error")) && await zi.isHidden("#play"));
 await zi.fill("#f-date", "1988-02-15");
 await zi.fill("#f-time", "23:30");
 await zi.check("#f-latezi");
@@ -700,11 +704,13 @@ check("夜子時 is offered only near midnight, and the 詳批 keeps a 23:30 bir
 await zi.click("#again-new");
 await zi.click("#tab-match");
 check("the 合婚 tab brings 夜子時 over from 我的人生", await zi.isChecked("#ma-latezi") && await zi.isVisible("#ma-latezi-wrap"));
-// The other person's 夜子時 stays with them: into 用這對伴侶過一生, and back to the 合婚 tab from its end page.
-await zi.fill("#mb-date", "1990-03-10");
+// The other person's birthplace and 夜子時 stay with them: into 用這對伴侶過一生, and back to the 合婚 tab from its end
+// page. 烏魯木齊 2000-06-21 01:30 is 23:18 the evening before, so with 夜子時 their day is 己酉 (in 臺北 it would be 庚戌).
+await zi.fill("#mb-date", "2000-06-21");
 await zi.uncheck("#mb-nohour");
 await zi.check("#mb-tmode-clock");
-await zi.fill("#mb-time", "23:30");
+await zi.fill("#mb-time", "01:30");
+await zi.selectOption("#mb-place", "烏魯木齊（北京時間）");
 await zi.check("#mb-sex-f");
 await zi.check("#mb-latezi");
 await zi.click("#form-match button[type=submit]");
@@ -718,7 +724,7 @@ await ended(zi, 45000);
 await zi.evaluate(() => { const d = document.querySelector("#ai-match"); d.hidden = false; d.open = true; });
 await zi.click("#ai-match-tab");
 await zi.waitForSelector("#match:not([hidden]) .hh-hero", { timeout: 10000 });
-check("the other person's 夜子時 comes through their life and back to the 合婚 tab", /甲戌/.test(ziMatch) && await zi.isChecked("#mb-latezi") && /甲戌/.test(await zi.textContent("#hh-body")) && await zi.inputValue("#mb-time") === "23:30");
+check("the other person's birthplace and 夜子時 come through their life and back to the 合婚 tab", /己酉/.test(ziMatch) && await zi.isChecked("#mb-latezi") && /己酉/.test(await zi.textContent("#hh-body")) && await zi.inputValue("#mb-time") === "01:30" && await zi.inputValue("#mb-place") === "烏魯木齊（北京時間）");
 await zi.close();
 
 // 填到一半重新整理: the forms and the tab come back; 清空重填 clears them; nothing personal stays after the tab.

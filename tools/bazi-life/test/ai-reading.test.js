@@ -300,6 +300,34 @@ test("the checker does not take everyday words for 神煞 or a denied 破格 for
   assert.match(bj.facts, /有奪財之憂（比劫奪財）/);
   assert.deepEqual(contentProblems("比劫透出，也就是比劫奪財，錢財要守。", bj.check).problems, []);
 
+  // Denials and warnings in other words, the break names inside the strength words, and the hedges that still claim.
+  for (const t of ["格局清純，無傷官見官之病。", "命中不見梟神奪食，做事能有始有終。", "這張命盤不犯官殺混雜，方向清楚。", "合夥時要避免比劫奪財的情況。", "傷官見官的情形在你的命盤裡並沒有出現。", "好在你的命盤沒有財多身弱的問題。"]) assert.deepEqual(problems(t), [], t);
+  for (const t of ["你的命盤恐怕有傷官見官的問題。", "可怕的是梟神奪食。", "這不是小事而是官殺混雜的格局。"]) assert.ok(problems(t).some(p => p.includes("破格")), t);
+  // More everyday words; proverbs are not citations; a quote must keep the source the facts give it.
+  for (const t of ["這張命盤先天喜水。", "你天天喜氣洋洋。", "風華蓋世的才情。", "居家擺設可參考左青龍右白虎。", "這也是古人常講的道理，人生要懂得「進退有度」。"]) assert.deepEqual(problems(t), [], t);
+  assert.ok(problems("逢天喜好事多。").some(p => p.includes("天喜")) || a.facts.includes("天喜"));
+  const old = (a.facts.match(/古訣「([^」]+)」/) || [])[1];
+  if (old) {
+    assert.deepEqual(problems(`古訣說「${old.replace("，", " ")}」。`), [], "a space for the comma");
+    assert.ok(problems(`《滴天髓》說「${old}」。`).some(p => p.includes("出自古訣")), "古訣 is not 《滴天髓》");
+  }
+  assert.ok(problems("滴天髓說「丁火柔中，能化金水」。").some(p => p.includes("引文")), "a book named without 《》");
+  const m2 = partOf("match", "m2", partner);
+  assert.deepEqual(contentProblems("古語說「家和萬事興」，兩個人把家照顧好。", m2.check).problems, []);
+  // 從強 is a kind of 從格.
+  const cq = partOf("full", "a", null, { ...input, date: { y: 2002, m: 1, d: 5 }, time: { h: 16, mi: 36 } });
+  assert.deepEqual(contentProblems("你的命盤屬於從格裡的從強格，印星與比劫成勢。", cq.check).problems, []);
+  // What one school likes is not the chart's 喜用, and another school's 格局 named by the facts may be repeated.
+  const views = a.facts.split("\n").find(l => l.includes("各派看法"));
+  assert.deepEqual(contentProblems(views.replace(/^【[^】]+】/, ""), a.check).problems, []);
+  // A break on one year's line holds in a sentence about that year, not for the whole chart.
+  const sh = partOf("short", "short", null, { ...input, date: { y: 2017, m: 5, d: 21 }, time: { h: 8, mi: 48 } });
+  const yl = sh.facts.split("\n").find(l => l.startsWith("- ") && l.includes("梟神奪食"));
+  if (yl) {
+    assert.ok(contentProblems("你的命盤梟神奪食，格局有破損。", sh.check).problems.some(p => p.includes("梟神奪食")));
+    assert.deepEqual(contentProblems(`${yl.match(/(\d{4}) 年/)[1]} 年要留意梟神奪食，飲食睡眠宜顧。`, sh.check).problems, []);
+  }
+
   // A list entry is held to its own year: a 神煞 of one year does not pass on another.
   const y0 = partOf("full", "years0");
   const pick = Object.keys(STARS).map(st => [st, y0.items.find(it => it.line.includes(st)), y0.items.find(it => !it.line.includes(st))])
@@ -310,6 +338,9 @@ test("the checker does not take everyday words for 神煞 or a denied 破格 for
   const c = checkPart(text, y0);
   assert.ok(c.bad.some(b => b.key === lacks.key && b.why.includes(star)), `${star} on ${lacks.key}`);
   assert.ok(!c.bad.some(b => b.key === has.key), `${star} on ${has.key} is its own`);
+  // The engine writes 流年逢文昌 with the short name, so the model may too.
+  const wen = y0.items.find(it => it.line.includes("逢文昌"));
+  if (wen) assert.ok(!checkPart(listText(y0, it => ({ 好事: it === wen ? "流年逢文昌，利讀書、考試與證照，適合進修。" : "工作上容易遇到合作與貴人。", 要注意: "理財宜保守，合夥借貸要小心。" })), y0).bad.some(b => b.key === wen.key));
 });
 
 test("health in the AI reading follows the 詳批's rule: the strongest element only when it holds 30 % or more", () => {

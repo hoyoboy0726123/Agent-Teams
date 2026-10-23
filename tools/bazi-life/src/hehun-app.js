@@ -226,7 +226,7 @@ function startLife() {
   const { a, b } = shown;
   const name = clean($("#hh-life-name").value);
   if (!name) { lifeError("請幫對方取個名字，故事裡會用這個名字稱呼對方。"); $("#hh-life-name").focus(); return; }
-  const partner = { name, date: b.date, time: b.time, sex: b.sex, only: true, ...(b.zi === "late" && b.time ? { zi: "late" } : {}) };
+  const partner = { name, date: b.date, time: b.time, sex: b.sex, only: true, ...(b.place ? { place: b.place } : {}), ...(b.zi === "late" && b.time ? { zi: "late" } : {}) };
   const met = yearIn("#hh-life-met"), wed = yearIn("#hh-life-wed");
   if (met !== undefined) partner.metYear = Number.isInteger(met) ? met : NaN;
   if (wed !== undefined) partner.marriedYear = Number.isInteger(wed) ? wed : NaN;

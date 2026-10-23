@@ -164,10 +164,12 @@ export function computeChart({ date, time = null, place, sex = "male", options =
     const altNames = names(ctx.pillarsAtShift(clock.dst));
     const cur = names(sc), changed = Object.keys(cur).filter(k => altNames[k] !== cur[k]);
     const ROLE = { year: "年柱", month: "月柱", day: "日柱", hour: "時柱" };
-    const again = resolved.status === "ambiguous" && alt.y === date.y && alt.m === date.m && alt.d === date.d && alt.h === wall.h && alt.mi === wall.mi;
+    // That clock reading may itself be one that repeats (the end of summer time, or of double summer time).
+    const occ = Math.max(0, resolveWallTime({ ...alt, s: 0 }, place.tz).instants.indexOf(later));
+    const again = occ > 0 && alt.y === date.y && alt.m === date.m && alt.d === date.d && alt.h === wall.h && alt.mi === wall.mi;
     const day = alt.y !== date.y ? `${alt.y} 年 ${alt.m} 月 ${alt.d} 日 ` : alt.m !== date.m || alt.d !== date.d ? `${alt.m} 月 ${alt.d} 日 ` : "";
-    const what = again ? "請改選第 2 次出現的時間" : `請改填 ${day}${pad(alt.h)}:${pad(alt.mi)}`;
-    warnings.push({ kind: "dst-entered", time: { y: alt.y, m: alt.m, d: alt.d, h: alt.h, mi: alt.mi }, ...(again ? { occurrence: 1 } : {}), changed: Object.fromEntries(changed.map(k => [k, altNames[k]])),
+    const what = again ? `請改選第 ${occ + 1} 次出現的時間` : `請改填 ${day}${pad(alt.h)}:${pad(alt.mi)}${occ ? `，並選第 ${occ + 1} 次出現的時間` : ""}`;
+    warnings.push({ kind: "dst-entered", time: { y: alt.y, m: alt.m, d: alt.d, h: alt.h, mi: alt.mi }, ...(occ ? { occurrence: occ } : {}), changed: Object.fromEntries(changed.map(k => [k, altNames[k]])),
       text: `如果家裡記下的已經是扣掉夏令時間的標準時間，${what}：${changed.length ? changed.map(k => `${ROLE[k]}${cur[k]}會變成${altNames[k]}`).join("、") : "四柱都不會變"}。` });
   }
   if (byShichen) warnings.push({ kind: "shichen", text: `依你選的${time.branch}時排日柱和時柱，不再做真太陽時校正；起運以這個時辰的中間估算。` });

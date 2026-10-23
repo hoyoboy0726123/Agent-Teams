@@ -13,8 +13,9 @@ const el = (p, part) => document.getElementById(`${p}-${part}`);
 function nearMidnight(p) {
   if (el(p, "nohour").checked) return false;
   if (el(p, "tmode-shichen").checked) return el(p, "shichen").value === "zi-pm";
-  const [h, mi] = (el(p, "time").value || "").split(":").map(Number);
-  if (!Number.isFinite(h)) return false;
+  const clock = el(p, "time").value || "";   // "" would split into [0], i.e. midnight
+  const [h, mi] = clock.split(":").map(Number);
+  if (!clock || !Number.isFinite(h)) return false;
   const [y, m, d] = ((el(p, "date") || {}).value || "").split("-").map(Number), place = el(p, "place") && findPlace(el(p, "place").value);
   if (place && y >= 1801 && y <= 2199 && m && d) {
     try {
@@ -52,8 +53,9 @@ export function readTimeField(p) {
     const time = shichenTime(el(p, "shichen").value);
     return time ? { time, zi } : { error: "請選出生的時辰，或勾選「時辰不詳」。" };
   }
-  const [h, mi] = (el(p, "time").value || "").split(":").map(Number);
-  if (!Number.isFinite(h)) return { error: "請輸入出生時間，或改選時辰、勾選「時辰不詳」。" };
+  const clock = el(p, "time").value || "";
+  const [h, mi] = clock.split(":").map(Number);
+  if (!clock || !Number.isFinite(h)) return { error: "請輸入出生時間，或改選時辰、勾選「時辰不詳」。" };
   return { time: { h, mi: Number.isFinite(mi) ? mi : 0 }, zi };
 }
 

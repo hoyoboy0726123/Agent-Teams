@@ -216,4 +216,8 @@ test("summer time already taken off at home: the chart says which time to enter 
   // Across New Year the hint names the year.
   const sydney = chart(1990, 12, 31, 23, 30, {}, findPlace("雪梨")).warnings.find(w => w.kind === "dst-entered");
   assert.match(sydney.text, /請改填 1991 年 1 月 1 日 00:30/);
+  // British double summer time 1947: the hinted 02:30 itself repeats, so the hint says which one.
+  const london = chart(1947, 8, 10, 1, 30, {}, findPlace("倫敦")).warnings.find(w => w.kind === "dst-entered");
+  assert.match(london.text, /請改填 02:30，並選第 2 次出現的時間：時柱戊子會變成己丑/);
+  assert.equal(chart(1947, 8, 10, 2, 30, { occurrence: london.occurrence }, findPlace("倫敦")).pillars[3].name, "己丑");
 });

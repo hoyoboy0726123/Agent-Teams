@@ -96,6 +96,8 @@ function contextOf(chart, analysis) {
   return c;
 }
 const fav = (c, e) => c.favor[e] || 0;
+// 中和 charts lean one way only a little: they are 「日主能任」「日主偏強／偏弱」, not 身強／身弱.
+const canTake = c => (c.strength === "中和" ? "日主能任" : "身強能任");
 const good = (c, e) => fav(c, e) >= 0.25;
 const bad = (c, e) => fav(c, e) <= -0.25;
 const markOf = v => (v >= 0.25 ? "喜" : v <= -0.25 ? "忌" : "平");
@@ -154,7 +156,7 @@ function godSignal(c, W, group, xs) {
   switch (group) {
     case "官殺": {
       const sha = gods.includes("七殺"), guan = gods.includes("正官");
-      if (both) { theme = "正官七殺同現（官殺並見），責任與壓力同時湧來"; core = isGood ? (c.weak ? "官殺為喜，權責加重而能擔當" : "身強能任，權責一起加重") : isBad ? "壓力與規矩兩頭夾，宜量力而為" : "工作上的責任加重"; }
+      if (both) { theme = "正官七殺同現（官殺並見），責任與壓力同時湧來"; core = isGood ? (c.weak ? "官殺為喜，權責加重而能擔當" : `${canTake(c)}，權責一起加重`) : isBad ? "壓力與規矩兩頭夾，宜量力而為" : "工作上的責任加重"; }
       if (stage === "child") { theme = "官殺對孩子來說是規矩與管教"; core = "學校、家裡的要求變多"; }
       else if (stage === "teen") core = `考試與師長的要求變多，${isGood ? "壓力反而成為動力" : "容易感到緊繃"}`;
       notes.career = stage === "child" ? `${lbl}：規矩與管教變多，學校、家裡的要求比較嚴`
@@ -294,7 +296,7 @@ function godSignal(c, W, group, xs) {
       shorts.family = "比劫手足星被引動";
       shorts.wealth = `${lbl}${isBad ? "，競爭與破耗多" : ""}`;
       if (grown(stage) && (isGood || isBad)) notes.career = isGood ? "同事朋友相挺，適合團隊合作" : "同輩競爭多，功勞容易被分走，宜把成果留下紀錄";
-      if (isGood) { notes.health = c.strength === "專旺" ? "專旺喜比劫順勢，精神與體力較好" : "身弱得比劫幫身，精神與體力較好"; domains.health = 0.2; }
+      if (isGood) { notes.health = c.strength === "專旺" ? "專旺喜比劫順勢，精神與體力較好" : c.strength === "中和" ? "日主略偏弱，得比劫幫身，精神與體力較好" : "身弱得比劫幫身，精神與體力較好"; domains.health = 0.2; }
       break;
     }
     default: break;
@@ -1035,7 +1037,7 @@ function comboSignals(c, W) {
   if (m && !kid) {
     const ok = good(c, els.官殺), female = c.sex === "female" && adult;
     const work = teen ? "課業與師長的要求多頭並進" : senior ? "責任與雜事多頭並進" : "工作上多頭馬車、責任不清";
-    const pre = c.weak ? "官殺為喜" : "身強能任";
+    const pre = c.weak ? "官殺為喜" : canTake(c);
     const loveBit = female ? (ok ? "；女命官殺都是夫星，追求者多，感情宜專一" : "；女命官殺都是夫星，感情對象容易複雜，宜專一") : c.sex === "female" && teen ? "；追求者多，交友宜謹慎" : "";
     out.push(signal("combo.官殺混雜", {
       kind: "combo", tone: ok ? "中" : "凶", weight: 5, domains: { career: adult ? (ok ? 0.1 : -0.5) : 0, love: female ? (ok ? -0.1 : -0.5) : 0 },
@@ -1053,7 +1055,7 @@ function comboSignals(c, W) {
   m = find(x => grp(x) === "財", y => grp(y) === "官殺");
   if (m && good(c, els.財) && good(c, els.官殺) && grownUp) {
     const guan = m[1].god === "正官", name = guan ? "財官雙美" : "財滋七殺";
-    const body = senior ? "財務與名聲都順，受人敬重" : guan ? "財生官、官護財，利升遷加薪" : c.weak ? "財殺皆為喜用，敢衝敢扛，事業財運並進" : "身強能任，敢衝敢扛，事業財運並進";
+    const body = senior ? "財務與名聲都順，受人敬重" : guan ? "財生官、官護財，利升遷加薪" : c.weak ? "財殺皆為喜用，敢衝敢扛，事業財運並進" : `${canTake(c)}，敢衝敢扛，事業財運並進`;
     const spouse = !adult ? "" : c.sex === "male" ? "；財也是男命的妻星，感情亦順" : guan ? "；正官也是女命的夫星，利婚姻" : "；七殺也是女命的夫星（偏夫），感情亦有進展";
     const line = senior ? `${name}，財務名聲都順` : guan ? "財官雙美，利升遷加薪" : "財滋七殺，事業財運並進";
     out.push(signal("combo.財官雙美", {
@@ -1236,10 +1238,10 @@ function starSignals(c, W, stars) {
     }
     // 祿 and 羊刃 are the day master's own element: a strong chart takes them as more 比劫, a weak one as help.
     if (name === "祿神" && !o && bad(c, c.dm)) {
-      const who = c.strength === "從弱" ? "從格忌比劫幫身，逢祿反" : "身強逢之也";
-      t = `${t}；不過祿也是比劫，${who}主開銷與競爭`; d = { career: 0.2, wealth: 0 }; tone = "中"; notes = { career: `逢祿，工作有著落，但${c.strength === "從弱" ? "從格逢祿反" : "身強逢祿也"}主開銷與競爭` };
+      const [who, short] = c.strength === "從弱" ? ["從格忌比劫幫身，逢祿反", "從格逢祿反"] : c.strength === "中和" ? ["日主略偏強，逢之也", "日主略偏強，逢祿也"] : ["身強逢之也", "身強逢祿也"];
+      t = `${t}；不過祿也是比劫，${who}主開銷與競爭`; d = { career: 0.2, wealth: 0 }; tone = "中"; notes = { career: `逢祿，工作有著落，但${short}主開銷與競爭` };
     }
-    if (name === "羊刃" && !o && good(c, c.dm)) { t = `逢羊刃：${c.strength === "專旺" ? "旺上加旺，順勢敢衝" : "身弱逢刃，反能扛事"}、敢做決定；但也要防衝動與受傷`; tone = "中"; d = { health: -0.2 }; notes = { health: "逢羊刃，敢做決定，但也要防衝動與受傷" }; }
+    if (name === "羊刃" && !o && good(c, c.dm)) { t = `逢羊刃：${c.strength === "專旺" ? "旺上加旺，順勢敢衝" : c.strength === "中和" ? "日主略偏弱，逢刃反能扛事" : "身弱逢刃，反能扛事"}、敢做決定；但也要防衝動與受傷`; tone = "中"; d = { health: -0.2 }; notes = { health: "逢羊刃，敢做決定，但也要防衝動與受傷" }; }
     if (name === "流霞" && c.sex === "female" && stage === "adult") t = `${t}；女命也要留意生產`;
     if ((name === "文昌貴人" || name === "學堂") && student) w += 1.5;
     const body = t.split("：").slice(1).join("：");

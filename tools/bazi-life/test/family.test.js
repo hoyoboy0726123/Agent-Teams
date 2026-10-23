@@ -93,4 +93,8 @@ test("a partner's 夜子時 from the 合婚 form is kept when their chart is mad
   assert.equal(memberChart(partner, findPlace("臺北市")).pillars[2], "乙亥", "23 點換日");
   assert.equal(memberChart({ ...partner, zi: "late" }, findPlace("臺北市")).pillars[2], "甲戌", "夜子時");
   assert.equal(memberChart({ date: partner.date, time: null, zi: "late" }, findPlace("臺北市")).pillars[2], memberChart({ date: partner.date, time: null }, findPlace("臺北市")).pillars[2], "no hour, no 子時 rule");
+  // Their own birthplace, when the 合婚 form gave one: 烏魯木齊 01:30 is the evening before.
+  const far = { date: { y: 2000, m: 6, d: 21 }, time: { h: 1, mi: 30 }, zi: "late", place: findPlace("烏魯木齊（北京時間）") };
+  assert.deepEqual(memberChart(far, findPlace("臺北市")).pillars.slice(2), ["己酉", "丙子"]);
+  assert.deepEqual(memberChart({ ...far, place: undefined }, findPlace("臺北市")).pillars.slice(2), ["庚戌", "丁丑"]);
 });

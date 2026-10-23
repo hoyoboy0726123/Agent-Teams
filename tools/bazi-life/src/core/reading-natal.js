@@ -468,6 +468,7 @@ function basics(c) {
     else if (night) lunarValue += late
       ? `（採夜子時：23 點後出生，日柱仍算當天${other ? `；若 23 點換日，日柱是${other.pillars.day}` : ""}）`
       : `（23 點後出生，日柱已換到次日${other ? `；若採夜子時，日柱是${other.pillars.day}` : ""}）`;
+    else if (before) lunarValue += "（真太陽時還在前一天晚上，日柱以前一天論，農曆仍依填寫的日期）";
     else if (solarDate > civil) lunarValue += "（真太陽時已過午夜，日柱以次日論）";
   }
   out.push({ label: "農曆", value: lunarValue });

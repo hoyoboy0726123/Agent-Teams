@@ -23,10 +23,11 @@ export const sexOf = r => (r === "father" || /Brother/.test(r) ? "male" : "femal
 
 // A family member's chart. Their birthplace is taken to be the protagonist's; without a birth time it has three
 // pillars, like the protagonist's chart when the hour is unknown.
-// member.zi: "late" when 夜子時 was chosen for them (the 合婚 form keeps it), else the 23 點換日 rule.
+// member.zi: "late" when 夜子時 was chosen for them (the 合婚 form keeps it), else the 23 點換日 rule. member.place: their
+// own birthplace when the 合婚 form gave one, else yours.
 export function memberChart(member, place) {
   const zi = member.zi === "late" && member.time ? "late" : "early";
-  const pillars = Object.values(fourPillars({ date: member.date, time: member.time || null, place, options: { solar: "true", zi } }));
+  const pillars = Object.values(fourPillars({ date: member.date, time: member.time || null, place: member.place || place, options: { solar: "true", zi } }));
   return { ...member, pillars, analysis: analyse(pillars) };
 }
 

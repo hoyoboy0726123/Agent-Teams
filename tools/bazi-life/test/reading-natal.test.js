@@ -208,6 +208,10 @@ test("the 農曆 line explains the 子時 rule, also when true solar time falls 
   assert.equal(lateDay, "己亥");
   assert.match(early, /真太陽時是前一天 23 點後.*若採夜子時，日柱是己亥/);
   assert.match(late, /採夜子時：真太陽時是前一天 23 點後，日柱算前一天.*若 23 點換日，日柱是庚子/);
+  // 烏魯木齊 2000-06-21 00:30 is 22:18 the evening before: that day's pillar, said so.
+  const urumqi = computeChart({ date: { y: 2000, m: 6, d: 21 }, time: { h: 0, mi: 30 }, place: findPlace("烏魯木齊（北京時間）"), sex: "male" });
+  assert.equal(urumqi.pillars[2].name, "己酉");
+  assert.match(natalReading(urumqi, analyse(urumqi.pillars.map(p => p.name))).basics.find(i => i.label === "農曆").value, /真太陽時還在前一天晚上，日柱以前一天論/);
   // 1988-02-15 23:30 is after 23:00 on the day itself.
   assert.match(lunarOf(1988, 2, 15, 23, 30, "early")[1], /23 點後出生，日柱已換到次日；若採夜子時，日柱是庚子/);
 });

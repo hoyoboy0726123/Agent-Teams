@@ -271,6 +271,7 @@ function checkOf(people, facts) {
     pillars: new Set([...(facts.match(PAIR) || []), ...people.flatMap(P => P.names)]),
     dayStems: people.map(P => P.a.dayMaster.stem), useful: union(P => P.a.useful), avoid: union(P => P.a.avoid),
     missing: union(P => P.chart.missing), strengths: people.map(P => P.a.strength), patterns: people.map(P => P.a.pattern),
+    kinds: people.map(P => (P.a.special ? P.a.special.kind : null)),
     birthYears: people.map(P => P.by), single: people.length === 1, facts,
     decades: people.flatMap(P => P.chart.luck.decades.map(d => ({ name: d.name, startAge: d.startAge, endAge: d.endAge, startYear: d.startYear, endYear: d.endYear }))),
   };
@@ -445,20 +446,28 @@ const PAIR_FORBIDDEN = [/外遇|劈腿|出軌|小三|離婚收場|一定會分�
 // Names the reading may only repeat from its facts: 神煞 and the 太歲 spirits (longest first, so 天德合 is not read as
 // 天德), the books, the lines quoted from them or from 古訣, and the named ways a structure breaks. Words that are also
 // everyday Chinese (桃花, 驛馬, 學堂, 太歲, and the idioms 陰差陽錯, 天羅地網) are only warned about; 太陽, 太陰 and 福德
-// are left out, and 天喜 and 華蓋 are not counted inside ordinary words (每天喜歡、歡天喜地、才華蓋世).
+// are left out, and 天喜, 華蓋 and 白虎 are not counted inside ordinary words (每天喜歡、先天喜水、才華蓋世、左青龍右白虎).
 const STAR_NAMES = [...new Set([...Object.keys(STARS), ...Object.keys(SPIRITS).filter(x => !["太陽", "太陰", "福德"].includes(x))])].sort((x, y) => y.length - x.length);
 const LOOSE_STARS = new Set(["桃花", "驛馬", "學堂", "太歲", "陰差陽錯", "天羅地網"]);
-const NOT_STARS = /歡天喜地|[每今昨明當春夏秋冬整白聊]天喜|天喜(?=[歡愛好樂悅])|才華蓋/g;
-// Short names of a 神煞, counted only where they read as one (命帶文昌、逢天乙、紅艷星); the facts use the full name.
+const NOT_STARS = /歡天喜地|[每今昨明當春夏秋冬整白聊先後天那這哪樂隔]天喜|天喜(?=[歡愛樂悅事氣訊極])|[才風]華蓋|青龍白虎|右白虎/g;
+// Short names of a 神煞, counted only where they read as one (命帶文昌、逢天乙、紅艷星). The facts may use the full name
+// or, like the yearly texts (流年逢文昌), the short one in the same way; 陽刃 is also how the 詳批 names a 月刃.
 const SHORT_STARS = { 文昌: "文昌貴人", 天乙: "天乙貴人", 紅艷: "紅艷煞", 孤鸞: "孤鸞煞", 陽刃: "羊刃" };
 const SHORT_RE = new RegExp(`(?:命帶|命中有|帶有?|逢|遇到?|見|坐)(${Object.keys(SHORT_STARS).join("|")})|(${Object.keys(SHORT_STARS).join("|")})星`, "g");
 const BOOKS = ["滴天髓", "窮通寶鑑", "子平真詮"];
-const BREAKS = ["傷官見官", "官殺混雜", "梟神奪食", "財多身弱", "殺重身輕", "比劫奪財", "財星壞印", "財星透出壞印", "身弱難以任官", "身弱殺重", "印多身旺"];
-// A quote after a book or 古訣, in 「」 or 『』, compared without spaces and closing stops, and with 、 read as ，.
-const QUOTE = /(?:《[^》]{1,12}》|古訣|古書|古籍|古人|古語|古云|古諺|命書)[^「『。]{0,20}[「『]([^」』]{2,40})[」』]/g;
-const quoteKey = t => t.replace(/[\s　]/g, "").replace(/、/g, "，").replace(/[。！，；]+$/, "");
-// A clause that denies or explains a break (「沒有傷官見官」「正官格忌傷官見官」) does not claim it.
-const NOT_CLAIMED = /沒有|並無|並沒|毫無|不是|不算|不怕|不會|避開|免於|忌|怕/;
+export const BREAKS = ["傷官見官", "官殺混雜", "梟神奪食", "財多身弱", "殺重身輕", "比劫奪財", "財星壞印", "財星透出壞印", "身弱難以任官", "身弱殺重", "印多身旺"];
+// A quote of a book (with or without 《》) or of 古訣／古書, in 「」『』 or “”, with no comma between: that is a citation.
+// Proverbs (古人說「相敬如賓」) are not. Quotes are compared without spaces, with 、；, and …… read as ，, and without the
+// closing stop; and a quote must come from the same source the facts give it (古書 may be any of them).
+const QUOTE = new RegExp(`(《[^》]{1,12}》|${BOOKS.join("|")}|古訣|古書)[^「『“。，,；\\n]{0,12}[「『“]([^」』”]{2,40})[」』”]`, "g");
+const quoteKey = t => t.replace(/[、；,\s　]|…+/g, "，").replace(/，+/g, "，").replace(/^，|[。！，]+$/g, "");
+const sourceKey = src => (BOOKS.includes(src) ? `《${src}》` : src);
+// A clause that denies, warns against or explains a break (「沒有傷官見官」「要避免比劫奪財」「正官格忌傷官見官」) does not
+// claim it; 恐怕、可怕、忌神 and 「不是…而是」 do not count as denials.
+const NOT_CLAIMED = /沒有|並無|並沒|(?<!毫)無(?![論疑])|未(?!來)|不見|不犯|不是|不算|不怕|不會|不用|不必|不喜|避免|避開|免於|以免|防|(?<![恐可哪])怕|忌(?!神)/;
+const NOT_AFTER = /並沒有|沒有出現|不明顯|不存在|不成立/;
+// A year or 大運 line of the facts (「- 19 歲（2028 年…」) holds for that time only.
+const timesOf = t => [...t.matchAll(/(\d{4})\s*年/g)].map(m => `${m[1]} 年`).concat([...t.matchAll(/(\d{1,3})\s*歲/g)].map(m => `${m[1]} 歲`), [...t.matchAll(new RegExp(`([${STEMS}][${BRANCHES}])大運`, "g"))].map(m => `${m[1]}大運`));
 function groundingProblems(all, facts, add, problems, warnings) {
   let rest = all.replace(NOT_STARS, m => "　".repeat(m.length));
   for (const name of STAR_NAMES) {
@@ -466,24 +475,40 @@ function groundingProblems(all, facts, add, problems, warnings) {
     rest = rest.split(name).join("　".repeat(name.length));
     if (!facts.includes(name)) add(LOOSE_STARS.has(name) ? warnings : problems, `寫了命盤資料裡沒有的神煞：${name}`);
   }
+  const shortInFacts = new Set([...facts.matchAll(SHORT_RE)].map(m => m[1] || m[2]));
   for (const m of rest.matchAll(SHORT_RE)) {
     const short = m[1] || m[2];
-    if (!facts.includes(SHORT_STARS[short])) add(problems, `寫了命盤資料裡沒有的神煞：${SHORT_STARS[short]}`);
+    if (!facts.includes(SHORT_STARS[short]) && !shortInFacts.has(short) && !(short === "陽刃" && facts.includes(short))) add(problems, `寫了命盤資料裡沒有的神煞：${SHORT_STARS[short]}`);
   }
   for (const m of all.matchAll(/《([^》]{1,12})》/g)) {
     if (!BOOKS.includes(m[1]) || !facts.includes(`《${m[1]}》`)) add(problems, `引了命盤資料裡沒有的書：《${m[1]}》`);
   }
-  const quotable = quoteKey(facts);
+  const quoted = new Map();
+  for (const m of facts.matchAll(QUOTE)) {
+    const k = quoteKey(m[2]);
+    if (!quoted.has(k)) quoted.set(k, new Set());
+    quoted.get(k).add(sourceKey(m[1]));
+  }
+  const flat = quoteKey(facts);
   for (const m of all.matchAll(QUOTE)) {
-    if (!quotable.includes(quoteKey(m[1]))) add(problems, `引文「${m[1]}」不在命盤資料裡`);
+    const k = quoteKey(m[2]), src = sourceKey(m[1]), from = quoted.get(k);
+    if (!from && !flat.includes(k)) add(problems, `引文「${m[2]}」不在命盤資料裡`);
+    else if (from && src !== "古書" && !from.has(src)) add(problems, `引文「${m[2]}」在命盤資料裡出自${[...from].join("、")}，不是${src}`);
   }
   // The 喜忌 reasons say what a structure fears (「正官格忌傷官見官（格局）」); that does not make it this chart's break.
-  const claimed = facts.replace(/格忌[^；。（\n]{1,12}（格局）/g, "格忌（格局）");
+  // A break on a year or 大運 line holds only in a sentence about that time.
+  const claimed = facts.replace(/格忌[^；。（\n]{1,12}（格局）/g, "格忌（格局）").split("\n");
+  const core = claimed.filter(l => !l.startsWith("- ")).join("\n"), timed = claimed.filter(l => l.startsWith("- "));
   for (const b of BREAKS) {
-    if (claimed.includes(b)) continue;
+    if (core.includes(b)) continue;
+    const when = timed.filter(l => l.includes(b));
     for (let at = all.indexOf(b); at >= 0; at = all.indexOf(b, at + b.length)) {
-      const clause = all.slice(0, at).split(/[。！？；，\n]/).pop();
-      if (!NOT_CLAIMED.test(clause)) { add(problems, `說了這張命盤沒有的破格：${b}`); break; }
+      const clause = all.slice(0, at).split(/[。！？；，\n]|而是|卻|但是?|反而/).pop(), after = all.slice(at + b.length).split(/[。！？；，\n]/)[0];
+      if (NOT_CLAIMED.test(clause) || NOT_AFTER.test(after)) continue;
+      const sentence = `${all.slice(0, at).split(/[。！？\n]/).pop()}${all.slice(at).split(/[。！？\n]/)[0]}`;
+      if (when.length && timesOf(sentence).some(t => when.some(l => l.includes(t)))) continue;
+      add(problems, `說了這張命盤沒有的破格：${b}`);
+      break;
     }
   }
 }
@@ -501,15 +526,22 @@ export function contentProblems(all, C) {
   for (const m of all.matchAll(PILLAR_THEN_YEAR)) if (yearPillar(Number(m[2])) !== m[1]) add(problems, `${m[2]} 年不是${m[1]}年`);
   for (const m of all.matchAll(DAY_MASTER)) { const st = m[1] || m[2]; if (st && !C.dayStems.includes(st)) add(problems, `日主是${C.dayStems.join("、")}，不是${st}`); }
   for (const m of all.matchAll(STEM_ELEMENT_RE)) if (STEM_ELEMENT[m[1]] !== m[2]) add(problems, `${m[1]}屬${STEM_ELEMENT[m[1]]}，不是${m[2]}`);
-  for (const m of all.matchAll(LIKES)) for (const e of elementsOf(m[1])) if (!C.useful.includes(e)) add(problems, `${e}不是喜用（喜用是${C.useful.join("、") || "不明顯"}）`);
-  for (const m of all.matchAll(DISLIKES)) for (const e of elementsOf(m[1])) if (!C.avoid.includes(e)) add(problems, `${e}不是忌神（忌的是${C.avoid.join("、") || "不明顯"}）`);
+  // What one school likes (「調候一派喜火」, as the 詳批 lists them) is not the chart's 喜用.
+  // 金神「喜火制伏」 is what the star likes, not the chart.
+  const blended = all.replace(/[^；。！？\n]*(?:扶抑|調候|格局[（一派喜忌])[^；。！？\n]*|喜火制伏?/g, m => "　".repeat(m.length));
+  for (const m of blended.matchAll(LIKES)) for (const e of elementsOf(m[1])) if (!C.useful.includes(e)) add(problems, `${e}不是喜用（喜用是${C.useful.join("、") || "不明顯"}）`);
+  for (const m of blended.matchAll(DISLIKES)) for (const e of elementsOf(m[1])) if (!C.avoid.includes(e)) add(problems, `${e}不是忌神（忌的是${C.avoid.join("、") || "不明顯"}）`);
   for (const m of all.matchAll(LACKS)) if (!C.missing.includes(m[1])) add(problems, `命中不缺${m[1]}`);
   const has = (...xs) => C.strengths.some(s => xs.includes(s));
-  if (/身強|日主(?:偏)?(?:強|旺)/.test(all) && !has("身強", "專旺")) add(problems, `日主是${C.strengths.join("、")}，不是身強`);
-  if (/身弱|日主(?:偏)?弱/.test(all) && !has("身弱", "從弱")) add(problems, `日主是${C.strengths.join("、")}，不是身弱`);
+  // 財多身弱、身弱殺重… name a break, not the strength: the break check above holds them to the facts.
+  const bare = BREAKS.reduce((t, b) => t.split(b).join("　".repeat(b.length)), all);
+  if (/身強|日主(?:偏)?(?:強|旺)(?!弱)/.test(bare) && !has("身強", "專旺")) add(problems, `日主是${C.strengths.join("、")}，不是身強`);
+  if (/身弱|日主(?:偏)?弱/.test(bare) && !has("身弱", "從弱")) add(problems, `日主是${C.strengths.join("、")}，不是身弱`);
   if (/專旺/.test(all) && !has("專旺")) add(problems, `日主是${C.strengths.join("、")}，不是專旺`);
-  if (/從弱|從格/.test(all) && !has("從弱")) add(problems, `日主是${C.strengths.join("、")}，不是從弱`);
-  for (const p of PATTERNS) if (!C.patterns.includes(p) && all.includes(p)) add(problems, `格局是${C.patterns.join("、")}，不是${p}`);
+  if (/從弱/.test(all) && !has("從弱")) add(problems, `日主是${C.strengths.join("、")}，不是從弱`);
+  if (/從格/.test(all) && !has("從弱") && !C.kinds.includes("從強")) add(problems, `日主是${C.strengths.join("、")}，不是從格`);
+  // 「也有流派改取偏財格」: the facts name another school's reading of the month, which may be repeated.
+  for (const p of PATTERNS) if (!C.patterns.includes(p) && all.includes(p) && !(C.facts && C.facts.includes(`改取${p}`))) add(problems, `格局是${C.patterns.join("、")}，不是${p}`);
   // An age must be the year's 足歲 or 虛歲, for one of the people.
   const ageFits = (year, age) => C.birthYears.some(by => age === year - by || age === year - by + 1);
   for (const m of all.matchAll(YEAR_AGE)) if (!ageFits(Number(m[1]), Number(m[2]))) add(problems, `${m[1]} 年不是 ${m[2]} 歲`);
@@ -586,7 +618,7 @@ function checkList(text, part, previous) {
     for (const line of b.body.split("\n")) { const m = line.trim().match(FIELD_LINE); if (m && it.fields.includes(m[1]) && !fields[m[1]]) fields[m[1]] = m[2].trim(); }
     const short = it.fields.filter(f => !fields[f] || fields[f].length < (f === "重點" ? 6 : 8));
     if (short.length) { bad.push({ key: it.key, why: `少了「${short.join("」「")}」` }); continue; }
-    const check = it.line ? { ...part.check, facts: `${part.shared}\n${it.line}` } : part.check;
+    const check = it.line ? { ...part.check, facts: `${part.shared}\n${it.line.replace(/^- /, "")}` } : part.check;
     const c = contentProblems(it.fields.map(f => fields[f]).join("\n"), check);
     for (const w of c.warnings) if (!warnings.includes(w)) warnings.push(w);
     if (c.problems.length) { bad.push({ key: it.key, why: c.problems.join("、") }); continue; }
