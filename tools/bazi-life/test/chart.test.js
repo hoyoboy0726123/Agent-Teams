@@ -194,3 +194,16 @@ test("every 時辰 gives its own branch, and 子時 at either end of the date la
   assert.equal(timeText({ h: 9, mi: 5 }), "09:05");
   assert.equal(shichenTime("nope"), null);
 });
+
+test("summer time already taken off at home: the chart says which time to enter and which pillars change", () => {
+  const morning = chart(1979, 8, 1, 7, 30).warnings.find(w => w.kind === "dst-entered");
+  assert.ok(morning, "a DST birth gets the hint");
+  assert.match(morning.text, /請改填 08:30：時柱己卯會變成庚辰/);
+  assert.equal(chart(1979, 8, 1, 8, 30).pillars[3].name, "庚辰", "entering the hinted time gives that pillar");
+  const night = chart(1979, 8, 1, 23, 30).warnings.find(w => w.kind === "dst-entered");
+  assert.match(night.text, /8 月 2 日 00:30.*日柱庚子會變成辛丑/);
+  assert.ok(!chart(1990, 8, 1, 7, 30).warnings.some(w => w.kind === "dst-entered"), "no hint without summer time");
+  const byShichen = computeChart({ date: { y: 1979, m: 8, d: 1 }, time: { h: 7, mi: 0, branch: "辰" }, place: taipei, sex: "male" });
+  assert.ok(!byShichen.warnings.some(w => w.kind === "dst-entered"), "a chosen 時辰 is taken as it is");
+  assert.ok(!chart(1979, 8, 1, 7, 30, { solar: "clock" }).warnings.some(w => w.kind === "dst-entered"), "不校正 takes no summer time off");
+});

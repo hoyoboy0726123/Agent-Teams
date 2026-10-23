@@ -20,7 +20,7 @@ import { computeChart } from "./core/chart.js";
 import { findPlace } from "./core/places.js";
 import { analyse, ELEMENTS } from "./core/analysis.js";
 import { natalStars, STARS } from "./core/detail.js";
-import { natalReading, DAY_MASTER_TEXT, TEN_GOD_TEXT, PATTERN_TEXT, ELEMENT_INDUSTRIES, ELEMENT_ORGANS, ELEMENT_LUCK } from "./core/reading-natal.js";
+import { natalReading, patternFacts, DAY_MASTER_TEXT, TEN_GOD_TEXT, PATTERN_TEXT, ELEMENT_INDUSTRIES, ELEMENT_ORGANS, ELEMENT_LUCK } from "./core/reading-natal.js";
 import { decadeReading, yearReading, DOMAIN_NAME } from "./core/reading-year.js";
 import { partnerReading } from "./core/partner.js";
 import { SHICHEN, shichenTime } from "./core/shichen.js";
@@ -78,7 +78,8 @@ const timeOut = t => {
   const sc = t.branch ? SHICHEN.find(x => x.branch === t.branch && x.h === t.h && x.mi === t.mi) : null;
   return sc ? { shichen: sc.key } : { h: t.h, mi: t.mi };
 };
-const birthOut = (b, withPlace) => ({ y: b.date.y, m: b.date.m, d: b.date.d, time: timeOut(b.time), ...(withPlace ? { place: b.place.name } : {}), sex: b.sex });
+// 夜子時 is sent only when chosen (zi: "late"), so every other request stays as it was.
+const birthOut = (b, withPlace) => ({ y: b.date.y, m: b.date.m, d: b.date.d, time: timeOut(b.time), ...(withPlace ? { place: b.place.name } : {}), sex: b.sex, ...(b.zi === "late" && b.time ? { zi: "late" } : {}) });
 
 // What the page says for a part that came back without text: the Worker's status, and for 503 whether the day's
 // Workers AI allocation is used up ("quota") or the model failed this once ("unavailable", worth another try).
@@ -109,7 +110,8 @@ function birthIn(b, withPlace) {
     if (!time) return null;
   }
   if (b.sex !== "male" && b.sex !== "female") return null;
-  const out = { date: { y, m, d }, time, sex: b.sex };
+  if (b.zi !== undefined && b.zi !== "early" && b.zi !== "late") return null;
+  const out = { date: { y, m, d }, time, sex: b.sex, ...(b.zi === "late" && time ? { zi: "late" } : {}) };
   if (withPlace) {
     out.place = typeof b.place === "string" ? findPlace(b.place) : null;
     if (!out.place) return null;
@@ -134,10 +136,11 @@ export function readReadingRequest(body) {
 // The parts of one reading usually reach the same Worker instance, so the last charts are kept.
 const CHARTS = new Map();
 function personOf(birth, now) {
-  const key = JSON.stringify([birth.date, birth.time, birth.place.name, birth.sex]);
+  const zi = birth.zi === "late" ? "late" : "early";
+  const key = JSON.stringify([birth.date, birth.time, birth.place.name, birth.sex, zi]);
   let base = CHARTS.get(key);
   if (!base) {
-    const chart = computeChart({ ...birth, options: { solar: "true" } }, { lean: true });
+    const chart = computeChart({ ...birth, options: { solar: "true", zi } }, { lean: true });
     const names = chart.pillars.map(p => p.name);
     base = { chart, names, a: analyse(names), by: birth.date.y, sex: birth.sex };
     CHARTS.set(key, base);
@@ -177,7 +180,9 @@ function chartLines(P, { full = true, of = "" } = {}) {
   const lines = [];
   if (full) lines.push(`【${of}四柱】${c.pillars.map(p => `${p.label}${p.name}（天干${p.stem.name}${p.role === "day" ? "是日主" : `為${p.stem.god}`}，地支${p.branch.name}藏${p.branch.hidden.map(h => `${h.name}${h.god}`).join("、")}）`).join("；")}。`);
   lines.push(`【${of}日主】${dm.stem}${dm.element}，${t.yinyang}，意象是${t.image}。長處：${t.nature}。盲點：${t.blind}。`);
-  lines.push(`【${of}強弱與格局】日主${a.strength}（生扶日主的力量約占 ${Math.round(a.support * 100)}%），${a.season}；格局是${a.pattern}${pt ? `：${pt.nature}${full ? `；成格喜${pt.wants}，破格怕${pt.fears}` : ""}` : ""}。`);
+  lines.push(`【${of}強弱與格局】日主${a.strength}${a.special ? `（${a.special.name}）` : ""}（生扶日主的力量約占 ${Math.round(a.support * 100)}%），${a.season}；格局是${a.pattern}${pt ? `：${pt.nature}` : ""}。`);
+  // Only what holds for this chart (reading-natal.js patternFacts), never the list of what could break a structure.
+  if (full) lines.push(`【${of}格局成敗】${patternLine(P)}`);
   if (full) lines.push(`【${of}五行力量】${ELEMENTS.map(e => `${e} ${a.scores[e]}`).join("、")}；最旺是${order[4]}，最弱是${order[0]}；${c.missing.length ? `天干地支裡沒有${c.missing.join("、")}（命中缺${c.missing.join("、")}）` : "五行俱全"}。`);
   lines.push(`【${of}喜忌】${u ? `用神${u}${us.length ? `，喜${us.join("、")}` : ""}` : "喜忌不明顯"}${j ? `；忌${j}${js.length ? `，也忌${js.join("、")}` : ""}` : ""}。`);
   if (!full) return lines;
@@ -193,9 +198,22 @@ function chartLines(P, { full = true, of = "" } = {}) {
   if (good.length) lines.push(`【${of}神煞】${good.map(x => `${x}（${STARS[x].text}）`).join("；")}。`);
   return lines;
 }
+function patternLine(P) {
+  const f = patternFacts(P.chart, P.a);
+  if (f.special) return `${f.special}：${P.a.special.note}。一般的成格、破格條件不適用。`;
+  return [
+    f.good.length ? `成格之處：${f.good.join("、")}` : "沒有明顯的成格條件",
+    f.hidden,
+    f.bad.length ? `破格之處：${f.bad.join("、")}` : "沒有破格之處",
+    `結論：${f.verdict}`,
+  ].filter(Boolean).join("；") + "。";
+}
+// The same rule as the 詳批's health section: the weakest element always, the strongest only when it holds 30 % or more.
 function healthLine(P) {
   const order = ELEMENTS.slice().sort((x, y) => P.a.scores[x] - P.a.scores[y]);
-  return `【健康（傳統說法）】五行最弱的${order[0]}對應${ELEMENT_ORGANS[order[0]].organs}，平時宜${ELEMENT_ORGANS[order[0]].care}；最旺的${order[4]}對應${ELEMENT_ORGANS[order[4]].organs}，過旺也是負擔，${ELEMENT_ORGANS[order[4]].care}。`;
+  const total = ELEMENTS.reduce((t, e) => t + P.a.scores[e], 0), strong = order[4];
+  const heavy = total && P.a.scores[strong] / total >= 0.3;
+  return `【健康（傳統說法）】五行最弱的${order[0]}對應${ELEMENT_ORGANS[order[0]].organs}，平時宜${ELEMENT_ORGANS[order[0]].care}${heavy ? `；最旺的${strong}對應${ELEMENT_ORGANS[strong].organs}，過旺也是負擔，${ELEMENT_ORGANS[strong].care}` : ""}。`;
 }
 function luckLine(P) {
   const [u, v] = P.a.useful;
@@ -253,7 +271,7 @@ function checkOf(people, facts) {
     pillars: new Set([...(facts.match(PAIR) || []), ...people.flatMap(P => P.names)]),
     dayStems: people.map(P => P.a.dayMaster.stem), useful: union(P => P.a.useful), avoid: union(P => P.a.avoid),
     missing: union(P => P.chart.missing), strengths: people.map(P => P.a.strength), patterns: people.map(P => P.a.pattern),
-    birthYears: people.map(P => P.by), single: people.length === 1,
+    birthYears: people.map(P => P.by), single: people.length === 1, facts,
     decades: people.flatMap(P => P.chart.luck.decades.map(d => ({ name: d.name, startAge: d.startAge, endAge: d.endAge, startYear: d.startYear, endYear: d.endYear }))),
   };
 }
@@ -347,7 +365,7 @@ function rulesOf(kind) {
     `你是一位溫暖、專業、說話實在的八字命理師，正在為臺灣的${pair ? "一對伴侶寫「AI 合婚」" : "一位讀者寫「AI 命理師解讀」"}。`,
     "",
     "寫作規則：",
-    "1. 只能使用下面「命盤資料」裡寫到的干支、十神、喜忌、格局、大運、流年、年份和歲數。不要自己排盤或推算，也不要補上資料裡沒有的干支、神煞、年份或歲數；寫到年份和歲數時，要和資料裡同一行的寫法一致。",
+    "1. 只能使用下面「命盤資料」裡寫到的干支、十神、喜忌、格局、大運、流年、年份和歲數。不要自己排盤或推算，也不要補上資料裡沒有的干支、神煞、年份或歲數；寫到年份和歲數時，要和資料裡同一行的寫法一致。成格、破格只寫「格局成敗」裡列出的；引用古書時，書名和原句都要照抄資料裡的，資料沒有就不要引。",
     `2. 用繁體中文和臺灣用語，口吻像面對面聊天：親切、具體、鼓勵。用到術語時，順便用白話解釋。${pair ? "稱呼兩個人「你」和「對方」，不要取名字。" : "稱呼讀者「你」。"}`,
     "3. 不談死亡、壽命和意外災難，不點名任何疾病或檢查項目；健康只談作息、飲食、運動和定期健康檢查。",
     `4. 不用恐嚇的說法（例如血光、劫數、大凶），也不建議任何改運商品、法會、點燈、符咒或付費化解。${pair ? "不說誰剋誰，不預言分手、離婚或外遇。" : ""}`,
@@ -421,6 +439,27 @@ const FORBIDDEN = [
   [/改運|消災|法會|點燈|安太歲|符咒|護身符|開光|收驚|斬桃花|風水物|付費化解|化解儀式|購買.{0,8}(?:水晶|手鍊|飾品|吉祥物)/, "建議了改運商品或儀式"],
 ];
 const PAIR_FORBIDDEN = [/外遇|劈腿|出軌|小三|離婚收場|一定會分手|注定分開/, "預言了外遇或分手"];
+// Names the reading may only repeat from its facts: 神煞 (longest first, so 天德合 is not read as 天德), the books, the
+// lines quoted from them, and the named ways a structure breaks. 桃花 and 驛馬 are everyday words too, so only warned.
+const STAR_NAMES = Object.keys(STARS).sort((x, y) => y.length - x.length);
+const LOOSE_STARS = new Set(["桃花", "驛馬"]);
+const BOOKS = ["滴天髓", "窮通寶鑑", "子平真詮"];
+const BREAKS = ["傷官見官", "官殺混雜", "梟神奪食", "財多身弱", "殺重身輕", "比劫奪財", "財星壞印", "財星透出壞印", "身弱難以任官", "身弱殺重", "印多身旺"];
+function groundingProblems(all, facts, add, problems, warnings) {
+  let rest = all;
+  for (const name of STAR_NAMES) {
+    if (!rest.includes(name)) continue;
+    rest = rest.split(name).join("　".repeat(name.length));
+    if (!facts.includes(name)) add(LOOSE_STARS.has(name) ? warnings : problems, `寫了命盤資料裡沒有的神煞：${name}`);
+  }
+  for (const m of all.matchAll(/《([^》]{1,12})》/g)) {
+    if (!BOOKS.includes(m[1]) || !facts.includes(`《${m[1]}》`)) add(problems, `引了命盤資料裡沒有的書：《${m[1]}》`);
+  }
+  for (const m of all.matchAll(/《[^》]{1,12}》[^「。]{0,16}「([^」]{2,40})」/g)) {
+    if (!facts.includes(m[1])) add(problems, `引文「${m[1]}」不在命盤資料裡`);
+  }
+  for (const b of BREAKS) if (all.includes(b) && !facts.includes(b)) add(problems, `說了這張命盤沒有的破格：${b}`);
+}
 const MAINLAND = /質量|信息|視頻|網絡|軟件|屏幕|打印|博客|鼠標|硬件|反饋|早上好/g;
 const SIMPLIFIED = new Set(SIMPLIFIED_ONLY);
 const elementsOf = s => s.match(/[木火土金水]/g) || [];
@@ -469,6 +508,7 @@ export function contentProblems(all, C) {
     }
   } else if (PAIR_FORBIDDEN[0].test(all)) add(problems, PAIR_FORBIDDEN[1]);
   for (const [re, why] of FORBIDDEN) if (re.test(all)) add(problems, why);
+  if (C.facts) groundingProblems(all, C.facts, add, problems, warnings);
   const simplified = [...new Set([...all].filter(ch => SIMPLIFIED.has(ch)))];
   if (simplified.length) add(problems, `出現簡體字：${simplified.join("")}`);
   const mainland = [...new Set(all.match(MAINLAND) || [])];

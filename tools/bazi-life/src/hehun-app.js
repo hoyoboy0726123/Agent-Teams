@@ -86,6 +86,7 @@ function setPerson(p, x) {
   if (x.place) $(`#${p}-place`).value = x.place.name;
   $(`#${p}-sex-f`).checked = x.sex === "female";
   $(`#${p}-sex-m`).checked = x.sex !== "female";
+  if ($(`#${p}-latezi`)) $(`#${p}-latezi`).checked = x.zi === "late";
   syncTimeField(p);
 }
 
@@ -97,7 +98,7 @@ function fillFromLife(force) {
   if (force || !$("#ma-date").value) {
     $("#ma-name").value = $("#f-name").value;
     $("#ma-date").value = $("#f-date").value;
-    for (const part of ["tmode-clock", "tmode-shichen", "nohour"]) $(`#ma-${part}`).checked = $(`#f-${part}`).checked;
+    for (const part of ["tmode-clock", "tmode-shichen", "nohour", "latezi"]) $(`#ma-${part}`).checked = $(`#f-${part}`).checked;
     $("#ma-time").value = $("#f-time").value;
     $("#ma-shichen").value = $("#f-shichen").value;
     $("#ma-place").value = $("#f-place").value;
@@ -138,7 +139,7 @@ function readPerson(p, label) {
   if (y < 1900 || y > 2100) return { error: `${label}的出生年份請在 1900 到 2100 年之間。` };
   const hour = readTimeField(p);
   if (hour.error) return { error: `${label}的出生時間：${hour.error}` };
-  return { date: { y, m, d }, time: hour.time, place: findPlace($(`#${p}-place`).value), sex: $(`#${p}-sex-f`).checked ? "female" : "male", name: clean($(`#${p}-name`).value) };
+  return { date: { y, m, d }, time: hour.time, place: findPlace($(`#${p}-place`).value), sex: $(`#${p}-sex-f`).checked ? "female" : "male", name: clean($(`#${p}-name`).value), ...(hour.zi === "late" ? { zi: "late" } : {}) };
 }
 
 // ---------- 合婚 ----------
@@ -148,7 +149,7 @@ function compute() {
   hooks.showError("");
   let r;
   try {
-    const chartOf = x => computeChart({ date: x.date, time: x.time, place: x.place, sex: x.sex, options: { solar: "true" } }, { lean: true });
+    const chartOf = x => computeChart({ date: x.date, time: x.time, place: x.place, sex: x.sex, options: { solar: "true", zi: x.zi === "late" ? "late" : "early" } }, { lean: true });
     r = hehunReading({ a: { chart: chartOf(a), sex: a.sex, name: a.name }, b: { chart: chartOf(b), sex: b.sex, name: b.name }, now: new Date().getFullYear() });
   } catch (e) {
     console.error(e);
@@ -232,7 +233,7 @@ function startLife() {
   const problems = checkFamily(family, a.date, a.sex);
   if (problems.length) { lifeError(problems.join(" ")); return; }
   lifeError("");
-  hooks.begin({ date: a.date, time: a.time, place: a.place, sex: a.sex }, null, { name: a.name, family });
+  hooks.begin({ date: a.date, time: a.time, place: a.place, sex: a.sex, ...(a.zi === "late" ? { zi: "late" } : {}) }, null, { name: a.name, family });
 }
 
 // ---------- AI 深度合婚 ----------

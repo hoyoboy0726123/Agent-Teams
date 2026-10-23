@@ -276,7 +276,7 @@ function startFromForm() {
   const problems = checkFamily(family, { y, m, d }, $("#sex-f").checked ? "female" : "male");
   if (problems.length) { $("#family").open = true; return showError(problems.join(" ")); }
   showError("");
-  const input = { date: { y, m, d }, time: hour.time, place: findPlace($("#f-place").value), sex: $("#sex-f").checked ? "female" : "male" };
+  const input = { date: { y, m, d }, time: hour.time, place: findPlace($("#f-place").value), sex: $("#sex-f").checked ? "female" : "male", ...(hour.zi === "late" ? { zi: "late" } : {}) };
   begin(input, null, { name: cleanName($("#f-name").value), family });
 }
 
@@ -294,7 +294,8 @@ function startRandom() {
 function begin(input, born, extra = {}) {
   stop();
   let chart, prep;
-  try { chart = computeChart({ ...input, options: { solar: "true" } }); prep = prepare(chart, { name: extra.name || "", family: extra.family || null }); }
+  // 夜子時 (input.zi, from the birth form or the 合婚 tab) keeps a 23:00–24:00 birth on that day; otherwise 23 點換日.
+  try { chart = computeChart({ ...input, options: { solar: "true", zi: input.zi === "late" ? "late" : "early" } }); prep = prepare(chart, { name: extra.name || "", family: extra.family || null }); }
   catch (e) { console.error(e); return showError("這個日期或地點沒辦法排盤，請再檢查一次。"); }
   // A name without Kangxi strokes still appears in the story; it just isn't scored.
   const name = prep.name || (extra.name ? { full: extra.name, effects: null } : null);

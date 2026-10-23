@@ -121,12 +121,12 @@ function update() {
 
 // Clock facts (summer time, war time, local mean time) are explained in the correction trail instead.
 function renderWarnings(c) {
-  const parts = c.warnings.filter(w => ["ambiguous", "gap", "hour", "jie"].includes(w.kind)).map(w => {
+  const parts = c.warnings.filter(w => ["ambiguous", "gap", "hour", "jie", "dst-entered"].includes(w.kind)).map(w => {
     let extra = "";
     if (w.kind === "ambiguous") {
       extra = `<div class="row">${c.time.occurrences.map((o, i) => `<button type="button" data-occ="${i}" aria-pressed="${i === c.time.chosen}">第 ${i + 1} 次（UTC${esc(o.offset)}）</button>`).join("")}</div>`;
     }
-    const strong = ["ambiguous", "gap", "jie"].includes(w.kind);
+    const strong = ["ambiguous", "gap", "jie"].includes(w.kind) || (w.kind === "dst-entered" && Object.keys(w.changed).length > 0);
     return `<div class="warn${strong ? " strong" : ""}"><p>${esc(w.text)}</p>${extra}</div>`;
   });
   $("#warnings").innerHTML = parts.join("");

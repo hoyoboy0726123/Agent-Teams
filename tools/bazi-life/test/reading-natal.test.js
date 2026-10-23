@@ -6,7 +6,7 @@ import { computeChart } from "../src/core/chart.js";
 import { findPlace, PLACE_GROUPS } from "../src/core/places.js";
 import { analyse } from "../src/core/analysis.js";
 import { natalStars } from "../src/core/detail.js";
-import { natalReading, SECTION_IDS, GLOSSARY, DAY_MASTER_TEXT, TEN_GOD_TEXT, PATTERN_TEXT, ELEMENT_INDUSTRIES, ELEMENT_ORGANS, ELEMENT_LUCK } from "../src/core/reading-natal.js";
+import { natalReading, SECTION_IDS, GLOSSARY, DAY_MASTER_TEXT, TEN_GOD_TEXT, PATTERN_TEXT, ELEMENT_INDUSTRIES, ELEMENT_ORGANS, ELEMENT_LUCK, CLASSIC_LINES } from "../src/core/reading-natal.js";
 import { makeRng } from "../src/sim/rng.js";
 
 const BROKEN = /[{}]|undefined|null|NaN|\[object|function/;
@@ -166,4 +166,29 @@ test("the static tables cover every stem, ten god, structure and element", () =>
   }
   assert.deepEqual(ELEMENT_LUCK.水.numbers, [1, 6]);   // 河圖：天一生水，地六成之
   assert.deepEqual(ELEMENT_LUCK.土.numbers, [5, 0]);
+});
+
+test("every classical quote is one of the lines kept in the code, under the right book, and never called 開篇", () => {
+  const allowed = new Set(CLASSIC_LINES);
+  let quotes = 0;
+  for (const chart of charts(400, 77)) {
+    const names = chart.pillars.map(p => p.name), r = natalReading(chart, analyse(names));
+    for (const t of strings(r)) {
+      assert.doesNotMatch(t, /開篇/, t);
+      // 《滴天髓》…「line」, 《窮通寶鑑》…「line」 and 古訣「line」: the quoted words must be a kept line.
+      for (const m of t.matchAll(/(《滴天髓》|古訣)[^「。]{0,12}「([^」]+)」/g)) { quotes++; assert.ok(allowed.has(m[2]), `${names.join(" ")}: ${m[1]}「${m[2]}」`); }
+    }
+  }
+  assert.ok(quotes > 400, `${quotes} quotes checked`);
+});
+
+test("the 六親 section says what 十神 can and cannot tell, points to 合盤, and makes no hurtful family claims", () => {
+  const HURT = /緣分較淡|子女較少|無子|剋父|剋母|剋夫|剋妻|喪父|喪母|孤獨終老|六親無靠/;
+  for (const chart of charts(200, 31)) {
+    const names = chart.pillars.map(p => p.name), r = natalReading(chart, analyse(names));
+    const fam = r.sections.find(s => s.id === "family"), text = sectionText(fam);
+    assert.match(text, /只看得出傾向/, names.join(" "));
+    assert.match(text, /合盤/, names.join(" "));
+    assert.doesNotMatch(text, HURT, `${names.join(" ")}: ${(text.match(HURT) || [])[0]}`);
+  }
 });

@@ -31,7 +31,8 @@ import {
 
 // ---------- 靜態表 ----------
 
-// 十天干日主：《滴天髓》開篇、意象、性格的長處與盲點。
+// 十天干日主：《滴天髓》論十干的句子（〈天干〉篇，依任鐵樵《滴天髓闡微》；全書開篇是「欲識三元萬法宗」，不是這些句子）、
+// 意象、性格的長處與盲點。
 export const DAY_MASTER_TEXT = {
   甲: { yinyang: "陽木", image: "參天大樹", verse: "甲木參天，脫胎要火",
     nature: "正直上進、有原則，像大樹一心往上長，做事有規畫、肯承擔，帶著天生的領導架勢",
@@ -65,7 +66,8 @@ export const DAY_MASTER_TEXT = {
     blind: "容易多愁善感、缺乏安全感，想得多而行動遲疑" },
 };
 
-// 《滴天髓》裡和取用有關的句子：符合 when 時，格局與用神一節會引用。
+// 《滴天髓》〈天干〉篇裡和取用有關的句子：符合 when 時，格局與用神一節會引用。丙火「甲來成滅」有的版本作「甲來焚滅」。
+// Every quote the reading prints must be one of these lines, DAY_MASTER_TEXT's verses or EXCESS (test/reading-natal.test.js).
 const VERSES = {
   甲: [
     { line: "脫胎要火", when: c => c.a.useful.includes("火"), text: "甲木要有火來發揮，就像木材遇火才見光彩" },
@@ -115,6 +117,13 @@ const EXCESS = {
   官殺: { 木: "木弱逢金，必為砍折", 火: "火弱逢水，必為熄滅", 土: "土衰逢木，必遭傾陷", 金: "金衰遇火，必見銷鎔", 水: "水弱逢土，必為淤塞" },
   比劫: { 木: "強木得火，方化其頑", 火: "強火得土，方止其焰", 土: "強土得金，方制其壅", 金: "強金得水，方挫其鋒", 水: "強水得木，方洩其勢" },
 };
+
+// Every line the reading may quote from the classics: anything else in 「」 after a book's name is a mistake.
+export const CLASSIC_LINES = [
+  ...Object.values(DAY_MASTER_TEXT).map(x => x.verse),
+  ...Object.values(VERSES).flat().map(v => v.line),
+  ...Object.values(EXCESS).flatMap(o => Object.values(o)),
+];
 
 // 十神：白話說明、長處、盲點、太重時、日支坐此十神的內在性格、適合的工作型態。
 export const TEN_GOD_TEXT = {
@@ -442,8 +451,11 @@ function basics(c) {
   if (c.hourKnown) {
     lunarValue += ` ${P.hour.branch.name}時`;
     const solarDate = chart.time.solarClock.slice(0, 10), civil = chart.time.entered.slice(0, 10);
-    const late = chart.input.options.zi === "early" && Number(chart.time.solarClock.slice(11, 13)) >= 23 && solarDate === civil;
-    if (late) lunarValue += "（23 點後出生，日柱已換到次日）";
+    const night = Number(chart.time.solarClock.slice(11, 13)) >= 23 && solarDate === civil;
+    // The other 子時 school's day pillar, when it differs (chart.variants; a lean chart has none).
+    const other = (chart.variants || []).find(v => v.options && v.options.zi && v.changed.includes("day"));
+    if (night && chart.input.options.zi === "early") lunarValue += `（23 點後出生，日柱已換到次日${other ? `；若採夜子時，日柱是${other.pillars.day}` : ""}）`;
+    else if (night && chart.input.options.zi === "late") lunarValue += `（採夜子時：23 點後出生，日柱仍算當天${other ? `；若 23 點換日，日柱是${other.pillars.day}` : ""}）`;
     else if (solarDate > civil) lunarValue += "（真太陽時已過午夜，日柱以次日論）";
   }
   out.push({ label: "農曆", value: lunarValue });
@@ -722,8 +734,8 @@ function strengthSection(c) {
     const g = drainGroup(c);
     s2 = `最耗日主的是${GROUP_WORD[g]}（${c.ge[g]}），屬於「${{ 食傷: "洩多身弱", 財: "財多身弱", 官殺: "殺重身輕" }[g]}」，凡事宜先求穩、再求進。`;
   } else if (a.strength === "中和") s2 = `生扶與剋洩大致平衡，喜忌也就較溫和，整體${leansStrong(c) ? "略偏強" : "略偏弱"}一些。`;
-  else if (a.strength === "從弱") s2 = `日主幾乎無根、生扶極少，傳統上可視為從格：不再扶身，而是順從最旺的${GROUP_WORD[drainGroup(c)]}。`;
-  else if (a.strength === "專旺") s2 = "日主之氣佔了全局大半，傳統上可視為專旺格：順其旺氣，忌強行剋制。";
+  else if (a.strength === "從弱") s2 = `日主幾乎無根、生扶極少，傳統上可視為${a.special.name}：不再扶身，${a.special.follows ? `而是順從最旺的${GROUP_WORD[a.special.follows]}` : "而是順從食傷、財、官殺的整體旺勢"}。`;
+  else if (a.strength === "專旺") s2 = `日主之氣佔了全局大半，傳統上可視為${a.special.name}：順其旺氣，忌強行剋制。`;
   else s2 = `${leansStrong(c) ? "整體偏強，宜洩、宜耗" : "整體偏弱，宜生、宜扶"}，取用以平衡為原則。`;
   return section("strength", [s1 + s2, schoolsSentence(c)], items);
 }
@@ -733,6 +745,8 @@ function schoolsSentence(c) {
   const a = c.a;
   const likesOf = s => ELEMENTS.filter(e => (a.schools[s].element[e] || 0) > 0).sort((x, y) => a.schools[s].element[y] - a.schools[s].element[x]);
   const fy = likesOf("扶抑"), gj = likesOf("格局"), th = a.schools.調候;
+  // 從格／專旺: 調候 and 格局 step aside (analysis.js), so only the special structure's own likes count.
+  if (a.special && th.abstain) return `各派看法：${a.special.name}已不是一般的強弱平衡，調候與格局兩派讓位，只依${a.special.name}順勢取用，${fy.length ? `喜${fy.join("、")}` : "沒有明顯偏好"}。本報告依此取用。`;
   const parts = [`扶抑一派看強弱（${a.schools.扶抑.verdict}），${fy.length ? `喜${fy.join("、")}` : "沒有明顯偏好"}`];
   if (th.abstain) parts.push(`調候一派認為${th.verdict}寒暖適中，不特別偏好`);
   else if (th.stems && th.stems.length) parts.push(`調候一派依《窮通寶鑑》取${th.stems.join("、")}`);
@@ -762,8 +776,9 @@ function whereHidden(c, group) {
 function patternCheck(c) {
   const a = c.a, s = a.strength, pat = a.pattern;
   // A 從 or 專旺 chart is read as that special structure: the ordinary 成格／破格 rules assume a balanced day master.
-  if (s === "從弱") return { good: [], hidden: "", bad: [], verdict: `日主從勢，改以從格論：順著最旺的${GROUP_WORD[drainGroup(c)]}走，格局反而清；最怕行運再見印比扶身` };
-  if (s === "專旺") return { good: [], hidden: "", bad: [], verdict: "日主一氣獨旺，改以專旺格論：順其旺氣、喜食傷洩秀，最怕官殺逆勢剋制" };
+  // analysis.js special: 從兒、從財、從殺、從勢, or 專旺 (曲直、炎上… in its season), each with its own likes and fears.
+  if (s === "從弱") return { good: [], hidden: "", bad: [], verdict: `日主從勢，改以${a.special.name}論：${a.special.note}，順勢時格局反而清` };
+  if (s === "專旺") return { good: [], hidden: "", bad: [], verdict: `日主一氣獨旺，改以${a.special.name}論：${a.special.note}` };
   const vis = g => visibleOf(c, g).length > 0, hid = g => hiddenOf(c, g, ["本氣", "中氣"]).length > 0;
   const okStrength = s === "身強" || s === "中和" || s === "專旺";
   const good = [], hidden = [], bad = [];
@@ -844,7 +859,7 @@ function patternCheck(c) {
 function schoolReason(c, school, e, like) {
   const g = c.eg[e], s = c.a.strength, pat = c.a.pattern;
   if (school === "扶抑") {
-    if (s === "從弱") return like ? "從弱宜順從旺勢" : "從弱忌逆勢生扶";
+    if (s === "從弱") return like ? `${c.a.special.kind}宜順從旺勢` : { 印: `${c.a.special.kind}忌印星生身`, 比劫: `${c.a.special.kind}忌比劫幫身`, 食傷: "從殺忌食傷制殺", 官殺: "從兒忌官殺剋身" }[g] || null;
     if (s === "專旺") return like ? "專旺宜順其旺氣" : "專旺忌逆勢剋耗";
     const mild = s === "中和" ? "略" : "";
     if (leansStrong(c)) return (like ? { 食傷: `身${mild}強宜洩，食傷洩秀`, 財: `身${mild}強能任財`, 官殺: `身${mild}強宜剋，官殺制身` } : { 比劫: `身${mild}強忌再幫身`, 印: `身${mild}強忌再生身` })[g] || null;
@@ -978,7 +993,7 @@ function godCombo(c) {
 }
 function characterSection(c) {
   const { a, dm, de } = c, info = DAY_MASTER_TEXT[dm];
-  const s1 = `${dm}${de}日主，《滴天髓》開篇說「${info.verse}」，性格如${info.image}：${info.nature}。`;
+  const s1 = `${dm}${de}日主，《滴天髓》論${dm}${de}說「${info.verse}」，性格如${info.image}：${info.nature}。`;
   const s2 = `需要留意的是，${info.blind}。`;
   const ranked = Object.entries(c.counts).sort((x, y) => y[1].weight - x[1].weight || y[1].visible.length - x[1].visible.length);
   const [god, cnt] = ranked[0], t = TEN_GOD_TEXT[god];
@@ -1026,13 +1041,13 @@ function familySection(c) {
     const role = c.roles[c.ge.印];
     mother = `母親星${motherGod === "偏印" ? "以偏印代" : "正印"}（${c.ge.印}）${kinWhere(motherGod)}，${visGod(c, motherGod) ? "母親的照顧與影響明顯" : "母親的影響較含蓄"}`
       + (roleIsGood(role) ? "；印星是喜用，母親的支持對你幫助很大。" : roleIsBad(role) ? `；但印星屬${role}，母親的關愛有時會變成壓力或過度保護，彼此保留空間更好。` : "。");
-  } else mother = `命中不見印星（${c.ge.印}），和母親各有各的生活重心，靠自己的時候多。`;
+  } else mother = `命中不見印星（${c.ge.印}），傳統上解讀為較早學會靠自己；和母親實際的關係，還是看彼此怎麼相處。`;
   if (fatherGod) {
     const role = c.roles[c.ge.財];
-    father = `父親星${fatherGod === "正財" ? "以正財代" : "偏財"}（${c.ge.財}）${kinWhere(fatherGod)}，${visGod(c, fatherGod) ? "父親在你成長中的角色鮮明" : "父親的角色較低調，相處時間可能較少"}`
+    father = `父親星${fatherGod === "正財" ? "以正財代" : "偏財"}（${c.ge.財}）${kinWhere(fatherGod)}，${visGod(c, fatherGod) ? "父親在你成長中的角色鮮明" : "父親的角色較含蓄"}`
       + (c.share[c.ge.比劫] >= 0.3 && !visGod(c, fatherGod) ? "，比劫又重，傳統上說父親較辛勞" : "")
       + (roleIsGood(role) ? "；財星是喜用，父親對你仍有實質的支持。" : roleIsBad(role) ? `；財星屬${role}，和父親在觀念與金錢上宜多溝通。` : "。");
-  } else father = `命中不見財星（${c.ge.財}），和父親的緣分較淡，或相處時間較少。`;
+  } else father = `命中不見財星（${c.ge.財}），從十神只看得出父親這顆星不顯；和父親實際的關係，還是看彼此怎麼相處。`;
 
   // 兄弟：比劫與月柱
   const bjVis = visibleOf(c, "比劫"), bjHid = hiddenOf(c, "比劫"), bjRole = c.roles[de];
@@ -1051,7 +1066,7 @@ function familySection(c) {
 
   // 子女：時柱；男命官殺、女命食傷
   const kid = c.male ? "官殺" : "食傷", kidEl = c.ge[kid], kidGods = GROUP_GODS[kid].filter(g => hasGod(c, g)), kidRole = c.roles[kidEl];
-  const kidStar = `${c.male ? "男命以官殺" : "女命以食傷"}為子女星，${kidGods.length ? `${kidGods.join("、")}（${kidEl}）${kidGods.some(g => visGod(c, g)) ? "透出天干，與子女的緣分明朗" : "藏而不透，與子女的緣分需要時間經營"}` : `${kidEl}在命中不顯，子女緣來得較晚或子女較少`}${roleIsGood(kidRole) ? "，子女星是喜用，日後子女是你的助力" : ""}`;
+  const kidStar = `${c.male ? "男命以官殺" : "女命以食傷"}為子女星，${kidGods.length ? `${kidGods.join("、")}（${kidEl}）${kidGods.some(g => visGod(c, g)) ? "透出天干，與子女的緣分明朗" : "藏而不透，與子女的緣分需要時間經營"}` : `${kidEl}在命中不顯，傳統上說子女緣可能來得較晚（要不要生、何時生，仍是自己的選擇）`}${roleIsGood(kidRole) ? "，子女星是喜用，日後子女是你的助力" : ""}`;
   let children;
   if (P.hour) {
     const hs = c.roles[P.hour.stem.element], hb = c.roles[P.hour.branch.element];
@@ -1064,7 +1079,10 @@ function familySection(c) {
     { label: "父母", text: mother + father }, { label: "兄弟姊妹", text: siblings },
     { label: "配偶", text: spouse }, { label: "子女", text: children },
   ];
-  return section("family", [s1 + s2], items);
+  // 十神看六親只是傾向: said in this section itself, for readers who were adopted, lost a parent, grew up in a blended
+  // family or chose not to have children, with a pointer to the 合盤 that reads a real family member.
+  const s3 = "十神論六親只看得出傾向，不能代替真實的家庭經驗：被收養、在重組家庭長大、選擇不生，或親人已不在身邊的人，請以自己的實際情況為準；想看和某位家人合不合，填入他的生日做合盤會更準。";
+  return section("family", [s1 + s2 + s3], items);
 }
 
 // ---------- 7 事業 ----------
@@ -1292,4 +1310,11 @@ export function natalReading(chart, analysis, { name = null } = {}) {
     notes: (chart.warnings || []).map(w => w.text),
     disclaimer: DISCLAIMER,
   };
+}
+
+// 成格／破格 as they hold for this chart (the same check the 詳批 uses), for the AI reading's facts: only conditions
+// that fired, never the generic list of what could break a structure.
+export function patternFacts(chart, analysis) {
+  const r = patternCheck(context(chart, analysis, null));
+  return { pattern: analysis.pattern, special: analysis.special ? analysis.special.name : null, good: r.good, hidden: r.hidden, bad: r.bad, verdict: r.verdict };
 }

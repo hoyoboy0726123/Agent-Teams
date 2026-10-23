@@ -669,6 +669,27 @@ const hhLast = Math.max(...hhLife.map(([age]) => age));
 check("小美 comes into the story in 2012 (at 24), and nobody before", hhLast < 24 || (!!hhMet && !hhLife.some(([age, t]) => age < 24 && /開始交往|就在一起了|跟你告白/.test(t))), hhMet ? hhMet[1] : `ended at ${hhLast}`);
 await hh.close();
 
+// 夜子時: offered only near midnight; it keeps a 23:30 birth on that day in the 詳批, names the other school's day pillar,
+// and comes along to the 合婚 tab.
+const zi = await fresh({ viewport: { width: 400, height: 900 } });
+await zi.goto(url);
+await zi.fill("#f-date", "1988-02-15");
+await zi.fill("#f-time", "12:00");
+const ziNoon = await zi.isHidden("#f-latezi-wrap");
+await zi.fill("#f-time", "23:30");
+const ziNight = await zi.isVisible("#f-latezi-wrap");
+await zi.check("#f-latezi");
+await zi.click("#form-me button[type=submit]");
+await zi.waitForSelector("#play:not([hidden])");
+await zi.click("#c-skip");
+await ended(zi, 45000);
+const ziReport = await zi.textContent("#report");
+check("夜子時 is offered only near midnight, and the 詳批 keeps a 23:30 birth on that day and names the other day pillar", ziNoon && ziNight && /採夜子時/.test(ziReport) && /庚子/.test(ziReport) && /若 23 點換日，日柱是辛丑/.test(ziReport), ziReport.slice(0, 80));
+await zi.click("#again-new");
+await zi.click("#tab-match");
+check("the 合婚 tab brings 夜子時 over from 我的人生", await zi.isChecked("#ma-latezi") && await zi.isVisible("#ma-latezi-wrap"));
+await zi.close();
+
 // 填到一半重新整理: the forms and the tab come back; 清空重填 clears them; nothing personal stays after the tab.
 const draft = await fresh({ viewport: { width: 400, height: 900 } });
 await draft.goto(url);

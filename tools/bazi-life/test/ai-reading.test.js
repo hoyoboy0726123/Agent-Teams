@@ -245,3 +245,51 @@ test("a failed part says what happened, and only a used-up day says come back to
   assert.match(readingError(502, {}), /自動檢查/);
   assert.match(readingError(500, null), /連不上/);
 });
+
+test("the fact sheet gives only the 成格／破格 that hold for this chart, and the text may only repeat its 神煞, books and quotes", async () => {
+  const { contentProblems } = await import("../src/ai-reading.js");
+  const a = partOf("full", "a");
+  assert.match(a.facts, /【格局成敗】/);
+  assert.doesNotMatch(a.facts, /破格怕/, "no generic list of what could break the structure");
+  const C = a.check, problems = t => contentProblems(t, C);
+  const absent = ["天乙貴人", "文昌貴人", "華蓋", "羊刃", "魁罡", "金神"].find(n => !a.facts.includes(n));
+  assert.ok(absent);
+  assert.ok(problems(`命理上看，你命帶${absent}，做事有人幫。`).problems.some(p => p.includes(absent)));
+  assert.ok(problems("《三命通會》說你的命格很好。").problems.some(p => p.includes("三命通會")));
+  assert.ok(problems("《滴天髓》說「一盞明燈照九州」。").problems.some(p => /引文|書/.test(p)));
+  const breaks = ["傷官見官", "官殺混雜", "梟神奪食"].find(b => !a.facts.includes(b));
+  assert.ok(problems(`命理上看，你的命盤有${breaks}的情形。`).problems.some(p => p.includes(breaks)));
+  // 桃花 is an everyday word as well: only a warning.
+  if (!a.facts.includes("桃花")) {
+    const r = problems("命理上看，這幾年桃花不少。");
+    assert.ok(!r.problems.some(p => p.includes("桃花")) && r.warnings.some(w => w.includes("桃花")));
+  }
+  // What the facts do contain may be repeated.
+  const quote = (a.facts.match(/《滴天髓》[^「]{0,12}「([^」]+)」/) || [])[1];
+  if (quote) assert.deepEqual(problems(`《滴天髓》說「${quote}」，命理上看很貼切。`).problems, []);
+});
+
+test("health in the AI reading follows the 詳批's rule: the strongest element only when it holds 30 % or more", () => {
+  for (const y of [1960, 1975, 1988, 1990, 2001]) {
+    const b = partOf("full", "b", null, { ...input, date: { y, m: 6, d: 21 } });
+    const line = b.facts.split("\n").find(l => l.startsWith("【健康"));
+    assert.ok(line, `${y}`);
+    const scores = b.facts.match(/【五行力量】([^；]+)/);
+    if (!scores) continue;
+    const vals = Object.fromEntries([...scores[1].matchAll(/([木火土金水]) ([\d.]+)/g)].map(m => [m[1], Number(m[2])]));
+    const total = Object.values(vals).reduce((t, v) => t + v, 0), top = Object.entries(vals).sort((x, y) => y[1] - x[1])[0];
+    assert.equal(line.includes("最旺的"), top[1] / total >= 0.3, `${y}: ${line}`);
+  }
+});
+
+test("夜子時 goes with the request only when chosen, the Worker accepts only early or late, and the chart follows it", () => {
+  const late = { ...input, date: { y: 1988, m: 2, d: 15 }, time: { h: 23, mi: 30 }, zi: "late" };
+  assert.equal(readingRequest(late, "full").birth.zi, "late");
+  assert.equal(readingRequest({ ...late, zi: "early" }, "full").birth.zi, undefined, "the default is not sent");
+  assert.equal(readingRequest({ ...late, time: null }, "full").birth.zi, undefined, "no hour, no 子時 rule");
+  const body = readingRequest(late, "full", { part: "a" });
+  assert.equal(readReadingRequest({ ...body, birth: { ...body.birth, zi: "noon" } }), null);
+  const day = from => partOf("full", "a", null, from).facts.match(/【四柱】[^；]*；月柱[^；]*；日柱(..)/)[1];
+  assert.equal(day({ ...late, zi: "early" }), "辛丑");
+  assert.equal(day(late), "庚子");
+});

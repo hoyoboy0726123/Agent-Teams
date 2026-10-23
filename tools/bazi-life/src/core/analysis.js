@@ -80,6 +80,31 @@ function fuyi(dm, support, rooted) {
   return { verdict: "中和", note: "日主強弱適中，只有輕微偏好", votes: { 比劫: -0.5 * lean, 印: -0.5 * lean, 食傷: 0.5 * lean, 財: 0.5 * lean, 官殺: 0.5 * lean } };
 }
 
+// 從弱 follows what drains it most (子平 從兒、從財、從殺; 從勢 when no one of them clearly leads), and 專旺 takes its
+// classical name only in its own element's season (曲直 in 寅卯辰 and so on); out of season it is just 專旺. In both, the
+// day master is no longer balanced, so 調候 and 格局 step aside (when 扶抑 takes part in the blend) and these votes rule.
+export const FOLLOW = {
+  從兒: { votes: { 比劫: 0, 印: -1, 食傷: 1, 財: 0.8, 官殺: -0.5 }, note: "順從食傷，喜財星流通；最怕印星奪食，也不喜官殺" },
+  從財: { votes: { 比劫: -1, 印: -1, 食傷: 0.8, 財: 1, 官殺: 0.5 }, note: "順從財星，喜食傷生財；最怕比劫奪財、印星生身" },
+  從殺: { votes: { 比劫: -1, 印: -1, 食傷: -1, 財: 0.8, 官殺: 1 }, note: "順從官殺，喜財星生殺；最怕食傷制殺、印比扶身" },
+  從勢: { votes: { 比劫: -1, 印: -1, 食傷: 0.5, 財: 1, 官殺: 1 }, note: "食傷、財、官殺都重而不分高下，順勢而行；最怕印比扶身" },
+};
+const FOLLOW_OF = { 食傷: "從兒", 財: "從財", 官殺: "從殺" };
+const ZHUANWANG = { 木: ["曲直格", "寅卯辰"], 火: ["炎上格", "巳午未"], 土: ["稼穡格", "辰戌丑未"], 金: ["從革格", "申酉戌"], 水: ["潤下格", "亥子丑"] };
+const LEAD = 1.25;   // a drain leads when it is a quarter heavier than the next one
+function special(verdict, dm, monthBranch, scores) {
+  if (verdict === "從弱") {
+    const ranked = ["食傷", "財", "官殺"].map(g => [g, scores[elementOf(dm, g)]]).sort((x, y) => y[1] - x[1]);
+    const kind = ranked[0][1] >= LEAD * ranked[1][1] ? FOLLOW_OF[ranked[0][0]] : "從勢";
+    return { kind, name: `${kind}格`, note: FOLLOW[kind].note, votes: FOLLOW[kind].votes, follows: kind === "從勢" ? null : ranked[0][0] };
+  }
+  if (verdict === "專旺") {
+    const [name, season] = ZHUANWANG[dm];
+    return { kind: "專旺", name: season.includes(monthBranch) ? name : "專旺格", note: "順其旺氣、喜食傷洩秀；最怕官殺逆勢剋制", votes: null, follows: null };
+  }
+  return null;
+}
+
 // The 窮通寶鑑 stems vote in order (1, 0.6, 0.35, then 0.2); a cold winter also votes against water and a hot summer
 // against fire, unless the book itself calls for that element.
 const STEM_ELEMENT = { 甲: "木", 乙: "木", 丙: "火", 丁: "火", 戊: "土", 己: "土", 庚: "金", 辛: "金", 壬: "水", 癸: "水" };
@@ -121,13 +146,17 @@ export function analyse(names, { hidden = "5-2-1", month = 2, school = "blend" }
   const support = (scores[supportEl[0]] + scores[supportEl[1]]) / total;
   const rooted = names.some(n => pillarOf(n).hidden.some(h => h.el === dm));
 
-  const f = fuyi(dm, support, rooted), t = tiaohou(day.stem, monthBranch), g = geju(day.stem, names[1]);
+  const fy = fuyi(dm, support, rooted), t = tiaohou(day.stem, monthBranch), g = geju(day.stem, names[1]);
+  const sp = special(fy.verdict, dm, monthBranch, scores);
+  const f = sp && sp.votes ? { ...fy, note: `${fy.note}：${sp.name}，${sp.note}`, votes: sp.votes } : fy;
+  const weights = SCHOOL_WEIGHTS[school];
+  // 從格／專旺: the other two schools step aside, unless the reader chose one of them alone.
+  const aside = !!sp && weights.扶抑 > 0;
   const schools = {
     扶抑: { ...f, element: groupVotes(dm, f.votes) },
-    調候: { ...t, element: Object.fromEntries(ELEMENTS.map(e => [e, t.votes[e] || 0])) },
-    格局: { ...g, element: groupVotes(dm, g.votes) },
+    調候: { ...t, element: Object.fromEntries(ELEMENTS.map(e => [e, t.votes[e] || 0])), ...(aside ? { abstain: true } : {}) },
+    格局: { ...g, element: groupVotes(dm, g.votes), ...(aside ? { abstain: true } : {}) },
   };
-  const weights = SCHOOL_WEIGHTS[school];
   const favor = {}, views = {};
   for (const e of ELEMENTS) {
     let sum = 0, wsum = 0;
@@ -147,6 +176,7 @@ export function analyse(names, { hidden = "5-2-1", month = 2, school = "blend" }
     support: Math.round(support * 1000) / 1000,
     rooted,
     strength: f.verdict,
+    special: sp ? { kind: sp.kind, name: sp.name, note: sp.note, follows: sp.follows } : null,
     pattern: g.verdict,
     season: t.verdict,
     schools,
