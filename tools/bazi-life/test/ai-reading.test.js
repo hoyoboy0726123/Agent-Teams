@@ -269,6 +269,49 @@ test("the fact sheet gives only the 成格／破格 that hold for this chart, an
   if (quote) assert.deepEqual(problems(`《滴天髓》說「${quote}」，命理上看很貼切。`).problems, []);
 });
 
+test("the checker does not take everyday words for 神煞 or a denied 破格 for a claim, and holds each year to its own line", async () => {
+  const { contentProblems } = await import("../src/ai-reading.js");
+  const { STARS } = await import("../src/core/detail.js");
+  const a = partOf("full", "a"), problems = t => contentProblems(t, a.check).problems;
+  for (const t of ["你們每天喜歡一起散步。", "夏天喜歡運動。", "大家歡天喜地。", "你的才華蓋世。"]) assert.deepEqual(problems(t), [], t);
+  if (!a.facts.includes("陰差陽錯")) assert.deepEqual(problems("感情上偶爾陰差陽錯，多溝通就好。"), []);
+  if (!a.facts.includes("天喜")) assert.ok(problems("你命帶天喜。").some(p => p.includes("天喜")));
+  if (!a.facts.includes("華蓋")) assert.ok(problems("你命帶華蓋。").some(p => p.includes("華蓋")));
+  assert.ok(problems("明年又逢白虎、喪門。").some(p => p.includes("白虎") && !a.facts.includes("白虎")));
+  if (!a.facts.includes("文昌貴人")) assert.ok(problems("你命帶文昌，讀書順利。").some(p => p.includes("文昌貴人")));
+  // A break that is denied or explained is fine; one that is claimed is not.
+  const breaks = ["傷官見官", "官殺混雜", "梟神奪食"].filter(b => !a.facts.includes(b));
+  assert.deepEqual(problems(`好在你的命盤沒有${breaks.join("、")}這類破格。`), []);
+  assert.ok(problems(`你的命盤有${breaks[0]}的情形。`).length);
+  // Quotes after 古訣 are held to the facts too; a copy with 。 inside 」 or 、 for ， still counts as a copy.
+  assert.ok(problems("古訣說「土多水塞，貴在順勢」。").some(p => p.includes("引文")));
+  const quote = (a.facts.match(/《滴天髓》[^「]{0,12}「([^」]+)」/) || [])[1];
+  assert.ok(quote, "the facts quote 《滴天髓》");
+  assert.deepEqual(problems(`《滴天髓》說「${quote}。」`), []);
+  assert.deepEqual(problems(`《滴天髓》說「${quote.replace("，", "、")}」`), []);
+
+  // 「正官格忌傷官見官（格局）」 among the 喜忌 reasons says what the structure fears, not that this chart has it.
+  const zg = partOf("full", "a", null, { ...input, date: { y: 1989, m: 2, d: 28 }, time: { h: 14, mi: 43 }, sex: "male" });
+  assert.match(zg.facts, /格忌傷官見官（格局）/);
+  assert.ok(contentProblems("你的命盤有傷官見官的情形，這是格局的破損之處。", zg.check).problems.some(p => p.includes("傷官見官")));
+  assert.deepEqual(contentProblems("正官格忌傷官見官，所以金不宜太多。", zg.check).problems, []);
+  // The three breaks worded without their usual names now carry them.
+  const bj = partOf("full", "a", null, { ...input, date: { y: 1950, m: 6, d: 7 }, time: { h: 3, mi: 30 }, sex: "male" });
+  assert.match(bj.facts, /有奪財之憂（比劫奪財）/);
+  assert.deepEqual(contentProblems("比劫透出，也就是比劫奪財，錢財要守。", bj.check).problems, []);
+
+  // A list entry is held to its own year: a 神煞 of one year does not pass on another.
+  const y0 = partOf("full", "years0");
+  const pick = Object.keys(STARS).map(st => [st, y0.items.find(it => it.line.includes(st)), y0.items.find(it => !it.line.includes(st))])
+    .find(([st, has, lacks]) => has && lacks && !y0.shared.includes(st) && st.length > 2);
+  assert.ok(pick, "a 神煞 that only some years have");
+  const [star, has, lacks] = pick;
+  const text = listText(y0, it => ({ 好事: `這一年逢${star}，${"工作上容易遇到合作與貴人。"}`, 要注意: "理財宜保守，合夥借貸要小心。" }));
+  const c = checkPart(text, y0);
+  assert.ok(c.bad.some(b => b.key === lacks.key && b.why.includes(star)), `${star} on ${lacks.key}`);
+  assert.ok(!c.bad.some(b => b.key === has.key), `${star} on ${has.key} is its own`);
+});
+
 test("health in the AI reading follows the 詳批's rule: the strongest element only when it holds 30 % or more", () => {
   for (const y of [1960, 1975, 1988, 1990, 2001]) {
     const b = partOf("full", "b", null, { ...input, date: { y, m: 6, d: 21 } });

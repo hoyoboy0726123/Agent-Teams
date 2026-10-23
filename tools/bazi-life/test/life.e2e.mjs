@@ -678,6 +678,18 @@ await zi.fill("#f-time", "12:00");
 const ziNoon = await zi.isHidden("#f-latezi-wrap");
 await zi.fill("#f-time", "23:30");
 const ziNight = await zi.isVisible("#f-latezi-wrap");
+// The chart decides, not the clock hour: 烏魯木齊 01:30 is 23:24 the evening before, 臺北 22:30 is still before 23:00.
+await zi.fill("#f-date", "1995-05-10");
+await zi.fill("#f-time", "01:30");
+await zi.selectOption("#f-place", "烏魯木齊（北京時間）");
+const ziFar = await zi.isVisible("#f-latezi-wrap");
+await zi.selectOption("#f-place", "臺北市");
+await zi.fill("#f-date", "2000-01-01");
+await zi.fill("#f-time", "22:30");
+const ziEarly = await zi.isHidden("#f-latezi-wrap");
+check("夜子時 shows when true solar time is after 23:00, wherever the clock says", ziFar && ziEarly);
+await zi.fill("#f-date", "1988-02-15");
+await zi.fill("#f-time", "23:30");
 await zi.check("#f-latezi");
 await zi.click("#form-me button[type=submit]");
 await zi.waitForSelector("#play:not([hidden])");
@@ -688,6 +700,25 @@ check("夜子時 is offered only near midnight, and the 詳批 keeps a 23:30 bir
 await zi.click("#again-new");
 await zi.click("#tab-match");
 check("the 合婚 tab brings 夜子時 over from 我的人生", await zi.isChecked("#ma-latezi") && await zi.isVisible("#ma-latezi-wrap"));
+// The other person's 夜子時 stays with them: into 用這對伴侶過一生, and back to the 合婚 tab from its end page.
+await zi.fill("#mb-date", "1990-03-10");
+await zi.uncheck("#mb-nohour");
+await zi.check("#mb-tmode-clock");
+await zi.fill("#mb-time", "23:30");
+await zi.check("#mb-sex-f");
+await zi.check("#mb-latezi");
+await zi.click("#form-match button[type=submit]");
+await zi.waitForSelector("#match:not([hidden]) .hh-hero");
+const ziMatch = await zi.textContent("#hh-body");
+await zi.fill("#hh-life-name", "林小雨");
+await zi.click("#hh-life");
+await zi.waitForSelector("#play:not([hidden])");
+await zi.click("#c-skip");
+await ended(zi, 45000);
+await zi.evaluate(() => { const d = document.querySelector("#ai-match"); d.hidden = false; d.open = true; });
+await zi.click("#ai-match-tab");
+await zi.waitForSelector("#match:not([hidden]) .hh-hero", { timeout: 10000 });
+check("the other person's 夜子時 comes through their life and back to the 合婚 tab", /甲戌/.test(ziMatch) && await zi.isChecked("#mb-latezi") && /甲戌/.test(await zi.textContent("#hh-body")) && await zi.inputValue("#mb-time") === "23:30");
 await zi.close();
 
 // 填到一半重新整理: the forms and the tab come back; 清空重填 clears them; nothing personal stays after the tab.

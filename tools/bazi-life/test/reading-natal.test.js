@@ -6,7 +6,7 @@ import { computeChart } from "../src/core/chart.js";
 import { findPlace, PLACE_GROUPS } from "../src/core/places.js";
 import { analyse } from "../src/core/analysis.js";
 import { natalStars } from "../src/core/detail.js";
-import { natalReading, SECTION_IDS, GLOSSARY, DAY_MASTER_TEXT, TEN_GOD_TEXT, PATTERN_TEXT, ELEMENT_INDUSTRIES, ELEMENT_ORGANS, ELEMENT_LUCK, CLASSIC_LINES } from "../src/core/reading-natal.js";
+import { natalReading, SECTION_IDS, GLOSSARY, DAY_MASTER_TEXT, TEN_GOD_TEXT, PATTERN_TEXT, ELEMENT_INDUSTRIES, ELEMENT_ORGANS, ELEMENT_LUCK, CLASSIC_LINES, CLASSIC_SOURCE } from "../src/core/reading-natal.js";
 import { makeRng } from "../src/sim/rng.js";
 
 const BROKEN = /[{}]|undefined|null|NaN|\[object|function/;
@@ -169,14 +169,17 @@ test("the static tables cover every stem, ten god, structure and element", () =>
 });
 
 test("every classical quote is one of the lines kept in the code, under the right book, and never called 開篇", () => {
-  const allowed = new Set(CLASSIC_LINES);
+  assert.equal(CLASSIC_SOURCE.size, new Set(CLASSIC_LINES).size);
   let quotes = 0;
   for (const chart of charts(400, 77)) {
     const names = chart.pillars.map(p => p.name), r = natalReading(chart, analyse(names));
     for (const t of strings(r)) {
       assert.doesNotMatch(t, /開篇/, t);
-      // 《滴天髓》…「line」, 《窮通寶鑑》…「line」 and 古訣「line」: the quoted words must be a kept line.
-      for (const m of t.matchAll(/(《滴天髓》|古訣)[^「。]{0,12}「([^」]+)」/g)) { quotes++; assert.ok(allowed.has(m[2]), `${names.join(" ")}: ${m[1]}「${m[2]}」`); }
+      // 《滴天髓》…「line」 and 古訣「line」: the quoted words must be a kept line, named after its own source.
+      for (const m of t.matchAll(/(《[^》]+》|古訣)[^「。]{0,12}「([^」]+)」/g)) {
+        quotes++;
+        assert.equal(CLASSIC_SOURCE.get(m[2]), m[1], `${names.join(" ")}: ${m[1]}「${m[2]}」`);
+      }
     }
   }
   assert.ok(quotes > 400, `${quotes} quotes checked`);
@@ -191,4 +194,20 @@ test("the 六親 section says what 十神 can and cannot tell, points to 合盤,
     assert.match(text, /合盤/, names.join(" "));
     assert.doesNotMatch(text, HURT, `${names.join(" ")}: ${(text.match(HURT) || [])[0]}`);
   }
+});
+
+test("the 農曆 line explains the 子時 rule, also when true solar time falls on the evening before the entered date", () => {
+  const lunarOf = (y, m, d, h, mi, zi) => {
+    const c = computeChart({ date: { y, m, d }, time: { h, mi }, place: findPlace("臺北市"), sex: "male", options: { zi } });
+    const item = natalReading(c, analyse(c.pillars.map(p => p.name))).basics.find(i => i.label === "農曆");
+    return [c.pillars[2].name, item.value];
+  };
+  // 1979-08-01 00:30 summer time is 07-31 23:29 true solar time.
+  const [earlyDay, early] = lunarOf(1979, 8, 1, 0, 30, "early"), [lateDay, late] = lunarOf(1979, 8, 1, 0, 30, "late");
+  assert.equal(earlyDay, "庚子");
+  assert.equal(lateDay, "己亥");
+  assert.match(early, /真太陽時是前一天 23 點後.*若採夜子時，日柱是己亥/);
+  assert.match(late, /採夜子時：真太陽時是前一天 23 點後，日柱算前一天.*若 23 點換日，日柱是庚子/);
+  // 1988-02-15 23:30 is after 23:00 on the day itself.
+  assert.match(lunarOf(1988, 2, 15, 23, 30, "early")[1], /23 點後出生，日柱已換到次日；若採夜子時，日柱是庚子/);
 });

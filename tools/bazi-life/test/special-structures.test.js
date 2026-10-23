@@ -7,10 +7,17 @@ import { analyse, FOLLOW } from "../src/core/analysis.js";
 import { natalReading } from "../src/core/reading-natal.js";
 import { makeRng } from "../src/sim/rng.js";
 
-const KINDS = [...Object.keys(FOLLOW), "專旺"];
-const chartAt = (y, m, d, h, sex = "male") => computeChart({ date: { y, m, d }, time: { h, mi: 0 }, place: findPlace("臺北市"), sex });
+const KINDS = [...Object.keys(FOLLOW), "專旺", "從強"];
+// Lean charts (no 排盤-page extras) keep the scans of thousands of births quick; the readings are the same.
+const chartAt = (y, m, d, h, sex = "male") => computeChart({ date: { y, m, d }, time: { h, mi: 0 }, place: findPlace("臺北市"), sex }, { lean: true });
 
+const found = new Map();
 function specials(n, seed) {
+  const key = `${n}|${seed}`;
+  if (!found.has(key)) found.set(key, scan(n, seed));
+  return found.get(key);
+}
+function scan(n, seed) {
   const rng = makeRng(seed), out = [];
   for (let i = 0; i < n; i++) {
     const c = chartAt(1930 + rng.int(96), 1 + rng.int(12), 1 + rng.int(28), rng.int(24), rng() < 0.5 ? "male" : "female");
@@ -45,8 +52,70 @@ test("in 8,000 random charts every kind of 從格 and 專旺 turns up, and each 
   for (const k of KINDS) assert.ok(seen[k] > 0, `${k} never turned up: ${JSON.stringify(seen)}`);
 });
 
+// The review examples: a 食傷生財 chart with almost no metal is 從兒, a 財官 pair with no 食傷 does not like 食傷, and a
+// 子-month water chart whose metal (印) outweighs its water is 從強, not 潤下.
+test("從勢 needs all three drains, a pair names its own flow, and 印 heavier than 比劫 is 從強", () => {
+  const at = (d, h, sex) => { const [y, m, dd] = d.split("-").map(Number), c = chartAt(y, m, dd, h, sex); return analyse(c.pillars.map(p => p.name)); };
+  const er = at("1978-06-12", 2, "female");
+  assert.equal(er.special.name, "從兒格");
+  assert.ok(!er.useful.includes("金"), "the missing 官殺 is not a 喜神");
+  const cai = at("1963-12-02", 21, "female");
+  assert.equal(cai.special.name, "從財格");
+  assert.ok(!cai.useful.includes("金"), "食傷 with a strong 官殺 beside 財 is not liked");
+  const qiang = at("2002-01-05", 16, "male");
+  assert.equal(qiang.special.name, "從強格");
+  assert.ok(!qiang.useful.includes("木") && qiang.useful.includes("金"), "從強 likes 印 and not 食傷");
+
+  for (const { c, a } of specials(8000, 11)) {
+    const id = c.pillars.map(p => p.name).join(" "), score = g => a.scores[a.groups[g]];
+    if (a.strength === "從弱") {
+      const ranked = ["食傷", "財", "官殺"].sort((x, y) => score(y) - score(x));
+      assert.ok(a.useful.includes(a.groups[ranked[0]]), `${id}: the heaviest drain is always liked`);
+      if (a.special.kind === "從勢") {
+        const pair = new Set(ranked.slice(0, 2));
+        assert.ok(score(ranked[2]) >= 0.6 * score(ranked[1]) - 0.011 || (pair.has("食傷") && pair.has("官殺")), `${id}: 從勢 only when all three are heavy, or 食傷 faces 官殺`);
+        assert.ok(a.favor[a.groups.財] >= a.favor[a.groups.官殺] && a.favor[a.groups.官殺] >= a.favor[a.groups.食傷], `${id}: 從勢 likes 財 most`);
+      }
+    } else {
+      const own = a.scores[a.dayMaster.element], seal = score("印");
+      if (a.special.kind === "從強") assert.ok(seal > own - 0.011 && !a.useful.includes(a.groups.食傷), `${id}: 從強 has more 印 and does not like 食傷`);
+      else assert.ok(own >= seal - 0.011, `${id}: ${a.special.name} has at least as much 比劫 as 印`);
+    }
+  }
+});
+
+test("the 詳批 of a 從格 or 專旺 chart keeps to its own likes: no 身弱 labels, no warning against its 用神, no stale 調候", () => {
+  for (const { c, a } of specials(8000, 11)) {
+    const id = c.pillars.map(p => p.name).join(" "), r = natalReading(c, a);
+    const sec = k => JSON.stringify(r.sections.find(s => s.id === k));
+    if (a.strength === "從弱") {
+      assert.doesNotMatch(sec("character"), /財多身弱|官殺重而身弱/, `${id}: character`);
+      assert.doesNotMatch(sec("summary"), /古訣/, `${id}: no 古訣 warning against what a 從格 follows`);
+    }
+    assert.doesNotMatch(sec("pattern"), /行運中兼顧/, `${id}: 調候 steps aside`);
+    if (a.schools.調候.stems && a.schools.調候.stems.length) assert.match(sec("pattern"), /調候讓位/, `${id}`);
+    if (a.special.kind !== "從勢") assert.doesNotMatch(JSON.stringify(r), /日主從勢/, `${id}: only a 從勢 chart is called 從勢`);
+    if (a.dayMaster.stem === "壬") assert.doesNotMatch(JSON.stringify(r), /通根透癸/, `${id}: a 從 or 專旺 壬 does not rush like a rooted one`);
+    assert.ok(r.basics.find(b => b.label === "命局").value.includes(a.special.name), `${id}: 命局 names ${a.special.name}`);
+  }
+});
+
+test("the yearly texts of a 從格 or 專旺 chart do not call it 身弱 or 身強 where it likes the opposite", async () => {
+  const { yearReading } = await import("../src/core/reading-year.js");
+  let seen = 0;
+  for (const { c, a } of specials(8000, 11).slice(0, 40)) {
+    for (let age = 1; age <= 80; age += 1) {
+      const t = JSON.stringify(yearReading(c, a, age));
+      if (a.strength === "專旺") assert.doesNotMatch(t, /身弱逢刃|身弱得比劫/, `${a.special.name} ${age}`);
+      if (a.strength === "從弱") assert.doesNotMatch(t, /身強逢/, `${a.special.name} ${age}`);
+      seen++;
+    }
+  }
+  assert.ok(seen > 1000);
+});
+
 test("a single school chosen by the reader is not set aside by a 從格", () => {
-  const [{ c }] = specials(3000, 11).filter(x => x.a.strength === "從弱");
+  const [{ c }] = specials(8000, 11).filter(x => x.a.strength === "從弱");
   const names = c.pillars.map(p => p.name);
   for (const school of ["調候", "格局"]) {
     const a = analyse(names, { school });

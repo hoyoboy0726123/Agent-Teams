@@ -124,6 +124,12 @@ export const CLASSIC_LINES = [
   ...Object.values(VERSES).flat().map(v => v.line),
   ...Object.values(EXCESS).flatMap(o => Object.values(o)),
 ];
+// Where each kept line comes from, as the 詳批 names it.
+export const CLASSIC_SOURCE = new Map([
+  ...Object.values(DAY_MASTER_TEXT).map(x => [x.verse, "《滴天髓》"]),
+  ...Object.values(VERSES).flat().map(v => [v.line, "《滴天髓》"]),
+  ...Object.values(EXCESS).flatMap(o => Object.values(o)).map(l => [l, "古訣"]),
+]);
 
 // 十神：白話說明、長處、盲點、太重時、日支坐此十神的內在性格、適合的工作型態。
 export const TEN_GOD_TEXT = {
@@ -451,11 +457,17 @@ function basics(c) {
   if (c.hourKnown) {
     lunarValue += ` ${P.hour.branch.name}時`;
     const solarDate = chart.time.solarClock.slice(0, 10), civil = chart.time.entered.slice(0, 10);
-    const night = Number(chart.time.solarClock.slice(11, 13)) >= 23 && solarDate === civil;
+    // After 23:00 true solar time, on the entered day or (summer time, far west) on the evening before it.
+    const night = Number(chart.time.solarClock.slice(11, 13)) >= 23, before = solarDate < civil;
     // The other 子時 school's day pillar, when it differs (chart.variants; a lean chart has none).
     const other = (chart.variants || []).find(v => v.options && v.options.zi && v.changed.includes("day"));
-    if (night && chart.input.options.zi === "early") lunarValue += `（23 點後出生，日柱已換到次日${other ? `；若採夜子時，日柱是${other.pillars.day}` : ""}）`;
-    else if (night && chart.input.options.zi === "late") lunarValue += `（採夜子時：23 點後出生，日柱仍算當天${other ? `；若 23 點換日，日柱是${other.pillars.day}` : ""}）`;
+    const late = chart.input.options.zi === "late";
+    if (night && before) lunarValue += late
+      ? `（採夜子時：真太陽時是前一天 23 點後，日柱算前一天，農曆仍依填寫的日期${other ? `；若 23 點換日，日柱是${other.pillars.day}` : ""}）`
+      : `（真太陽時是前一天 23 點後，23 點已換日，日柱就是填寫的這一天${other ? `；若採夜子時，日柱是${other.pillars.day}` : ""}）`;
+    else if (night) lunarValue += late
+      ? `（採夜子時：23 點後出生，日柱仍算當天${other ? `；若 23 點換日，日柱是${other.pillars.day}` : ""}）`
+      : `（23 點後出生，日柱已換到次日${other ? `；若採夜子時，日柱是${other.pillars.day}` : ""}）`;
     else if (solarDate > civil) lunarValue += "（真太陽時已過午夜，日柱以次日論）";
   }
   out.push({ label: "農曆", value: lunarValue });

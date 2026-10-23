@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { computeChart } from "../src/core/chart.js";
 import { findPlace } from "../src/core/places.js";
 import { analyse } from "../src/core/analysis.js";
-import { relate, buildFamily, checkFamily, familyTilts } from "../src/core/family.js";
+import { relate, buildFamily, checkFamily, familyTilts, memberChart } from "../src/core/family.js";
 import { prepare } from "../src/sim/setup.js";
 import { runLife } from "../src/sim/life.js";
 import { shichenTime } from "../src/core/shichen.js";
@@ -86,4 +86,11 @@ test("a family member's 時辰 is their hour pillar as it is, and an exact time 
   assert.equal(fam(shichenTime("wu")).pillars[3][1], "午");
   assert.equal(fam({ h: 12, mi: 0 }).pillars[3][1], "巳", "12:00 on Beijing time is 巳時 in Ürümqi solar time");
   assert.equal(fam(null).pillars.length, 3, "時辰不詳 leaves three pillars");
+});
+
+test("a partner's 夜子時 from the 合婚 form is kept when their chart is made", () => {
+  const partner = { date: { y: 1990, m: 3, d: 10 }, time: { h: 23, mi: 30 } };
+  assert.equal(memberChart(partner, findPlace("臺北市")).pillars[2], "乙亥", "23 點換日");
+  assert.equal(memberChart({ ...partner, zi: "late" }, findPlace("臺北市")).pillars[2], "甲戌", "夜子時");
+  assert.equal(memberChart({ date: partner.date, time: null, zi: "late" }, findPlace("臺北市")).pillars[2], memberChart({ date: partner.date, time: null }, findPlace("臺北市")).pillars[2], "no hour, no 子時 rule");
 });

@@ -206,4 +206,14 @@ test("summer time already taken off at home: the chart says which time to enter 
   const byShichen = computeChart({ date: { y: 1979, m: 8, d: 1 }, time: { h: 7, mi: 0, branch: "辰" }, place: taipei, sex: "male" });
   assert.ok(!byShichen.warnings.some(w => w.kind === "dst-entered"), "a chosen 時辰 is taken as it is");
   assert.ok(!chart(1979, 8, 1, 7, 30, { solar: "clock" }).warnings.some(w => w.kind === "dst-entered"), "不校正 takes no summer time off");
+  // In the hour repeated when summer time ends, a time written in standard time is the 2nd one, not an hour later.
+  const repeated = chart(1979, 9, 30, 23, 50).warnings.find(w => w.kind === "dst-entered");
+  assert.match(repeated.text, /請改選第 2 次出現的時間/);
+  assert.doesNotMatch(repeated.text, /10 月 1 日/);
+  assert.equal(repeated.occurrence, 1);
+  assert.deepEqual(repeated.changed, {}, "the 2nd 23:50 is still 戊子");
+  assert.equal(chart(1979, 9, 30, 23, 50, { occurrence: 1 }).pillars[3].name, "戊子");
+  // Across New Year the hint names the year.
+  const sydney = chart(1990, 12, 31, 23, 30, {}, findPlace("雪梨")).warnings.find(w => w.kind === "dst-entered");
+  assert.match(sydney.text, /請改填 1991 年 1 月 1 日 00:30/);
 });

@@ -831,6 +831,8 @@ function aiButtons() {
 function prefillPartner() {
   const p = run.extra.family && run.extra.family.partner, row = $("#ai-partner");
   $("#ai-p-sex").value = p && (p.sex === "male" || p.sex === "female") ? p.sex : run.input.sex === "male" ? "female" : "male";
+  // 夜子時 from the 合婚 form has no box here: it is kept for as long as the birthday and time are the ones filled in.
+  row.dataset.latezi = p && p.date && p.time && p.zi === "late" ? JSON.stringify({ date: p.date, time: p.time }) : "";
   if (p && p.date) {
     $("#ai-p-date").value = `${p.date.y}-${pad2(p.date.m)}-${pad2(p.date.d)}`;
     const t = p.time, sc = t && t.branch ? SHICHEN.find(x => x.branch === t.branch && x.h === t.h && x.mi === t.mi) : null;
@@ -855,7 +857,9 @@ function readPartner() {
   const [y, m, d] = ($("#ai-p-date").value || "").split("-").map(Number);
   if (!y) return { error: "請先填另一半的出生日期。" };
   if (y < 1900 || y > 2100) return { error: "出生年份請在 1900 到 2100 年之間。" };
-  return { date: { y, m, d }, time: readMemberHour($("#ai-partner")), sex: $("#ai-p-sex").value };
+  const birth = { date: { y, m, d }, time: readMemberHour($("#ai-partner")) };
+  const late = birth.time && $("#ai-partner").dataset.latezi === JSON.stringify(birth);
+  return { ...birth, sex: $("#ai-p-sex").value, ...(late ? { zi: "late" } : {}) };
 }
 
 async function askAI(kind, { auto = false } = {}) {
