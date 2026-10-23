@@ -23,7 +23,8 @@ function frame(analysis) {
   const likes = u ? `用神${u}${us.length ? `，喜${us.join("、")}` : ""}` : "喜忌不明顯";
   const dislikes = a ? `；忌${a}${as.length ? `，仇${as.join("、")}` : ""}` : "";
   const pattern = analysis.special ? `月令${analysis.pattern}，以${analysis.special.name}論` : analysis.pattern;
-  return `${dm.stem}${dm.element}日主，${analysis.strength}，${pattern}；${likes}${dislikes}。`;
+  const strength = analysis.special && analysis.special.kind === "從強" ? "印比成勢" : analysis.strength;
+  return `${dm.stem}${dm.element}日主，${strength}，${pattern}；${likes}${dislikes}。`;
 }
 
 // Consecutive 大運 of the same tone, read as one stretch of life.

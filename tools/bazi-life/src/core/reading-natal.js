@@ -263,6 +263,7 @@ export const GLOSSARY = {
   調候: "依出生季節調節寒暖燥濕",
   從弱: "日主太弱時改為順從旺勢的特殊格局",
   專旺: "日主一氣獨旺、順其氣勢的特殊格局",
+  從強: "印星與比劫成勢、印星更重，順其強勢的特殊格局",
   配偶宮: "日支，代表配偶與婚姻",
   配偶星: "男命看財星、女命看官殺",
   財庫: "財星五行的墓庫，主積蓄",
@@ -412,6 +413,9 @@ const visGod = (c, god) => !!(c.gods[god] && c.gods[god].visible.length);
 const hasGod = (c, god) => !!(c.gods[god] && (c.gods[god].visible.length || c.gods[god].hidden.length));
 const elementInState = (c, state) => ELEMENTS.find(e => c.states[e] === state);
 const isStrong = c => c.a.strength === "身強" || c.a.strength === "專旺";
+// 從強 is a 專旺 verdict whose 印 outweighs 比劫 (analysis.js): it is named and worded as 從強, and it fears 財.
+const congqiang = a => !!(a.special && a.special.kind === "從強");
+const strengthLabel = a => (congqiang(a) ? "從強" : a.strength);
 const isWeak = c => c.a.strength === "身弱" || c.a.strength === "從弱";
 // 扶抑 leans strong when it dislikes the day master's own element (身強, or 中和 on the strong side).
 const leansStrong = c => (c.a.schools.扶抑.element[c.de] || 0) < 0;
@@ -540,7 +544,7 @@ const CONTROL_IMAGE = { 木: "取其修剪成材", 火: "取其水火既濟", �
 function useFunction(c, e) {
   const g = c.eg[e], s = c.a.strength, v = c.a.views[e] || { likes: [] };
   if (s === "從弱") return "順從旺勢";
-  if (s === "專旺") return "順其旺氣";
+  if (s === "專旺") return congqiang(c.a) ? "順其強勢" : "順其旺氣";
   if (v.likes.includes("扶抑")) {
     if (g === "印") return "取其生身";
     if (g === "比劫") return "取其幫身";
@@ -596,7 +600,7 @@ function strengthSentence(c) {
     return `${root}，${help ? `${deep ? "又有" : "但"}${help}` : "又得月令之氣"}，綜合下來${verdict}，強在${strongSource(c) === "印" ? "印星" : "比劫"}。`;
   }
   if (s === "身弱") return `${root}${help ? `，雖有${help}` : ""}，但${drain}，綜合下來身弱。`;
-  if (s === "從弱") return `${root}，${help ? `只有${help}，` : "生扶極少，"}${drain}，日主極弱而有從勢，屬於從弱。`;
+  if (s === "從弱") return `${root}，${help ? `只有${help}，` : "生扶極少，"}${drain}，日主極弱而有從象，屬於從弱。`;
   if (s === "中和") return `${root}${help ? `，${help}` : ""}，生扶與剋洩的力量大致相當，強弱屬於中和。`;
   return `${root}${help ? `，${help}` : ""}，綜合下來判為${s}。`;
 }
@@ -740,7 +744,7 @@ function strengthSection(c) {
   const shallow = f.roots.length && f.roots.every(r => r.strength === "餘氣");
   const have = [f.ling && "得令", f.roots.length && (shallow ? "得地（根淺）" : "得地"), f.born.length && "得生", f.helped.length && "得助"].filter(Boolean);
   const lack = ["得令", "得地", "得生", "得助"].filter(x => !have.some(h => h.startsWith(x)));
-  const s1 = `四項之中${have.length ? `占了${have.join("、")}` : "一項都不占"}${have.length && lack.length ? `，缺${lack.join("、")}` : ""}；生扶日主的力量約佔全局 ${pct(a.support)}（一般命局約四成），判為${a.strength}。`;
+  const s1 = `四項之中${have.length ? `占了${have.join("、")}` : "一項都不占"}${have.length && lack.length ? `，缺${lack.join("、")}` : ""}；生扶日主的力量約佔全局 ${pct(a.support)}（一般命局約四成），判為${strengthLabel(a)}。`;
   let s2;
   if (a.strength === "身強") s2 = strongSource(c) === "印"
     ? `力量主要來自印星（${yin}）的生扶，屬於「印旺身強」：靠學習、長輩與環境撐起來的強，和同類幫身的強不同。`
@@ -749,7 +753,8 @@ function strengthSection(c) {
     const g = drainGroup(c);
     s2 = `最耗日主的是${GROUP_WORD[g]}（${c.ge[g]}），屬於「${{ 食傷: "洩多身弱", 財: "財多身弱", 官殺: "殺重身輕" }[g]}」，凡事宜先求穩、再求進。`;
   } else if (a.strength === "中和") s2 = `生扶與剋洩大致平衡，喜忌也就較溫和，整體${leansStrong(c) ? "略偏強" : "略偏弱"}一些。`;
-  else if (a.strength === "從弱") s2 = `日主幾乎無根、生扶極少，傳統上可視為${a.special.name}：不再扶身，${a.special.follows ? `而是順從${GROUP_WORD[a.special.follows]}的旺勢` : "而是順從食傷、財、官殺的整體旺勢"}。`;
+  else if (a.strength === "從弱") s2 = `日主幾乎無根、生扶極少，傳統上可視為${a.special.name}：不再扶身，${a.special.follows ? `而是順從${GROUP_WORD[a.special.follows]}的旺勢`
+    : (a.special.heavy || []).length === 2 ? `而是順從${a.special.heavy.map(g => GROUP_WORD[g]).join("與")}的旺勢，以財星居中調和` : "而是順從食傷、財、官殺的整體旺勢"}。`;
   else if (a.strength === "專旺") s2 = a.special.kind === "從強"
     ? `印星與比劫佔了全局大半，而印星更重，傳統上可視為${a.special.name}：順其強勢，忌財星、官殺逆勢。`
     : `日主之氣佔了全局大半，傳統上可視為${a.special.name}：順其旺氣，忌強行剋制。`;
@@ -929,12 +934,12 @@ function patternSection(c) {
   const s2 = `${parts.length ? `${parts.join("；")}，` : ""}${pc.verdict}。`;
 
   const u = a.useful, s = a.strength;
-  const NEED = { 身強: "身強之局宜洩、宜耗、宜剋", 身弱: "身弱之局宜生、宜扶", 中和: "中和之局重在維持平衡", 從弱: "從弱之局宜順從旺勢、不宜扶身", 專旺: "專旺之局宜順其旺氣、不宜強剋" };
+  const NEED = { 身強: "身強之局宜洩、宜耗、宜剋", 身弱: "身弱之局宜生、宜扶", 中和: "中和之局重在維持平衡", 從弱: "從弱之局宜順從旺勢、不宜扶身", 專旺: "專旺之局宜順其旺氣、不宜強剋", 從強: "從強之局宜順其強勢、喜比劫印星，忌財官逆勢" };
   const byRole = role => ELEMENTS.filter(e => c.roles[e] === role).sort((x, y) => (a.favor[y] || 0) - (a.favor[x] || 0));
   let s3, s4 = "", s5 = "";
   if (u.length) {
     const xi = byRole("喜神"), ji = byRole("忌神"), qiu = byRole("仇神"), xian = byRole("閒神");
-    s3 = `${NEED[s] || NEED.中和}：以${u[0]}（${GROUP_WORD[c.eg[u[0]]]}）為用神，${useFunction(c, u[0])}`
+    s3 = `${NEED[strengthLabel(a)] || NEED.中和}：以${u[0]}（${GROUP_WORD[c.eg[u[0]]]}）為用神，${useFunction(c, u[0])}`
       + `${xi.length ? `；${xi.join("、")}為喜神` : ""}${ji.length ? `，${ji.join("、")}為忌神` : ""}`
       + `${qiu.length ? `，${qiu.join("、")}為仇神` : ""}${xian.length ? `，${xian.join("、")}為閒神` : ""}。`;
     const e = u[0], pr = presence(c, e), st = c.states[e];
@@ -945,7 +950,7 @@ function patternSection(c) {
     else s4 = `用神${e}在命中不見，是最需要靠大運流年補足的五行，逢${stems}、${branches}的運最為得力。`;
     const verse = (VERSES[dm] || []).find(v => v.when(c));
     if (verse) s5 = `《滴天髓》說${dm}${de}「${verse.line}」，${verse.text}。`;
-  } else s3 = `${NEED[s] || NEED.中和}，但各派喜忌互相抵消，五行沒有明顯的用神，取用以平衡為主，行運的影響也較溫和。`;
+  } else s3 = `${NEED[strengthLabel(a)] || NEED.中和}，但各派喜忌互相抵消，五行沒有明顯的用神，取用以平衡為主，行運的影響也較溫和。`;
 
   const items = [];
   if (u.length) items.push({ label: `用神・${u[0]}（${GROUP_WORD[c.eg[u[0]]]}）`, text: roleText(c, u[0]) });
@@ -1008,7 +1013,7 @@ function godCombo(c) {
     [c.share[c.ge.財] >= HEAVY && c.a.strength === "身弱", "財多身弱，機會多、壓力也多，容易為責任與金錢操心"],
     [c.share[c.ge.官殺] >= HEAVY && c.a.strength === "身弱", "官殺重而身弱，責任感強、自我要求高，也容易把壓力往肚裡吞"],
     [c.share[c.ge.比劫] >= HEAVY && isStrong(c), "比劫成群，自我意識與競爭心都強，講義氣也好勝"],
-    [c.share[c.ge.印] >= HEAVY && isStrong(c), "印星重而身強，思慮周全、重視安全感，也要提醒自己少一點顧慮、多一點行動"],
+    [c.share[c.ge.印] >= HEAVY && isStrong(c), `${congqiang(c.a) ? "印星重重、印比成勢" : "印星重而身強"}，思慮周全、重視安全感，也要提醒自己少一點顧慮、多一點行動`],
     [c.share[c.ge.食傷] >= HEAVY && !isStrong(c), "食傷洩氣重，才華與表達欲旺盛，付出多也容易累，要懂得保留精力"],
   ];
   const hit = list.find(([ok]) => ok);
@@ -1164,6 +1169,7 @@ function wealthSection(c) {
   const s1 = `${dm}${de}以${ce}為財星：${both.length ? `${both.join("，")}，在${c.mb}月處「${c.states[ce]}」，${power}` : `命中不見${ce}，${power}，財富多靠專業與機運引出`}。`;
   const strongEnough = isStrong(c) || a.strength === "中和";
   const s2 = a.strength === "從弱" ? (a.useful.includes(ce) ? "從格順勢，財星為用時反而能借勢得財。" : "從格順勢，財富宜跟著大環境走，不宜逆勢硬拚。")
+    : congqiang(a) ? "從強之局忌財星壞印，不宜強求財，靠學識、專業與名聲帶財較順。"
     : a.strength === "專旺" ? "專旺之局不宜強求財，靠專業與名聲帶財較順。"
       : strongEnough && c.share[ce] >= 0.2 ? `日主${a.strength === "中和" ? "強弱適中" : "身強"}，擔得起財，屬於「身財兩停」，財富靠能力穩步累積。`
         : strongEnough ? "日主有力而財星偏弱，有能力卻要自己開創財源，越主動越有收穫。"
@@ -1176,7 +1182,7 @@ function wealthSection(c) {
       : zw ? "正偏財份量相當，收入有固定的一份，也有機會財" : "正偏財不顯，財源以穩定工作為主";
   const tomb = TOMB[ce], tombAt = c.pillars.filter(p => p.branch.name === tomb);
   const tombClash = tombAt.length && c.relations.some(r => r.kind === "六沖" && r.roles.some(role => c.P[role].branch.name === tomb));
-  const ku = tombAt.length ? `命帶財庫（${rolesWord(tombAt.map(p => p.role), "支")}${tomb}），有存錢、置產的本能${tombClash ? (isStrong(c) ? "；財庫逢沖，身強沖開財庫，反而有大筆進帳的機會" : "；財庫逢沖，容易財來財去，宜把錢放在不易動用的地方") : ""}`
+  const ku = tombAt.length ? `命帶財庫（${rolesWord(tombAt.map(p => p.role), "支")}${tomb}），有存錢、置產的本能${tombClash ? (c.a.strength === "身強" ? "；財庫逢沖，身強沖開財庫，反而有大筆進帳的機會" : "；財庫逢沖，容易財來財去，宜把錢放在不易動用的地方") : ""}`
     : `${ce}的財庫在${tomb}，命中沒有，存錢要靠紀律而不是本能`;
   const s3 = `${kind}；${ku}。`;
   const bjVis = visibleOf(c, "比劫").length > 0, bjRole = c.roles[de];
@@ -1218,7 +1224,8 @@ function marriageSection(c) {
   if (c.male && visibleOf(c, "比劫").length && (vis.length || hid.length) && roleIsBad(c.roles[de])) issues.push("比劫透出爭財，感情裡要防朋友或第三者介入");
   if (!c.male && visGod(c, "正官") && visGod(c, "七殺")) issues.push("官殺並透，追求者多，宜慎選、不急著定下來");
   if (!c.male && visGod(c, "傷官") && hasGod(c, "正官")) issues.push("傷官見官，對另一半要求高，相處時宜多欣賞、少挑剔");
-  if (c.share[el] >= HEAVY && isWeak(c)) issues.push(`${word}太重而日主弱，容易在感情中委屈自己，宜保持自我`);
+  // A 從格 follows the heavy star, so only a 身弱 chart is weighed down by it.
+  if (c.share[el] >= HEAVY && c.a.strength === "身弱") issues.push(`${word}太重而日主弱，容易在感情中委屈自己，宜保持自我`);
   s2 += issues.length ? `；${issues.join("；")}。` : "。";
   // 日支與其他柱的關係
   // The day branch's relations, one clause per kind (a 三刑 replaces its pairs).

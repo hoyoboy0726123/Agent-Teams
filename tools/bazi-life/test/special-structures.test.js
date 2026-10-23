@@ -55,7 +55,11 @@ test("in 8,000 random charts every kind of 從格 and 專旺 turns up, and each 
 // The review examples: a 食傷生財 chart with almost no metal is 從兒, a 財官 pair with no 食傷 does not like 食傷, and a
 // 子-month water chart whose metal (印) outweighs its water is 從強, not 潤下.
 test("從勢 needs all three drains, a pair names its own flow, and 印 heavier than 比劫 is 從強", () => {
-  const at = (d, h, sex) => { const [y, m, dd] = d.split("-").map(Number), c = chartAt(y, m, dd, h, sex); return analyse(c.pillars.map(p => p.name)); };
+  const at = (d, h, sex, mi = 0) => {
+    const [y, m, dd] = d.split("-").map(Number);
+    const c = computeChart({ date: { y, m, d: dd }, time: { h, mi }, place: findPlace("臺北市"), sex }, { lean: true });
+    return analyse(c.pillars.map(p => p.name));
+  };
   const er = at("1978-06-12", 2, "female");
   assert.equal(er.special.name, "從兒格");
   assert.ok(!er.useful.includes("金"), "the missing 官殺 is not a 喜神");
@@ -64,7 +68,14 @@ test("從勢 needs all three drains, a pair names its own flow, and 印 heavier 
   assert.ok(!cai.useful.includes("金"), "食傷 with a strong 官殺 beside 財 is not liked");
   const qiang = at("2002-01-05", 16, "male");
   assert.equal(qiang.special.name, "從強格");
-  assert.ok(!qiang.useful.includes("木") && qiang.useful.includes("金"), "從強 likes 印 and not 食傷");
+  assert.ok(!qiang.useful.includes("木") && qiang.useful[0] === "水" && qiang.useful.includes("金"), "從強 likes 比劫 first, then 印, and not 食傷");
+  // 財 a little ahead of 食傷 with little 官殺 is 從財, which fears 比劫; 食傷 against 官殺 with little 財 is 從勢 of the two.
+  const caiShi = at("1951-12-25", 16, "male", 57);
+  assert.equal(caiShi.special.name, "從財格");
+  assert.ok(caiShi.avoid.includes("土"), "比劫 would 奪財");
+  const shiGuan = at("1948-11-27", 1, "male", 31);
+  assert.equal(shiGuan.special.name, "從勢格");
+  assert.deepEqual(shiGuan.special.heavy, ["食傷", "官殺"]);
 
   for (const { c, a } of specials(8000, 11)) {
     const id = c.pillars.map(p => p.name).join(" "), score = g => a.scores[a.groups[g]];
@@ -78,8 +89,9 @@ test("從勢 needs all three drains, a pair names its own flow, and 印 heavier 
       }
     } else {
       const own = a.scores[a.dayMaster.element], seal = score("印");
-      if (a.special.kind === "從強") assert.ok(seal > own - 0.011 && !a.useful.includes(a.groups.食傷), `${id}: 從強 has more 印 and does not like 食傷`);
-      else assert.ok(own >= seal - 0.011, `${id}: ${a.special.name} has at least as much 比劫 as 印`);
+      // The scores leave the day stem out, so the day master's own element counts one more here.
+      if (a.special.kind === "從強") assert.ok(seal > own + 1 - 0.011 && !a.useful.includes(a.groups.食傷) && a.favor[a.dayMaster.element] >= a.favor[a.groups.印], `${id}: 從強 has more 印, likes 比劫 first and not 食傷`);
+      else assert.ok(own + 1 >= seal - 0.011, `${id}: ${a.special.name} has at least as much 比劫 as 印`);
     }
   }
 });
@@ -94,7 +106,10 @@ test("the 詳批 of a 從格 or 專旺 chart keeps to its own likes: no 身弱 l
     }
     assert.doesNotMatch(sec("pattern"), /行運中兼顧/, `${id}: 調候 steps aside`);
     if (a.schools.調候.stems && a.schools.調候.stems.length) assert.match(sec("pattern"), /調候讓位/, `${id}`);
-    if (a.special.kind !== "從勢") assert.doesNotMatch(JSON.stringify(r), /日主從勢/, `${id}: only a 從勢 chart is called 從勢`);
+    if (a.special.kind !== "從勢") assert.doesNotMatch(JSON.stringify(r), /日主從勢|而有從勢/, `${id}: only a 從勢 chart is called 從勢`);
+    if (a.special.kind === "從強") assert.doesNotMatch(JSON.stringify(r), /一氣獨旺|專旺之局|身強沖開財庫|印星重而身強/, `${id}: 從強 is not worded as 專旺`);
+    if (a.strength === "從弱") assert.doesNotMatch(sec("marriage"), /太重而日主弱/, `${id}: a 從格 follows its heavy 配偶星`);
+    if ((a.special.heavy || []).length === 2 && a.special.kind === "從勢") assert.doesNotMatch(JSON.stringify(r), /食傷、財、官殺都有勢力/, `${id}`);
     if (a.dayMaster.stem === "壬") assert.doesNotMatch(JSON.stringify(r), /通根透癸/, `${id}: a 從 or 專旺 壬 does not rush like a rooted one`);
     assert.ok(r.basics.find(b => b.label === "命局").value.includes(a.special.name), `${id}: 命局 names ${a.special.name}`);
   }

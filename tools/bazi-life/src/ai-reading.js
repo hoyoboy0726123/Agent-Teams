@@ -180,7 +180,8 @@ function chartLines(P, { full = true, of = "" } = {}) {
   const lines = [];
   if (full) lines.push(`【${of}四柱】${c.pillars.map(p => `${p.label}${p.name}（天干${p.stem.name}${p.role === "day" ? "是日主" : `為${p.stem.god}`}，地支${p.branch.name}藏${p.branch.hidden.map(h => `${h.name}${h.god}`).join("、")}）`).join("；")}。`);
   lines.push(`【${of}日主】${dm.stem}${dm.element}，${t.yinyang}，意象是${t.image}。長處：${t.nature}。盲點：${t.blind}。`);
-  lines.push(`【${of}強弱與格局】日主${a.strength}${a.special ? `（${a.special.name}）` : ""}（生扶日主的力量約占 ${Math.round(a.support * 100)}%），${a.season}；${a.special ? `月令取${a.pattern}，但全局以${a.special.name}論` : `格局是${a.pattern}${pt ? `：${pt.nature}` : ""}`}。`);
+  const strength = a.special && a.special.kind === "從強" ? "極旺而印比成勢" : a.strength;
+  lines.push(`【${of}強弱與格局】日主${strength}${a.special ? `（${a.special.name}）` : ""}（生扶日主的力量約占 ${Math.round(a.support * 100)}%），${a.season}；${a.special ? `月令取${a.pattern}，但全局以${a.special.name}論` : `格局是${a.pattern}${pt ? `：${pt.nature}` : ""}`}。`);
   // Only what holds for this chart (reading-natal.js patternFacts), never the list of what could break a structure.
   if (full) lines.push(`【${of}格局成敗】${patternLine(P)}`);
   if (full) lines.push(`【${of}五行力量】${ELEMENTS.map(e => `${e} ${a.scores[e]}`).join("、")}；最旺是${order[4]}，最弱是${order[0]}；${c.missing.length ? `天干地支裡沒有${c.missing.join("、")}（命中缺${c.missing.join("、")}）` : "五行俱全"}。`);

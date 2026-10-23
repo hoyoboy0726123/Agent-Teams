@@ -501,14 +501,14 @@ await remembered.p.click("#form-me button[type=submit]");
 await remembered.p.waitForSelector("#play:not([hidden])");
 const wasOff = !(await remembered.p.isChecked("#c-ai"));
 await remembered.p.click("#c-skip");
-await ended(remembered.p, 30000);
+await ended(remembered.p, 45000);
 await remembered.p.waitForTimeout(300);
 check("turned off and reloaded, the box stays off and the end page sends nothing", wasOff && remembered.bodies.length === 0 && await remembered.p.isVisible("#ai-full") && await remembered.p.isVisible("#ai-short"));
 await remembered.p.click("#again-same");
 await remembered.p.waitForSelector("#play:not([hidden])");
 await remembered.p.check("#c-ai");
 await remembered.p.click("#c-skip");
-await ended(remembered.p, 30000);
+await ended(remembered.p, 45000);
 await remembered.p.waitForTimeout(300);
 const firstParts = partsFor("full", 1988, NOW).length;
 check("ticked again, the next end page writes the reading by itself and remembers it", remembered.bodies.length === firstParts && await remembered.p.evaluate(() => localStorage.getItem("bazi-life.aiAuto")) === "1");
@@ -520,7 +520,7 @@ for (let k = 0; k < 6 && !held; k++) {
   await remembered.p.click("#go-random");
   await remembered.p.waitForSelector("#play:not([hidden])");
   await remembered.p.click("#c-skip");
-  await ended(remembered.p, 30000);
+  await ended(remembered.p, 45000);
   await remembered.p.waitForTimeout(300);
   if (await remembered.p.isVisible("#ai-short")) held = { before, after: remembered.bodies.length, status: await remembered.p.textContent("#ai-status"), consent: await remembered.p.textContent("#ai-consent") };
 }

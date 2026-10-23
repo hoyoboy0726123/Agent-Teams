@@ -88,7 +88,7 @@ function contextOf(chart, analysis) {
     roles: elementRoles(analysis), favor: analysis.favor, useful: analysis.useful[0] || null, avoid: analysis.avoid[0] || null,
     weak: analysis.strength === "身弱" || analysis.strength === "從弱",
     // 從格 and 專旺 like the opposite of what 身弱／身強 would, so the wording of 祿、刃 and 比劫 follows the strength itself.
-    strength: analysis.strength,
+    strength: analysis.strength, kind: analysis.special ? analysis.special.kind : null,
     stars: natalStars(chart), starCtx: starContext(chart), years: new Map(), decades: new Map(),
     yearBranch: byRole.year.branch, zodiac: ZODIAC[byRole.year.branch],
   };
@@ -296,7 +296,7 @@ function godSignal(c, W, group, xs) {
       shorts.family = "比劫手足星被引動";
       shorts.wealth = `${lbl}${isBad ? "，競爭與破耗多" : ""}`;
       if (grown(stage) && (isGood || isBad)) notes.career = isGood ? "同事朋友相挺，適合團隊合作" : "同輩競爭多，功勞容易被分走，宜把成果留下紀錄";
-      if (isGood) { notes.health = c.strength === "專旺" ? "專旺喜比劫順勢，精神與體力較好" : c.strength === "中和" ? "日主略偏弱，得比劫幫身，精神與體力較好" : "身弱得比劫幫身，精神與體力較好"; domains.health = 0.2; }
+      if (isGood) { notes.health = c.kind === "從強" ? "從強喜比劫順勢，精神與體力較好" : c.strength === "專旺" ? "專旺喜比劫順勢，精神與體力較好" : c.strength === "中和" ? "日主略偏弱，得比劫幫身，精神與體力較好" : "身弱得比劫幫身，精神與體力較好"; domains.health = 0.2; }
       break;
     }
     default: break;
