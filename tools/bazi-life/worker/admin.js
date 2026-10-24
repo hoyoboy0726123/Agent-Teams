@@ -14,6 +14,9 @@ export const ADMIN_HTML = `<!doctype html>
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif; }
 main { max-width: 960px; margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 16px; }
+#app { display: grid; gap: 16px; }
+[hidden] { display: none !important; }
+main > *, #app > * { min-width: 0; }
 h1 { margin: 0; font-size: 22px; }
 h2 { margin: 0 0 8px; font-size: 17px; }
 .sub { color: var(--muted); margin: 2px 0 0; font-size: 13px; }
@@ -38,7 +41,7 @@ table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-nu
 th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
 th:first-child, td:first-child { text-align: left; }
 th { color: var(--muted); font-weight: 500; }
-svg text { fill: var(--muted); font-size: 11px; }
+svg text { fill: var(--muted); font-size: 24px; }
 .legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
 form { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -78,7 +81,7 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
       <p class="fine">以畫面真的在看的時間計算（切到別的 App 時不算）。</p>
     </section>
     <section class="card">
-      <h2>每天的瀏覽與 AI 點擊</h2>
+      <h2>每天的瀏覽與 AI 點擊（至少 7 天，最多 30 天）</h2>
       <div class="legend"><span><i style="background:var(--accent-2)"></i>瀏覽</span><span><i style="background:var(--accent)"></i>按 AI 分析報告（訪次）</span></div>
       <div id="chart"></div>
     </section>
@@ -156,16 +159,16 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
     steps("#stay", [["30 秒以上", t.t30 || 0], ["1 分鐘以上", t.t60 || 0], ["3 分鐘以上", t.t180 || 0], ["10 分鐘以上", t.t600 || 0]], t.view || 0);
     for (const [i, s] of document.querySelectorAll("#stay .step .num").entries()) s.textContent += "（" + pct([t.t30, t.t60, t.t180, t.t600][i] || 0, t.view) + "）";
     // Daily bars, oldest on the left (at most 30 days).
-    const span = Math.min(days, 30), daysList = Array.from({ length: span }, (_, k) => back(span - 1 - k));
-    const W = 900, H = 180, P = 24, bw = (W - P) / span, max = Math.max(1, ...daysList.map(d => (map.get(d) || {}).view || 0));
-    let svg = '<svg viewBox="0 0 ' + W + " " + (H + 22) + '" width="100%" role="img" aria-label="每天的瀏覽與 AI 點擊">';
+    const span = Math.max(7, Math.min(days, 30)), daysList = Array.from({ length: span }, (_, k) => back(span - 1 - k));
+    const W = 900, H = 220, P = 40, bw = (W - P) / span, max = Math.max(1, ...daysList.map(d => (map.get(d) || {}).view || 0));
+    let svg = '<svg viewBox="0 0 ' + W + " " + (H + 40) + '" width="100%" role="img" aria-label="每天的瀏覽與 AI 點擊">';
     daysList.forEach((d, i) => {
       const r = map.get(d) || {}, x = P + i * bw, hv = (r.view || 0) / max * H, ha = (r.ai_life_u || 0) / max * H;
       svg += '<rect x="' + (x + bw * 0.1) + '" y="' + (H - hv) + '" width="' + bw * 0.45 + '" height="' + hv + '" rx="2" fill="var(--accent-2)"><title>' + d + "：瀏覽 " + (r.view || 0) + "</title></rect>";
       svg += '<rect x="' + (x + bw * 0.55) + '" y="' + (H - ha) + '" width="' + bw * 0.35 + '" height="' + ha + '" rx="2" fill="var(--accent)"><title>' + d + "：按 AI 報告 " + (r.ai_life_u || 0) + "</title></rect>";
-      if (span <= 7 || i % Math.ceil(span / 7) === 0 || i === span - 1) svg += '<text x="' + (x + bw / 2) + '" y="' + (H + 16) + '" text-anchor="middle">' + d.slice(5).replace("-", "/") + "</text>";
+      if (span <= 7 || i % Math.ceil(span / 7) === 0 || i === span - 1) svg += '<text x="' + (x + bw / 2) + '" y="' + (H + 30) + '" text-anchor="middle">' + d.slice(5).replace("-", "/") + "</text>";
     });
-    svg += '<text x="0" y="10">' + max + "</text></svg>";
+    svg += '<text x="0" y="20">' + max + "</text></svg>";
     $("#chart").innerHTML = svg;
     const head = "<tr><th>日期</th><th>瀏覽</th><th>訪客</th><th>平均停留</th><th>開始人生</th><th>完成（訪次）</th><th>按 AI 報告</th><th>點擊率</th><th>合婚</th><th>按 AI 合婚</th></tr>";
     $("#table").innerHTML = head + (list.length ? list.slice().reverse().map(d => "<tr><td>" + d.day + "</td><td>" + n(d.view) + "</td><td>" + n(d.visitor) + "</td><td>" + dur((d.seconds || 0) / (d.view || 0)) + "</td><td>" + n(d.start) + "</td><td>" + n(d.end_u) + "</td><td>" + n(d.ai_life_u) + "</td><td>" + pct(d.ai_life_u, d.end_u) + "</td><td>" + n(d.hehun_u) + "</td><td>" + n(d.ai_match_u) + "</td></tr>").join("") : '<tr><td colspan="10">這段期間還沒有資料。</td></tr>');
