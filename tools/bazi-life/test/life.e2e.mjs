@@ -544,7 +544,7 @@ await ended(soon, 45000);
 const soonBefore = await soon.isHidden("#ai-soon-msg");
 await soon.click("#ai-soon-btn");
 await soon.click("#ai-soon-btn");
-check("the end page shows the results and one AI 分析報告 button, which says 敬請期待 and sends no reading", await soon.isHidden("#ai") && await soon.isVisible("#ai-soon") && soonBefore && /敬請期待/.test(await soon.textContent("#ai-soon-msg")) && await soon.isVisible("#report") && !/付費|收費|NT\$|元/.test(await soon.textContent("#ai-soon")) && soonReading.length === 0);
+check("the end page shows the results and one AI 分析報告 button, which says 敬請期待 and sends no reading", await soon.isHidden("#ai") && await soon.isVisible("#ai-soon") && soonBefore && /敬請期待/.test(await soon.textContent("#ai-soon-msg")) && await soon.isVisible("#report") && !/付費|收費|NT\\$|元|即將推出|敬請期待/.test(await soon.$eval("#ai-soon", el => el.textContent.replace(el.querySelector("#ai-soon-msg").textContent, ""))) && soonReading.length === 0);
 await soon.click("#again-new");
 await soon.click("#tab-match");
 await soon.fill("#ma-date", "1988-02-15");

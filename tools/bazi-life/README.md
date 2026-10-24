@@ -276,7 +276,7 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 
 ### AI 命理師解讀與 AI 合婚（測試版）
 
-> **目前是「敬請期待」**（2026-10-24 起，先公開試水溫）：結局頁只顯示排盤引擎的結果（人生 K 線、同盤重跑、八字命理詳批），AI 那一格換成「AI 命理分析報告（即將推出）」和一個「AI 分析報告」按鈕，按下去顯示「敬請期待」；合婚分頁的「AI 深度合婚」也一樣。頁面上沒有任何收費字樣。開關在 `src/ai-mode.js`（`aiSoon()`）和 `wrangler.jsonc` 的 `AI_READING: "soon"`（Worker 的 `/api/reading` 回 503 `soon`）。要開放時，刪掉 `AI_READING` 並讓 `aiSoon()` 回 `false`。在自己的手機上試真正的解讀：瀏覽器的 `localStorage` 設 `bazi-life.aiPreview` = `1`（Worker 那邊也要開著才寫得出來）；瀏覽器測試也是這樣打開它。按鈕被按了幾次，記在後台（見「後台統計」）。下面說的是開放之後的樣子。
+> **目前是「敬請期待」**（2026-10-24 起，先公開試水溫）：結局頁只顯示排盤引擎的結果（人生 K 線、同盤重跑、八字命理詳批），AI 那一格換成「AI 命理分析報告」和一個「AI 分析報告」按鈕，按之前看不出還沒開放（這樣才量得到有多少人想按），按下去才顯示「敬請期待」；合婚分頁的「AI 深度合婚」也一樣。頁面上沒有任何收費字樣。開關在 `src/ai-mode.js`（`aiSoon()`）和 `wrangler.jsonc` 的 `AI_READING: "soon"`（Worker 的 `/api/reading` 回 503 `soon`）。要開放時，刪掉 `AI_READING` 並讓 `aiSoon()` 回 `false`。在自己的手機上試真正的解讀：瀏覽器的 `localStorage` 設 `bazi-life.aiPreview` = `1`（Worker 那邊也要開著才寫得出來）；瀏覽器測試也是這樣打開它。按鈕被按了幾次，記在後台（見「後台統計」）。下面說的是開放之後的樣子。
 
 結局頁在八字命理詳批前面有一張「AI 命理師解讀」：結局頁一打開就自動開始寫完整解讀，由 Workers AI 的 Gemma 4 直接讀你的八字命盤，用白話寫一份解讀，玩家可以先讀完 AI 的整理，有興趣再往下看詳批的大運流年排法；下面的「AI 合婚（免費）」填另一半的生日，寫兩個人的合婚解讀。AI 讀的是真正的命盤，不是這一局遊戲的人生。收費的評估（實測、範例、定價、金流、稅與消保法）在「[AI 命理師收費評估](https://claude.ai/artifact/Ay7xfnc5m6CvCkF44jQp9q)」。
 
