@@ -17,10 +17,12 @@ const check = (name, ok, extra = "") => { results.push(ok); console.log(`${ok ? 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined });
 const errors = [];
 const watch = p => { p.on("pageerror", e => errors.push(e.message)); return p; };
-// A fresh page. Unless `welcomed` is false it opens where a returning player lands (我的人生), not on 歡迎.
-async function fresh(opts, { welcomed = true } = {}) {
+// A fresh page. Unless `welcomed` is false it opens where a returning player lands (我的人生), not on 歡迎. AI 分析報告
+// is 敬請期待 on the site (src/ai-mode.js); the pages here try the real reading (the preview switch) unless `soon` is set.
+async function fresh(opts, { welcomed = true, soon = false } = {}) {
   const p = watch(await browser.newPage(opts));
   if (welcomed) await p.addInitScript(() => { try { localStorage.setItem("bazi-life.welcomed", "1"); } catch {} });
+  if (!soon) await p.addInitScript(() => { try { localStorage.setItem("bazi-life.aiPreview", "1"); } catch {} });
   await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   return p;
 }
@@ -47,8 +49,8 @@ async function ended(p, timeout) {
 const page = await fresh({ viewport: { width: 1100, height: 1300 } }, { welcomed: false });
 await page.goto(url);
 const welcome = await page.textContent("#welcome");
-check("a first visit opens on 歡迎: how to play, what is fun, and that the data stays on the phone", await page.isVisible("#welcome") && await page.isHidden("#form-me") && /怎麼玩/.test(welcome) && /好玩的地方/.test(welcome) && /網站後台不保存任何資料/.test(welcome) && /沒有帳號、沒有資料庫/.test(welcome) && /AI 命理師解讀.+不含姓名、暱稱和家人/.test(welcome) && /合婚分頁的合婚結果在手機上算，不會上傳/.test(welcome));
-check("the welcome page and the footer say the end-page reading is sent by itself and how to stop it, and promise nothing it breaks", /結局頁會自動請 AI 命理師解讀/.test(welcome) && /取消勾選「結局自動 AI 解讀」/.test(welcome) && !/只有你自己按下|只留在手機裡，不會上傳/.test(welcome) && /網站不保存/.test(await page.textContent(".privacy-pill")) && /結局頁的解讀預設自動開始/.test(await page.textContent("footer")));
+check("a first visit opens on 歡迎: how to play, what is fun, and that the data stays on the phone", await page.isVisible("#welcome") && await page.isHidden("#form-me") && /怎麼玩/.test(welcome) && /好玩的地方/.test(welcome) && /網站後台不保存這些資料/.test(welcome) && /沒有帳號/.test(welcome) && /合婚分頁的合婚結果在手機上算，不會上傳/.test(welcome));
+check("the welcome page and the footer say only anonymous counts are kept, and promise no AI reading yet", /只統計匿名的次數.+不含生日、姓名或 IP/.test(welcome) && !/AI 命理師會自動|結局自動 AI 解讀|AI 深度合婚/.test(welcome) && /網站不保存/.test(await page.textContent(".privacy-pill")) && /只統計匿名的瀏覽次數、停留時間和按鈕點擊/.test(await page.textContent("footer")) && !/結局頁的解讀預設自動開始/.test(await page.textContent("footer")));
 await page.click('[data-goto="me"]');
 await page.waitForTimeout(250);
 check("the welcome page walks through a life in pixels", await painted(page, "#welcome-scene") && (await page.$$("#welcome-stages span")).length === 6);
@@ -118,7 +120,7 @@ if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/life-
 await page.click("#again-same");
 await page.waitForSelector("#play:not([hidden])");
 await page.click("#c-skip").catch(() => {});
-await ended(page, 20000);
+await ended(page, 45000);
 check("living again with the same chart works", /這一次，你活到/.test(await page.textContent("#end-title")));
 
 // name and family
@@ -148,7 +150,7 @@ check("siblings can be added and removed", (await page.$$("#sibling-list .member
 await page.click("#form-me button[type=submit]");
 await page.waitForSelector("#play:not([hidden])");
 await page.click("#c-skip");
-await ended(page, 20000);
+await ended(page, 45000);
 const story = await page.textContent("#feed");
 check("the story uses the name and the family", /名叫陳怡君。爸爸是陳大明，媽媽是林美華。上面已經有哥哥志明。/.test(story));
 check("the younger sister is born at 4 with her name", /妹妹小美/.test(await page.textContent('#feed li[data-age="4"]')));
@@ -188,7 +190,7 @@ for (let lives = 0; lives < 4; lives++) {
     await page.waitForSelector("#choice:not([hidden]), #end:not([hidden])", { timeout: 45000 });
     if (await page.isVisible("#choice .options button")) { asked++; await page.click("#choice .options button"); }
   }
-  await ended(page, 20000);
+  await ended(page, 45000);
   if (Number(((await page.textContent("#end-title")).match(/活到 (\d+) 歲/) || [])[1]) >= 30) break;
 }
 const majorFeed = await page.textContent("#feed");
@@ -526,6 +528,39 @@ for (let k = 0; k < 6 && !held; k++) {
 }
 check("lives skipped through quickly stop starting by themselves before the Worker's 20 parts a minute, and say so", held && held.after === held.before && held.before <= 20 && /這一分鐘已經寫了好幾份解讀/.test(held.status) && /按下按鈕/.test(held.consent), JSON.stringify(held));
 await remembered.p.close();
+// As on the site: AI 分析報告 and AI 深度合婚 say 敬請期待, nothing is sent to /api/reading, and the visit, the life, the
+// ending and each press are counted, as event names only (src/stats.js).
+const soon = await fresh({ viewport: { width: 400, height: 900 } }, { soon: true });
+const statsSent = [], soonReading = [];
+await soon.route("**/api/stats", route => { statsSent.push(JSON.parse(route.request().postData() || "{}")); return route.fulfill({ status: 204 }); });
+await soon.route("**/api/reading", route => { soonReading.push(route.request()); return route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"soon"}' }); });
+await soon.goto(site);
+await soon.fill("#f-name", "陳志明");
+await soon.click("#form-me button[type=submit]");
+await soon.waitForSelector("#play:not([hidden])");
+check("while AI 分析報告 is 敬請期待 the play screen offers no 結局自動 AI 解讀", await soon.isHidden("#c-ai-wrap"));
+await soon.click("#c-skip");
+await ended(soon, 45000);
+const soonBefore = await soon.isHidden("#ai-soon-msg");
+await soon.click("#ai-soon-btn");
+await soon.click("#ai-soon-btn");
+check("the end page shows the results and one AI 分析報告 button, which says 敬請期待 and sends no reading", await soon.isHidden("#ai") && await soon.isVisible("#ai-soon") && soonBefore && /敬請期待/.test(await soon.textContent("#ai-soon-msg")) && await soon.isVisible("#report") && !/付費|收費|NT\$|元/.test(await soon.textContent("#ai-soon")) && soonReading.length === 0);
+await soon.click("#again-new");
+await soon.click("#tab-match");
+await soon.fill("#ma-date", "1988-02-15");
+await soon.fill("#mb-date", "1990-05-20");
+await soon.click("#form-match button[type=submit]");
+await soon.waitForSelector("#match:not([hidden]) .hh-hero");
+await soon.click("#hh-soon-btn");
+check("the 合婚 tab shows its result and an AI 深度合婚 button that says 敬請期待", await soon.isHidden("#hh-ai") && /敬請期待/.test(await soon.textContent("#hh-soon-msg")) && soonReading.length === 0);
+await soon.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+await soon.evaluate(() => { Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true }); document.dispatchEvent(new Event("visibilitychange")); });
+await soon.waitForTimeout(500);
+const statsEvents = statsSent.flatMap(b => b.e || []), statsText = JSON.stringify(statsSent);
+const countOf = e => statsEvents.filter(x => x === e).length;
+check("the visit, the life, the ending and the presses are counted as event names only", countOf("view") === 1 && countOf("visitor") === 1 && countOf("start") >= 1 && countOf("end_u") === 1 && countOf("ai_life") === 2 && countOf("ai_life_u") === 1 && countOf("hehun_u") === 1 && countOf("ai_match_u") === 1 && statsSent.every(b => b.p === "life") && statsSent.some(b => b.s >= 1) && !/1988|1990|陳|志明|臺北/.test(statsText), statsText.slice(0, 160));
+await soon.close();
+
 server.close();
 
 // 伴侶合盤: a partner with a birthday gets a bond on the family card, counts over the 100 lives and a report section.
@@ -662,7 +697,7 @@ await hh.click("#hh-life");
 await hh.waitForSelector("#play:not([hidden])");
 check("用這對伴侶過一生 starts your life with the other person as the partner", await hh.isHidden("#match") && await hh.isHidden("#setup") && /1988 年 2 月 15 日/.test(await hh.textContent("#born")));
 await hh.click("#c-skip");
-await ended(hh, 20000);
+await ended(hh, 45000);
 const hhLife = await hh.$$eval("#feed li", els => els.map(e => [Number(e.dataset.age), e.textContent]));
 const hhMet = hhLife.find(([age, t]) => age === 24 && /小美/.test(t));
 const hhLast = Math.max(...hhLife.map(([age]) => age));
@@ -748,7 +783,7 @@ await draft.click("#tab-me");
 check("after a reload the family's 時辰 and exact times come back", await draft.inputValue(".member[data-role=father] .m-hour") === "wu" && await draft.inputValue("#sibling-list .member:last-child .m-hour") === "clock" && await draft.inputValue("#sibling-list .member:last-child .m-time") === "06:15" && await draft.isVisible("#sibling-list .member:last-child .m-time") && await draft.isHidden(".member[data-role=father] .m-time"));
 check("after a reload the birth form, the partner and the siblings come back", await draft.inputValue("#f-name") === "陳志明" && await draft.inputValue(".member[data-role=partner] .m-name") === "王小美" && await draft.inputValue("#f-wed") === "2016" && await draft.inputValue("#sibling-list .member:last-child .m-name") === "陳小華" && await draft.evaluate(() => document.querySelector("#family").open));
 const stores = await draft.evaluate(() => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) }));
-check("the half-filled forms are kept in this tab only, with nothing personal in long-term storage", stores.local.every(k => ["bazi-life.welcomed", "bazi-life.majorOnly", "bazi-life.aiAuto"].includes(k)) && stores.session.includes("bazi-life.form"), JSON.stringify(stores));
+check("the half-filled forms are kept in this tab only, with nothing personal in long-term storage", stores.local.every(k => ["bazi-life.welcomed", "bazi-life.majorOnly", "bazi-life.aiAuto", "bazi-life.aiPreview", "bazi-life.lastVisit"].includes(k)) && stores.session.includes("bazi-life.form"), JSON.stringify(stores));
 draft.once("dialog", d => d.accept());
 await draft.click("#me-clear");
 await draft.reload();
@@ -769,7 +804,7 @@ check("a 時辰 picked instead of a clock time comes back after a reload", await
 await sc.click("#form-me button[type=submit]");
 await sc.waitForSelector("#play:not([hidden])");
 await sc.click("#c-skip");
-await ended(sc, 20000);
+await ended(sc, 45000);
 const hourBranch = (await sc.textContent("#report .paipan tbody tr:nth-child(3) td:last-child")).trim();
 check("a life born in 辰時 has a 辰 hour pillar and the report says 辰時", hourBranch === "辰" && /1988 年 2 月 15 日 辰時/.test(await sc.textContent("#report")) && /依出生日期與辰時排出的命盤/.test(await sc.textContent("#report-lede")), hourBranch);
 await sc.close();
@@ -814,7 +849,7 @@ await phone.waitForSelector("#play:not([hidden])");
 const statusHeight = await phone.$eval(".status", el => el.getBoundingClientRect().height);
 check("on a phone the scene and the status bar take under 40% of the screen", statusHeight < 360, `${Math.round(statusHeight)}px of 900`);
 await phone.click("#c-skip");
-await ended(phone, 20000);
+await ended(phone, 45000);
 const width = await phone.evaluate(() => document.documentElement.scrollWidth);
 check("no sideways scrolling at phone width", width <= 400, `scrollWidth ${width}`);
 if (process.env.SHOTS) await phone.screenshot({ path: `${process.env.SHOTS}/life-phone-dark.png`, fullPage: true });

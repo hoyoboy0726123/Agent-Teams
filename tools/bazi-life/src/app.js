@@ -3,6 +3,7 @@ import { computeChart, SOLAR_MODES, ZI_RULES, YUN_METHODS } from "./core/chart.j
 import { PLACE_GROUPS, findPlace } from "./core/places.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
 import { initTimeField, readTimeField, syncTimeField, useClockTime, timeFieldIds } from "./time-field.js";
+import { initStats } from "./stats.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -33,6 +34,7 @@ const FIELDS = ["f-date", ...timeFieldIds("f"), "sex-m", "sex-f", "f-place", "f-
 const saveSoon = later(() => DRAFT.save({ v: 1, fields: readIds(FIELDS), example, occurrence }));
 
 function setup() {
+  initStats("chart");
   const examples = $("#examples");
   for (const ex of EXAMPLES) examples.insertAdjacentHTML("beforeend", `<button type="button" class="chip" data-example="${ex.id}" aria-pressed="false">${esc(ex.label)}</button>`);
   $("#f-place").innerHTML = PLACE_GROUPS.map(g => `<optgroup label="${esc(g.group)}">${g.places.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("")

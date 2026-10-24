@@ -29,6 +29,8 @@ import { SHICHEN } from "./core/shichen.js";
 import { trait } from "./sim/words.js";
 import { initBaby } from "./baby-app.js";
 import { initMatch, onMatchTab, openMatch } from "./hehun-app.js";
+import { aiSoon } from "./ai-mode.js";
+import { initStats, track, trackOnce } from "./stats.js";
 import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
 import { initTimeField, readTimeField, syncTimeField, timeFieldIds } from "./time-field.js";
@@ -56,10 +58,13 @@ const recapWorthy = e => (e.big || RECAP_IDS.has(e.id)) && e.id !== "birth" && e
 const INTERPRET_URL = (document.querySelector('meta[name="interpret-endpoint"]') || {}).content || "";
 const READING_URL = (document.querySelector('meta[name="reading-endpoint"]') || {}).content || "";
 const aiOff = () => !READING_URL || !/^https?:$/.test(location.protocol);
+// 結局自動 AI 解讀 is offered only while the AI reading is open (ai-mode.js) and on the site.
+const noAutoBox = () => aiSoon() || aiOff() || aiOutToday();
 const AI_AUTO = "bazi-life.aiAuto";
 let remoteOff = !INTERPRET_URL || !/^https?:$/.test(location.protocol);
 
 function setup() {
+  initStats("life");
   $("#f-place").innerHTML = PLACE_GROUPS.map(g => `<optgroup label="${esc(g.group)}">${g.places.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("");
   $("#f-place").value = "臺北市";
   for (const tab of TABS) $(`#tab-${tab}`).addEventListener("click", () => selectTab(tab));
@@ -102,7 +107,7 @@ function setup() {
   // so no box either.
   try { $("#c-ai").checked = localStorage.getItem(AI_AUTO) !== "0"; } catch {}
   $("#c-ai").addEventListener("change", () => { try { localStorage.setItem(AI_AUTO, $("#c-ai").checked ? "1" : "0"); } catch {} });
-  $("#c-ai-wrap").hidden = aiOff() || aiOutToday();
+  $("#c-ai-wrap").hidden = noAutoBox();
   for (const b of document.querySelectorAll("[data-speed]")) b.addEventListener("click", () => {
     speed = Number(b.dataset.speed);
     for (const x of document.querySelectorAll("[data-speed]")) x.setAttribute("aria-pressed", String(x === b));
@@ -123,6 +128,8 @@ function setup() {
     const only = $("#f-only").checked;
     $("#sibling-list").hidden = only; $("#add-sibling").hidden = only;
   });
+  // AI 分析報告 is not open yet (ai-mode.js): the button says 敬請期待, and the press is counted (stats.js).
+  $("#ai-soon-btn").addEventListener("click", () => { $("#ai-soon-msg").hidden = false; trackOnce("ai_life"); });
   $("#ai-short").addEventListener("click", () => askAI("short"));
   $("#ai-full").addEventListener("click", () => askAI("full"));
   $("#ai-match-go").addEventListener("click", () => askAI("match"));
@@ -305,7 +312,8 @@ function begin(input, born, extra = {}) {
   $("#setup").hidden = true; $("#baby").hidden = true; $("#match").hidden = true; $("#end").hidden = true; $("#play").hidden = false;
   $("#feed").innerHTML = ""; $("#choice").hidden = true; recap = [];
   $("#born").textContent = born || `${input.date.y} 年 ${input.date.m} 月 ${input.date.d} 日在${input.place.name}出生。`;
-  $("#c-ai-wrap").hidden = aiOff() || aiOutToday();   // nothing to switch on while today's AI quota is used up
+  $("#c-ai-wrap").hidden = noAutoBox();   // nothing to switch on while the AI is not open or today's quota is used up
+  track("start");
   paused = false; $("#c-pause").textContent = "暫停";
   updateStatus();
   window.scrollTo({ top: 0 });
@@ -780,6 +788,11 @@ const pad2 = n => String(n).padStart(2, "0");
 function drawAI() {
   aiShown = null;
   aiAutoJob = null;
+  trackOnce("end");
+  const soon = aiSoon();
+  $("#ai-soon").hidden = !soon;
+  $("#ai-soon-msg").hidden = true;
+  if (soon) { $("#ai").hidden = true; return; }
   $("#ai").hidden = false;
   $("#ai-body").innerHTML = "";
   const off = aiOff();

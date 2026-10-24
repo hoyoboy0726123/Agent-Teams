@@ -3,5 +3,6 @@
 import LIFE from "../public/life.html";
 import CHART from "../public/index.html";
 import { makeApp } from "./app.js";
+export { StatsStore } from "./stats-store.js";
 
 export default makeApp({ "/": LIFE, "/life": LIFE, "/life.html": LIFE, "/index.html": CHART, "/chart": CHART });

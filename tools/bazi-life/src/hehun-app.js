@@ -6,6 +6,8 @@ import { hehunReading } from "./core/hehun.js";
 import { checkFamily } from "./core/family.js";
 import { readingRequest, readingError, PARTS, toneWord } from "./ai-reading.js";
 import { aiOutToday, markAiOut } from "./ai-quota.js";
+import { aiSoon } from "./ai-mode.js";
+import { trackOnce } from "./stats.js";
 import { SHICHEN } from "./core/shichen.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
 import { initTimeField, readTimeField, syncTimeField, timeFieldIds } from "./time-field.js";
@@ -39,6 +41,8 @@ export function initMatch(h) {
   $("#hh-life").addEventListener("click", startLife);
   $("#hh-edit").addEventListener("click", () => $("#setup").scrollIntoView({ behavior: "smooth", block: "start" }));
   $("#hh-ai-btn").addEventListener("click", askAI);
+  // AI 深度合婚 is not open yet (ai-mode.js): its button says 敬請期待, and the press is counted (stats.js).
+  $("#hh-soon-btn").addEventListener("click", () => { $("#hh-soon-msg").hidden = false; trackOnce("ai_match"); });
   $("#hh-ai-body").addEventListener("click", e => { const b = e.target.closest("[data-ai-retry]"); if (b && ai) askParts(ai, [b.dataset.aiRetry]); });
   if (!$("#form-match").hidden) onMatchTab("match");
 }
@@ -49,7 +53,7 @@ export function onMatchTab(tab) {
   if (tab === "match") fillFromLife(false);
   $("#match").hidden = tab !== "match" || !shown;
   // A 合婚 shown before today's AI quota ran out: AI 深度合婚 goes away unless some of it was written.
-  if (tab === "match" && shown && onSite() && aiOutToday()) {
+  if (tab === "match" && shown && !aiSoon() && onSite() && aiOutToday()) {
     if (!(ai && PARTS.match.some(x => ai.parts[x]))) $("#hh-ai").hidden = true;
     aiOutControls();
   }
@@ -242,6 +246,11 @@ const AI_WAIT = { m1: "合婚總評與兩個人的個性", m2: "相處的優點�
 const setStatus = (text, bad = false) => { const el = $("#hh-ai-status"); el.textContent = text; el.classList.toggle("bad", bad); };
 
 function drawAI() {
+  trackOnce("hehun");
+  const soon = aiSoon();
+  $("#hh-soon").hidden = !soon;
+  $("#hh-soon-msg").hidden = true;
+  if (soon) { $("#hh-ai").hidden = true; return; }
   const off = !onSite();
   // While today's AI quota is used up (ai-quota.js), AI 深度合婚 is not offered at all.
   $("#hh-ai").hidden = !off && aiOutToday();

@@ -14,11 +14,18 @@
   // same id in another Worker would share these counters).
   "ratelimits": [
     { "name": "INTERPRET_LIMIT", "namespace_id": "4721", "simple": { "limit": 12, "period": 60 } },
-    { "name": "READING_LIMIT", "namespace_id": "4722", "simple": { "limit": 20, "period": 60 } }
+    { "name": "READING_LIMIT", "namespace_id": "4722", "simple": { "limit": 20, "period": 60 } },
+    // The back office's anonymous counts (/api/stats): a page sends a few a minute.
+    { "name": "STATS_LIMIT", "namespace_id": "4723", "simple": { "limit": 60, "period": 60 } }
   ],
+  // The daily totals for /admin, in one SQLite-backed Durable Object (worker/stats-store.js).
+  "durable_objects": { "bindings": [{ "name": "STATS", "class_name": "StatsStore" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StatsStore"] }],
   "vars": {
     // "compact" sends the shorter prompt: about 6 instead of 10 neurons a reading, slightly less accurate.
-    "PROMPT": "full"
+    "PROMPT": "full",
+    // "soon": AI 分析報告 is not open yet; the pages say 敬請期待 and /api/reading answers 503 soon. Remove to open it.
+    "AI_READING": "soon"
   },
   "observability": { "enabled": true }
 }

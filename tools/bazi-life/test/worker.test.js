@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { makeApp, MODEL, READING_MODELS, readRequest, textOf, usageOf } from "../worker/app.js";
 import { interpretPrompt } from "../src/sim/interpret.js";
-import { READING_VERSION, readReadingRequest, readingPart } from "../src/ai-reading.js";
+import { READING_VERSION, readReadingRequest, readingPart, readingRequest } from "../src/ai-reading.js";
 
 const SITE = "https://bazi-life.example.workers.dev";
 const worker = makeApp({ "/": "<p>命盤人生</p>", "/life.html": "<p>命盤人生</p>", "/index.html": "<p>排盤</p>" });
@@ -351,4 +351,65 @@ test("text and usage in each model's shape", () => {
   assert.deepEqual(usageOf({ usage: { input_tokens: 10, output_tokens: 3 } }), { in: 10, out: 3 });
   assert.deepEqual(usageOf({ usage: { prompt_tokens: 7, completion_tokens: 2 } }), { in: 7, out: 2 });
   assert.equal(usageOf({}), null);
+});
+
+// ---------- /api/stats, /admin and AI_READING ----------
+import { readStats, tableOf, dayOf, EVENTS } from "../worker/stats.js";
+function statsEnv({ rows = [], allow = true, key = "s3cret-key" } = {}) {
+  const adds = [], reads = [];
+  return {
+    adds, reads, ADMIN_KEY: key,
+    STATS: { idFromName: n => n, get: () => ({ add: async x => { adds.push(x); }, read: async from => { reads.push(from); return rows; } }) },
+    STATS_LIMIT: { limit: async () => ({ success: allow }) },
+  };
+}
+const statsPost = (body, headers = {}) => new Request(`${SITE}/api/stats`, {
+  method: "POST", headers: { "content-type": "text/plain", origin: SITE, "cf-connecting-ip": "203.0.113.7", ...headers },
+  body: typeof body === "string" ? body : JSON.stringify(body),
+});
+
+test("the pages' anonymous counts are added to today's totals; anything else is turned away", async () => {
+  const e = statsEnv();
+  const res = await worker.fetch(statsPost({ p: "life", e: ["view", "visitor", "ai_life", "ai_life_u", "birthday:1990"], s: 42.4 }), e);
+  assert.equal(res.status, 204);
+  assert.deepEqual(e.adds, [{ day: dayOf(Date.now()), page: "life", counts: { view: 1, visitor: 1, ai_life: 1, ai_life_u: 1, seconds: 42 } }]);
+  assert.equal((await worker.fetch(statsPost({ p: "life", e: ["birthday"] }), e)).status, 400, "only known events");
+  assert.equal((await worker.fetch(statsPost({ p: "other", e: ["view"] }), e)).status, 400, "only the two pages");
+  assert.equal((await worker.fetch(statsPost({ p: "life", e: ["view"] }, { origin: "https://evil.example" }), e)).status, 403);
+  assert.equal((await worker.fetch(statsPost({ p: "life", e: ["view"] }), statsEnv({ allow: false }))).status, 429);
+  assert.equal((await worker.fetch(statsPost("x".repeat(2000)), e)).status, 413);
+  assert.equal(e.adds.length, 1);
+  // At most 20 events and 15 minutes of screen time a request.
+  assert.equal(readStats({ p: "chart", e: Array(50).fill("view"), s: 99999 }).counts.view, 20);
+  assert.equal(readStats({ p: "chart", e: [], s: 99999 }).counts.seconds, 900);
+  assert.equal(readStats({ p: "chart", e: [], s: 0 }), null);
+  assert.ok(EVENTS.every(x => /^[a-z0-9_]+$/.test(x)));
+});
+
+test("the totals are read only with the admin key, day by day per page; /admin is the back office page", async () => {
+  const rows = [{ day: "2026-10-23", page: "life", metric: "view", n: 5 }, { day: "2026-10-24", page: "life", metric: "view", n: 7 }, { day: "2026-10-24", page: "life", metric: "ai_life_u", n: 2 }];
+  const e = statsEnv({ rows });
+  const get = (auth, days = 7) => new Request(`${SITE}/api/stats?days=${days}`, { headers: auth ? { authorization: `Bearer ${auth}` } : {} });
+  assert.equal((await worker.fetch(get(null), e)).status, 401);
+  assert.equal((await worker.fetch(get("wrong-key!"), e)).status, 401);
+  assert.equal((await worker.fetch(get("s3cret-key"), statsEnv({ key: "" }))).status, 503, "no key set, nothing to read");
+  const res = await worker.fetch(get("s3cret-key"), e);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(body.rows, [{ day: "2026-10-24", page: "life", view: 7, ai_life_u: 2 }, { day: "2026-10-23", page: "life", view: 5 }]);
+  assert.equal(e.reads[0], dayOf(Date.now() - 6 * 86400e3));
+  assert.deepEqual(tableOf([]), []);
+  const admin = await worker.fetch(new Request(`${SITE}/admin`), {});
+  assert.equal(admin.status, 200);
+  assert.match(admin.headers.get("x-robots-tag"), /noindex/);
+  assert.match(await admin.text(), /命盤人生・後台[\s\S]*AI 報告點擊率/);
+});
+
+test("while AI 分析報告 is 敬請期待, /api/reading writes nothing", async () => {
+  const e = { ...env(openai("{}")), AI_READING: "soon" };
+  const body = readingRequest({ date: { y: 1990, m: 6, d: 21 }, time: { h: 12, mi: 0 }, place: { name: "臺北市" }, sex: "female" }, "full", { part: "a" });
+  const res = await worker.fetch(new Request(`${SITE}/api/reading`, { method: "POST", headers: { "content-type": "application/json", origin: SITE }, body: JSON.stringify(body) }), e);
+  assert.equal(res.status, 503);
+  assert.deepEqual(await res.json(), { error: "soon" });
+  assert.equal(e.calls.length, 0);
 });

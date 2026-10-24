@@ -13,7 +13,11 @@
 // asked for once more with the problems listed; a section part that fails twice answers 502 and the page offers to
 // write that part again, and a list keeps the engine's words for the entries the model missed.
 //
-// Bindings (wrangler.jsonc): AI (Workers AI), INTERPRET_LIMIT and READING_LIMIT (requests per minute per IP).
+// /api/stats and /admin: anonymous daily counts for the back office (worker/stats.js, worker/admin.js).
+//
+// Bindings (wrangler.jsonc): AI (Workers AI), INTERPRET_LIMIT, READING_LIMIT and STATS_LIMIT (requests per minute per
+// IP), STATS (the Durable Object with the counts). AI_READING = "soon" turns /api/reading away; ADMIN_KEY (a secret)
+// opens /api/stats for reading.
 // Variables: PROMPT = "compact" for the shorter interpret prompt (fewer neurons, slightly less accurate);
 // READING_MODEL to write readings with another model of READING_MODELS; LAB_KEY (only on a separate lab Worker) lets a
 // request that carries it in x-lab-key pick the model and get the usage, the timing and the checker's notes back.
@@ -21,6 +25,8 @@
 // to it). Nothing the player writes, and no reading, is logged or kept.
 import { interpretPrompt, readInterpretation, jsonFromText } from "../src/sim/interpret.js";
 import { readReadingRequest, readingPart, partPrompt, partTokens, checkPart, finishPart, READING_VERSION } from "../src/ai-reading.js";
+import { readStats, tableOf, sameKey, dayOf } from "./stats.js";
+import { ADMIN_HTML } from "./admin.js";
 
 export const MODEL = "@cf/google/gemma-4-26b-a4b-it";
 const MAX_BODY = 4096;
@@ -124,6 +130,9 @@ export const isQuotaError = message => /\b4006\b|daily free allocation/i.test(me
 export async function reading(request, env) {
   const got = await readBody(request, READING_MAX_BODY);
   if (got.error) return got.error;
+  // AI 分析報告 is not open yet (src/ai-mode.js): the pages say 敬請期待 and this answers no one, lab requests aside.
+  const labKey = !!env.LAB_KEY && request.headers.get("x-lab-key") === env.LAB_KEY;
+  if (env.AI_READING === "soon" && !labKey) return answer(503, { error: "soon" });
   const ask = readReadingRequest(got.body);
   if (!ask) return answer(400, { error: "request" });
   const lab = !!env.LAB_KEY && request.headers.get("x-lab-key") === env.LAB_KEY;
@@ -166,6 +175,37 @@ export async function reading(request, env) {
   return answer(200, { ...head, ...finishPart(part, result), ...labInfo });
 }
 
+// ---------- /api/stats and /admin ----------
+const STATS_MAX_BODY = 1024;
+const store = env => env.STATS.get(env.STATS.idFromName("all"));
+export async function stats(request, env, ctx) {
+  if (request.method === "GET") {
+    const auth = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!env.ADMIN_KEY) return answer(503, { error: "unavailable" });
+    if (!sameKey(auth, env.ADMIN_KEY)) return answer(401, { error: "key" });
+    if (!env.STATS) return answer(503, { error: "unavailable" });
+    const days = Math.max(1, Math.min(366, Number(new URL(request.url).searchParams.get("days")) || 30));
+    const from = dayOf(Date.now() - (days - 1) * 86400e3);
+    return answer(200, { today: dayOf(Date.now()), from, rows: tableOf(await store(env).read(from)) });
+  }
+  const got = await readBody(request, STATS_MAX_BODY);
+  if (got.error) return got.error;
+  const ask = readStats(got.body);
+  if (!ask) return answer(400, { error: "request" });
+  if (env.STATS_LIMIT) {
+    const { success } = await env.STATS_LIMIT.limit({ key: request.headers.get("cf-connecting-ip") || "unknown" });
+    if (!success) return answer(429, { error: "busy" });
+  }
+  if (!env.STATS) return answer(503, { error: "unavailable" });
+  const write = store(env).add({ day: dayOf(Date.now()), ...ask });
+  if (ctx && ctx.waitUntil) ctx.waitUntil(write.catch(() => {})); else await write;
+  return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
+}
+const ADMIN_HEADERS = {
+  "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow",
+  "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", "x-frame-options": "DENY",
+};
+
 // The pages are part of the Worker itself rather than static assets: an asset upload is authorised by a token of its
 // own, which the cloud environment's proxy would replace with the account's API token.
 // no-cache: the browser asks each time, so a new deploy shows at once (with max-age=600 a phone kept showing the old page
@@ -189,10 +229,12 @@ const matches = (header, etag) => !!header && (header.trim() === "*" || header.s
 // The Worker for the given pages ({ path: html }): the pages, and the API.
 export function makeApp(pages) {
   return {
-    async fetch(request, env) {
+    async fetch(request, env, ctx) {
       const { pathname } = new URL(request.url);
       if (pathname === "/api/interpret") return interpret(request, env);
       if (pathname === "/api/reading") return reading(request, env);
+      if (pathname === "/api/stats") return stats(request, env, ctx);
+      if (pathname === "/admin") return new Response(request.method === "HEAD" ? null : ADMIN_HTML, { headers: ADMIN_HEADERS });
       if (pathname.startsWith("/api/")) return answer(404, { error: "not found" });
       const html = Object.hasOwn(pages, pathname) ? pages[pathname] : null;
       if (html === null) return new Response("找不到這個頁面。", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
