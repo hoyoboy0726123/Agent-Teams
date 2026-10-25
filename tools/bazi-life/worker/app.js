@@ -26,7 +26,7 @@
 // to it). Nothing the player writes, and no reading, is logged or kept.
 import { interpretPrompt, readInterpretation, jsonFromText } from "../src/sim/interpret.js";
 import { readReadingRequest, readingPart, partPrompt, partTokens, checkPart, finishPart, READING_VERSION } from "../src/ai-reading.js";
-import { readStats, tableOf, sameKey, dayOf, liveOf } from "./stats.js";
+import { readStats, tableOf, sameKey, dayOf, liveOf, demoLive } from "./stats.js";
 import { ADMIN_HTML } from "./admin.js";
 
 export const MODEL = "@cf/google/gemma-4-26b-a4b-it";
@@ -209,7 +209,11 @@ export async function live(request, env) {
   if (request.method !== "GET") return answer(405, { error: "method" });
   if (!env.STATS) return answer(503, { error: "unavailable" });
   const now = Date.now();
-  if (!liveCache || now - liveCache.at > 20e3) liveCache = { at: now, body: JSON.stringify(liveOf(await store(env).live(dayOf(now), now), now)) };
+  const demo = env.LIVE_DEMO === "1";
+  if (!liveCache || liveCache.demo !== demo || now - liveCache.at > 20e3) {
+    const real = await store(env).live(dayOf(now), now);
+    liveCache = { at: now, demo, body: JSON.stringify(demo ? demoLive(real, now) : liveOf(real, now)) };
+  }
   return new Response(liveCache.body, { headers: LIVE_HEADERS });
 }
 const ADMIN_HEADERS = {

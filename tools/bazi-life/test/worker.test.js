@@ -459,3 +459,21 @@ test("/api/live answers anyone with the numbers, cached for 20 seconds", async (
   assert.equal(lived.length, 1, "the second call within 20 s is answered from memory");
   assert.equal((await worker.fetch(new Request(`${SITE}/api/live`, { method: "POST" }), e)).status, 405);
 });
+
+import { demoLive } from "../worker/stats.js";
+test("demo numbers for a new site: plausible, the same within a half minute, growing through the day, real lives first", async () => {
+  const noon = Date.parse("2026-10-26T12:00:00+08:00"), evening = Date.parse("2026-10-26T21:00:00+08:00");
+  const a = demoLive({ total: 4, todayEnds: 1, beats: 0, lives: [], recent: [] }, noon), b = demoLive({ total: 4, todayEnds: 1, beats: 0, lives: [], recent: [] }, noon + 10e3);
+  assert.deepEqual(a, b, "the same within the half minute");
+  assert.ok(a.demo && a.total > 1284 && a.today >= 100 && a.today < 260 && a.nowPlaying >= 4 && a.nowPlaying <= 25);
+  assert.ok(a.todayLives.avgAge >= 79 && a.todayLives.avgAge <= 83 && a.todayLives.maxAge >= 97 && Object.keys(a.todayLives.elements).length === 5);
+  assert.equal(a.recent.length, 5);
+  assert.ok(a.recent.every(l => /後$/.test(l.decade) && "甲乙丙丁戊己庚辛壬癸".includes(l.stem) && l.age >= 55 && l.age <= 100 && typeof l.home === "boolean"));
+  const c = demoLive({ total: 4, todayEnds: 1, beats: 2, lives: [], recent: [{ ts: evening - 60e3, decade: "80 後", stem: "丁", age: 86, married: 1, home: 1, kids: 2 }] }, evening);
+  assert.ok(c.today > a.today, "more by the evening");
+  assert.deepEqual(c.recent[0], { decade: "80 後", stem: "丁", age: 86, married: 1, home: true, kids: 2, ago: 1 }, "a real life comes first");
+  const e = { LIVE_DEMO: "1", STATS: { idFromName: n => n, get: () => ({ live: async () => ({ total: 2, todayEnds: 0, beats: 0, lives: [], recent: [] }) }) } };
+  const res = await worker.fetch(new Request(`${SITE}/api/live?x=1`), e);
+  const body = await res.json();
+  assert.ok(body.demo && body.recent.length === 5 && body.todayLives);
+});

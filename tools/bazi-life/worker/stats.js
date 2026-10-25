@@ -36,6 +36,39 @@ export function readStats(body) {
   return Object.keys(counts).length || life ? { page: body.p, counts, ...(life ? { life } : {}) } : null;
 }
 
+// Demo numbers for the welcome page while the site is new (wrangler.jsonc LIVE_DEMO): plausible, seeded by the time so a
+// refresh shows the same numbers growing through the day, with the real counts added on top. Remove LIVE_DEMO to show
+// only the real numbers (which then hide until there are enough, below).
+const LAUNCH = Date.parse("2026-10-24T00:00:00+08:00");
+const mulberry = seed => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+const DEMO_DAY = 260;   // lives a day in the demo
+export function demoLive(real, now = Date.now()) {
+  const tw = new Date(now + 8 * 3600e3), dayFrac = (tw.getUTCHours() * 60 + tw.getUTCMinutes()) / 1440, h = tw.getUTCHours();
+  const days = Math.max(0, (now - LAUNCH) / 86400e3);
+  // Busier in the evening, quiet at 4 a.m.
+  const curve = 0.35 + 0.65 * Math.max(0, Math.sin(Math.PI * Math.max(0, Math.min(1, (h + tw.getUTCMinutes() / 60 - 6) / 18))));
+  const slot = Math.floor(now / 30e3), rng = mulberry(slot);
+  const today = Math.floor(DEMO_DAY * dayFrac * (0.85 + 0.3 * curve)) + (real.todayEnds || 0);
+  const total = 1284 + Math.floor(DEMO_DAY * days) + (real.total || 0);
+  const nowPlaying = Math.max(1, Math.round(4 + 14 * curve + rng() * 3)) + (real.beats || 0);
+  const dayRng = mulberry(Math.floor(now / 86400e3));
+  const el = {}; let left = 100;
+  for (const e of ["木", "火", "土", "金"]) { const v = Math.round(14 + dayRng() * 12); el[e] = v; left -= v; }
+  el.水 = Math.max(8, left);
+  const n = Math.max(today, 1);
+  const elements = Object.fromEntries(Object.entries(el).map(([k, v]) => [k, Math.max(1, Math.round(n * v / 100))]));
+  for (const l of real.lives || []) elements[STEM_ELEMENT[l.stem]] = (elements[STEM_ELEMENT[l.stem]] || 0) + 1;
+  const todayLives = { n: n + (real.lives || []).length, avgAge: 79 + Math.round(dayRng() * 4), maxAge: 97 + Math.round(dayRng() * 7), married: 60 + Math.round(dayRng() * 10), home: 64 + Math.round(dayRng() * 10), elements };
+  // Five recent lives, changing every three minutes, the real ones first.
+  const rslot = Math.floor(now / 180e3), r2 = mulberry(rslot * 7 + 3);
+  const fake = Array.from({ length: 5 }, (_, i) => {
+    const age = Math.round(55 + r2() * 45), married = r2() < 0.68 ? (r2() < 0.15 ? 2 : 1) : 0;
+    return { decade: DECADES[3 + Math.floor(r2() * 6)], stem: STEMS[Math.floor(r2() * 10)], age, married, home: r2() < 0.7, kids: married ? Math.floor(r2() * 3) : 0, ago: [1, 4, 7, 12, 19][i] + Math.floor((now % 180e3) / 60e3) };
+  });
+  const realRecent = (real.recent || []).slice(0, 5).map(l => ({ decade: l.decade, stem: l.stem, age: l.age, married: l.married, home: !!l.home, kids: l.kids, ago: Math.max(0, Math.round((now - l.ts) / 60000)) }));
+  return { total, nowPlaying, today, todayLives, recent: [...realRecent, ...fake].slice(0, 5), demo: true };
+}
+
 // What the welcome page shows (/api/live), from the store's answer { total, today, beats, lives, recent }: the small
 // numbers stay hidden until there is enough behind them, so a quiet first week does not read as an empty room.
 export const SHOW = { strip: 50, today: 20, recent: 3 };
