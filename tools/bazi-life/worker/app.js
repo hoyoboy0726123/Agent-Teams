@@ -241,8 +241,9 @@ async function etagOf(html) {
 // If-None-Match: a list of tags, or *.
 const matches = (header, etag) => !!header && (header.trim() === "*" || header.split(",").some(t => t.trim().replace(/^W\//, "") === etag));
 
-// The Worker for the given pages ({ path: html }): the pages, and the API.
-export function makeApp(pages) {
+// The Worker for the given pages ({ path: html }) and files ({ path: { body, type } }, such as the share image): the
+// pages, the files, and the API.
+export function makeApp(pages, files = {}) {
   return {
     async fetch(request, env, ctx) {
       const { pathname } = new URL(request.url);
@@ -251,6 +252,10 @@ export function makeApp(pages) {
       if (pathname === "/api/stats") return stats(request, env, ctx);
       if (pathname === "/api/live") return live(request, env);
       if (pathname === "/admin") return new Response(request.method === "HEAD" ? null : ADMIN_HTML, { headers: ADMIN_HEADERS });
+      if (Object.hasOwn(files, pathname)) {
+        if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405, headers: { allow: "GET, HEAD" } });
+        return new Response(request.method === "HEAD" ? null : files[pathname].body, { headers: { "content-type": files[pathname].type, "cache-control": "public, max-age=86400", "x-content-type-options": "nosniff" } });
+      }
       if (pathname.startsWith("/api/")) return answer(404, { error: "not found" });
       const html = Object.hasOwn(pages, pathname) ? pages[pathname] : null;
       if (html === null) return new Response("找不到這個頁面。", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });

@@ -478,3 +478,14 @@ test("demo numbers for a new site: plausible, the same within a half minute, gro
   const body = await res.json();
   assert.ok(body.demo && body.recent.length === 5 && body.todayLives);
 });
+
+test("a file such as the share image is served with its type and a day's cache", async () => {
+  const app = makeApp({ "/": "<p>命盤人生</p>" }, { "/og.png": { body: new Uint8Array([137, 80, 78, 71]), type: "image/png" } });
+  const res = await app.fetch(new Request(`${SITE}/og.png`), {});
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "image/png");
+  assert.match(res.headers.get("cache-control"), /max-age=86400/);
+  assert.equal((await res.arrayBuffer()).byteLength, 4);
+  assert.equal((await app.fetch(new Request(`${SITE}/og.png`, { method: "POST" }), {})).status, 405);
+  assert.equal((await app.fetch(new Request(`${SITE}/nope.png`), {})).status, 404);
+});
