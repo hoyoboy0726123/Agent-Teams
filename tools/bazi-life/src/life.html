@@ -43,6 +43,24 @@ p { margin: 0; }
 .notice { font-size: 13px; color: var(--muted); border-left: 3px solid var(--rule); padding-left: 10px; max-width: 70ch; }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 header { display: grid; gap: 10px; }
+/* 門面: a dark ink masthead in both themes, with a 羅盤 of thin rings behind the title and a 朱印 beside it. */
+.masthead { position: relative; overflow: hidden; isolation: isolate; background: #141a24; color: #eef1f0; border-radius: 18px; padding: 26px 22px 22px; gap: 14px; }
+.masthead .eyebrow { color: #93b2ea; font-size: 12px; letter-spacing: 0.22em; font-weight: 500; }
+.mast-title { display: flex; align-items: flex-end; gap: 14px; }
+.masthead h1 { font-size: clamp(60px, 17vw, 104px); line-height: 1; letter-spacing: 0.1em; margin-right: -0.1em; color: #f6f1e7; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25); }
+.seal { flex: 0 0 auto; width: 46px; height: 46px; margin-bottom: 10px; display: grid; place-items: center; background: #b5332a; color: #f6f1e7; font-family: var(--display); font-weight: 700; font-size: 28px; line-height: 1; border-radius: 6px; box-shadow: inset 0 0 0 2px rgba(246, 241, 231, 0.55), inset 0 0 0 4px #b5332a; transform: rotate(-6deg); }
+.masthead .lede { color: #c6cfd8; max-width: 44ch; font-size: 16px; line-height: 1.75; }
+.mast-tags { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.mast-tags li { font-size: 12.5px; color: #e5e9ed; border: 1px solid rgba(229, 233, 237, 0.28); border-radius: 999px; padding: 4px 11px; }
+.masthead .notice { color: #8f9bab; border-left-color: rgba(229, 233, 237, 0.25); font-size: 12.5px; margin-top: 2px; }
+.mast-rings { position: absolute; right: -90px; top: -110px; width: 360px; height: 360px; z-index: -1; pointer-events: none; }
+.mast-rings i { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(147, 178, 234, 0.22); }
+.mast-rings i:nth-child(2) { inset: 44px; border-color: rgba(147, 178, 234, 0.16); border-style: dashed; }
+.mast-rings i:nth-child(3) { inset: 96px; border-color: rgba(236, 106, 87, 0.35); }
+.mast-rings::after { content: ""; position: absolute; inset: 0; background-image: radial-gradient(rgba(246, 241, 231, 0.22) 1px, transparent 1.2px); background-size: 18px 18px; -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 30%, transparent 70%); mask-image: radial-gradient(circle at 50% 50%, #000 30%, transparent 70%); }
+@media (min-width: 600px) { .masthead { padding: 34px 32px 28px; } .masthead h1 { letter-spacing: 0.14em; } .seal { width: 54px; height: 54px; font-size: 32px; margin-bottom: 14px; } }
+@media (prefers-reduced-motion: no-preference) { .mast-rings i:nth-child(2) { animation: spin 90s linear infinite; } }
+@keyframes spin { to { transform: rotate(360deg); } }
 button { font: inherit; color: inherit; cursor: pointer; }
 input, select { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
@@ -562,10 +580,19 @@ footer a { color: var(--indigo); }
 </style>
 
 <div class="wrap">
-  <header>
-    <span class="eyebrow">第 1 步預覽・人生模擬</span>
-    <h1>命盤人生</h1>
+  <header class="masthead">
+    <div class="mast-rings" aria-hidden="true"><i></i><i></i><i></i></div>
+    <span class="eyebrow">八字 × 人生模擬</span>
+    <div class="mast-title">
+      <h1>命盤人生</h1>
+      <span class="seal" aria-hidden="true">命</span>
+    </div>
     <p class="lede">輸入生辰，依照八字的大運和流年走完一生。每件事發生的機率以台灣統計為基礎，命盤只讓機率傾斜，人生的方向由你選擇。</p>
+    <ul class="mast-tags" aria-label="特色">
+      <li>以台灣統計校準</li>
+      <li>同一張命盤重跑 100 次</li>
+      <li>免費、不用註冊</li>
+    </ul>
     <p class="notice">這是依傳統命理規則和台灣統計產生的模擬故事，不是預言。命理推演僅供參考，不能當作醫療、法律或重大決定的依據。</p>
   </header>
 
