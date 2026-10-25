@@ -158,8 +158,8 @@ body.story-open { overflow: hidden; }
 .day-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
 .tile.elements { gap: 8px; }
 .bars { display: flex; align-items: flex-end; gap: 6px; height: 56px; }
-.bars .bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%; }
-.bars .bar i { display: block; width: 100%; height: var(--h); min-height: 2px; background: var(--c); border-radius: 4px 4px 0 0; }
+.bars .bar { flex: 1; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 4px; height: 100%; justify-items: center; }
+.bars .bar i { display: block; align-self: end; width: 100%; height: var(--h); min-height: 2px; background: var(--c); border-radius: 4px 4px 0 0; }
 .bars .bar span { font-size: 11px; color: var(--muted); }
 @media (min-width: 720px) { .day-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 details.family { border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); }
