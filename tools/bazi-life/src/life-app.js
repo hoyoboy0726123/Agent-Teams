@@ -528,6 +528,7 @@ function finish() {
   stop();
   const { life, chart, prep, input } = run;
   const s = life.state;
+  updateStatus();   // after 直接看結局 the bar still showed the year it was pressed in
   run.summary = rerun({ chart, analysis: prep.analysis, luck: prep.luck, runs: 100, key: `${chart.pillars.map(p => p.name).join("")}|${input.sex}|${input.date.y}`, name: run.name, family: prep.family });
   $("#end-title").textContent = `這一次，你活到 ${s.age} 歲。`;
   $("#end-sub").textContent = `這只是同一張命盤的其中一種人生。下面的 100 次重跑，才看得出哪些事情比較常發生。`;
