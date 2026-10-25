@@ -50,8 +50,9 @@ function pause() {
 // big things. It goes with the next batch; nothing else about the life or the person.
 export function sendLife(summary) {
   if (!on) return;
-  life = summary;
-  track("end");
+  life = summary;   // the end itself is counted by the page's trackOnce("end"); this only rides along
+  clearTimeout(flushTimer);
+  flushTimer = setTimeout(flush, 2000);
 }
 // While a life is being played the page beats once a minute, so the welcome page can say how many are playing now.
 // `playing` says whether one is; the first beat goes at once.
