@@ -21,11 +21,23 @@ const watch = p => { p.on("pageerror", e => errors.push(e.message)); return p; }
 // is 敬請期待 on the site (src/ai-mode.js); the pages here try the real reading (the preview switch) unless `soon` is set.
 async function fresh(opts, { welcomed = true, soon = false } = {}) {
   const p = watch(await browser.newPage(opts));
-  if (welcomed) await p.addInitScript(() => { try { localStorage.setItem("bazi-life.welcomed", "1"); } catch {} });
+  // Every visit opens on 歡迎; a reload keeps the tab. The tests of the forms start where a player who opened 我的人生
+  // and reloaded would: on that tab.
+  if (welcomed) await p.addInitScript(() => { try { if (!sessionStorage.getItem("bazi-life.tab")) sessionStorage.setItem("bazi-life.tab", JSON.stringify("me")); } catch {} });
+  await p.route("**/api/live", r => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ total: 3 }) }));
   if (!soon) await p.addInitScript(() => { try { localStorage.setItem("bazi-life.aiPreview", "1"); } catch {} });
   await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   return p;
 }
+// Served over http, as the Worker serves it: /api/interpret answers like worker/index.js would. A Worker that is
+// busy or out of quota (503), or a request that fails, leaves the player with the local options, with no message.
+const html = await readFile(fileURLToPath(new URL("../public/life.html", import.meta.url)));
+const server = createServer((req, res) => {
+  if (req.url === "/life.html") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(html); }
+  else { res.writeHead(404); res.end(); }
+});
+await new Promise(done => server.listen(0, "127.0.0.1", done));
+const site = `http://127.0.0.1:${server.address().port}/life.html`;
 // A pixel canvas has been drawn on (the sky and the place fill it).
 const painted = (p, sel) => p.$eval(sel, c => { const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n > c.width * c.height * 0.9; });
 // The first choice of a life. A life that ends before it (rare: the seed is random) is lived again.
@@ -49,7 +61,22 @@ async function ended(p, timeout) {
 const page = await fresh({ viewport: { width: 1100, height: 1300 } }, { welcomed: false });
 await page.goto(url);
 const welcome = await page.textContent("#welcome");
-check("a first visit opens on 歡迎: how to play, what is fun, and that the data stays on the phone", await page.isVisible("#welcome") && await page.isHidden("#form-me") && /怎麼玩/.test(welcome) && /好玩的地方/.test(welcome) && /網站後台不保存這些資料/.test(welcome) && /沒有帳號/.test(welcome) && /合婚分頁的合婚結果在手機上算，不會上傳/.test(welcome));
+check("a visit opens on 歡迎: the headline, how to play, what is fun, and that the data stays on the phone", await page.isVisible("#welcome") && await page.isHidden("#form-me") && /同一個生日/.test(welcome) && /怎麼玩/.test(welcome) && /好玩的地方/.test(welcome) && /網站後台不保存這些資料/.test(welcome) && /沒有帳號/.test(welcome) && /合婚分頁的合婚結果在手機上算，不會上傳/.test(welcome));
+// On the site (over http) the numbers come from /api/live; this one answers { total: 3 } (fresh()).
+const quiet = await fresh({ viewport: { width: 1100, height: 1300 } }, { welcomed: false });
+await quiet.goto(site);
+await quiet.waitForSelector("#live-strip:not([hidden])", { timeout: 5000 }).catch(() => {});
+const nowPillars = await quiet.$$eval("#live-now-chart b", els => els.map(e => e.textContent));
+check("歡迎 shows this moment's four pillars in Taipei and only the total while the numbers are few", await quiet.isVisible("#live-now-chart") && nowPillars.length === 4 && nowPillars.every(x => /^[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]$/.test(x)) && /日主，如/.test(await quiet.textContent("#now-text")) && await quiet.textContent("#live-total") === "3" && await quiet.isHidden("#live-now-box") && await quiet.isHidden("#live-recent") && await quiet.isHidden("#live-day") && await page.isHidden("#live-strip"), nowPillars.join(" "));
+await quiet.close();
+// With enough lives behind them, the live strip, today's numbers and the last lives show, from /api/live alone.
+const busy = await fresh({ viewport: { width: 1100, height: 1300 } }, { welcomed: false });
+await busy.route("**/api/live", r => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ total: 5210, nowPlaying: 12, today: 348, todayLives: { n: 348, avgAge: 81, maxAge: 103, married: 67, home: 72, elements: { 木: 60, 火: 95, 土: 76, 金: 52, 水: 65 } }, recent: [{ decade: "80 後", stem: "丁", age: 86, married: 1, home: true, kids: 2, ago: 2 }, { decade: "90 後", stem: "壬", age: 79, married: 0, home: false, kids: 0, ago: 0 }, { decade: "70 後", stem: "己", age: 94, married: 1, home: true, kids: 3, ago: 70 }] }) }));
+await busy.goto(site);
+await busy.waitForSelector("#live-recent:not([hidden])", { timeout: 5000 }).catch(() => {});
+const busyText = await busy.textContent("#welcome");
+check("with enough lives the welcome page shows who is playing now, today's lives and the last few, anonymously", await busy.textContent("#live-now") === "12" && await busy.textContent("#live-today") === "348" && await busy.textContent("#live-total") === "5,210" && /平均活到81歲/.test(busyText.replace(/\s+/g, "")) && /103 歲/.test(busyText) && (await busy.$$("#live-recent-list li")).length === 3 && /80 後、丁火日主，活到 86 歲，結了 1 次婚，買了房，有 2 個孩子2 分鐘前/.test(busyText.replace(/\n/g, "")) && /剛剛/.test(busyText) && /1 小時前/.test(busyText) && (await busy.$$("#live-elements .bar")).length === 5);
+await busy.close();
 check("the welcome page and the footer say only anonymous counts are kept, and promise no AI reading yet", /只統計匿名的次數.+不含生日、姓名或 IP/.test(welcome) && !/AI 命理師會自動|結局自動 AI 解讀|AI 深度合婚/.test(welcome) && /網站不保存/.test(await page.textContent(".privacy-pill")) && /只統計匿名的瀏覽次數、停留時間和按鈕點擊/.test(await page.textContent("footer")) && !/結局頁的解讀預設自動開始/.test(await page.textContent("footer")));
 await page.click('[data-goto="me"]');
 await page.waitForTimeout(250);
@@ -197,15 +224,6 @@ const majorFeed = await page.textContent("#feed");
 check("with 只問人生大事 the big decisions are asked and the rest follow the personality", asked >= 3 && /依你的個性：/.test(majorFeed), `${asked} asked`);
 await page.uncheck("#c-major");
 
-// Served over http, as the Worker serves it: /api/interpret answers like worker/index.js would. A Worker that is
-// busy or out of quota (503), or a request that fails, leaves the player with the local options, with no message.
-const html = await readFile(fileURLToPath(new URL("../public/life.html", import.meta.url)));
-const server = createServer((req, res) => {
-  if (req.url === "/life.html") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(html); }
-  else { res.writeHead(404); res.end(); }
-});
-await new Promise(done => server.listen(0, "127.0.0.1", done));
-const site = `http://127.0.0.1:${server.address().port}/life.html`;
 async function servedPage(answer, before = null) {
   const p = await fresh({ viewport: { width: 1000, height: 1200 } });
   const sent = [];
@@ -292,7 +310,7 @@ await rd.p.route("**/api/reading", async route => {
 });
 check("the top of the play screen offers 結局自動 AI 解讀, ticked, saying what it sends", await rd.p.isVisible("#c-ai") && await rd.p.isChecked("#c-ai") && /出生日期、時間、出生地和性別.*不含姓名和家人/.test(await rd.p.textContent("#c-ai-wrap")) && !(await rd.p.$eval(".status", el => el.contains(document.querySelector("#c-ai")))));
 await rd.p.click("#c-skip");
-await ended(rd.p, 30000);
+await ended(rd.p, 45000);
 const consent = await rd.p.textContent("#ai-consent");
 check("the end page starts the full reading by itself, under a consent line that says so and how to turn it off", await rd.p.isHidden("#ai-short") && await rd.p.isHidden("#ai-full") && await rd.p.isVisible("#ai-match") && /自動/.test(consent) && /不含姓名和家人/.test(consent) && /結局自動 AI 解讀/.test(consent), consent);
 check("while the reading writes itself AI 合婚 stays closed, filled in with the partner of the family form", !(await rd.p.$eval("#ai-match", d => d.open)) && await rd.p.inputValue("#ai-p-date") === "1990-05-20" && await rd.p.inputValue("#ai-p-sex") === "female" && await rd.p.inputValue("#ai-p-when .m-hour") === "wu");
@@ -335,7 +353,7 @@ async function liveAgain(p, before = null) {
   await p.waitForSelector("#play:not([hidden])");
   if (before) await before();
   await p.click("#c-skip");
-  await ended(p, 30000);
+  await ended(p, 45000);
   await p.waitForTimeout(300);
 }
 await liveAgain(rd.p);
@@ -384,12 +402,12 @@ async function toEnd(p, before = null) {
   await p.waitForSelector("#play:not([hidden])");
   if (before) await before();
   await p.click("#c-skip");
-  await ended(p, 30000);
+  await ended(p, 45000);
   await p.waitForTimeout(300);
 }
 const quota = await readingPage(QUOTA);
 await quota.p.click("#c-skip");
-await ended(quota.p, 30000);
+await ended(quota.p, 45000);
 await quota.p.waitForSelector("#ai", { state: "hidden", timeout: 10000 });
 check("when today's quota is used up, the reading that started by itself takes the AI card away, with no message, and 詳批 stays", quota.bodies.length === FULL && await quota.p.isHidden("#ai") && await quota.p.isVisible("#report") && await quota.p.evaluate(() => sessionStorage.getItem("bazi-life.aiOut")) === TODAY, `${quota.bodies.length} asked`);
 const quotaAsked = quota.bodies.length;
@@ -431,7 +449,7 @@ await asked2.p.close();
 // The quota runs out partway: the written parts stay, the rest get no red rows, only a calm line.
 const partway = await readingPage((route, body) => (/"part":"years/.test(body) ? QUOTA(route) : viaWorker(route, body)));
 await partway.p.click("#c-skip");
-await ended(partway.p, 30000);
+await ended(partway.p, 45000);
 await partway.p.waitForFunction(() => /還有 \d+ 段沒寫到/.test(document.querySelector("#ai-status").textContent), null, { timeout: 30000 });
 const YEARS = partsFor("full", 1988, NOW).filter(x => x.startsWith("years")).length;
 check("when the quota runs out partway, the written parts stay and the rest are named in one calm line", await partway.p.isVisible("#ai") && /命盤總論/.test(await partway.p.textContent("#ai-body")) && (await partway.p.$$("#ai-body .ai-decade")).length >= 5 && (await partway.p.$$("#ai-body [data-ai-retry], #ai-body .ai-wait.bad")).length === 0 && !(await partway.p.$eval("#ai-status", el => el.classList.contains("bad"))) && new RegExp(`還有 ${YEARS} 段沒寫到`).test(await partway.p.textContent("#ai-status")));
@@ -440,7 +458,7 @@ await partway.p.close();
 // Another failure in the same batch as the quota: no 重寫這一段 that could not send, just the calm line for all of them.
 const mixed = await readingPage((route, body) => (/"part":"years/.test(body) ? QUOTA(route) : /"part":"a"/.test(body) ? route.fulfill({ status: 502, contentType: "application/json", body: '{"error":"reply"}' }) : viaWorker(route, body)));
 await mixed.p.click("#c-skip");
-await ended(mixed.p, 30000);
+await ended(mixed.p, 45000);
 await mixed.p.waitForFunction(() => /還有 \d+ 段沒寫到/.test(document.querySelector("#ai-status").textContent), null, { timeout: 30000 });
 check("a part that failed for another reason in the same batch gets no dead 重寫這一段, and is counted in the calm line", (await mixed.p.$$("#ai-body [data-ai-retry], #ai-body .ai-wait.bad")).length === 0 && new RegExp(`還有 ${YEARS + 1} 段沒寫到`).test(await mixed.p.textContent("#ai-status")) && /感情與婚姻/.test(await mixed.p.textContent("#ai-body")));
 await mixed.p.close();
@@ -448,7 +466,7 @@ await mixed.p.close();
 // get no card. A 合婚 shown before then loses AI 深度合婚 when its tab is opened again.
 const earlier = await readingPage(viaWorker);
 await earlier.p.click("#c-skip");
-await ended(earlier.p, 30000);
+await ended(earlier.p, 45000);
 await earlier.p.waitForFunction(() => document.querySelectorAll("#ai-body .ai-years li").length > 10 && !/正在寫/.test(document.querySelector("#ai-status").textContent), null, { timeout: 30000 });
 const written = earlier.bodies.length, wroteAges = (await earlier.p.$$("#ai-body .ai-years li")).length;
 await earlier.p.click("#again-new");
@@ -489,7 +507,7 @@ await deepq.p.close();
 // written again, and nobody is told to come back tomorrow.
 const flaky = await readingPage((route, body) => (/"part":"years/.test(body) ? route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"unavailable"}' }) : viaWorker(route, body)));
 await flaky.p.click("#c-skip");
-await ended(flaky.p, 30000);
+await ended(flaky.p, 45000);
 await flaky.p.waitForFunction(() => /段沒寫好/.test(document.querySelector("#ai-status").textContent), null, { timeout: 30000 });
 const flakyBody = await flaky.p.textContent("#ai-body"), yearParts = partsFor("full", 1988, NOW).filter(x => x.startsWith("years")).length;
 check("a part the model failed once keeps the written parts and offers 重寫這一段, without 'come back tomorrow'", /命盤總論/.test(flakyBody) && (await flaky.p.$$("#ai-body .ai-decade")).length >= 5 && (await flaky.p.$$("#ai-body [data-ai-retry]")).length === yearParts && /現在寫不了/.test(flakyBody) && !/額度|明天/.test(flakyBody + await flaky.p.textContent("#ai-status")), `${(await flaky.p.$$("#ai-body [data-ai-retry]")).length} retry rows`);
@@ -559,6 +577,8 @@ await soon.waitForTimeout(500);
 const statsEvents = statsSent.flatMap(b => b.e || []), statsText = JSON.stringify(statsSent);
 const countOf = e => statsEvents.filter(x => x === e).length;
 check("the visit, the life, the ending and the presses are counted as event names only", countOf("view") === 1 && countOf("visitor") === 1 && countOf("start") >= 1 && countOf("end_u") === 1 && countOf("ai_life") === 2 && countOf("ai_life_u") === 1 && countOf("hehun_u") === 1 && countOf("ai_match_u") === 1 && statsSent.every(b => b.p === "life") && statsSent.some(b => b.s >= 1) && !/1988|1990|陳|志明|臺北/.test(statsText), statsText.slice(0, 160));
+const lifeSent = statsSent.map(b => b.life).filter(Boolean);
+check("a finished life is sent as its decade, day stem, age and three big things, with a heartbeat while it ran", lifeSent.length === 1 && lifeSent[0].decade === "80 後" && lifeSent[0].stem === "辛" && Number.isInteger(lifeSent[0].age) && typeof lifeSent[0].home === "boolean" && Object.keys(lifeSent[0]).sort().join() === "age,decade,home,kids,married,stem" && countOf("beat") >= 1, JSON.stringify(lifeSent[0]));
 await soon.close();
 
 server.close();

@@ -4,9 +4,11 @@
 // nothing else (worker/stats.js). Without the Worker (a file, or the Claude artifact) nothing is sent.
 const URL_ = (document.querySelector('meta[name="stats-endpoint"]') || {}).content || "";
 const on = !!URL_ && /^https?:$/.test(location.protocol);
+// The welcome page's numbers come from /api/live next to it (worker/app.js live).
+export const LIVE_URL = on ? URL_.replace(/\/api\/stats$/, "/api/live") : "";
 const LAST = "bazi-life.lastVisit";
 const MILESTONES = [[30, "t30"], [60, "t60"], [180, "t180"], [600, "t600"]];
-let page = "life", queue = [], seconds = 0, since = null, flushTimer = null;
+let page = "life", queue = [], seconds = 0, since = null, flushTimer = null, life = null;
 const once = new Set();
 
 // Taiwan's date, the day the totals are kept by.
@@ -44,6 +46,24 @@ function pause() {
   if (since) { seconds += (Date.now() - since) / 1000; since = null; }
 }
 
+// A finished life's anonymous summary (worker/stats.js readLife): the decade of birth, the day stem, the age and three
+// big things. It goes with the next batch; nothing else about the life or the person.
+export function sendLife(summary) {
+  if (!on) return;
+  life = summary;
+  track("end");
+}
+// While a life is being played the page beats once a minute, so the welcome page can say how many are playing now.
+// `playing` says whether one is; the first beat goes at once.
+let beatTimer = null;
+export function heartbeat(playing) {
+  if (!on) return;
+  clearInterval(beatTimer); beatTimer = null;
+  if (!playing()) return;
+  track("beat");
+  beatTimer = setInterval(() => { if (playing() && document.visibilityState !== "hidden") track("beat"); else { clearInterval(beatTimer); beatTimer = null; } }, 60000);
+}
+
 // One event; trackOnce also sends `${e}_u` the first time in this page load (how many visits did it at all).
 export function track(e) {
   if (!on) return;
@@ -60,9 +80,10 @@ export function trackOnce(e, alsoEach = true) {
 function flush() {
   clearTimeout(flushTimer);
   const s = Math.round(seconds);
-  if (!queue.length && s < 1) return;
+  if (!queue.length && s < 1 && !life) return;
   shown += s; seconds -= s;
-  const body = JSON.stringify({ p: page, e: queue.splice(0, 20), s });
+  const body = JSON.stringify({ p: page, e: queue.splice(0, 20), s, ...(life ? { life } : {}) });
+  life = null;
   if (queue.length) flushTimer = setTimeout(flush, 500);
   try {
     if (navigator.sendBeacon && navigator.sendBeacon(URL_, new Blob([body], { type: "text/plain" }))) return;

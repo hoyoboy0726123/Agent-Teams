@@ -13,7 +13,8 @@
 // asked for once more with the problems listed; a section part that fails twice answers 502 and the page offers to
 // write that part again, and a list keeps the engine's words for the entries the model missed.
 //
-// /api/stats and /admin: anonymous daily counts for the back office (worker/stats.js, worker/admin.js).
+// /api/stats and /admin: anonymous daily counts for the back office (worker/stats.js, worker/admin.js); /api/live: the
+// welcome page's numbers (lives finished, playing now, today's lives, the last few lives), for anyone.
 //
 // Bindings (wrangler.jsonc): AI (Workers AI), INTERPRET_LIMIT, READING_LIMIT and STATS_LIMIT (requests per minute per
 // IP), STATS (the Durable Object with the counts). AI_READING = "soon" turns /api/reading away; ADMIN_KEY (a secret)
@@ -25,7 +26,7 @@
 // to it). Nothing the player writes, and no reading, is logged or kept.
 import { interpretPrompt, readInterpretation, jsonFromText } from "../src/sim/interpret.js";
 import { readReadingRequest, readingPart, partPrompt, partTokens, checkPart, finishPart, READING_VERSION } from "../src/ai-reading.js";
-import { readStats, tableOf, sameKey, dayOf } from "./stats.js";
+import { readStats, tableOf, sameKey, dayOf, liveOf } from "./stats.js";
 import { ADMIN_HTML } from "./admin.js";
 
 export const MODEL = "@cf/google/gemma-4-26b-a4b-it";
@@ -201,6 +202,16 @@ export async function stats(request, env, ctx) {
   if (ctx && ctx.waitUntil) ctx.waitUntil(write.catch(() => {})); else await write;
   return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
 }
+// /api/live: what the welcome page shows, for anyone; cached for 20 seconds at the edge and in the browser.
+const LIVE_HEADERS = { ...JSON_HEADERS, "cache-control": "public, max-age=20", "access-control-allow-origin": "*" };
+let liveCache = null;
+export async function live(request, env) {
+  if (request.method !== "GET") return answer(405, { error: "method" });
+  if (!env.STATS) return answer(503, { error: "unavailable" });
+  const now = Date.now();
+  if (!liveCache || now - liveCache.at > 20e3) liveCache = { at: now, body: JSON.stringify(liveOf(await store(env).live(dayOf(now), now), now)) };
+  return new Response(liveCache.body, { headers: LIVE_HEADERS });
+}
 const ADMIN_HEADERS = {
   "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex, nofollow",
   "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", "x-frame-options": "DENY",
@@ -234,6 +245,7 @@ export function makeApp(pages) {
       if (pathname === "/api/interpret") return interpret(request, env);
       if (pathname === "/api/reading") return reading(request, env);
       if (pathname === "/api/stats") return stats(request, env, ctx);
+      if (pathname === "/api/live") return live(request, env);
       if (pathname === "/admin") return new Response(request.method === "HEAD" ? null : ADMIN_HTML, { headers: ADMIN_HEADERS });
       if (pathname.startsWith("/api/")) return answer(404, { error: "not found" });
       const html = Object.hasOwn(pages, pathname) ? pages[pathname] : null;

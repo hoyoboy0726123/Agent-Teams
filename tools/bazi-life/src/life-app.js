@@ -1,5 +1,5 @@
 // 命盤人生・人生模擬頁：生辰 → 命盤 → 一年一年過完一生 → 人生 K 線與同盤重跑 100 次。全部在瀏覽器裡算。
-import { computeChart } from "./core/chart.js";
+import { computeChart, fourPillars } from "./core/chart.js";
 import { PLACE_GROUPS, findPlace } from "./core/places.js";
 import { prepare } from "./sim/setup.js";
 import { createLife } from "./sim/life.js";
@@ -11,7 +11,7 @@ import { describeEffects, LEVEL_NAME } from "./core/name.js";
 import { checkFamily, familyTilts, describeFamilyTilts, isSibling } from "./core/family.js";
 import { describeViews } from "./core/analysis.js";
 import { luckGods } from "./core/detail.js";
-import { natalReading } from "./core/reading-natal.js";
+import { natalReading, DAY_MASTER_TEXT } from "./core/reading-natal.js";
 import { yearReading, decadeReading, eventReason } from "./core/reading-year.js";
 import { nameReading } from "./core/name-reading.js";
 import { overallReading } from "./core/reading-overall.js";
@@ -30,7 +30,7 @@ import { trait } from "./sim/words.js";
 import { initBaby } from "./baby-app.js";
 import { initMatch, onMatchTab, openMatch } from "./hehun-app.js";
 import { aiSoon } from "./ai-mode.js";
-import { initStats, track, trackOnce } from "./stats.js";
+import { initStats, track, trackOnce, sendLife, heartbeat, LIVE_URL } from "./stats.js";
 import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
 import { initTimeField, readTimeField, syncTimeField, timeFieldIds } from "./time-field.js";
@@ -69,12 +69,10 @@ function setup() {
   $("#f-place").value = "臺北市";
   for (const tab of TABS) $(`#tab-${tab}`).addEventListener("click", () => selectTab(tab));
   for (const b of document.querySelectorAll("[data-goto]")) b.addEventListener("click", () => { selectTab(b.dataset.goto); $("#setup").scrollIntoView({ behavior: "smooth", block: "start" }); });
-  // The first visit opens on 歡迎; once another tab is opened, later visits start on 我的人生 (this browser only).
-  // A reload goes back to the tab that was open.
-  let welcomed = false;
-  try { welcomed = localStorage.getItem("bazi-life.welcomed") === "1"; } catch {}
+  // Every visit opens on 歡迎 (the live numbers and 此刻的八字 are there); a reload goes back to the tab that was open.
   const lastTab = TAB_DRAFT.load();
-  selectTab(TABS.includes(lastTab) ? lastTab : welcomed ? "me" : "welcome");
+  selectTab(TABS.includes(lastTab) ? lastTab : "welcome");
+  initWelcome();
   initTimeField("f");
   initMemberHours($("#form-me"));
   initBaby({ begin, showError });
@@ -152,8 +150,8 @@ function selectTab(tab) {
     $(`#tab-${t}`).setAttribute("aria-selected", String(t === tab));
     $(PANEL[t]).hidden = t !== tab;
   }
-  if (tab !== "welcome") try { localStorage.setItem("bazi-life.welcomed", "1"); } catch {}
   TAB_DRAFT.save(tab);
+  if (tab === "welcome") refreshWelcome();
   saveFormSoon.flush();   // what was just typed in 我的人生 is saved before 合婚 reads it (hehun-app.js fillFromLife)
   onMatchTab(tab);
 }
@@ -314,6 +312,7 @@ function begin(input, born, extra = {}) {
   $("#born").textContent = born || `${input.date.y} 年 ${input.date.m} 月 ${input.date.d} 日在${input.place.name}出生。`;
   $("#c-ai-wrap").hidden = noAutoBox();   // nothing to switch on while the AI is not open or today's quota is used up
   track("start");
+  heartbeat(() => !!run && !run.life.done && !$("#play").hidden);
   paused = false; $("#c-pause").textContent = "暫停";
   updateStatus();
   window.scrollTo({ top: 0 });
@@ -544,6 +543,8 @@ function finish() {
     ...(s.written ? [["自己寫的決定", `${s.written} 次`]] : []),
   ];
   $("#end-facts").innerHTML = facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("");
+  // The welcome page's 剛剛走完的人生: the decade, the day stem, the age and three big things; nothing that points back.
+  sendLife({ decade: decadeOf(input.date.y), stem: chart.dayMaster.name, age: s.age, married: s.marriages, home: s.home === "own", kids: s.kids.length });
   $("#end").hidden = false;
   drawKline();
   drawTable();
@@ -1045,6 +1046,75 @@ function drawShare(peak) {
     <svg viewBox="0 0 300 60" preserveAspectRatio="none" aria-hidden="true"><polyline points="${line}" fill="none" stroke="var(--seal)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
     <span class="sub">人生高峰在 ${peak.age} 歲那年</span>
     <span class="foot">模擬故事，不是預言・命理推演僅供參考</span>`;
+}
+
+
+// ---------- 歡迎: the live numbers and 此刻的八字 ----------
+// /api/live (worker/stats.js liveOf) gives what there is enough of: total always; playing now and today's count from
+// 50 lives; today's averages from 20 lives today; the last few lives from 3. Each block shows only when its numbers came.
+const DECADES = ["1930 前", "30 後", "40 後", "50 後", "60 後", "70 後", "80 後", "90 後", "00 後", "10 後", "20 後", "未來"];
+const decadeOf = y => (y < 1930 ? DECADES[0] : y >= 2030 ? DECADES[11] : DECADES[1 + Math.floor((y - 1930) / 10)]);
+const ELEMENT_OF = { 甲: "木", 乙: "木", 丙: "火", 丁: "火", 戊: "土", 己: "土", 庚: "金", 辛: "金", 壬: "水", 癸: "水" };
+const ELEMENT_COLOR = { 木: "var(--wood)", 火: "var(--fire)", 土: "var(--earth)", 金: "var(--metal)", 水: "var(--water)" };
+const n0 = n => Number(n || 0).toLocaleString("zh-TW");
+let liveTimer = null, nowTimer = null;
+function initWelcome() {
+  drawNow();
+  nowTimer = setInterval(drawNow, 60000);
+  refreshWelcome();
+}
+// Fetch again when the tab is shown, and every 30 seconds while it is.
+function refreshWelcome() {
+  clearInterval(liveTimer);
+  if (!LIVE_URL) return;
+  const tick = () => { if ($("#welcome").hidden || $("#setup").hidden || document.visibilityState === "hidden") return; loadLive(); };
+  tick();
+  liveTimer = setInterval(tick, 30000);
+}
+async function loadLive() {
+  let d;
+  try { const r = await fetch(LIVE_URL, { cache: "no-store" }); if (!r.ok) return; d = await r.json(); } catch { return; }
+  drawLive(d);
+}
+function drawLive(d) {
+  const strip = $("#live-strip");
+  strip.hidden = !(d.total >= 1);
+  if (!strip.hidden) {
+    $("#live-total").textContent = n0(d.total);
+    const more = Number.isFinite(d.nowPlaying);
+    $("#live-now-box").hidden = !more; $("#live-today-box").hidden = !more;
+    if (more) { $("#live-now").textContent = n0(d.nowPlaying); $("#live-today").textContent = n0(d.today); }
+  }
+  const t = d.todayLives, today = $("#live-day");
+  today.hidden = !t;
+  if (t) {
+    $("#live-avg").textContent = `${t.avgAge} 歲`; $("#live-max").textContent = `${t.maxAge} 歲`;
+    $("#live-married").textContent = `${t.married}%`; $("#live-home").textContent = `${t.home}%`;
+    const max = Math.max(1, ...Object.values(t.elements || {}));
+    $("#live-elements").innerHTML = ["木", "火", "土", "金", "水"].map(e => `<div class="bar" style="--h:${Math.round(((t.elements || {})[e] || 0) / max * 100)}%; --c:${ELEMENT_COLOR[e]}"><i></i><span>${e}</span></div>`).join("");
+    $("#live-day-n").textContent = `今天 ${n0(t.n)} 段人生`;
+  }
+  const recent = $("#live-recent");
+  recent.hidden = !(d.recent && d.recent.length);
+  if (!recent.hidden) $("#live-recent-list").innerHTML = d.recent.map(l => {
+    const things = [l.married ? `結了 ${l.married} 次婚` : "沒有結婚", l.home ? "買了房" : "", l.kids ? `有 ${l.kids} 個孩子` : ""].filter(Boolean);
+    const el = ELEMENT_OF[l.stem] || "土";
+    return `<li><span class="stem" style="background:${ELEMENT_COLOR[el]}">${esc(l.stem)}</span><span><b>${esc(l.decade)}、${esc(l.stem)}${el}日主</b>，活到 ${l.age} 歲，${esc(things.join("，"))}<small>${l.ago < 1 ? "剛剛" : l.ago < 60 ? `${l.ago} 分鐘前` : l.ago < 1440 ? `${Math.floor(l.ago / 60)} 小時前` : `${Math.floor(l.ago / 1440)} 天前`}</small></span></li>`;
+  }).join("");
+}
+// 此刻出生的寶寶 in Taipei, by the clock (no true-solar correction: the point is the moment, not a real birth).
+function drawNow() {
+  const box = $("#live-now-chart");
+  if (!box) return;
+  const now = new Date(Date.now() + 8 * 3600e3);
+  const date = { y: now.getUTCFullYear(), m: now.getUTCMonth() + 1, d: now.getUTCDate() }, time = { h: now.getUTCHours(), mi: now.getUTCMinutes() };
+  let p;
+  try { p = fourPillars({ date, time, place: findPlace("臺北市"), options: { solar: "clock" } }); } catch { box.hidden = true; return; }
+  box.hidden = false;
+  const stem = p.day[0], t = DAY_MASTER_TEXT[stem] || {};
+  $("#now-clock").textContent = `臺北 ${String(time.h).padStart(2, "0")}:${String(time.mi).padStart(2, "0")}`;
+  for (const [k, id] of [["year", "now-y"], ["month", "now-m"], ["day", "now-d"], ["hour", "now-h"]]) $(`#${id}`).textContent = p[k];
+  $("#now-text").textContent = `${stem}${ELEMENT_OF[stem]}日主，如${t.image || ""}：${(t.nature || "").split("，").slice(0, 2).join("，")}。時柱每兩小時換一次，日主每天換一個。`;
 }
 
 setup();

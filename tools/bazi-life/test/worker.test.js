@@ -413,3 +413,49 @@ test("while AI 分析報告 is 敬請期待, /api/reading writes nothing", async
   assert.deepEqual(await res.json(), { error: "soon" });
   assert.equal(e.calls.length, 0);
 });
+
+// ---------- /api/live and the life summaries ----------
+import { readLife, liveOf, SHOW } from "../worker/stats.js";
+test("a finished life is kept only as its decade, day stem, age and three big things", () => {
+  assert.deepEqual(readLife({ decade: "80 後", stem: "丁", age: 86, married: 1, home: true, kids: 2, name: "陳志明" }), { decade: "80 後", stem: "丁", age: 86, married: 1, home: 1, kids: 2 });
+  assert.equal(readLife({ decade: "1988", stem: "丁", age: 86 }), null, "a year is not a decade");
+  assert.equal(readLife({ decade: "80 後", stem: "丁火", age: 86 }), null);
+  assert.equal(readLife({ decade: "80 後", stem: "丁", age: 130 }), null);
+  assert.deepEqual(readLife({ decade: "80 後", stem: "丁", age: 40, married: 99, kids: -3 }), { decade: "80 後", stem: "丁", age: 40, married: 9, home: 0, kids: 0 });
+  const e = statsEnv();
+  return worker.fetch(statsPost({ p: "life", e: ["end", "end_u"], life: { decade: "90 後", stem: "壬", age: 79, married: 0, home: false, kids: 0 } }), e).then(res => {
+    assert.equal(res.status, 204);
+    assert.deepEqual(e.adds[0].life, { decade: "90 後", stem: "壬", age: 79, married: 0, home: 0, kids: 0 });
+    assert.deepEqual(e.adds[0].counts, { end: 1, end_u: 1 });
+  });
+});
+
+test("the welcome page's numbers show only what there is enough of", () => {
+  const lives = Array.from({ length: 20 }, (_, i) => ({ decade: "80 後", stem: "甲乙丙丁戊己庚辛壬癸"[i % 10], age: 70 + i, married: i % 2, home: i % 3 === 0 ? 1 : 0, kids: i % 4 }));
+  const recent = lives.slice(0, 5).map((l, i) => ({ ...l, ts: 1000000 - i * 60000 }));
+  const quiet = liveOf({ total: 3, todayEnds: 3, beats: 1, lives: lives.slice(0, 2), recent: recent.slice(0, 2) }, 1000000);
+  assert.deepEqual(quiet, { total: 3 }, "a quiet first week shows only the total");
+  const busy = liveOf({ total: SHOW.strip, todayEnds: 40, beats: 7, lives, recent }, 1000000 + 120000);
+  assert.equal(busy.nowPlaying, 7);
+  assert.equal(busy.today, 40);
+  assert.equal(busy.todayLives.n, 20);
+  assert.equal(busy.todayLives.avgAge, 80);
+  assert.equal(busy.todayLives.maxAge, 89);
+  assert.equal(busy.todayLives.married, 50);
+  assert.deepEqual(busy.todayLives.elements, { 木: 4, 火: 4, 土: 4, 金: 4, 水: 4 });
+  assert.equal(busy.recent.length, 5);
+  assert.deepEqual(busy.recent[0], { decade: "80 後", stem: "甲", age: 70, married: 0, home: true, kids: 0, ago: 2 });
+  assert.ok(!("ts" in busy.recent[0]));
+});
+
+test("/api/live answers anyone with the numbers, cached for 20 seconds", async () => {
+  const lived = [];
+  const e = { STATS: { idFromName: n => n, get: () => ({ live: async (day, now) => { lived.push(day); return { total: 123, todayEnds: 9, beats: 2, lives: [], recent: [] }; } }) } };
+  const res = await worker.fetch(new Request(`${SITE}/api/live`), e);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get("cache-control"), /max-age=20/);
+  assert.deepEqual(await res.json(), { total: 123, nowPlaying: 2, today: 9 });
+  await worker.fetch(new Request(`${SITE}/api/live`), e);
+  assert.equal(lived.length, 1, "the second call within 20 s is answered from memory");
+  assert.equal((await worker.fetch(new Request(`${SITE}/api/live`, { method: "POST" }), e)).status, 405);
+});

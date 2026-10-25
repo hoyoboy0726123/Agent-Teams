@@ -129,6 +129,38 @@ body.story-open { overflow: hidden; }
 .welcome-privacy svg { flex: 0 0 auto; }
 .welcome-privacy .fine { font-size: 13px; color: var(--muted); }
 .welcome-go { display: flex; flex-wrap: wrap; gap: 10px; }
+.welcome-go .big { font-size: 17px; padding: 14px 22px; }
+.hero h2 { font-size: clamp(32px, 9vw, 44px); line-height: 1.25; letter-spacing: 1px; }
+.hero .lede { margin: 10px 0 0; font-size: 16px; color: var(--muted); max-width: 540px; }
+.welcome .tile { background: var(--sheet); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 12px; display: grid; gap: 2px; align-content: start; }
+.welcome .tile .k { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.welcome .tile .v { font-size: 26px; font-weight: 500; line-height: 1.2; }
+.welcome .tile .u { font-size: 12px; color: var(--muted); }
+.live-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; }
+.live-strip .tile[hidden] { display: none; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--down); display: inline-block; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+.now-chart { background: var(--indigo-wash); border-radius: 14px; padding: 14px 16px; display: grid; gap: 10px; }
+.now-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--indigo); font-weight: 500; }
+.now-head .num { color: var(--muted); font-weight: 400; font-size: 12px; }
+.now-pillars { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; text-align: center; }
+.now-pillars small { display: block; font-size: 11px; color: var(--muted); }
+.now-pillars b { display: block; font-family: var(--display); font-size: clamp(24px, 7vw, 32px); font-weight: 700; }
+.now-pillars .dm b { color: var(--metal); }
+.now-chart p { margin: 0; font-size: 13px; color: var(--ink); }
+.welcome h3 small { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 6px; }
+.recent { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.recent li { background: var(--sheet); border: 1px solid var(--rule); border-radius: 12px; padding: 10px 12px; display: flex; gap: 12px; align-items: center; font-size: 14px; }
+.recent .stem { width: 40px; height: 40px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center; font-family: var(--display); font-size: 20px; font-weight: 700; color: #fff; }
+.recent small { display: block; font-size: 12px; color: var(--muted); }
+.day-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+.tile.elements { gap: 8px; }
+.bars { display: flex; align-items: flex-end; gap: 6px; height: 56px; }
+.bars .bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%; }
+.bars .bar i { display: block; width: 100%; height: var(--h); min-height: 2px; background: var(--c); border-radius: 4px 4px 0 0; }
+.bars .bar span { font-size: 11px; color: var(--muted); }
+@media (min-width: 720px) { .day-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 details.family { border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); }
 details.family > summary { cursor: pointer; padding: 10px 12px; font-size: 14px; font-weight: 500; }
 details.family > summary small { font-weight: 400; color: var(--muted); }
@@ -545,15 +577,48 @@ footer a { color: var(--indigo); }
       <button type="button" role="tab" id="tab-match" aria-selected="false" aria-controls="form-match">合婚</button>
     </div>
     <div id="welcome" class="welcome" role="tabpanel" aria-labelledby="tab-welcome">
+      <div class="hero">
+        <h2>同一個生日，<br>一百種人生。</h2>
+        <p class="lede">輸入出生的日期、時間和地點，從 0 歲一年一年活到老。八字命盤只讓機率傾斜，方向還是你選的。</p>
+      </div>
       <figure class="welcome-scene">
         <canvas class="pixel" id="welcome-scene" width="128" height="44" aria-hidden="true"></canvas>
         <figcaption class="stages" id="welcome-stages"></figcaption>
       </figure>
-      <div class="welcome-intro">
-        <h2>歡迎來到命盤人生</h2>
-        <p>輸入一個生日，看看這張八字命盤會走出怎樣的一生。可以替自己、家人、另一半，甚至還沒出生的寶寶，各過一次人生。</p>
-        <p class="privacy-pill"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>資料在你的手機裡計算，網站不保存</p>
+      <div class="live-strip" id="live-strip" hidden aria-label="即時數據">
+        <div class="tile" id="live-now-box" hidden><span class="k"><i class="dot"></i>此刻在過人生</span><span class="v num" id="live-now">0</span><span class="u">人</span></div>
+        <div class="tile" id="live-today-box" hidden><span class="k">今天走完的人生</span><span class="v num" id="live-today">0</span><span class="u">段</span></div>
+        <div class="tile"><span class="k">至今一共</span><span class="v num" id="live-total">0</span><span class="u">段人生</span></div>
       </div>
+      <div class="now-chart" id="live-now-chart" hidden>
+        <div class="now-head"><span>此刻出生的寶寶，八字是</span><span class="num" id="now-clock"></span></div>
+        <div class="now-pillars">
+          <div><small>年柱</small><b id="now-y"></b></div>
+          <div><small>月柱</small><b id="now-m"></b></div>
+          <div class="dm"><small>日柱</small><b id="now-d"></b></div>
+          <div><small>時柱</small><b id="now-h"></b></div>
+        </div>
+        <p id="now-text"></p>
+      </div>
+      <div class="welcome-go">
+        <button type="button" class="primary big" data-goto="me">輸入生日，開始我的人生</button>
+        <button type="button" class="secondary" data-goto="random">不想填？隨機投胎</button>
+      </div>
+      <p class="privacy-pill"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>免費、不用註冊。資料在你的手機裡計算，網站不保存</p>
+      <section id="live-recent" hidden>
+        <h3>剛剛走完的人生 <small>匿名，只留下大事</small></h3>
+        <ul class="recent" id="live-recent-list"></ul>
+      </section>
+      <section id="live-day" hidden>
+        <h3>今天大家活得怎麼樣 <small id="live-day-n"></small></h3>
+        <div class="day-grid">
+          <div class="tile"><span class="k">平均活到</span><span class="v num" id="live-avg"></span></div>
+          <div class="tile"><span class="k">今天最長壽</span><span class="v num" id="live-max"></span></div>
+          <div class="tile"><span class="k">結了婚</span><span class="v num" id="live-married"></span></div>
+          <div class="tile"><span class="k">買了房</span><span class="v num" id="live-home"></span></div>
+        </div>
+        <div class="tile elements"><span class="k">今天的日主，誰最多</span><div class="bars" id="live-elements"></div></div>
+      </section>
       <section>
         <h3>怎麼玩</h3>
         <ol class="steps">
@@ -565,10 +630,10 @@ footer a { color: var(--indigo); }
       <section>
         <h3>好玩的地方</h3>
         <ul class="fun">
-          <li><b>同一張命盤，100 種人生</b>同樣的生日再過 100 次，看哪些事幾乎每次都發生，哪些只是可能。命盤只讓機率傾斜，方向還是你選的。</li>
+          <li><b>同一張命盤，100 種人生</b>同樣的生日再過 100 次，看哪些事幾乎每次都發生，哪些只是可能。</li>
           <li><b>人生 K 線</b>一生的起伏畫成像股票的走勢圖，高點、低點和關卡年，一眼就看到。</li>
           <li><b>台灣的時代背景</b>九二一、SARS、金融海嘯、新冠疫情……依出生的年份，你會在不同的年紀遇上它們。</li>
-          <li><b>家人和另一半都在故事裡</b>填上爸媽、兄弟姊妹和伴侶的生日，看你們合不合。另一半會真的走進你的人生，還能指定你們結婚的那一年。</li>
+          <li><b>家人和另一半都在故事裡</b>填上爸媽、兄弟姊妹和伴侶的生日，看你們合不合。另一半會真的走進你的人生。</li>
           <li><b>合婚</b>填兩個人的生日，馬上看契合度、關係類型、傳統合婚九項、相處說明書和未來十年的感情走勢。</li>
           <li><b>準爸媽模式</b>幫寶寶比較候選名字和出生時段，每個名字都過同樣的 100 次人生，比得公平。</li>
           <li><b>看得懂的八字詳批</b>四柱、十神、大運流年、神煞和姓名學，每一步怎麼算的都寫出來。</li>
@@ -577,11 +642,10 @@ footer a { color: var(--indigo); }
       <section class="welcome-privacy" aria-labelledby="privacy-title">
         <h3 id="privacy-title"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>你的資料在手機裡計算，網站不保存</h3>
         <p>生日、名字、家人和伴侶的資料，全部在你的手機（瀏覽器）裡計算，<strong>網站後台不保存這些資料</strong>。這個網站沒有帳號，也不需要登入。填到一半重新整理不會不見：資料只暫存在這個分頁裡，關掉網頁就跟著消失。為了讓你重玩時多遇到沒看過的題目，最近兩局問過哪些題目（只記題目種類）也放在這個分頁裡，一樣關掉就清掉。</p>
-        <p class="fine">只有「寫下你自己的決定」裡打的那一句話會交給 AI 判讀，送出前名字會換成「伴侶」「爸爸」這樣的稱呼，用完不保存。合婚分頁的合婚結果在手機上算，不會上傳。為了改進網站，我們只統計匿名的次數：有幾次瀏覽、畫面停留多久、按了哪些按鈕；不含生日、姓名或 IP，也沒有 cookie，認不出是誰。</p>
+        <p class="fine">只有「寫下你自己的決定」裡打的那一句話會交給 AI 判讀，送出前名字會換成「伴侶」「爸爸」這樣的稱呼，用完不保存。合婚分頁的合婚結果在手機上算，不會上傳。為了改進網站和首頁的即時數據，我們只統計匿名的次數：有幾次瀏覽、畫面停留多久、按了哪些按鈕；走完一生時另外記一筆「出生年代、日主、活到幾歲、結婚次數、有沒有買房、幾個孩子」，不含生日、姓名或 IP，也沒有 cookie，認不出是誰。</p>
       </section>
       <div class="welcome-go">
         <button type="button" class="primary" data-goto="me">開始我的人生</button>
-        <button type="button" class="secondary" data-goto="random">隨機投胎</button>
         <button type="button" class="secondary" data-goto="match">看兩個人合不合</button>
         <button type="button" class="secondary" data-goto="baby">準爸媽模式</button>
       </div>
