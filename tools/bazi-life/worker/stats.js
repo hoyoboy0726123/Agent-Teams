@@ -63,10 +63,11 @@ export function demoLive(real, now = Date.now()) {
   const rslot = Math.floor(now / 180e3), r2 = mulberry(rslot * 7 + 3);
   const fake = Array.from({ length: 5 }, (_, i) => {
     const age = Math.round(55 + r2() * 45), married = r2() < 0.68 ? (r2() < 0.15 ? 2 : 1) : 0;
-    return { decade: DECADES[3 + Math.floor(r2() * 6)], stem: STEMS[Math.floor(r2() * 10)], age, married, home: r2() < 0.7, kids: married ? Math.floor(r2() * 3) : 0, ago: [1, 4, 7, 12, 19][i] + Math.floor((now % 180e3) / 60e3) };
+    const k = r2(), kids = !married ? (k < 0.9 ? 0 : 1) : k < 0.25 ? 0 : k < 0.6 ? 1 : k < 0.9 ? 2 : 3;
+    return { decade: DECADES[3 + Math.floor(r2() * 6)], stem: STEMS[Math.floor(r2() * 10)], age, married, home: r2() < 0.7, kids, ago: [1, 4, 7, 12, 19][i] + Math.floor((now % 180e3) / 60e3) };
   });
   const realRecent = (real.recent || []).slice(0, 5).map(l => ({ decade: l.decade, stem: l.stem, age: l.age, married: l.married, home: !!l.home, kids: l.kids, ago: Math.max(0, Math.round((now - l.ts) / 60000)) }));
-  return { total, nowPlaying, today, todayLives, recent: [...realRecent, ...fake].slice(0, 5), demo: true };
+  return { total, nowPlaying, today, todayLives, recent: [...realRecent, ...fake].sort((a, b) => a.ago - b.ago).slice(0, 5), demo: true };
 }
 
 // What the welcome page shows (/api/live), from the store's answer { total, today, beats, lives, recent }: the small

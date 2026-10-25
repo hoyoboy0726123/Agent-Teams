@@ -471,7 +471,8 @@ test("demo numbers for a new site: plausible, the same within a half minute, gro
   assert.ok(a.recent.every(l => /後$/.test(l.decade) && "甲乙丙丁戊己庚辛壬癸".includes(l.stem) && l.age >= 55 && l.age <= 100 && typeof l.home === "boolean"));
   const c = demoLive({ total: 4, todayEnds: 1, beats: 2, lives: [], recent: [{ ts: evening - 60e3, decade: "80 後", stem: "丁", age: 86, married: 1, home: 1, kids: 2 }] }, evening);
   assert.ok(c.today > a.today, "more by the evening");
-  assert.deepEqual(c.recent[0], { decade: "80 後", stem: "丁", age: 86, married: 1, home: true, kids: 2, ago: 1 }, "a real life comes first");
+  assert.deepEqual(c.recent[0], { decade: "80 後", stem: "丁", age: 86, married: 1, home: true, kids: 2, ago: 1 }, "a real life a minute old comes first");
+  assert.ok(c.recent.every((l, i) => !i || l.ago >= c.recent[i - 1].ago), "newest first");
   const e = { LIVE_DEMO: "1", STATS: { idFromName: n => n, get: () => ({ live: async () => ({ total: 2, todayEnds: 0, beats: 0, lives: [], recent: [] }) }) } };
   const res = await worker.fetch(new Request(`${SITE}/api/live?x=1`), e);
   const body = await res.json();
