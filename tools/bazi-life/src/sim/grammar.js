@@ -26,21 +26,78 @@ function alternatives(inner) {
   return parts;
 }
 
-export function expand(template, vars = {}, rng = Math.random) {
+// `trace`, when given, records each pick: one { n, k, sub } per {a|b} group in the order met (a group without
+// alternatives, such as {{a|b}c}, adds its own groups to the same level), where sub traces the part picked. The draws
+// are the same with or without it. The English edition renders its own template with these picks (render below).
+export function expand(template, vars = {}, rng = Math.random, trace = null) {
   let out = "";
   for (let i = 0; i < template.length;) {
     if (template[i] !== "{") { out += template[i++]; continue; }
     const end = closing(template, i);
     if (end < 0) { out += template.slice(i); break; }
     const inner = template.slice(i + 1, end), parts = alternatives(inner);
-    if (parts.length > 1) out += expand(parts[Math.floor(rng() * parts.length)], vars, rng);
-    else if (/^\w+$/.test(inner)) {
+    if (parts.length > 1) {
+      const k = Math.floor(rng() * parts.length), sub = trace && [];
+      if (trace) trace.push({ n: parts.length, k, sub });
+      out += expand(parts[k], vars, rng, sub);
+    } else if (/^\w+$/.test(inner)) {
       const v = vars[inner];
       out += v === undefined || v === null ? `{${inner}}` : String(typeof v === "function" ? v() : v);
-    } else out += expand(inner, vars, rng);
+    } else out += expand(inner, vars, rng, trace);
     i = end + 1;
   }
   return out;
+}
+
+// {name} only, no alternatives and no random draws: what a template literal `…${name}…` gave (ctx.f in life.js).
+export function fill(template, vars = {}) {
+  return template.replace(/\{(\w+)\}/g, (all, k) => (vars[k] === undefined || vars[k] === null ? all : String(typeof vars[k] === "function" ? vars[k]() : vars[k])));
+}
+
+// Expands a template with the picks of a trace instead of random draws: the n-th {a|b} group takes the part the
+// n-th group of the traced template took (modulo its own count, and the first part past the end of the trace).
+// {name} and {name:filter…} are written by `value(spec)`; see lang.js for the filters.
+export function render(template, trace, value) {
+  const cursor = { i: 0 };
+  const walk = (t, tr, cur) => {
+    let out = "";
+    for (let i = 0; i < t.length;) {
+      if (t[i] !== "{") { out += t[i++]; continue; }
+      const end = closing(t, i);
+      if (end < 0) { out += t.slice(i); break; }
+      const inner = t.slice(i + 1, end), parts = alternatives(inner);
+      if (parts.length > 1) {
+        const step = tr[cur.i++], k = step ? step.k % parts.length : 0;
+        out += walk(parts[k], step ? step.sub || [] : [], { i: 0 });
+      } else if (/^\w+(:[^{}|]*)?$/.test(inner)) out += value(inner);
+      else out += walk(inner, tr, cur);
+      i = end + 1;
+    }
+    return out;
+  };
+  return walk(template, trace || [], cursor);
+}
+
+// The shape a translation must keep: the {name}s used anywhere (without filters), and the number of parts of each
+// top-level {a|b} group, in order (groups inside a group without alternatives count as top-level, as in expand).
+// byPart: for each top-level group, the names each of its parts uses (lazy slots such as {friend} must match).
+export function shape(template) {
+  const vars = new Set(), alts = [], byPart = [];
+  const names = t => { const out = new Set(); for (const m of t.matchAll(/\{(\w+)(?::[^{}|]*)?\}/g)) out.add(m[1]); return out; };
+  for (const m of template.matchAll(/\{(\w+)(?::[^{}|]*)?\}/g)) vars.add(m[1]);
+  const walk = t => {
+    for (let i = 0; i < t.length;) {
+      if (t[i] !== "{") { i++; continue; }
+      const end = closing(t, i);
+      if (end < 0) break;
+      const inner = t.slice(i + 1, end), parts = alternatives(inner);
+      if (parts.length > 1) { alts.push(parts.length); byPart.push(parts.map(p => [...names(p)].sort())); }
+      else if (!/^\w+(:[^{}|]*)?$/.test(inner)) walk(inner);
+      i = end + 1;
+    }
+  };
+  walk(template);
+  return { vars: [...vars].sort(), alts, byPart };
 }
 
 // How many different sentences a template can make (for the variety tests).

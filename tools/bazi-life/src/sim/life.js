@@ -11,7 +11,8 @@ import { familyTilts, isSibling, isOlder, RELATIONS, partnerNote } from "../core
 import { ALL_EVENTS, deathEvent } from "./story/index.js";
 import { ACTIONS } from "./actions.js";
 import { act, closeSpell } from "./act.js";
-import { expand } from "./grammar.js";
+import { expand, fill } from "./grammar.js";
+import { makeLang } from "./lang.js";
 import { initTraits, nudge, styleWeight } from "./traits.js";
 import { newPerson, pronoun } from "./people.js";
 import { chatTool, tripPlace, jobElement } from "./world.js";
@@ -98,7 +99,11 @@ const STYLE_NUDGE = { risk: [["drive", 0.02], ["caution", -0.02]], safe: [["caut
 //   seen       the kinds of question the player was asked in recent lives (the page keeps them for this tab only).
 //              Everyday questions among them come up less often (NOVELTY) and the others a little more (FRESH), so a
 //              replay brings other situations; the big decisions, and questions certain in their year, are as always.
-export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed = 1, auto = false, policy = null, county = null, name = null, family = null, majorOnly = false, seen = null }) {
+//   lang       "zh" (the default) or "en" with `catalog`, the English bundle (lang.js). The life is the same in both:
+//              English only changes the words the story shows, never a draw.
+export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed = 1, auto = false, policy = null, county = null, name = null, family = null, majorOnly = false, seen = null, lang = "zh", catalog = null }) {
+  if (lang !== "zh" && lang !== "en") throw new Error(`unknown language ${lang}`);
+  const en = lang === "en" ? makeLang(catalog) : null;
   const rng = makeRng(seed);
   const recent = seen && seen.length ? new Set(seen) : null;
   // A separate stream decides whether the calibrated core events happen and who dies when, so adding a story
@@ -133,20 +138,32 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     friend: () => (scene.friend ??= (() => { const f = s.friends.filter(x => x.alive); return f.length ? rng.pick(f).call : "老朋友"; })()),
     grand: s.sex === "female" ? "阿嬤" : "阿公", chat: chatTool(s.year), trip: () => (scene.trip ??= tripPlace(s, ctx)), age: s.age, year: s.year,
   });
+  // In English the Chinese is expanded all the same (the same draws and the same check against sentences already
+  // told), and its picks are traced so the English template can take the same ones. The lazy slots ({friend},
+  // {trip}) are read back from the scene rather than drawn again.
   function words(templates, vars = {}) {
     const list = Array.isArray(templates) ? templates : [templates];
     const fresh = list.filter(t => !s.used.has(t));
     const template = rng.pick(fresh.length ? fresh : list);
     s.used.add(template);
     const all = { ...slots(), ...vars };
-    let text = expand(template, all, rng);
-    for (let i = 0; i < 6 && s.used.has(text); i++) text = expand(template, all, rng);
+    const trace = en && [];
+    let text = expand(template, all, rng, trace);
+    for (let i = 0; i < 6 && s.used.has(text); i++) { if (trace) trace.length = 0; text = expand(template, all, rng, trace); }
     s.used.add(text);
-    return text;
+    if (!en) return text;
+    const lazy = { friend: () => scene.friend ?? "老朋友", trip: () => scene.trip ?? "墾丁" };
+    for (const k of Object.keys(lazy)) if (k in vars) delete lazy[k];
+    return en.w(template, { ...all, ...lazy }, trace, text);
   }
+  // A template with {name}s only, for what would be a template literal: no draws, so `…${x}…` → ctx.f("…{x}…", { x })
+  // gives the same Chinese, and the English has a stable key.
+  const filled = (template, vars = {}) => (en ? en.f(template, vars) : fill(template, vars));
+  // A plain string the story shows, in this life's language.
+  const shown = t => (en ? en.text(t) : t);
 
   const ctx = {
-    rng, R, chart, analysis, s, luckAt: yearLuck, tiltOf, name, family, w: words,
+    rng, R, chart, analysis, s, luckAt: yearLuck, tiltOf, name, family, w: words, f: filled, lang,
     // The chance of a good (or bad) turn of `domain` this year, from a base probability.
     odds: (domain, channel, p) => tilt(p, tiltOf({ domain, channel })),
     roll: (domain, channel, p) => rng() < tilt(p, tiltOf({ domain, channel })),
@@ -212,11 +229,11 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     if (s.rel === "married" && s.partner && s.partner.real && s.flags.realPartnerWed === undefined) s.flags.realPartnerWed = s.age;
     if (!out || !out.text) return null;
     const why = explain(ev, l, lnm);
-    const entry = { age: s.age, year: s.year, id: ev.id, domain: ev.domain, channel: ev.channel, text: out.text, mood: out.mood || 0, reason: why && why.text, reasonFrom: why && why.from, big: !!(out.big || ev.big), choice, asked, free, picked };
+    const entry = { age: s.age, year: s.year, id: ev.id, domain: ev.domain, channel: ev.channel, text: shown(out.text), mood: out.mood || 0, reason: why && why.text, reasonFrom: why && why.from, big: !!(out.big || ev.big), choice: shown(choice), asked, free, picked };
     s.happiness = Math.max(0, Math.min(100, s.happiness + (out.mood || 0)));
     log.push(entry);
     // Big moments are remembered, so later years can look back on them.
-    if (entry.big && ev.id !== "death" && ev.id !== "birth") s.memory.push({ kind: ev.id, text: out.text, age: s.age, year: s.year, mood: out.mood || 0 });
+    if (entry.big && ev.id !== "death" && ev.id !== "birth") s.memory.push({ kind: ev.id, text: entry.text, age: s.age, year: s.year, mood: out.mood || 0 });
     return entry;
   }
 
@@ -258,8 +275,8 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
       const top = ws.indexOf(Math.max(...ws)), second = Math.max(0, ...ws.filter((_, k) => k !== top));
       const lean = ws.filter(w => w > 0).length >= 2 && second > 0 && ws[top] >= 1.12 * second ? top : -1;
       pending = {
-        id: ev.id, prompt: c.prompt, why: explain(ev, l, lnm), lean,
-        options: options.map((o, k) => ({ id: o.id || null, label: o.label, hint: o.hint || "", act: o.act || null, style: o.style || null, lean: k === lean })),
+        id: ev.id, prompt: shown(c.prompt), why: explain(ev, l, lnm), lean,
+        options: options.map((o, k) => ({ id: o.id || null, label: shown(o.label), hint: shown(o.hint || ""), act: o.act || null, style: o.style || null, lean: k === lean })),
         // What the free-text interpreter needs: the question, the protagonist in a few words, and the buttons.
         free: c.free === false ? null : { situation: c.prompt, context: c.context || situationContext(s), options: options.filter(o => o.id).map(o => ({ id: o.id, label: o.label, hint: o.hint || "" })) },
         ev, c, list: options, l, lnm,
@@ -404,6 +421,9 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     setMajorOnly(on) { majorOnly = !!on; },
     get pending() { return pending && { id: pending.id, prompt: pending.prompt, options: pending.options, why: pending.why, free: pending.free, lean: pending.lean }; },
     get done() { return !s.alive; },
+    lang,
+    // In English: the Chinese this life showed that has no English yet (templates, strings, words).
+    get untranslated() { return en ? [...en.missing] : []; },
   };
 }
 
