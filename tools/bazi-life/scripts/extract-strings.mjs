@@ -23,10 +23,11 @@ import { shape } from "../src/sim/lang.js";
 import { english } from "./story-bundle.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const DIRS = ["src/sim", "src/core"];
+// Folders, and single files of the page that write reading and result text through core/tr.js.
+const DIRS = ["src/sim", "src/core", "src/report.js", "src/life-app.js", "src/hehun-app.js", "src/baby-app.js", "src/pixel-app.js"];
 const CJK = /[\u3400-\u9fff\uf900-\ufaff]/;
 const CJK_ANY = /[\u3000-\u303f\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]/;   // Han, and CJK and full-width punctuation
-const SHOWN = new Set(["w", "f", "prompt", "label", "hint", "text", "topic"]);
+const SHOWN = new Set(["w", "f", "tr", "trw", "prompt", "label", "hint", "text", "topic"]);
 const KEYS = new Set(["prompt", "label", "hint", "text", "topic"]);
 
 // ---------- tokenizer ----------
@@ -54,7 +55,7 @@ export function scan(src) {
   // Chinese strings, and templates of ctx.w / ctx.f without Chinese ("{lead}{ask}"), which have English too.
   const record = (value, at, mixed, kind) => {
     const use = context();
-    if (CJK.test(value) || ((use === "w" || use === "f") && /\{\w+\}/.test(value))) found.push({ value, line: at, mixed, use, kind });
+    if (CJK.test(value) || ((use === "w" || use === "f" || use === "tr") && /\{\w+\}/.test(value))) found.push({ value, line: at, mixed, use, kind });
   };
 
   function quoted(q) {
@@ -133,7 +134,8 @@ export function scan(src) {
       // punctuation
       if (c === "(" || c === "[" || c === "{") {
         // ctx.w( … ) and ctx.f( … ): a call whose strings are templates
-        const call = c === "(" && prev && prev.t === "ident" && (prev.v === "w" || prev.v === "f") && prev2 && prev2.t === "punct" && prev2.v === "." ? prev.v : null;
+        // and tr( … ) / trw( … ) of the readings (core/tr.js), called as plain functions
+        const call = c === "(" && prev && prev.t === "ident" && ((prev.v === "w" || prev.v === "f") && prev2 && prev2.t === "punct" && prev2.v === "." || (prev.v === "tr" || prev.v === "trw") && !(prev2 && prev2.t === "punct" && prev2.v === ".")) ? prev.v : null;
         stack.push({ key: null, call });
         if (c === "{") depth++;
         push({ t: "punct", v: c }); i++; continue;
@@ -173,9 +175,13 @@ async function files() {
       else if (e.name.endsWith(".js")) out.push(p);
     }
   };
-  for (const d of DIRS) await walk(d);
+  for (const d of DIRS) { if (d.endsWith(".js")) out.push(d); else await walk(d); }
   return out.sort();
 }
+
+// English may keep a Chinese term in brackets after its English, the way the readings explain terms: "your Day Master
+// (日主)". Bracketed Chinese of up to 12 characters is allowed; any other Chinese in the English is a problem.
+const bare = text => String(text).replace(/\(([\u3400-\u9fff\uf900-\ufaff、]{1,12})\)/g, "");
 
 export async function extract() {
   const entries = {}, perFile = {};
@@ -202,9 +208,9 @@ export function check(zhStrings, en) {
   const sameList = (a, b) => a.length === b.length && a.every((x, k) => x === b[k]);
   for (const [zh, text] of Object.entries(en.story)) {
     const where = en.from[zh];
-    if (!zhStrings.has(zh)) problems.push({ where, zh, problem: "no such Chinese string in src/sim or src/core (changed or removed?)" });
+    if (!zhStrings.has(zh)) problems.push({ where, zh, problem: "no such Chinese string in the scanned code (changed or removed?)" });
     if (typeof text !== "string" || !text.trim()) { problems.push({ where, zh, problem: "empty English" }); continue; }
-    if (CJK_ANY.test(text)) problems.push({ where, zh, problem: `Chinese left in the English: ${text}` });
+    if (CJK_ANY.test(bare(text))) problems.push({ where, zh, problem: `Chinese left in the English: ${text}` });
     const a = shape(zh), b = shape(text);
     if (!sameList(a.vars, b.vars)) problems.push({ where, zh, problem: `{vars} differ: ${a.vars.join(",") || "none"} vs ${b.vars.join(",") || "none"}` });
     if (!sameList(a.alts, b.alts)) problems.push({ where, zh, problem: `top-level {a|b} parts differ: [${a.alts}] vs [${b.alts}]` });

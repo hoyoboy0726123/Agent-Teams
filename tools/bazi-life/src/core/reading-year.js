@@ -19,6 +19,23 @@
 // traditional remedy, never as a verdict. Readings are cached per chart and analysis: treat them as read-only.
 import { pillarOf, groupOf, elementOf } from "./analysis.js";
 import { luckRelations, luckStars, taisui, luckGods, elementRoles, natalStars, starContext, GOD_GROUP } from "./detail.js";
+import { tr, trw, readingLang } from "./tr.js";
+// English (README「英文版（翻譯層）」): every sentence goes through tr() and every lone word through trw(); the English
+// is src/i18n/en/reading-year.json, the terms src/i18n/en/bazi-terms.json. The Chinese is exactly what it was. Text
+// that is cut, joined or measured below is done the English way in English: sentences end in "." and are joined by a
+// space, a signal's text starts with a capital, lengths allow for English being about 2.6 times longer.
+const EN = () => readingLang() === "en";
+const cap = s => (EN() && typeof s === "string" ? s.replace(/^(\W*)([a-z])/, (all, lead, ch) => lead + ch.toUpperCase()) : s);
+const LIM = n => (EN() ? Math.round(n * 2.6) : n);
+const SEMI = () => (EN() ? "; " : "；");
+const unend = s => s.replace(EN() ? /\.$/ : /。$/, "");
+// "Bing Wu (丙午)": a pillar's Chinese after its first mention in English.
+const withZh = (text, zh) => (EN() ? text.replace(trw(zh), m => `${m} (${zh})`) : text);
+// A list: 「甲、乙、丙」, "a, b and c".
+const both = list => (list.length < 2 ? list[0] : tr("{yrFirst}、{yrSecond}", { yrFirst: list.slice(0, -1).join(EN() ? ", " : "、"), yrSecond: list[list.length - 1] }));
+const PILLAR_ZH = { year: "年柱", month: "月柱", day: "日柱", hour: "時柱" };
+const BRANCH_AT = { year: "年支{b}", day: "日支{b}", hour: "時支{b}" };
+const STEM_AT = { year: "年干{s}", month: "月干{s}", hour: "時干{s}" };
 
 // ---------- words ----------
 const STEM_EL = { 甲: "木", 乙: "木", 丙: "火", 丁: "火", 戊: "土", 己: "土", 庚: "金", 辛: "金", 壬: "水", 癸: "水" };
@@ -60,21 +77,25 @@ const GOD = {
 const st = s => `${s}${STEM_EL[s]}`;    // 甲木
 const br = b => `${b}${BRANCH_EL[b]}`;  // 子水
 // A natal branch or stem by its pillar: 「月令寅木」「日支丑土」「時干戊土」「日主辛金」, or the decade's.
-const branchAt = (R, b) => (R === "month" ? `月令${br(b)}` : R === "decade" ? `大運${br(b)}` : `${ROLE_ZH[R]}支${br(b)}`);
-const stemAt = (R, s) => (R === "day" ? `日主${st(s)}` : R === "decade" ? `大運${st(s)}` : `${ROLE_ZH[R]}干${st(s)}`);
+const branchAt = (R, b) => (R === "month" ? tr("月令{b}", { b: br(b) }) : R === "decade" ? tr("大運{b}", { b: br(b) }) : tr(BRANCH_AT[R], { b: br(b) }));
+const stemAt = (R, s) => (R === "day" ? tr("日主{s}", { s: st(s) }) : R === "decade" ? tr("大運{s}", { s: st(s) }) : tr(STEM_AT[R], { s: st(s) }));
 const stageOf = age => (age < 12 ? "child" : age < 18 ? "teen" : age < 65 ? "adult" : "senior");
 const grown = stage => stage === "adult" || stage === "senior";
 const round2 = x => Math.round(x * 100) / 100;
 const clampLevel = x => (x >= 1.5 ? 2 : x >= 0.5 ? 1 : x <= -1.5 ? -2 : x <= -0.5 ? -1 : 0);
-const end = s => (/[。！？]$/.test(s) ? s : `${s}。`);
-const joinNotes = list => end(list.join("；"));
+const end = s => (EN() ? (/[.!?…]$/.test(s) ? s : `${s}.`) : /[。！？]$/.test(s) ? s : `${s}。`);
+const joinNotes = list => (EN() ? list.map(end).join(" ") : end(list.join("；")));
 
 // ---------- the chart, once ----------
 const cache = new WeakMap();
 function contextOf(chart, analysis) {
   let byAnalysis = cache.get(chart);
   if (!byAnalysis) cache.set(chart, (byAnalysis = new WeakMap()));
-  let c = byAnalysis.get(analysis);
+  // One context per language: the cached readings hold their text.
+  let byLang = byAnalysis.get(analysis);
+  if (!byLang) byAnalysis.set(analysis, (byLang = {}));
+  const lang = readingLang();
+  let c = byLang[lang];
   if (c) return c;
   const natal = chart.pillars.map(p => ({ role: p.role, name: p.name, stem: p.stem.name, branch: p.branch.name, stemEl: p.stem.element, branchEl: p.branch.element, stemGod: p.stem.god, branchGod: p.branch.god }));
   const byRole = Object.fromEntries(natal.map(n => [n.role, n]));
@@ -92,16 +113,16 @@ function contextOf(chart, analysis) {
     stars: natalStars(chart), starCtx: starContext(chart), years: new Map(), decades: new Map(),
     yearBranch: byRole.year.branch, zodiac: ZODIAC[byRole.year.branch],
   };
-  byAnalysis.set(analysis, c);
+  byLang[lang] = c;
   return c;
 }
 const fav = (c, e) => c.favor[e] || 0;
 // 中和 charts lean one way only a little: they are 「日主能任」「日主偏強／偏弱」, not 身強／身弱.
-const canTake = c => (c.strength === "中和" ? "日主能任" : "身強能任");
+const canTake = c => (c.strength === "中和" ? tr("日主能任") : tr("身強能任"));
 const good = (c, e) => fav(c, e) >= 0.25;
 const bad = (c, e) => fav(c, e) <= -0.25;
 const markOf = v => (v >= 0.25 ? "喜" : v <= -0.25 ? "忌" : "平");
-const roleSay = (c, e) => (c.roles[e] === "閒神" ? `${e}為閒神，影響不大` : `${e}是你的${c.roles[e]}`);
+const roleSay = (c, e) => (c.roles[e] === "閒神" ? tr("{el}為閒神，影響不大", { el: e }) : tr("{el}是你的{role}", { el: e, role: c.roles[e] }));
 const sideOf = (c, e) => (good(c, e) ? "good" : bad(c, e) ? "bad" : "mid");
 
 function pillarInfo(c, name) {
@@ -110,9 +131,11 @@ function pillarInfo(c, name) {
 }
 
 function signal(id, o) {
-  const s = { id, kind: o.kind, tone: o.tone || "中", weight: o.weight || 3, domains: o.domains || {}, change: o.change || [], tags: o.tags || [], text: end(o.text), short: o.short, notes: o.notes || {} };
-  if (o.shorts) s.shorts = o.shorts;
-  if (o.headline) s.headline = o.headline;
+  const notes = o.notes || {};
+  if (EN()) for (const k of Object.keys(notes)) notes[k] = cap(notes[k]);
+  const s = { id, kind: o.kind, tone: o.tone || "中", weight: o.weight || 3, domains: o.domains || {}, change: o.change || [], tags: o.tags || [], text: cap(end(o.text)), short: cap(o.short), notes };
+  if (o.shorts) { s.shorts = o.shorts; if (EN()) for (const k of Object.keys(s.shorts)) s.shorts[k] = cap(s.shorts[k]); }
+  if (o.headline) s.headline = cap(o.headline);
   if (o.point === false) s.point = false;
   if (o.context) s.context = true;
   if (o.amplify) s.amplify = o.amplify;
@@ -140,9 +163,13 @@ function godSignals(c, W) {
 }
 
 function godLabel(W, xs) {
-  const P = W.P, pre = W.mode === "flow" ? "" : "大運";
-  if (xs.length === 2) return xs[0].god === xs[1].god ? `${pre}${P.name}干支皆${xs[0].god}` : `${pre}${st(P.stem)}${xs[0].god}、${br(P.branch)}${xs[1].god}`;
-  return xs[0].part === "stem" ? `${pre}${st(P.stem)}${xs[0].god}透干` : `${pre}${br(P.branch)}${xs[0].god}坐支`;
+  const P = W.P, dec = W.mode !== "flow";
+  if (xs.length === 2) {
+    return xs[0].god === xs[1].god
+      ? tr(dec ? "大運{name}干支皆{god}" : "{name}干支皆{god}", { name: P.name, god: xs[0].god })
+      : tr(dec ? "大運{s}{god}、{b}{god2}" : "{s}{god}、{b}{god2}", { s: st(P.stem), god: xs[0].god, b: br(P.branch), god2: xs[1].god });
+  }
+  return xs[0].part === "stem" ? tr(dec ? "大運{s}{god}透干" : "{s}{god}透干", { s: st(P.stem), god: xs[0].god }) : tr(dec ? "大運{b}{god}坐支" : "{b}{god}坐支", { b: br(P.branch), god: xs[0].god });
 }
 
 function godSignal(c, W, group, xs) {
@@ -152,156 +179,156 @@ function godSignal(c, W, group, xs) {
   const sign = isGood ? 1 : isBad ? -1 : 0;
   const tone = isGood ? "吉" : isBad ? "凶" : "中";
   const notes = {}, domains = {}, change = [], tags = [], shorts = {};
-  let theme = both ? null : GOD[god].theme, core = both ? null : GOD[god][side], extra = "";
+  let theme = both ? null : tr(GOD[god].theme), core = both ? null : tr(GOD[god][side]), extra = "";
   switch (group) {
     case "官殺": {
       const sha = gods.includes("七殺"), guan = gods.includes("正官");
-      if (both) { theme = "正官七殺同現（官殺並見），責任與壓力同時湧來"; core = isGood ? (c.weak ? "官殺為喜，權責加重而能擔當" : `${canTake(c)}，權責一起加重`) : isBad ? "壓力與規矩兩頭夾，宜量力而為" : "工作上的責任加重"; }
-      if (stage === "child") { theme = "官殺對孩子來說是規矩與管教"; core = "學校、家裡的要求變多"; }
-      else if (stage === "teen") core = `考試與師長的要求變多，${isGood ? "壓力反而成為動力" : "容易感到緊繃"}`;
-      notes.career = stage === "child" ? `${lbl}：規矩與管教變多，學校、家裡的要求比較嚴`
-        : stage === "teen" ? `${lbl}：考試與師長的要求變多，${isGood ? "壓力反而成為動力" : "容易感到緊繃，宜調整步調"}`
-          : `${lbl}，${say}：${isGood ? (sha && !guan ? "敢扛事、能掌權，有突破與升遷的機會" : "利升遷、考核，容易受上司肯定") : isBad ? "責任與壓力偏重，宜量力而為、避免和上司硬碰硬" : "工作上責任加重，有壓力也有機會"}`;
+      if (both) { theme = tr("正官七殺同現（官殺並見），責任與壓力同時湧來"); core = isGood ? (c.weak ? tr("官殺為喜，權責加重而能擔當") : tr("{take}，權責一起加重", { take: canTake(c) })) : isBad ? tr("壓力與規矩兩頭夾，宜量力而為") : tr("工作上的責任加重"); }
+      if (stage === "child") { theme = tr("官殺對孩子來說是規矩與管教"); core = tr("學校、家裡的要求變多"); }
+      else if (stage === "teen") core = tr("考試與師長的要求變多，{how}", { how: isGood ? tr("壓力反而成為動力") : tr("容易感到緊繃") });
+      notes.career = stage === "child" ? tr("{lbl}：規矩與管教變多，學校、家裡的要求比較嚴", { lbl })
+        : stage === "teen" ? tr("{lbl}：考試與師長的要求變多，{how}", { lbl, how: isGood ? tr("壓力反而成為動力") : tr("容易感到緊繃，宜調整步調") })
+          : tr("{lbl}，{say}：{what}", { lbl, say, what: isGood ? (sha && !guan ? tr("敢扛事、能掌權，有突破與升遷的機會") : tr("利升遷、考核，容易受上司肯定")) : isBad ? tr("責任與壓力偏重，宜量力而為、避免和上司硬碰硬") : tr("工作上責任加重，有壓力也有機會") });
       domains.career = grown(stage) ? 0.6 * sign : 0.2 * sign;
       change.push("career");
       tags.push(...(isGood ? ["promotion", "job"] : isBad ? ["conflict", "jobLoss", "job"] : ["job", "promotion"]));
-      shorts.career = `${lbl}`;
+      shorts.career = lbl;
       if (sex === "female" && stage !== "child") {
-        notes.love = stage === "teen" ? "官殺是女命的異性緣星，容易有心儀或追求的對象"
-          : stage === "senior" ? "官殺是女命的夫星，與老伴的相處被引動"
-            : both ? "官殺並見，追求者多、感情容易複雜，宜專一"
-              : guan ? `正官是女命的夫星，${now}被引動，感情容易有進展、利論及婚嫁`
-                : "七殺是女命的偏夫星，異性緣與情緣被引動，但對象可能較強勢，宜看清楚";
+        notes.love = stage === "teen" ? tr("官殺是女命的異性緣星，容易有心儀或追求的對象")
+          : stage === "senior" ? tr("官殺是女命的夫星，與老伴的相處被引動")
+            : both ? tr("官殺並見，追求者多、感情容易複雜，宜專一")
+              : guan ? tr("正官是女命的夫星，{now}被引動，感情容易有進展、利論及婚嫁", { now })
+                : tr("七殺是女命的偏夫星，異性緣與情緣被引動，但對象可能較強勢，宜看清楚");
         domains.love = both ? -0.2 : guan ? 0.6 : 0.3;
         change.push("love");
         tags.push(guan && !both ? "marriage" : "romance");
-        shorts.love = both ? "官殺並見，追求者多" : guan ? "正官夫星透出" : "七殺情緣星被引動";
-        extra = guan && !both ? "女命正官是夫星，感情也被引動" : "女命官殺是夫星，感情也被引動";
+        shorts.love = both ? tr("官殺並見，追求者多") : guan ? tr("正官夫星透出") : tr("七殺情緣星被引動");
+        extra = guan && !both ? tr("女命正官是夫星，感情也被引動") : tr("女命官殺是夫星，感情也被引動");
       }
       if (sex === "male" && grown(stage)) {
-        notes.family = stage === "senior" ? "男命官殺為子女星，子孫晚輩的事被引動" : "男命官殺為子女星，添丁或和孩子有關的事被引動";
+        notes.family = stage === "senior" ? tr("男命官殺為子女星，子孫晚輩的事被引動") : tr("男命官殺為子女星，添丁或和孩子有關的事被引動");
         domains.family = 0.2;
         change.push("family");
         tags.push("children");
-        shorts.family = "官殺子女星被引動";
-        extra = extra || "男命官殺為子女星，和孩子的緣分被引動";
+        shorts.family = tr("官殺子女星被引動");
+        extra = extra || tr("男命官殺為子女星，和孩子的緣分被引動");
       }
       if (sha && isBad) {
-        notes.health = `${lbl}且為忌神，壓力直接衝著自己，容易疲累、睡不好，宜多休息`;
+        notes.health = tr("{lbl}且為忌神，壓力直接衝著自己，容易疲累、睡不好，宜多休息", { lbl });
         domains.health = -0.4;
         tags.push("health");
-        shorts.health = `${lbl}，壓力衝著自己`;
+        shorts.health = tr("{lbl}，壓力衝著自己", { lbl });
       }
-      if (stage === "teen" || (stage === "adult" && W.age < 24)) notes.study = `官殺代表考試與紀律，${isGood ? "有壓力也有動力，利拚考試" : "考試壓力偏重，宜按部就班準備"}`;
+      if (stage === "teen" || (stage === "adult" && W.age < 24)) notes.study = tr("官殺代表考試與紀律，{how}", { how: isGood ? tr("有壓力也有動力，利拚考試") : tr("考試壓力偏重，宜按部就班準備") });
       break;
     }
     case "財": {
       const zheng = gods.includes("正財"), pian = gods.includes("偏財");
-      if (both) { theme = "正偏財並見，財源多元"; core = isGood ? "財源多、收入有成長" : isBad ? "錢財進出大，開銷也多" : "錢財進出變多"; }
-      if (isBad && c.weak && grown(stage)) core = `${core}（財多身弱）`;
-      if (stage === "child") { theme = "財星對孩子來說代表父親與家境（偏財為父）"; core = isGood ? "家境較寬裕" : isBad ? "家中開銷較大" : "家境平穩"; }
-      notes.wealth = stage === "child" ? `${lbl}：財星代表家境與父親，${isGood ? "家境較寬裕" : isBad ? "家中開銷較大" : "家境平穩"}`
-        : stage === "teen" ? `${lbl}：零用錢與打工的機會變多${isBad ? "，花費也大" : ""}`
-          : `${lbl}，${say}：${isGood ? (pian && !zheng ? "業務、副業或投資有斬獲的機會" : "努力有回報，正職收入穩定成長") : isBad ? `${c.weak ? "財多身弱，為錢奔忙" : "錢財進出大"}，投資宜保守、量入為出` : "錢財進出變多，量入為出即可"}`;
+      if (both) { theme = tr("正偏財並見，財源多元"); core = isGood ? tr("財源多、收入有成長") : isBad ? tr("錢財進出大，開銷也多") : tr("錢財進出變多"); }
+      if (isBad && c.weak && grown(stage)) core = tr("{core}（財多身弱）", { core });
+      if (stage === "child") { theme = tr("財星對孩子來說代表父親與家境（偏財為父）"); core = isGood ? tr("家境較寬裕") : isBad ? tr("家中開銷較大") : tr("家境平穩"); }
+      notes.wealth = stage === "child" ? tr("{lbl}：財星代表家境與父親，{how}", { lbl, how: isGood ? tr("家境較寬裕") : isBad ? tr("家中開銷較大") : tr("家境平穩") })
+        : stage === "teen" ? (isBad ? tr("{lbl}：零用錢與打工的機會變多，花費也大", { lbl }) : tr("{lbl}：零用錢與打工的機會變多", { lbl }))
+          : tr("{lbl}，{say}：{what}", { lbl, say, what: isGood ? (pian && !zheng ? tr("業務、副業或投資有斬獲的機會") : tr("努力有回報，正職收入穩定成長")) : isBad ? tr("{why}，投資宜保守、量入為出", { why: c.weak ? tr("財多身弱，為錢奔忙") : tr("錢財進出大") }) : tr("錢財進出變多，量入為出即可") });
       domains.wealth = grown(stage) ? (isGood ? 0.9 : isBad ? -0.6 : 0.1) : 0.3 * sign;
       change.push("wealth");
       tags.push(...(isGood ? ["gain"] : isBad ? ["loss"] : ["gain", "loss"]));
-      shorts.wealth = `${lbl}${isGood ? "，財星為喜" : isBad ? "，財星為忌" : ""}`;
+      shorts.wealth = isGood ? tr("{lbl}，財星為喜", { lbl }) : isBad ? tr("{lbl}，財星為忌", { lbl }) : lbl;
       if (sex === "male" && stage !== "child") {
-        notes.love = stage === "teen" ? "財星是男命的異性緣星，容易有心儀的對象"
-          : stage === "senior" ? "財星是男命的妻星，與老伴的相處被引動"
-            : both ? "正偏財並見，異性緣旺，感情宜專一"
-              : zheng ? `正財是男命的妻星，${now}被引動，感情容易有進展、利論及婚嫁`
-                : "偏財是男命的情緣星，異性緣變好，交往機會多";
+        notes.love = stage === "teen" ? tr("財星是男命的異性緣星，容易有心儀的對象")
+          : stage === "senior" ? tr("財星是男命的妻星，與老伴的相處被引動")
+            : both ? tr("正偏財並見，異性緣旺，感情宜專一")
+              : zheng ? tr("正財是男命的妻星，{now}被引動，感情容易有進展、利論及婚嫁", { now })
+                : tr("偏財是男命的情緣星，異性緣變好，交往機會多");
         domains.love = zheng && !both ? 0.6 : 0.3;
         change.push("love");
         tags.push(zheng && !both ? "marriage" : "romance");
-        shorts.love = zheng && !both ? "正財妻星透出" : "偏財情緣星被引動";
-        extra = "男命財星也是妻星，感情容易有進展";
+        shorts.love = zheng && !both ? tr("正財妻星透出") : tr("偏財情緣星被引動");
+        extra = tr("男命財星也是妻星，感情容易有進展");
       }
       if (pian) {
-        notes.family = `偏財也是父親星，${isGood ? "父親的助力多" : "和父親有關的事被引動，宜多關心父親"}`;
+        notes.family = tr("偏財也是父親星，{how}", { how: isGood ? tr("父親的助力多") : tr("和父親有關的事被引動，宜多關心父親") });
         tags.push("father");
-        shorts.family = "偏財父親星被引動";
+        shorts.family = tr("偏財父親星被引動");
       }
-      if (grown(stage)) notes.career = "財星主實際成果，工作以業績、收入為重";
+      if (grown(stage)) notes.career = tr("財星主實際成果，工作以業績、收入為重");
       break;
     }
     case "印": {
       const zheng = gods.includes("正印");
-      if (both) { theme = "正偏印並見，學習與思考的一年"; core = isGood ? "貴人與學習運都好" : isBad ? "想得多、做得少，宜設定期限推進" : "學習與文書的事變多"; }
-      if (stage === "child") { theme = "印星代表長輩照顧與學習"; core = isGood ? "長輩照顧周到，學習有進步" : "長輩管得多，學習要多鼓勵"; }
-      notes.study = stage === "child" ? `${lbl}：利學習，長輩的照顧與栽培多`
-        : stage === "senior" ? `${lbl}：適合培養興趣，親近宗教或心靈課程`
-          : `${lbl}，${say}：${isGood ? "利讀書、考試、證照與進修" : isBad ? "學習機會多但心思容易散，宜定下目標" : "適合安排進修與學習"}`;
+      if (both) { theme = tr("正偏印並見，學習與思考的一年"); core = isGood ? tr("貴人與學習運都好") : isBad ? tr("想得多、做得少，宜設定期限推進") : tr("學習與文書的事變多"); }
+      if (stage === "child") { theme = tr("印星代表長輩照顧與學習"); core = isGood ? tr("長輩照顧周到，學習有進步") : tr("長輩管得多，學習要多鼓勵"); }
+      notes.study = stage === "child" ? tr("{lbl}：利學習，長輩的照顧與栽培多", { lbl })
+        : stage === "senior" ? tr("{lbl}：適合培養興趣，親近宗教或心靈課程", { lbl })
+          : tr("{lbl}，{say}：{what}", { lbl, say, what: isGood ? tr("利讀書、考試、證照與進修") : isBad ? tr("學習機會多但心思容易散，宜定下目標") : tr("適合安排進修與學習") });
       domains.study = isGood ? 0.8 : isBad ? -0.3 : 0.2;
       tags.push("study", isBad ? "examRisk" : "exam");
-      shorts.study = `${lbl}${isGood ? "，印星為喜" : ""}`;
-      notes.family = zheng ? `正印是母親星，${isGood ? "母親的照顧與支持多" : "和母親有關的事被引動，宜多關心母親"}` : "偏印也代表長輩，家中長輩的事被引動";
+      shorts.study = isGood ? tr("{lbl}，印星為喜", { lbl }) : lbl;
+      notes.family = zheng ? tr("正印是母親星，{how}", { how: isGood ? tr("母親的照顧與支持多") : tr("和母親有關的事被引動，宜多關心母親") }) : tr("偏印也代表長輩，家中長輩的事被引動");
       domains.family = 0.2 * sign;
       change.push("family");
       tags.push("mother");
-      shorts.family = zheng ? "正印母親星被引動" : "偏印長輩星被引動";
+      shorts.family = zheng ? tr("正印母親星被引動") : tr("偏印長輩星被引動");
       if (grown(stage)) {
-        notes.wealth = `印也代表房產與文書，${isGood ? "置產、簽約的機會多" : "房產與合約文書要細看"}`;
+        notes.wealth = tr("印也代表房產與文書，{how}", { how: isGood ? tr("置產、簽約的機會多") : tr("房產與合約文書要細看") });
         change.push("wealth");
         tags.push("home");
-        shorts.wealth = `${lbl}，印主房產文書`;
-        notes.career = `${lbl}：${isGood ? "有長官前輩提攜，利考取證照、升等" : "宜按部就班，靠資歷與專業取勝"}`;
+        shorts.wealth = tr("{lbl}，印主房產文書", { lbl });
+        notes.career = tr("{lbl}：{how}", { lbl, how: isGood ? tr("有長官前輩提攜，利考取證照、升等") : tr("宜按部就班，靠資歷與專業取勝") });
         if (isGood) tags.push("helper");
       }
-      if (isGood) { notes.health = "印星護身，身心較能休養"; domains.health = 0.2; }
+      if (isGood) { notes.health = tr("印星護身，身心較能休養"); domains.health = 0.2; }
       break;
     }
     case "食傷": {
       const shi = gods.includes("食神"), shang = gods.includes("傷官");
-      if (both) { theme = "食神傷官並見，想法多、表現欲強"; core = isGood ? "才華與創意都能發揮" : isBad ? "付出多、說話也直，宜收斂" : "表現欲變強"; }
-      if (stage === "child") { theme = "食傷對孩子來說是玩心、才藝與表達"; core = shang ? "比較有主見、愛頂嘴" : "適合多元學習、多表現"; }
-      notes.career = stage === "child" ? `${lbl}：玩心與才藝並進，適合多元學習${shang ? "；也比較有主見" : ""}`
-        : stage === "teen" ? `${lbl}：才藝表現與${shang ? "叛逆心" : "興趣"}並存，適合發展專長`
-          : `${lbl}，${say}：${isGood ? (shang ? "點子多、表現亮眼，適合爭取表現機會" : "專業與作品容易受肯定") : isBad ? (shang ? "說話直、易與上司或體制起衝突，宜收斂鋒芒" : "付出多、回收慢，宜量力而為") : "表現欲強、想法多，適合發揮專業"}`;
+      if (both) { theme = tr("食神傷官並見，想法多、表現欲強"); core = isGood ? tr("才華與創意都能發揮") : isBad ? tr("付出多、說話也直，宜收斂") : tr("表現欲變強"); }
+      if (stage === "child") { theme = tr("食傷對孩子來說是玩心、才藝與表達"); core = shang ? tr("比較有主見、愛頂嘴") : tr("適合多元學習、多表現"); }
+      notes.career = stage === "child" ? (shang ? tr("{lbl}：玩心與才藝並進，適合多元學習；也比較有主見", { lbl }) : tr("{lbl}：玩心與才藝並進，適合多元學習", { lbl }))
+        : stage === "teen" ? (shang ? tr("{lbl}：才藝表現與叛逆心並存，適合發展專長", { lbl }) : tr("{lbl}：才藝表現與興趣並存，適合發展專長", { lbl }))
+          : tr("{lbl}，{say}：{what}", { lbl, say, what: isGood ? (shang ? tr("點子多、表現亮眼，適合爭取表現機會") : tr("專業與作品容易受肯定")) : isBad ? (shang ? tr("說話直、易與上司或體制起衝突，宜收斂鋒芒") : tr("付出多、回收慢，宜量力而為")) : tr("表現欲強、想法多，適合發揮專業") });
       domains.career = grown(stage) ? 0.4 * sign : 0;
       tags.push(...(isGood ? (shang ? ["startup", "jobChange"] : ["job", "startup"]) : isBad && shang ? ["conflict", "jobLoss"] : ["jobChange"]));
-      shorts.career = `${lbl}${shang ? "，想突破現狀" : "，才華有發揮"}`;
-      notes.study = shi ? `${lbl}：學習有興趣、表達好` : `${lbl}：聰明但不耐規矩，考試宜多下工夫`;
+      shorts.career = shang ? tr("{lbl}，想突破現狀", { lbl }) : tr("{lbl}，才華有發揮", { lbl });
+      notes.study = shi ? tr("{lbl}：學習有興趣、表達好", { lbl }) : tr("{lbl}：聰明但不耐規矩，考試宜多下工夫", { lbl });
       domains.study = shi ? 0.2 * (sign || 1) : -0.1;
       if (sex === "female" && grown(stage)) {
-        notes.family = stage === "senior" ? "女命食傷為子女星，子孫晚輩的事被引動" : "女命食傷為子女星，添丁或和孩子有關的事被引動";
+        notes.family = stage === "senior" ? tr("女命食傷為子女星，子孫晚輩的事被引動") : tr("女命食傷為子女星，添丁或和孩子有關的事被引動");
         domains.family = 0.2;
         change.push("family");
         tags.push("children");
-        shorts.family = "食傷子女星被引動";
-        extra = "女命食傷為子女星，和孩子的緣分被引動";
+        shorts.family = tr("食傷子女星被引動");
+        extra = tr("女命食傷為子女星，和孩子的緣分被引動");
       }
-      if (shi) { notes.health = isGood ? "食神主口福與放鬆，身心較舒坦" : "食神主口福，飲食與作息宜節制"; domains.health = isGood ? 0.2 : 0; }
+      if (shi) { notes.health = isGood ? tr("食神主口福與放鬆，身心較舒坦") : tr("食神主口福，飲食與作息宜節制"); domains.health = isGood ? 0.2 : 0; }
       if (grown(stage)) {
-        notes.wealth = `食傷是財之源，${isGood ? "靠專業與手藝賺錢" : "花在興趣與享受的錢變多"}`;
+        notes.wealth = tr("食傷是財之源，{how}", { how: isGood ? tr("靠專業與手藝賺錢") : tr("花在興趣與享受的錢變多") });
         if (isGood) tags.push("gain");
       }
       break;
     }
     case "比劫": {
       const jie = gods.includes("劫財");
-      if (both) { theme = "比肩劫財並見，同輩與競爭是主題"; core = isGood ? "朋友同輩相挺" : isBad ? "競爭與開銷都多" : "人際往來變多"; }
-      if (isGood && c.weak) core = `身弱得助，${core}`;
-      if (stage === "child") { theme = "比劫對孩子來說是兄弟姊妹與玩伴"; core = "和同學朋友的互動變多"; }
-      notes.wealth = stage === "child" ? `${lbl}：兄弟姊妹與玩伴的事多，東西常要和人分享`
-        : stage === "teen" ? `${lbl}：同儕影響大，花在朋友身上的錢變多`
-          : `${lbl}，${say}：${isGood ? "得朋友同輩相助，適合合作" : isBad ? `${jie ? "劫財主破耗，" : ""}競爭與開銷都多，借貸、作保、合夥宜謹慎` : "人情開銷變多"}`;
+      if (both) { theme = tr("比肩劫財並見，同輩與競爭是主題"); core = isGood ? tr("朋友同輩相挺") : isBad ? tr("競爭與開銷都多") : tr("人際往來變多"); }
+      if (isGood && c.weak) core = tr("身弱得助，{core}", { core });
+      if (stage === "child") { theme = tr("比劫對孩子來說是兄弟姊妹與玩伴"); core = tr("和同學朋友的互動變多"); }
+      notes.wealth = stage === "child" ? tr("{lbl}：兄弟姊妹與玩伴的事多，東西常要和人分享", { lbl })
+        : stage === "teen" ? tr("{lbl}：同儕影響大，花在朋友身上的錢變多", { lbl })
+          : tr("{lbl}，{say}：{what}", { lbl, say, what: isGood ? tr("得朋友同輩相助，適合合作") : isBad ? (jie ? tr("劫財主破耗，競爭與開銷都多，借貸、作保、合夥宜謹慎") : tr("競爭與開銷都多，借貸、作保、合夥宜謹慎")) : tr("人情開銷變多") });
       domains.wealth = grown(stage) ? (isGood ? 0.3 : isBad ? -0.6 : -0.2) : 0;
       if (isBad) tags.push("loss");
-      notes.family = `比劫是兄弟姊妹星，${isGood ? "手足之間互相扶持" : isBad ? "也容易為錢或家事起爭執" : "和兄弟姊妹的互動變多"}`;
+      notes.family = tr("比劫是兄弟姊妹星，{how}", { how: isGood ? tr("手足之間互相扶持") : isBad ? tr("也容易為錢或家事起爭執") : tr("和兄弟姊妹的互動變多") });
       change.push("family");
       tags.push("siblings");
-      shorts.family = "比劫手足星被引動";
-      shorts.wealth = `${lbl}${isBad ? "，競爭與破耗多" : ""}`;
-      if (grown(stage) && (isGood || isBad)) notes.career = isGood ? "同事朋友相挺，適合團隊合作" : "同輩競爭多，功勞容易被分走，宜把成果留下紀錄";
-      if (isGood) { notes.health = c.kind === "從強" ? "從強喜比劫順勢，精神與體力較好" : c.strength === "專旺" ? "專旺喜比劫順勢，精神與體力較好" : c.strength === "中和" ? "日主略偏弱，得比劫幫身，精神與體力較好" : "身弱得比劫幫身，精神與體力較好"; domains.health = 0.2; }
+      shorts.family = tr("比劫手足星被引動");
+      shorts.wealth = isBad ? tr("{lbl}，競爭與破耗多", { lbl }) : lbl;
+      if (grown(stage) && (isGood || isBad)) notes.career = isGood ? tr("同事朋友相挺，適合團隊合作") : tr("同輩競爭多，功勞容易被分走，宜把成果留下紀錄");
+      if (isGood) { notes.health = c.kind === "從強" ? tr("從強喜比劫順勢，精神與體力較好") : c.strength === "專旺" ? tr("專旺喜比劫順勢，精神與體力較好") : c.strength === "中和" ? tr("日主略偏弱，得比劫幫身，精神與體力較好") : tr("身弱得比劫幫身，精神與體力較好"); domains.health = 0.2; }
       break;
     }
     default: break;
   }
-  const text = `${lbl}（${say}）：${theme}，${core}${extra ? `；${extra}` : ""}`;
+  const text = extra ? tr("{lbl}（{say}）：{theme}，{core}；{extra}", { lbl, say, theme, core, extra }) : tr("{lbl}（{say}）：{theme}，{core}", { lbl, say, theme, core });
   return signal(`god.${group}`, { kind: "god", tone, weight: 4, domains, change, tags, text, short: lbl, shorts, notes, point: false });
 }
 
@@ -310,48 +337,51 @@ function favorSignal(c, W) {
   const P = W.P, fs = fav(c, P.stemEl), fb = fav(c, P.branchEl), ms = markOf(fs), mb = markOf(fb);
   const kid = W.stage === "child";
   const godBit = kid
-    ? (GOD_GROUP[P.gods.stem] === GOD_GROUP[P.gods.branch] ? GOD_SHORT_KID[GOD_GROUP[P.gods.stem]] : `${GOD_SHORT_KID[GOD_GROUP[P.gods.stem]]}、${GOD_SHORT_KID[GOD_GROUP[P.gods.branch]]}`)
-    : (P.gods.stem === P.gods.branch ? GOD_SHORT[P.gods.stem] : `${GOD_SHORT[P.gods.stem]}、${GOD_SHORT[P.gods.branch]}`);
-  const roleBit = P.stemEl === P.branchEl ? `${P.stemEl}為${c.roles[P.stemEl]}`
-    : c.roles[P.stemEl] === c.roles[P.branchEl] ? `${P.stemEl}、${P.branchEl}都是${c.roles[P.stemEl]}` : `${P.stemEl}為${c.roles[P.stemEl]}、${P.branchEl}為${c.roles[P.branchEl]}`;
-  const span = W.mode === "flow" ? ["上半年", "下半年", "流年天干管上半年、地支管下半年"] : ["前五年", "後五年", "大運前五年重天干、後五年重地支"];
+    ? (GOD_GROUP[P.gods.stem] === GOD_GROUP[P.gods.branch] ? tr(GOD_SHORT_KID[GOD_GROUP[P.gods.stem]]) : tr("{godA}、{godB}", { godA: tr(GOD_SHORT_KID[GOD_GROUP[P.gods.stem]]), godB: tr(GOD_SHORT_KID[GOD_GROUP[P.gods.branch]]) }))
+    : (P.gods.stem === P.gods.branch ? tr(GOD_SHORT[P.gods.stem]) : tr("{godA}、{godB}", { godA: tr(GOD_SHORT[P.gods.stem]), godB: tr(GOD_SHORT[P.gods.branch]) }));
+  const roleBit = P.stemEl === P.branchEl ? tr("{el}為{role}", { el: P.stemEl, role: c.roles[P.stemEl] })
+    : c.roles[P.stemEl] === c.roles[P.branchEl] ? tr("{el}、{el2}都是{role}", { el: P.stemEl, el2: P.branchEl, role: c.roles[P.stemEl] })
+      : tr("{el}為{role}、{el2}為{role2}", { el: P.stemEl, role: c.roles[P.stemEl], el2: P.branchEl, role2: c.roles[P.branchEl] });
+  const span = W.mode === "flow" ? [tr("上半年"), tr("下半年"), tr("流年天干管上半年、地支管下半年")] : [tr("前五年"), tr("後五年"), tr("大運前五年重天干、後五年重地支")];
   let verdict;
-  if (ms === "喜" && mb === "喜") verdict = W.mode === "flow" ? "干支皆為喜用，是順勢而為的一年" : "干支皆為喜用，是一步向上的好運";
-  else if (ms === "喜" && mb === "忌") verdict = `傳統上${span[2]}，${span[0]}較順，${span[1]}宜守成`;
-  else if (ms === "忌" && mb === "喜") verdict = `傳統上${span[2]}，${span[0]}阻力較多，${span[1]}漸入佳境`;
-  else if (ms === "忌" && mb === "忌") verdict = W.mode === "flow" ? "干支皆忌，這一年阻力較大，宜守不宜攻" : "干支皆忌，十年裡宜穩紮穩打、多累積實力";
-  else if (ms === "喜" || mb === "喜") verdict = "喜用得力，整體小吉";
-  else if (ms === "忌" || mb === "忌") verdict = "略有阻力，宜穩健行事";
-  else verdict = "喜忌平和，以穩為主";
+  if (ms === "喜" && mb === "喜") verdict = W.mode === "flow" ? tr("干支皆為喜用，是順勢而為的一年") : tr("干支皆為喜用，是一步向上的好運");
+  else if (ms === "喜" && mb === "忌") verdict = tr("傳統上{rule}，{first}較順，{second}宜守成", { rule: span[2], first: span[0], second: span[1] });
+  else if (ms === "忌" && mb === "喜") verdict = tr("傳統上{rule}，{first}阻力較多，{second}漸入佳境", { rule: span[2], first: span[0], second: span[1] });
+  else if (ms === "忌" && mb === "忌") verdict = W.mode === "flow" ? tr("干支皆忌，這一年阻力較大，宜守不宜攻") : tr("干支皆忌，十年裡宜穩紮穩打、多累積實力");
+  else if (ms === "喜" || mb === "喜") verdict = tr("喜用得力，整體小吉");
+  else if (ms === "忌" || mb === "忌") verdict = tr("略有阻力，宜穩健行事");
+  else verdict = tr("喜忌平和，以穩為主");
   // 干支的生剋：同氣、相生，或蓋頭（天干剋地支）、截腳（地支剋天干）讓喜用打折。
   let flowBit = "";
-  if (P.stemEl === P.branchEl) flowBit = "干支同氣，力量集中";
-  else if (CONTROLS[P.stemEl] === P.branchEl && mb === "喜") flowBit = "但天干剋地支（蓋頭），地支的喜用力量打折";
-  else if (CONTROLS[P.branchEl] === P.stemEl && ms === "喜") flowBit = "但地支剋天干（截腳），天干的喜用力量打折";
-  else if (GENERATES[P.stemEl] === P.branchEl) flowBit = "干生支，氣勢順";
-  else if (GENERATES[P.branchEl] === P.stemEl) flowBit = "支生干，根基穩";
-  const text = `天干${st(P.stem)}${P.gods.stem}、地支${br(P.branch)}${P.gods.branch}（${godBit}），${roleBit}：${verdict}${flowBit ? `；${flowBit}` : ""}`;
+  if (P.stemEl === P.branchEl) flowBit = tr("干支同氣，力量集中");
+  else if (CONTROLS[P.stemEl] === P.branchEl && mb === "喜") flowBit = tr("但天干剋地支（蓋頭），地支的喜用力量打折");
+  else if (CONTROLS[P.branchEl] === P.stemEl && ms === "喜") flowBit = tr("但地支剋天干（截腳），天干的喜用力量打折");
+  else if (GENERATES[P.stemEl] === P.branchEl) flowBit = tr("干生支，氣勢順");
+  else if (GENERATES[P.branchEl] === P.stemEl) flowBit = tr("支生干，根基穩");
+  const vars = { s: st(P.stem), gs: P.gods.stem, b: br(P.branch), gb: P.gods.branch, godBit, roleBit, verdict, flowBit };
+  const text = flowBit ? tr("天干{s}{gs}、地支{b}{gb}（{godBit}），{roleBit}：{verdict}；{flowBit}", vars) : tr("天干{s}{gs}、地支{b}{gb}（{godBit}），{roleBit}：{verdict}", vars);
   const score = (fs + fb) / 2;
-  const short = ms === "喜" && mb === "喜" ? "干支皆為喜用" : ms === "忌" && mb === "忌" ? "干支皆忌" : ms === "喜" ? "天干為喜" : mb === "喜" ? "地支為喜" : ms === "忌" ? "天干為忌" : mb === "忌" ? "地支為忌" : "喜忌平和";
-  const headline = ms === "喜" && mb === "喜" ? (W.mode === "flow" ? "干支皆為喜用，整體順勢" : "干支皆為喜用，運勢向上")
-    : ms === "喜" && mb === "忌" ? `天干為喜、地支為忌，${span[0]}較順`
-      : ms === "忌" && mb === "喜" ? `天干為忌、地支為喜，先難後易`
-        : ms === "忌" && mb === "忌" ? "干支皆忌，宜守不宜攻"
-          : ms === "喜" || mb === "喜" ? "喜用得力，小吉"
-            : ms === "忌" || mb === "忌" ? "略有阻力，宜穩健"
-              : "喜忌平和，以穩為主";
+  const short = tr(ms === "喜" && mb === "喜" ? "干支皆為喜用" : ms === "忌" && mb === "忌" ? "干支皆忌" : ms === "喜" ? "天干為喜" : mb === "喜" ? "地支為喜" : ms === "忌" ? "天干為忌" : mb === "忌" ? "地支為忌" : "喜忌平和");
+  const headline = ms === "喜" && mb === "喜" ? (W.mode === "flow" ? tr("干支皆為喜用，整體順勢") : tr("干支皆為喜用，運勢向上"))
+    : ms === "喜" && mb === "忌" ? tr("天干為喜、地支為忌，{first}較順", { first: span[0] })
+      : ms === "忌" && mb === "喜" ? tr("天干為忌、地支為喜，先難後易")
+        : ms === "忌" && mb === "忌" ? tr("干支皆忌，宜守不宜攻")
+          : ms === "喜" || mb === "喜" ? tr("喜用得力，小吉")
+            : ms === "忌" || mb === "忌" ? tr("略有阻力，宜穩健")
+              : tr("喜忌平和，以穩為主");
   return signal("favor", { kind: "favor", tone: score >= 0.25 ? "吉" : score <= -0.25 ? "凶" : "中", weight: 7, text, short, headline, context: true });
 }
 
 // ---------- 刑沖合害 ----------
 const PUNISH_MEANING = { 無恩之刑: "好心未必有好報，人際宜留分寸", 恃勢之刑: "容易固執、仗勢起衝突", 無禮之刑: "言語容易失禮、起口角", 自刑: "容易自尋煩惱、鑽牛角尖" };
+const punishMeaning = name => (PUNISH_MEANING[name] ? tr(PUNISH_MEANING[name]) : "");
 const BRANCH_ORDER = ["六沖", "六合", "相刑", "自刑", "六害", "半合", "拱合", "相破"];
 const KIND_ID = { 六沖: "clash", 六合: "combine", 相刑: "punish", 自刑: "punish", 六害: "harm", 半合: "half", 拱合: "arch", 相破: "break" };
 const KIND_VERB = { 六沖: "沖", 六合: "合", 相刑: "刑", 自刑: "自刑", 六害: "害", 相破: "破" };
 // 「相刑又相害」: the minor contacts that come with the main one.
 function alsoBit(kinds, main) {
   const rest = BRANCH_ORDER.filter(k => k !== main && kinds.has(k) && KIND_VERB[k]);
-  return rest.length ? `${KIND_VERB[main].replace("自刑", "刑")}中帶${rest.map(k => KIND_VERB[k].replace("自刑", "刑")).join("、")}` : "";
+  return rest.length ? tr("{mainVerb}中帶{restVerbs}", { mainVerb: KIND_VERB[main].replace("自刑", "刑"), restVerbs: both(rest.map(k => trw(KIND_VERB[k].replace("自刑", "刑")))) }) : "";
 }
 
 // The meaning of an element combination (半合、三合…) by the ten-god group it forms.
@@ -364,7 +394,7 @@ function formedBit(c, el, W) {
     食傷: { good: "才華與表現被引動", bad: "付出多、容易疲累", mid: "表現欲變強" },
     比劫: { good: "朋友同輩相助", bad: "競爭與開銷變多", mid: "人際往來變多" },
   };
-  return { group: g, side, text: `${el}是你的${GROUP_WORD[g]}（${c.roles[el]}），${M[g][side]}` };
+  return { group: g, side, text: tr("{el}是你的{group}（{role}），{meaning}", { el, group: GROUP_WORD[g], role: c.roles[el], meaning: tr(M[g][side]) }) };
 }
 const FORMED = {   // domain and tags for each ten-god group an element combination forms
   財: { domain: "wealth", good: ["gain"], bad: ["loss"] },
@@ -390,7 +420,7 @@ function pairSignals(c, W, other, list) {
   const out = [], P = W.P, kinds = new Set(list.map(r => r.kind)), kid = W.stage === "child", adult = grown(W.stage);
   const N = other === "decade" ? W.D : c.byRole[other];
   if (!N) return out;
-  const me = W.mode === "flow" ? br(P.branch) : `大運${br(P.branch)}`;
+  const me = W.mode === "flow" ? br(P.branch) : tr("大運{b}", { b: br(P.branch) });
   const at = branchAt(other, N.branch);
   const flowYear = W.mode === "flow";
   // 年支 contacts are 犯太歲 in a year reading (taisuiSignals); only the combinations stay here.
@@ -400,107 +430,110 @@ function pairSignals(c, W, other, list) {
   const nRole = c.roles[nEl];
   // The natal branch's element: a clash on 用神 hurts, a clash on 忌神 clears the way.
   const usefulHit = other !== "decade" && c.useful === nEl;
-  const qual = other === "decade" ? "" : good(c, nEl) ? `${N.branch}${nEl}是你的${nRole}，被沖宜多留意` : bad(c, nEl) ? `${N.branch}${nEl}為${nRole}，沖去反有轉機` : "";
+  const qual = other === "decade" ? "" : good(c, nEl) ? tr("{b}是你的{role}，被沖宜多留意", { b: br(N.branch), role: nRole }) : bad(c, nEl) ? tr("{b}為{role}，沖去反有轉機", { b: br(N.branch), role: nRole }) : "";
   const qualShift = other === "decade" ? 0 : good(c, nEl) ? -0.2 : bad(c, nEl) ? 0.3 : 0;
-  const stemBit = () => (CONTROLS[P.stemEl] === STEM_EL[N.stem] ? `${st(P.stem)}剋${st(N.stem)}` : `${st(N.stem)}剋${st(P.stem)}`);
+  const stemBit = () => (CONTROLS[P.stemEl] === STEM_EL[N.stem] ? tr("{s}剋{t}", { s: st(P.stem), t: st(N.stem) }) : tr("{s}剋{t}", { s: st(N.stem), t: st(P.stem) }));
+  const span = W.mode === "flow" ? tr("今年") : tr("這十年");
 
   if (kinds.has("反吟") && !yearTaisui) {
-    const head = W.mode === "flow" ? `流年${P.name}與${other === "decade" ? `大運${N.name}` : `${ROLE_ZH[other]}柱${N.name}`}天剋地沖（${other === "decade" ? "歲運相戰" : "反吟"}）` : `大運${P.name}與${ROLE_ZH[other]}柱${N.name}天剋地沖（反吟）`;
-    const how = `${stemBit()}、${me}沖${at}`;
+    const head = W.mode === "flow"
+      ? (other === "decade" ? tr("流年{p}與大運{n}天剋地沖（歲運相戰）", { p: P.name, n: N.name }) : tr("流年{p}與{pillar}{n}天剋地沖（反吟）", { p: P.name, pillar: PILLAR_ZH[other], n: N.name }))
+      : tr("大運{p}與{pillar}{n}天剋地沖（反吟）", { p: P.name, pillar: PILLAR_ZH[other], n: N.name });
+    const how = tr("{stemBit}、{me}沖{at}", { stemBit: stemBit(), me, at });
     const o = { kind: "rel", tone: "凶", change: [], notes: {}, domains: {}, tags: [], shorts: {}, lead: palaceLead(other, W.stage) };
     if (other === "day") {
       o.weight = 10;
-      o.text = kid ? `${head}：${how}，日柱代表自身，身體與生活環境容易有變動，照顧上要多費心` : `${head}：${how}，身體、婚姻、居所都容易變動，是${W.mode === "flow" ? "今年" : "這十年"}最需要穩住的地方，大事宜緩`;
-      o.notes = kid ? { health: `${head}，身體與作息要多照顧`, move: "生活環境也容易變動" }
-        : { health: `${head}，身體要多照顧，傳統上宜多休息、定期檢查`, love: `${head}，夫妻宮動盪，相處上宜多包容`, move: "天剋地沖日柱，日支也代表居所，住處容易變動", family: "天剋地沖日柱，家中容易有波折", wealth: "天剋地沖日柱，財務上起伏大，宜保守" };
+      o.text = kid ? tr("{head}：{how}，日柱代表自身，身體與生活環境容易有變動，照顧上要多費心", { head, how }) : tr("{head}：{how}，身體、婚姻、居所都容易變動，是{span}最需要穩住的地方，大事宜緩", { head, how, span });
+      o.notes = kid ? { health: tr("{head}，身體與作息要多照顧", { head }), move: tr("生活環境也容易變動") }
+        : { health: tr("{head}，身體要多照顧，傳統上宜多休息、定期檢查", { head }), love: tr("{head}，夫妻宮動盪，相處上宜多包容", { head }), move: tr("天剋地沖日柱，日支也代表居所，住處容易變動"), family: tr("天剋地沖日柱，家中容易有波折"), wealth: tr("天剋地沖日柱，財務上起伏大，宜保守") };
       o.domains = kid ? { health: -0.8 } : { health: -0.8, love: -0.8, family: -0.4, wealth: -0.4 };
       o.change = ["love", "move"];
       o.tags = ["illness", "health", "spouseClash", "spouseMove", "upheaval", "move"];
-      o.headline = kid ? "與日柱天剋地沖，身體與環境宜多照顧" : "與日柱天剋地沖（反吟），身體、婚姻、居所宜穩";
+      o.headline = kid ? tr("與日柱天剋地沖，身體與環境宜多照顧") : tr("與日柱天剋地沖（反吟），身體、婚姻、居所宜穩");
     } else if (other === "month") {
       o.weight = 9;
-      o.text = `${head}：${how}，月柱是父母宮也是事業根基，${kid ? "父母的工作或家宅容易有大變動" : "工作與家宅容易有大變動，也要多關心父母"}`;
-      o.notes = { career: `${head}，事業根基大動，換工作、轉換跑道的機會大`, family: "天剋地沖月柱，月柱是父母宮，宜多關心父母", move: "天剋地沖月柱，家宅也容易變動" };
+      o.text = tr("{head}：{how}，月柱是父母宮也是事業根基，{what}", { head, how, what: kid ? tr("父母的工作或家宅容易有大變動") : tr("工作與家宅容易有大變動，也要多關心父母") });
+      o.notes = { career: tr("{head}，事業根基大動，換工作、轉換跑道的機會大", { head }), family: tr("天剋地沖月柱，月柱是父母宮，宜多關心父母"), move: tr("天剋地沖月柱，家宅也容易變動") };
       if (kid) delete o.notes.career;
       o.domains = { career: kid ? 0 : -0.7, family: -0.5 };
       o.change = ["career", "move", "family"];
       o.tags = ["jobChange", "jobLoss", "parents", "move", "upheaval", "retire"];
-      o.headline = "與月柱天剋地沖（反吟），工作與家宅宜穩";
+      o.headline = tr("與月柱天剋地沖（反吟），工作與家宅宜穩");
     } else if (other === "hour") {
       o.weight = adult ? 8 : 5;
-      o.text = adult ? `${head}：${how}，時柱是子女宮與晚年，也主晚輩與部屬，相關的事容易大起大落，宜多溝通陪伴` : `${head}：${how}，時柱主志向與將來，興趣與計畫容易大變`;
-      o.notes = adult ? { family: `${head}，子女宮動盪，子女晚輩的事容易起伏`, career: "天剋地沖時柱，時柱也主部屬與晚輩，團隊人事容易變動" } : { study: "天剋地沖時柱，時柱主志向與將來，興趣與計畫容易大變" };
+      o.text = adult ? tr("{head}：{how}，時柱是子女宮與晚年，也主晚輩與部屬，相關的事容易大起大落，宜多溝通陪伴", { head, how }) : tr("{head}：{how}，時柱主志向與將來，興趣與計畫容易大變", { head, how });
+      o.notes = adult ? { family: tr("{head}，子女宮動盪，子女晚輩的事容易起伏", { head }), career: tr("天剋地沖時柱，時柱也主部屬與晚輩，團隊人事容易變動") } : { study: tr("天剋地沖時柱，時柱主志向與將來，興趣與計畫容易大變") };
       o.domains = adult ? { family: -0.5, career: -0.2 } : {};
       o.change = ["family"];
       o.tags = adult ? ["childrenCare"] : [];
-      o.headline = adult ? "與時柱天剋地沖（反吟），子女與晚輩之事宜多照應" : "與時柱天剋地沖（反吟），計畫容易大變";
+      o.headline = adult ? tr("與時柱天剋地沖（反吟），子女與晚輩之事宜多照應") : tr("與時柱天剋地沖（反吟），計畫容易大變");
     } else if (other === "year") {
       o.weight = 7;
-      o.text = `${head}：${how}，年柱主祖上與長輩，和家族、長輩有關的事容易有大變動，也常有離鄉發展的機會`;
-      o.notes = { family: `${head}，年柱主祖上與長輩，宜多關心家中長輩`, move: "天剋地沖年柱，容易離鄉發展、遷居" };
+      o.text = tr("{head}：{how}，年柱主祖上與長輩，和家族、長輩有關的事容易有大變動，也常有離鄉發展的機會", { head, how });
+      o.notes = { family: tr("{head}，年柱主祖上與長輩，宜多關心家中長輩", { head }), move: tr("天剋地沖年柱，容易離鄉發展、遷居") };
       o.domains = { family: -0.4 };
       o.change = ["move", "family"];
       o.tags = ["elders", "move", "abroad", "upheaval"];
-      o.headline = "與年柱天剋地沖（反吟），長輩與家族之事宜多照應";
+      o.headline = tr("與年柱天剋地沖（反吟），長輩與家族之事宜多照應");
     } else {
       o.weight = 8;
-      o.text = `${head}：十年運勢中的轉折年，起伏大，大事宜三思而後行`;
-      o.notes = { career: `${head}，工作上變動大，宜穩不宜躁`, wealth: "歲運相戰，財務起伏大，投資宜保守", health: "歲運相戰，體力與作息要多照顧", move: "歲運相戰，生活環境也容易變動" };
+      o.text = tr("{head}：十年運勢中的轉折年，起伏大，大事宜三思而後行", { head });
+      o.notes = { career: tr("{head}，工作上變動大，宜穩不宜躁", { head }), wealth: tr("歲運相戰，財務起伏大，投資宜保守"), health: tr("歲運相戰，體力與作息要多照顧"), move: tr("歲運相戰，生活環境也容易變動") };
       o.domains = { career: -0.5, wealth: -0.4, health: -0.4 };
       o.change = ["career", "move"];
       o.tags = ["upheaval", "jobChange", "move", "illness"];
-      o.headline = "與大運天剋地沖（歲運相戰），大事宜三思";
+      o.headline = tr("與大運天剋地沖（歲運相戰），大事宜三思");
     }
-    if (qual) o.text = `${o.text}。${qual}`;
-    o.short = `與${other === "decade" ? "大運" : `${ROLE_ZH[other]}柱`}${N.name}天剋地沖（反吟）`;
+    if (qual) o.text = tr("{text}。{qual}", { text: o.text, qual });
+    o.short = other === "decade" ? tr("與大運{n}天剋地沖（反吟）", { n: N.name }) : tr("與{pillar}{n}天剋地沖（反吟）", { pillar: PILLAR_ZH[other], n: N.name });
     o.shorts = { health: o.short, love: o.short, career: o.short, family: o.short, move: o.short, wealth: o.short };
     out.push(signal(`rel.fanyin.${other}`, o));
     out.push(...clashExtras(c, W, other, N, me, at, usefulHit));
     const bits = out.slice(1).filter(z => z.bit).map(z => z.bit);
-    if (bits.length) out[0].text = end(`${out[0].text.replace(/。$/, "")}；${bits.join("；")}`);
+    if (bits.length) out[0].text = cap(end(tr("{text}；{bits}", { text: unend(out[0].text), bits: bits.join(SEMI()) })));
     return out;
   }
 
   if ((kinds.has("伏吟") || kinds.has("歲運並臨")) && !yearTaisui) {
     if (other === "decade") {
       const sc = (fav(c, P.stemEl) + fav(c, P.branchEl)) / 2;
-      const text = `流年與大運同為${P.name}（歲運並臨）：吉凶都會被放大，${sc >= 0.25 ? "好運更旺，宜積極把握" : sc <= -0.25 ? "起伏更大，宜穩健保守、大事三思" : "宜穩健行事"}`;
-      out.push(signal("rel.suiyun", { kind: "rel", tone: sc >= 0.25 ? "吉" : sc <= -0.25 ? "凶" : "中", weight: 9.5, text, short: `流年與大運同為${P.name}（歲運並臨）`, headline: "歲運並臨，起伏放大", amplify: 1.3, change: ["career", "move"], tags: ["upheaval"], notes: { career: "歲運並臨，工作上的起落都會被放大", wealth: "歲運並臨，財務上的進出也被放大", health: sc <= -0.25 ? "歲運並臨又逢忌神，體力與作息宜多照顧" : "歲運並臨，宜量力而為" } }));
+      const text = tr("流年與大運同為{p}（歲運並臨）：吉凶都會被放大，{how}", { p: P.name, how: sc >= 0.25 ? tr("好運更旺，宜積極把握") : sc <= -0.25 ? tr("起伏更大，宜穩健保守、大事三思") : tr("宜穩健行事") });
+      out.push(signal("rel.suiyun", { kind: "rel", tone: sc >= 0.25 ? "吉" : sc <= -0.25 ? "凶" : "中", weight: 9.5, text, short: tr("流年與大運同為{p}（歲運並臨）", { p: P.name }), headline: tr("歲運並臨，起伏放大"), amplify: 1.3, change: ["career", "move"], tags: ["upheaval"], notes: { career: tr("歲運並臨，工作上的起落都會被放大"), wealth: tr("歲運並臨，財務上的進出也被放大"), health: sc <= -0.25 ? tr("歲運並臨又逢忌神，體力與作息宜多照顧") : tr("歲運並臨，宜量力而為") } }));
       return out;
     }
-    const head = `${W.who}${P.name}與${ROLE_ZH[other]}柱相同（伏吟）`;
+    const head = W.mode === "flow" ? tr("流年{p}與{pillar}相同（伏吟）", { p: P.name, pillar: PILLAR_ZH[other] }) : tr("大運{p}與{pillar}相同（伏吟）", { p: P.name, pillar: PILLAR_ZH[other] });
     const o = { kind: "rel", tone: "凶", notes: {}, domains: {}, tags: [], change: [], lead: palaceLead(other, W.stage) };
     if (other === "day") {
       o.weight = kid ? 5 : 8;
-      o.text = kid ? `${head}：伏吟主反覆，情緒較悶、小病容易反覆，照顧上多費心` : `${head}：伏吟主反覆、呻吟，身體、感情與自己的事容易舊事重演，心情也較沉悶，宜放慢步調`;
-      o.notes = kid ? { health: `${head}，小病容易反覆` } : { health: `${head}，身體的老毛病容易反覆，宜多休息`, love: `${head}，夫妻之間的舊問題容易重提`, family: "伏吟日柱，家中的事容易反覆", wealth: "伏吟日柱，財務上進展較慢，宜保守" };
+      o.text = kid ? tr("{head}：伏吟主反覆，情緒較悶、小病容易反覆，照顧上多費心", { head }) : tr("{head}：伏吟主反覆、呻吟，身體、感情與自己的事容易舊事重演，心情也較沉悶，宜放慢步調", { head });
+      o.notes = kid ? { health: tr("{head}，小病容易反覆", { head }) } : { health: tr("{head}，身體的老毛病容易反覆，宜多休息", { head }), love: tr("{head}，夫妻之間的舊問題容易重提", { head }), family: tr("伏吟日柱，家中的事容易反覆"), wealth: tr("伏吟日柱，財務上進展較慢，宜保守") };
       o.domains = kid ? { health: -0.4 } : { health: -0.5, love: -0.4, family: -0.3, wealth: -0.3 };
       o.tags = ["illness", "health", "spouseClash"];
-      o.headline = "與日柱伏吟，舊事容易重演";
+      o.headline = tr("與日柱伏吟，舊事容易重演");
     } else if (other === "month") {
       o.weight = 6;
-      o.text = `${head}：${kid ? "家中的舊事重提，宜多耐心" : "工作與家中的舊事重提，進展較慢，宜耐心處理"}`;
-      o.notes = { career: `${head}，工作上進展較慢、舊事重提`, family: "伏吟月柱，家中長輩的舊事重提，溝通多一點耐心" };
+      o.text = tr("{head}：{what}", { head, what: kid ? tr("家中的舊事重提，宜多耐心") : tr("工作與家中的舊事重提，進展較慢，宜耐心處理") });
+      o.notes = { career: tr("{head}，工作上進展較慢、舊事重提", { head }), family: tr("伏吟月柱，家中長輩的舊事重提，溝通多一點耐心") };
       if (kid) delete o.notes.career;
       o.domains = { career: kid ? 0 : -0.4, family: -0.3 };
       o.tags = ["parents"];
-      o.headline = "與月柱伏吟，工作與家中進展較慢";
+      o.headline = tr("與月柱伏吟，工作與家中進展較慢");
     } else if (other === "year") {
       o.weight = 4;
-      o.text = `${head}：長輩與家族的舊事容易重提，宜多耐心`;
-      o.notes = { family: `${head}，長輩與家族的舊事容易重提` };
+      o.text = tr("{head}：長輩與家族的舊事容易重提，宜多耐心", { head });
+      o.notes = { family: tr("{head}，長輩與家族的舊事容易重提", { head }) };
       o.domains = { family: -0.2 };
       o.tags = ["elders"];
-      o.headline = "與年柱伏吟，家族舊事重提";
+      o.headline = tr("與年柱伏吟，家族舊事重提");
     } else {
       o.weight = adult ? 4.5 : 3;
-      o.text = `${head}：${adult ? "子女晚輩的事反覆，計畫容易拖延" : "計畫與興趣容易反覆"}`;
-      o.notes = adult ? { family: `${head}，子女晚輩的事容易反覆` } : { study: `${head}，計畫與興趣容易反覆` };
+      o.text = tr("{head}：{what}", { head, what: adult ? tr("子女晚輩的事反覆，計畫容易拖延") : tr("計畫與興趣容易反覆") });
+      o.notes = adult ? { family: tr("{head}，子女晚輩的事容易反覆", { head }) } : { study: tr("{head}，計畫與興趣容易反覆", { head }) };
       o.domains = adult ? { family: -0.3 } : {};
       o.tags = adult ? ["childrenCare"] : [];
-      o.headline = "與時柱伏吟，計畫容易拖延";
+      o.headline = tr("與時柱伏吟，計畫容易拖延");
     }
-    o.short = `與${ROLE_ZH[other]}柱伏吟`;
+    o.short = tr("與{pillar}伏吟", { pillar: PILLAR_ZH[other] });
     out.push(signal(`rel.fuyin.${other}`, o));
     return out;
   }

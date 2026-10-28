@@ -107,7 +107,7 @@ test("the English keeps the Chinese template's shape, and the check finds the on
   const keys = new Map();
   for (const t of zh) { const k = storyKey(t); assert.ok(!keys.has(k) || keys.get(k) === t, `${t} and ${keys.get(k)} share ${k}`); keys.set(k, t); }
   const bad = check(zh, { story: { "那年八月的大水，你記得{大人們整夜把家具往高處搬。|鄰居划著木盆來救人。}": "You remember the flood {of {city}|that year}.", "不在程式裡": "Nowhere" }, words: {}, from: {} });
-  assert.deepEqual(bad.map(p => p.problem.split(":")[0]).sort(), ["no such Chinese string in src/sim or src/core (changed or removed?)", "{vars} differ"]);
+  assert.deepEqual(bad.map(p => p.problem.split(":")[0]).sort(), ["no such Chinese string in the scanned code (changed or removed?)", "{vars} differ"]);
   const parts = check(zh, { story: { "那年八月的大水，你記得{大人們整夜把家具往高處搬。|鄰居划著木盆來救人。}": "You remember {the grown-ups|a neighbour|the rain}." }, words: {}, from: {} });
   assert.match(parts[0].problem, /top-level \{a\|b\} parts differ: \[2\] vs \[3\]/);
 });

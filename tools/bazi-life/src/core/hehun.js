@@ -35,13 +35,18 @@
 // Wording follows partner.js and the research on Taiwanese 合婚: never 合／不合、上中下等婚、剋夫、不宜 or a paid
 // 化解; every check says what fits and what to work on, and is marked 主要／輔助／民俗 so the folk methods read as
 // folk methods. 命卦 carries the note that 《神峰通考》 already criticised it.
+//
+// English (core/tr.js, src/i18n/en/hehun.json) as in partner.js: each sentence is tr() of its Chinese template, a
+// person is `n` or `of` (you / your), and the text is tidied at the end. The values the page sorts or styles by stay
+// Chinese in both languages (type.id, checks' level and verdict, the years' pillar and tones, people's pillars).
 import { SixtyCycle } from "tyme4ts";
 import { analyse, pillarOf, elementScores, tenGod, ELEMENTS, GROUPS } from "./analysis.js";
 import { clash, sixCombine, tenGodCounts, GOD_GROUP, natalStars, starContextOf, luckStars } from "./detail.js";
-import { partnerReading, branchRelations, spouseElements, ZODIAC, TOGETHER } from "./partner.js";
+import { partnerReading, branchRelations, spouseElements, ZODIAC, TOGETHER, isEn, end, run, list, duo, se, nameForms, tidy } from "./partner.js";
 import { yearReading } from "./reading-year.js";
 import { ELEMENT_LUCK } from "./reading-natal.js";
 import { zh } from "./zh.js";
+import { tr, trw } from "./tr.js";
 
 const STEMS = "甲乙丙丁戊己庚辛壬癸", BRANCHES = "子丑寅卯辰巳午未申酉戌亥";
 const GENERATES = { 木: "火", 火: "土", 土: "金", 金: "水", 水: "木" };
@@ -57,7 +62,7 @@ const STRONG = 0.3;
 export const yearPillar = y => STEMS[(((y - 4) % 10) + 10) % 10] + BRANCHES[(((y - 4) % 12) + 12) % 12];
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const uniq = list => [...new Set(list)];
-const end = s => (/[。！？]$/.test(s) ? s : `${s}。`);
+const semi = items => items.join(isEn() ? "; " : "；");
 const cycleIndex = name => SixtyCycle.fromName(name).getIndex();
 
 // ---------- 命卦（呂才合婚） ----------
@@ -107,7 +112,7 @@ export function marriageMonths(yearBranch) {
 }
 
 // ---------- 一個人 ----------
-function personOf(x, n) {
+function personOf(x, { n, of }) {
   const chart = x.chart, names = chart.pillars.map(p => p.name), ps = names.map(pillarOf), a = x.analysis || analyse(names);
   const scores = elementScores(names), total = ELEMENTS.reduce((s, e) => s + scores[e], 0) || 1;
   const share = Object.fromEntries(ELEMENTS.map(e => [e, scores[e] / total]));
@@ -119,7 +124,7 @@ function personOf(x, n) {
   const natal = natalStars(chart);
   const by = chart.input.date.y, solar = yearPillar(by) === names[0] ? by : by - 1;
   return {
-    n, sex: x.sex, male: x.sex !== "female", chart, names, ps, a, share, chars, groups, main,
+    n, of, sex: x.sex, male: x.sex !== "female", chart, names, ps, a, share, chars, groups, main,
     visible: god => (gods[god] ? gods[god].visible.length : 0),
     top: ELEMENTS.slice().sort((p, q) => scores[q] - scores[p])[0], useful: a.useful[0] || null,
     own: new Set(Object.values(natal).flat()), dayStars: new Set(natal.day || []),
@@ -175,10 +180,10 @@ function scoreOf(A, B, F) {
     const k = mainKind(F.dayRel);
     let s = k ? MAIN[k] : 15;
     s -= F.dayRel.slice(1).filter(r => NEGATIVE.has(r.kind)).length;
-    let why = k ? (k === "同支" ? `日支同為${A.dayB}` : `日支${F.dayRel[0].pair}${k === "三合" ? "三合" : k}`) : "日支沒有合沖";
-    if (F.heaven && F.earth) { s = 25; why = "日柱天合地合"; }
-    else if (F.fullClash) { s = Math.min(s, 6); why = "日柱天剋地沖"; }
-    add("palace", "夫妻宮・日柱", clamp(s, 4, 25), 25, why);
+    let why = k ? (k === "同支" ? tr("日支同為{b}", { b: A.dayB }) : tr("日支{pair}{k}", { pair: duo(F.dayRel[0].pair), k: k === "三合" ? "三合" : k })) : tr("日支沒有合沖");
+    if (F.heaven && F.earth) { s = 25; why = tr("日柱天合地合"); }
+    else if (F.fullClash) { s = Math.min(s, 6); why = tr("日柱天剋地沖"); }
+    add("palace", tr("夫妻宮・日柱"), clamp(s, 4, 25), 25, why);
   }
   // 用神互補
   {
@@ -187,8 +192,8 @@ function scoreOf(A, B, F) {
       if (like && Y.top !== X.useful) s += 2;
       else if (burden) s -= 3.5;
     }
-    const why = F.ab && F.ba ? "用神互補" : F.ab || F.ba ? "一方補到另一方的用神" : F.burdenA || F.burdenB ? "最旺的五行是對方所忌" : "沒有明顯的互補";
-    add("useful", "用神互補", clamp(s, 4, 25), 25, why);
+    const why = F.ab && F.ba ? tr("用神互補") : F.ab || F.ba ? tr("一方補到另一方的用神") : F.burdenA || F.burdenB ? tr("最旺的五行是對方所忌") : tr("沒有明顯的互補");
+    add("useful", tr("用神互補"), clamp(s, 4, 25), 25, why);
   }
   // 配偶星
   {
@@ -199,13 +204,13 @@ function scoreOf(A, B, F) {
       if (sh < 0.005) s -= 1;
       else if (sh < 0.15 && ((X === A && F.starA) || (X === B && F.starB))) s += 1;
     }
-    add("star", word, clamp(s, 4, 15), 15, F.starA && F.starB ? `互為${word}` : F.starA || F.starB ? `${word}相應` : `日干不在彼此的${word}上`);
+    add("star", trw(word), clamp(s, 4, 15), 15, F.starA && F.starB ? tr("互為{words}", { words: word }) : F.starA || F.starB ? tr("{words}相應", { words: word }) : tr("日干不在彼此的{word}上", { word }));
   }
   // 日干
   {
     const S = { 合: 10, 比: A.stem === B.stem ? 6 : 7, A生B: 8, B生A: 8, A剋B: 5, B剋A: 5 };
-    const WHY = { 合: `日干${A.stem}${B.stem}相合`, 比: "日干同五行", A生B: "日干相生", B生A: "日干相生", A剋B: "日干一方約束一方", B剋A: "日干一方約束一方" };
-    add("stem", "日干", S[F.stemRel], 10, WHY[F.stemRel]);
+    const WHY = { 合: () => tr("日干{pair}相合", { pair: duo(A.stem + B.stem) }), 比: () => tr("日干同五行"), A生B: () => tr("日干相生"), B生A: () => tr("日干相生"), A剋B: () => tr("日干一方約束一方"), B剋A: () => tr("日干一方約束一方") };
+    add("stem", tr("日干"), S[F.stemRel], 10, WHY[F.stemRel]());
   }
   // 生肖
   {
@@ -213,17 +218,18 @@ function scoreOf(A, B, F) {
     const k = mainKind(F.yearRel);
     let s = k ? MAIN[k] : F.season ? 7 : 6;
     s -= F.yearRel.slice(1).filter(r => NEGATIVE.has(r.kind)).length;
-    const why = k ? (k === "同支" ? `同屬${ZODIAC[A.yearB]}` : `生肖${ZODIAC[A.yearB]}${ZODIAC[B.yearB]}${k === "三合" ? "三合" : k}`) : F.season ? `同屬${F.season[1]}三會` : "生肖沒有合沖";
-    add("zodiac", "生肖", clamp(s, 1, 10), 10, why);
+    const why = k ? (k === "同支" ? tr("同屬{z}", { z: ZODIAC[A.yearB] }) : tr("生肖{za}{zb}{k}", { za: ZODIAC[A.yearB], zb: ZODIAC[B.yearB], k: k === "三合" ? "三合" : k }))
+      : F.season ? tr("同屬{season}三會", { season: F.season[1] }) : tr("生肖沒有合沖");
+    add("zodiac", isEn() ? tr("生肖（契合度）") : "生肖", clamp(s, 1, 10), 10, why);
   }
   // 納音、命卦、神煞
-  add("nayin", "年命納音", { 生: 5, 比: 4, 剋: 2 }[F.nayin.rel], 5, { 生: "納音相生", 比: "納音比和", 剋: "納音相剋" }[F.nayin.rel]);
-  add("gua", "命卦", GUA_SCORE[F.gua], 5, { 5: `命卦${F.gua}`, 4: "命卦伏位", 3: "命卦屬於要多溝通的組合", 1: "命卦屬於要多磨合的組合" }[GUA_SCORE[F.gua]]);
+  add("nayin", tr("年命納音"), { 生: 5, 比: 4, 剋: 2 }[F.nayin.rel], 5, { 生: () => tr("納音相生"), 比: () => tr("納音比和"), 剋: () => tr("納音相剋") }[F.nayin.rel]());
+  add("gua", isEn() ? tr("命卦（契合度）") : "命卦", GUA_SCORE[F.gua], 5, { 5: () => tr("命卦{gua}", { gua: F.gua }), 4: () => tr("命卦伏位"), 3: () => tr("命卦屬於要多溝通的組合"), 1: () => tr("命卦屬於要多磨合的組合") }[GUA_SCORE[F.gua]]());
   {
     const seen = (F.seenAB.length ? 1 : 0) + (F.seenBA.length ? 1 : 0);
     const lonely = F.lonely[0].length + F.lonely[1].length;
     const s = 3 + seen - Math.min(2, lonely * 0.5);
-    add("stars", "婚姻神煞", clamp(Math.round(s), 1, 5), 5, seen ? "桃花紅鸞互見" : lonely ? "命帶孤辰寡宿等" : "沒有特別的神煞");
+    add("stars", tr("婚姻神煞"), clamp(Math.round(s), 1, 5), 5, seen ? tr("桃花紅鸞互見") : lonely ? tr("命帶孤辰寡宿等") : tr("沒有特別的神煞"));
   }
   return { total: parts.reduce((t, p) => t + p.got, 0), parts };
 }
@@ -249,7 +255,7 @@ function typeOf(F, score) {
   else if (harmony < 0.52) id = "慢熱磨合型";
   else if (attraction) id = "火花吸引型";
   else id = "細水長流型";
-  return { id, label: id, line: TYPES[id], harmony: Math.round(harmony * 100) / 100, complement: Math.round(complement * 100) / 100 };
+  return { id, label: tr(id), line: tr(TYPES[id]), harmony: Math.round(harmony * 100) / 100, complement: Math.round(complement * 100) / 100 };
 }
 
 // ---------- 個性與十神 ----------
