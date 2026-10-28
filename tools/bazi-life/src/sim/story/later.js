@@ -9,7 +9,7 @@
 // 這個模組不寫任何人的死亡或重病（在 core.js），也不讓主角結婚、離婚、生小孩、買房或退休。會動到 hr 的只有
 // 膝蓋退化、喪偶後的生活、照顧另一半三件事，每次最多乘 0.97 或 1.03，好壞都有，平均起來幾乎不變。
 import { bornSiblings, yearsMarried, tier, exam15Name } from "../world.js";
-import { siblingCall } from "../words.js";
+import { callName } from "../words.js";
 import { pronoun } from "../people.js";
 
 // ---------- who is around ----------
@@ -25,6 +25,8 @@ const justRetired = (s, n) => s.retired && s.age - (s.last.retire ?? s.age) <= n
 // Grown children not married yet in this story.
 const unwed = s => s.kids.filter(k => k.age >= 26 && k.age <= 40 && !k.married);
 const sibPronoun = x => (/Brother/.test(x.relation) ? "他" : "她");
+// 哥哥志明, or just 哥哥, as words.js siblingCall writes it, with the label and the name apart for the English.
+const sibling = (x, ctx) => (x.name ? ctx.f("{sib}{sibName}", { sib: x.label, sibName: callName(x.name) }) : ctx.f("{sib}", { sib: x.label }));
 
 // An old friend: one already in the story, or a new one about the same age.
 function oldFriend(s, ctx, how = "老朋友") {
@@ -121,48 +123,58 @@ function pickScene(s, ctx, id, list) {
   told.push(sc.key);
   return sc;
 }
+// Answers that begin with the scene's own words ({then}): the scene is a new one each time, so in Chinese, where those
+// words were part of the template, every template was new; a template told before is forgotten first to pick alike.
+const asNew = (s, list) => { for (const t of list) s.used.delete(t); return list; };
 
 // l_grandkidHelp: why the young family needs a hand. `g` is the newest grandchild; the templates use grandVars
-// ({g} {gt} {pk} {gw}). Each answer is [label, hint, templates].
-function grandHelpScenes(s, g) {
-  const age = g.age === 0 ? "剛滿月" : g.age === 1 ? "一歲多了" : "兩歲了";
-  const nursery = s.year >= 2000 ? "托嬰中心" : "托兒所", school = s.year >= 2012 ? "幼兒園" : "幼稚園";
+// ({g} {gt} {pk} {gw}) and the scene's `vars`. Each answer is [label, hint, templates, more vars]. Daycare is 托嬰中心
+// from 2000 (托兒所 before), and 幼兒園 from 2012 (幼稚園 before).
+function grandHelpScenes(s, g, ctx) {
+  const gage = g.age === 0 ? "剛滿月" : g.age === 1 ? "一歲多了" : "兩歲了", gv = grandVars(g), late = s.year >= 2000;
   const daily = [
     "{pk}他們要上班，你答應白天幫忙帶{g}。{每天早上七點，{pk}就把{g}抱過來，|客廳的地板鋪滿了巧拼和玩具，}{一天下來腰都直不起來，但{g}第一次叫「{grand}」的時候，什麼都值得了。|你又重新學了一次怎麼泡奶、換尿布、哄睡。}",
     "你成了{g}的白天保母，{推著娃娃車去菜市場，|在公園跟其他{grand}交換帶孫心得，}{連攤販都認得{g}了。|每天傍晚把{g}交回{pk}手上時，你又累又捨不得。}",
   ];
   const weekend = [
-    `你跟{pk}說好，平日{g}去${nursery}，週末再帶來給你顧。{星期六一早，你就在門口等。|週末的家裡，又有了小孩的哭聲和笑聲。|你在冰箱裡塞滿了{gt}愛吃的東西。}`,
+    late
+      ? "你跟{pk}說好，平日{g}去托嬰中心，週末再帶來給你顧。{星期六一早，你就在門口等。|週末的家裡，又有了小孩的哭聲和笑聲。|你在冰箱裡塞滿了{gt}愛吃的東西。}"
+      : "你跟{pk}說好，平日{g}去托兒所，週末再帶來給你顧。{星期六一早，你就在門口等。|週末的家裡，又有了小孩的哭聲和笑聲。|你在冰箱裡塞滿了{gt}愛吃的東西。}",
     "你答應週末幫忙顧{g}，{平日照樣去爬山、上課，|平日的時間還是留給自己，}{到了星期五晚上就開始期待。|星期天晚上{pk}來接人時，{g}抱著你不放。}",
   ];
   const move = ["搬到孩子家附近", "就近照應", "為了幫忙帶{g}，你搬到{pk}家附近，{走路五分鐘就到，|就隔一條巷子，|每天傍晚去接{g}回家，}{一家人常常一起吃晚飯。|{pk}說這樣安心多了。|{g}學會走路以後，最常走的就是到你家的那條路。}"];
-  const money = ["出錢請保母", "出錢不出力", `你沒辦法天天帶{g}，{就每個月幫{pk}出一半的保母費，|幫忙付了${nursery}的費用，|包了一個大紅包，說是給{g}的保母費，}{週末再去看{gt}。|{pk}說這樣就幫了大忙。|你說錢的事不用擔心。}`];
-  const no = (asked, after) => ["婉拒，過自己的生活", "身體和日子也要顧", `{pk}${asked}，你{想了很久，|老實說了自己的身體狀況，}{還是婉拒了。|說想把這幾年留給自己。}{pk}{有點失望，但說能理解。|${after}}`];
-  const share = ["和親家輪流", "兩邊的長輩一起來", `你和親家說好輪流帶{g}，{一三五你顧，二四換他們，|一邊顧白天，一邊顧晚上，|一家顧一個星期，}{{g}${g.age >= 2 ? "在兩家之間跑來跑去" : "在兩家之間輪流住"}，被兩邊的長輩寵上了天。|週末兩家人常常一起吃飯。|你和親家反而成了好朋友。}`];
+  const money = ["出錢請保母", "出錢不出力", late
+    ? "你沒辦法天天帶{g}，{就每個月幫{pk}出一半的保母費，|幫忙付了托嬰中心的費用，|包了一個大紅包，說是給{g}的保母費，}{週末再去看{gt}。|{pk}說這樣就幫了大忙。|你說錢的事不用擔心。}"
+    : "你沒辦法天天帶{g}，{就每個月幫{pk}出一半的保母費，|幫忙付了托兒所的費用，|包了一個大紅包，說是給{g}的保母費，}{週末再去看{gt}。|{pk}說這樣就幫了大忙。|你說錢的事不用擔心。}"];
+  const no = (asked, after) => ["婉拒，過自己的生活", "身體和日子也要顧", "{pk}{asked}，你{想了很久，|老實說了自己的身體狀況，}{還是婉拒了。|說想把這幾年留給自己。}{pk}{有點失望，但說能理解。|{after}}", { asked: ctx.f(asked, gv), after }];
+  const share = ["和親家輪流", "兩邊的長輩一起來", g.age >= 2
+    ? "你和親家說好輪流帶{g}，{一三五你顧，二四換他們，|一邊顧白天，一邊顧晚上，|一家顧一個星期，}{{g}在兩家之間跑來跑去，被兩邊的長輩寵上了天。|週末兩家人常常一起吃飯。|你和親家反而成了好朋友。}"
+    : "你和親家說好輪流帶{g}，{一三五你顧，二四換他們，|一邊顧白天，一邊顧晚上，|一家顧一個星期，}{{g}在兩家之間輪流住，被兩邊的長輩寵上了天。|週末兩家人常常一起吃飯。|你和親家反而成了好朋友。}"];
   return [
     {
-      key: "work", lead: `{pk}的{gw}{g}${age}，{pk}他們兩個都要上班，白天找不到人顧`, ask: "{pk}問你能不能白天幫忙帶，你怎麼打算？",
+      key: "work", vars: { gage }, lead: "{pk}的{gw}{g}{gage}，{pk}他們兩個都要上班，白天找不到人顧", ask: "{pk}問你能不能白天幫忙帶，你怎麼打算？",
       daily: ["白天幫忙帶", "累，但看著孫子長大", daily], weekend: ["只幫忙週末", "平日留給自己", weekend], move, money,
       no: no("問你能不能幫忙帶{g}", "後來找到了一位很好的保母。"), share,
     },
     {
-      key: "daycare", lead: `{g}${age}，${s.year >= 2011 ? "公托沒抽中，私立的托嬰中心也要排半年" : s.year >= 2000 ? "托嬰中心排不到位子" : "附近的托兒所不收這麼小的孩子"}，{pk}打電話來，問你能不能幫忙帶`, ask: "你的決定是？",
+      key: "daycare", vars: { gage, why: s.year >= 2011 ? "公托沒抽中，私立的托嬰中心也要排半年" : late ? "托嬰中心排不到位子" : "附近的托兒所不收這麼小的孩子" },
+      lead: "{g}{gage}，{why}，{pk}打電話來，問你能不能幫忙帶", ask: "你的決定是？",
       daily: ["白天先幫忙帶", "等排到位子再說", ["{pk}找不到地方送托，你答應白天先幫忙帶{g}。{每天早上{pk}把{g}抱過來，傍晚再接回去，|你在客廳鋪了巧拼，把危險的東西都收到高處，}{等排到位子時，{g}已經會叫「{grand}」了。|你又重新學了一次怎麼泡奶、換尿布、哄睡。}", daily[1]]],
       weekend: ["一個星期幫兩三天", "其他天讓他們想辦法", ["你答應一個星期幫忙顧{g}兩三天，{其他時間{pk}請了臨時保母，|其他天{pk}他們輪流請假，}{你的日子沒有全被打亂。|{g}來的那幾天，你都特別早起。}"]],
       move,
-      money: s.year >= 2000
+      money: late
         ? ["出錢上私立托嬰", "出錢不出力", ["你沒辦法天天帶{g}，{就幫{pk}付了私立托嬰中心的費用，|每個月幫忙出一半的托嬰費，}{週末再去看{gt}。|{pk}說這樣就幫了大忙。|你說錢的事不用擔心。}"]]
         : money,
-      no: no("問你能不能幫忙帶{g}", `後來排到了${nursery}的位子。`), share,
+      no: no("問你能不能幫忙帶{g}", late ? "後來排到了托嬰中心的位子。" : "後來排到了托兒所的位子。"), share,
     },
     (s.year >= 2002 || g.age === 0) && g.age <= 1 && {
-      key: "leave", lead: `{pk}的${s.year >= 2002 ? "育嬰假" : "產假"}快結束了，{g}還不到兩歲，{pk}吞吞吐吐地問你能不能幫忙`, ask: "要怎麼回答？",
+      key: "leave", lead: s.year >= 2002 ? "{pk}的育嬰假快結束了，{g}還不到兩歲，{pk}吞吞吐吐地問你能不能幫忙" : "{pk}的產假快結束了，{g}還不到兩歲，{pk}吞吞吐吐地問你能不能幫忙", ask: "要怎麼回答？",
       daily: ["接手白天帶", "累，但看著孫子長大", ["{pk}回去上班以後，你接手白天帶{g}。{每天早上七點，{pk}就把{g}抱過來，|客廳的地板鋪滿了巧拼和玩具，}{一天下來腰都直不起來，但{g}第一次叫「{grand}」的時候，什麼都值得了。|你又重新學了一次怎麼泡奶、換尿布、哄睡。}", daily[1]]],
       weekend: ["只幫忙週末", "平日留給自己", weekend], move, money,
       no: no("回去上班前問你能不能幫忙帶{g}", "後來找到了一位很好的保母。"), share,
     },
     g.age >= 1 && {
-      key: "nanny", lead: `{g}還沒到上${school}的年紀，{pk}他們請的保母卻突然不做了`, ask: "要怎麼幫忙？",
+      key: "nanny", lead: s.year >= 2012 ? "{g}還沒到上幼兒園的年紀，{pk}他們請的保母卻突然不做了" : "{g}還沒到上幼稚園的年紀，{pk}他們請的保母卻突然不做了", ask: "要怎麼幫忙？",
       daily: ["白天先接手帶", "等找到新保母再說", ["保母不做了，你答應白天先接手帶{g}。{每天早上{pk}把{g}抱過來，|你把客廳的茶几收起來，鋪上了巧拼，}{本來說好帶一個月，結果一帶就是一年。|你又重新學了一次怎麼哄睡、怎麼餵副食品。}", daily[1]]],
       weekend: ["只在週末幫忙", "平日留給自己", ["你跟{pk}說好，平日由他們再找保母，週末再把{g}帶來給你顧。{星期六一早，你就在門口等。|週末的家裡，又有了小孩的哭聲和笑聲。|你在冰箱裡塞滿了{gt}愛吃的東西。}"]],
       move,
@@ -171,8 +183,10 @@ function grandHelpScenes(s, g) {
     },
     {
       key: "far", lead: "{pk}他們在外縣市上班，想把{g}送回來給你帶，週末再來接", ask: "你怎麼打算？",
-      daily: [`把${g.call}接來家裡帶`, "週一到週五住你家", ["你把{g}接回家裡帶，{週一到週五都住你家，|嬰兒床就擺在你的床旁邊，}{星期天晚上{pk}來接人時，{g}抱著你不放。|你又重新學了一次怎麼泡奶、換尿布、哄睡。}", "{g}住進你家以後，{你推著娃娃車去菜市場，連攤販都認得{gt}了，|你在公園跟其他{grand}交換帶孫心得，}{每個星期天晚上，你都在門口揮手，揮到車子轉彎。|家裡又有了小孩的哭聲和笑聲。}"]],
-      weekend: ["只在週末帶", "平日還是跟著爸媽", [`你跟{pk}說，孩子還是跟在爸媽身邊比較好，平日{g}留在那邊上${nursery}，週末和放假再帶回來給你顧。{每個星期五晚上，你就開始期待。|你在冰箱裡塞滿了{gt}愛吃的東西。}`]],
+      daily: [ctx.f("把{g}接來家裡帶", gv), "週一到週五住你家", ["你把{g}接回家裡帶，{週一到週五都住你家，|嬰兒床就擺在你的床旁邊，}{星期天晚上{pk}來接人時，{g}抱著你不放。|你又重新學了一次怎麼泡奶、換尿布、哄睡。}", "{g}住進你家以後，{你推著娃娃車去菜市場，連攤販都認得{gt}了，|你在公園跟其他{grand}交換帶孫心得，}{每個星期天晚上，你都在門口揮手，揮到車子轉彎。|家裡又有了小孩的哭聲和笑聲。}"]],
+      weekend: ["只在週末帶", "平日還是跟著爸媽", [late
+        ? "你跟{pk}說，孩子還是跟在爸媽身邊比較好，平日{g}留在那邊上托嬰中心，週末和放假再帶回來給你顧。{每個星期五晚上，你就開始期待。|你在冰箱裡塞滿了{gt}愛吃的東西。}"
+        : "你跟{pk}說，孩子還是跟在爸媽身邊比較好，平日{g}留在那邊上托兒所，週末和放假再帶回來給你顧。{每個星期五晚上，你就開始期待。|你在冰箱裡塞滿了{gt}愛吃的東西。}"]],
       move: ["搬去孩子家住一陣子", "平日幫忙，週末回家", ["你收拾了一箱衣服，搬去{pk}家住了一陣子，{平日幫忙帶{g}，週末再回自己家，|白天帶{g}去公園，晚上一家人一起吃飯，}{{pk}說這樣安心多了。|{g}學會走路以後，最愛跟在你後面跑。}"]],
       money: ["出錢請保母", "出錢不出力", ["你沒辦法天天帶{g}，{就每個月幫{pk}出一半的保母費，|幫{pk}在他們家附近找了一位保母，錢由你出，}{週末再去看{gt}。|{pk}說這樣就幫了大忙。}"]],
       no: ["婉拒，過自己的生活", "身體和日子也要顧", "{pk}想把{g}送回來給你帶，你{想了很久，|老實說了自己的身體狀況，}{還是婉拒了。|說孩子還是跟在爸媽身邊比較好。}{pk}{有點失望，但說能理解。|後來在他們家附近找到了一位很好的保母。}"],
@@ -180,9 +194,11 @@ function grandHelpScenes(s, g) {
     },
     // 2021–2022 年疫情期間，托嬰中心一有確診就停托。
     s.year >= 2021 && s.year <= 2022 && {
-      key: "covid", w: 2, lead: `疫情期間，${nursery}{一有確診就停托|三天兩頭停課}，{pk}他們在家上班還要顧{g}`, ask: "要怎麼幫忙？",
+      key: "covid", w: 2, lead: "疫情期間，托嬰中心{一有確診就停托|三天兩頭停課}，{pk}他們在家上班還要顧{g}", ask: "要怎麼幫忙？",
       daily: ["白天過去幫忙顧", "戴好口罩照樣去", ["{pk}他們在家上班，你每天戴好口罩過去，白天幫忙顧{g}。{你在客廳陪{g}玩，{pk}他們關在房間裡開視訊會議，|中午你幫大家煮一鍋稀飯，}{一天下來腰都直不起來，但{g}第一次叫「{grand}」的時候，什麼都值得了。|疫情那一年，你是{g}最常見到的人。}"]],
-      weekend: ["只在停托的日子幫忙", "平日留給自己", [`你跟{pk}說好，${nursery}停托的那幾天你再過去幫忙。{接到電話，你就提著${s.year >= 2022 ? "快篩" : "口罩"}和一袋菜出門。|那陣子你的手機一響，就知道是{g}要來了。}`]],
+      weekend: ["只在停托的日子幫忙", "平日留給自己", [s.year >= 2022
+        ? "你跟{pk}說好，托嬰中心停托的那幾天你再過去幫忙。{接到電話，你就提著快篩和一袋菜出門。|那陣子你的手機一響，就知道是{g}要來了。}"
+        : "你跟{pk}說好，托嬰中心停托的那幾天你再過去幫忙。{接到電話，你就提著口罩和一袋菜出門。|那陣子你的手機一響，就知道是{g}要來了。}"]],
       move: ["搬去孩子家住一陣子", "就近照應", ["疫情期間，你收拾了一箱衣服，搬去{pk}家住了一陣子，{白天幫忙顧{g}，晚上一家人一起吃飯，|{pk}他們終於能安心開會，}{那段時間雖然擠，卻是一家人最常聚在一起的日子。|{g}最愛在走廊上追著你跑。}"]],
       money: ["出錢請到府保母", "出錢不出力", ["疫情期間你不方便天天出門，{就幫{pk}出錢請了一位到家裡的保母，|每個月幫忙出一半的保母費，}{每天用視訊陪{g}唱兒歌。|{pk}說這樣就幫了大忙。}"]],
       no: ["婉拒，先顧好自己", "疫情期間少出門", ["{pk}問你能不能幫忙顧{g}，你想到自己的年紀和疫情，{還是婉拒了。|說等疫情過了再說。}{pk}說能理解，{每天傳{g}的影片給你看。|後來他們夫妻輪流進辦公室。}"]],
@@ -201,12 +217,12 @@ function grandHelpScenes(s, g) {
 }
 
 // l_retiredLife: the moment the question comes up (`prompt`), how the answers begin (`open`, before 你…), and the
-// buttons a scene names its own way (`labels`: option → [label, hint]). {f} is an old friend, {k} a grown child.
-function retireScenes(s, pro, pal) {
+// buttons a scene names its own way (`labels`: option → [label, hint]). {f} is an old friend, {k} a grown child; a
+// scene's own words come in its `vars`.
+function retireScenes(s, pro, pal, ctx) {
   const office = s.job && !["自營", "家業"].includes(s.job.field);
   // 公教 have a monthly pension (月退); 勞保 pays one (勞保年金) from 2009, from 60 on; otherwise it is a lump sum.
   const civil = s.job && ["公部門", "教育"].includes(s.job.field), monthly = civil || (s.year >= 2009 && s.age >= 60);
-  const pension = civil ? "月退" : monthly ? "勞保年金" : "退休金";
   const grown = adultKids(s, 22).length > 0;
   return [
     { key: "sunday", prompt: "退休了，每天都是星期天。接下來的日子，你想怎麼過？", open: "退休後，" },
@@ -217,12 +233,14 @@ function retireScenes(s, pro, pal) {
       labels: { consult: pro ? ["答應回去當顧問", "老本行還用得上"] : ["答應回去帶新人", "老本行還用得上"] },
     },
     office && {
-      key: "pension", prompt: `${monthly ? "第一筆" : ""}${pension}入帳了，你${s.year >= 2025 ? "盯著手機裡的入帳通知" : "拿著存摺在銀行門口"}看了好一會兒。退休的日子要怎麼過？`, open: `${pension}入帳以後，`,
+      key: "pension", vars: { look: s.year >= 2025 ? "盯著手機裡的入帳通知" : "拿著存摺在銀行門口" },
+      prompt: civil ? "第一筆月退入帳了，你{look}看了好一會兒。退休的日子要怎麼過？" : monthly ? "第一筆勞保年金入帳了，你{look}看了好一會兒。退休的日子要怎麼過？" : "退休金入帳了，你{look}看了好一會兒。退休的日子要怎麼過？",
+      open: civil ? "月退入帳以後，" : monthly ? "勞保年金入帳以後，" : "退休金入帳以後，",
       labels: { travel: ["拿退休金去旅行", "趁走得動多看看"], shop: ["拿退休金開一間小店", "圓一個當老闆的夢"] },
     },
     married(s) && {
       key: "spouse", prompt: "退休後你整天待在家裡，{partner}說你跟前跟後、什麼都要管，叫你去找點事做。接下來要把時間花在哪裡？", open: "被{partner}念了幾次以後，",
-      labels: { travel: [`和${s.partner.call}去旅行`, "趁走得動多看看"], learn: ["學一樣才藝", "給自己找個新樂趣"] },
+      labels: { travel: [ctx.f("和{partner}去旅行", { partner: s.partner.call }), "趁走得動多看看"], learn: ["學一樣才藝", "給自己找個新樂趣"] },
     },
     grown && {
       key: "kids", prompt: s.year >= 2011 ? "{k}在家族的 LINE 群組裡傳了好幾個{旅行團|社區大學|志工招募}的連結，問你退休後有什麼打算。你想怎麼過？" : "{k}打電話來問你退休後有什麼打算，叫你不要整天待在家裡。你想怎麼過？",
@@ -238,7 +256,6 @@ function retireScenes(s, pro, pal) {
 // l_directive: what brings 預立醫療決定 to mind. `then` begins the answers, `away` is how it is put off; a scene can
 // name buttons its own way (`labels`). {kin} is the one you would ask to come along, {f} an old friend.
 function directiveScenes(s, hasKin, kidKin) {
-  const docs = `存摺${s.home === "own" ? "、房屋權狀" : ""}和保單`;
   return [
     {
       key: "tv", lead: "電視上在介紹《病人自主權利法》", ask: "你想到，如果有一天自己病重又沒辦法表達，要不要插管、急救，該由誰來決定？你打算怎麼做？",
@@ -267,13 +284,15 @@ function directiveScenes(s, hasKin, kidKin) {
       labels: { sign: ["去醫院諮商，把那一欄填上", "把自己的意願寫清楚"], wait: ["先空著再說", "還沒準備好面對"] },
     },
     {
-      key: "checkup", lead: `${s.health.chronic ? "回診拿慢性病的藥" : "做老人健檢"}時，家醫科醫師順口問你，有沒有想過預立醫療決定`, ask: "要怎麼做？",
+      key: "checkup", lead: s.health.chronic ? "回診拿慢性病的藥時，家醫科醫師順口問你，有沒有想過預立醫療決定" : "做老人健檢時，家醫科醫師順口問你，有沒有想過預立醫療決定", ask: "要怎麼做？",
       then: "聽了醫師的話，", away: "笑著跟醫師說還早",
       labels: { sign: ["請醫師安排諮商門診", "把自己的意願寫清楚"], wait: ["笑笑說還早", "還沒準備好面對"], ask: ["請醫師多說一點", "先弄懂再決定"] },
       askOpen: "你請醫師多說一點。",
     },
     {
-      key: "papers", lead: `你在整理${docs}的時候，想到還有一件事沒交代清楚：如果有一天自己沒辦法說話了，要不要插管急救`, ask: "要怎麼做？",
+      key: "papers", lead: s.home === "own"
+        ? "你在整理存摺、房屋權狀和保單的時候，想到還有一件事沒交代清楚：如果有一天自己沒辦法說話了，要不要插管急救"
+        : "你在整理存摺和保單的時候，想到還有一件事沒交代清楚：如果有一天自己沒辦法說話了，要不要插管急救", ask: "要怎麼做？",
       then: "整理完那些文件，", away: "把這件事跟那些文件一起放回抽屜",
       labels: { talk: ["把想法說給家人聽", "讓大家知道你的想法"], wait: ["先放回抽屜", "還沒準備好面對"] },
     },
@@ -293,13 +312,14 @@ export const LATER = [
     when: s => s.kids.length > 0 && s.kids[s.kids.length - 1].age >= 20 && s.kids[s.kids.length - 1].age <= 32, p: () => 0.15,
     choice: (s, ctx) => {
       const k = s.kids[s.kids.length - 1], v = kidVars(k), video = s.year >= 2011;
-      const left = married(s) ? "家裡只剩下你和{partner}兩個人" : "家裡只剩下你一個人";
+      const left = married(s) ? ctx.f("家裡只剩下你和{partner}兩個人", { partner: s.partner.call }) : "家裡只剩下你一個人";
+      const who = s.kids.length > 1 ? ctx.f("最小的{name}也", v) : k.call;
       return {
         prompt: ctx.w([
-          `${s.kids.length > 1 ? "最小的{name}也" : "{name}"}搬出去住了，${left}。空下來的日子要怎麼過？`,
-          `{name}拖著行李箱搬去外地工作，{房間一下子空了|門口少了一雙鞋}，${left}。接下來想怎麼過？`,
-          `晚餐又煮了太多菜——{name}已經搬出去了。${left}，你想怎麼過接下來的日子？`,
-        ], v),
+          "{who}搬出去住了，{left}。空下來的日子要怎麼過？",
+          "{name}拖著行李箱搬去外地工作，{房間一下子空了|門口少了一雙鞋}，{left}。接下來想怎麼過？",
+          "晚餐又煮了太多菜——{name}已經搬出去了。{left}，你想怎麼過接下來的日子？",
+        ], { ...v, who, left }),
         options: [
           {
             id: "l_emptyNest.room", label: "把孩子的房間改成自己的空間", hint: "書房、畫室或泡茶的角落", act: "hobby", style: "self", weight: 0.2,
@@ -321,9 +341,12 @@ export const LATER = [
           },
           {
             id: "l_emptyNest.call", label: video ? "固定和孩子視訊" : "固定和孩子通電話", hint: "每週約好一個晚上", act: "talk", style: "family", weight: 0.2,
-            apply: (s2, c) => ({ text: c.w([
-              `{name}搬出去後，你們說好每個{星期天|星期三}晚上${video ? "視訊" : "通電話"}，{你總是提早十分鐘就坐在${video ? "手機" : "電話"}旁邊。|你會先把要講的事寫在月曆上。|講不到幾句，就開始叮嚀{t}要多吃青菜。}`,
-              `{name}搬出去後，你學會了等{t}的${video ? "視訊" : "電話"}，{每次一響就跑過去接，|一講就是一個小時，}{掛掉以後，家裡又安靜下來。|{t}說你比以前還囉唆，語氣卻很開心。}`,
+            apply: (s2, c) => ({ text: c.w(video ? [
+              "{name}搬出去後，你們說好每個{星期天|星期三}晚上視訊，{你總是提早十分鐘就坐在手機旁邊。|你會先把要講的事寫在月曆上。|講不到幾句，就開始叮嚀{t}要多吃青菜。}",
+              "{name}搬出去後，你學會了等{t}的視訊，{每次一響就跑過去接，|一講就是一個小時，}{掛掉以後，家裡又安靜下來。|{t}說你比以前還囉唆，語氣卻很開心。}",
+            ] : [
+              "{name}搬出去後，你們說好每個{星期天|星期三}晚上通電話，{你總是提早十分鐘就坐在電話旁邊。|你會先把要講的事寫在月曆上。|講不到幾句，就開始叮嚀{t}要多吃青菜。}",
+              "{name}搬出去後，你學會了等{t}的電話，{每次一響就跑過去接，|一講就是一個小時，}{掛掉以後，家裡又安靜下來。|{t}說你比以前還囉唆，語氣卻很開心。}",
             ], v), mood: 2 }),
           },
           {
@@ -347,7 +370,7 @@ export const LATER = [
       const same = s.year >= 2019 && ctx.rng() < 0.02;   // same-sex marriage is legal from 2019-05-24
       const p = ctx.person({ role: "partner", sex: same ? k.sex : son ? "female" : "male", birthYear: k.birthYear + ctx.rng.int(7) - 3 });
       const first = !s.kids.some(x => x.married);
-      const v = { ...kidVars(k), inl: p.call, it: pronoun(p), dad: parentWord(s), n: 1 + ctx.rng.int(6), nat: p.nature.word === "工作狂" ? "工作狂" : `${p.nature.word}的人` };
+      const v = { ...kidVars(k), inl: p.call, it: pronoun(p), dad: parentWord(s), n: 1 + ctx.rng.int(6), nat: p.nature.word === "工作狂" ? "工作狂" : ctx.f("{nat}的人", { nat: p.nature.word }) };
       const wed = out => { k.married = true; k.spouse = p.call; return { ...out, big: first }; };
       return {
         prompt: ctx.w([
@@ -395,17 +418,17 @@ export const LATER = [
     id: "l_grandkidHelp", domain: "family", channel: "change", tags: ["children"], ages: [55, 80], cooldown: 5, max: 2,
     when: s => s.flags.grandkids > 0 && s.age - (s.last.grandchild ?? -99) <= 2 && !s.abroad && !s.health.serious, p: () => 0.3,
     choice: (s, ctx) => {
-      const gs = grandkids(s, ctx), g = gs[gs.length - 1], v = grandVars(g);
-      const sc = pickScene(s, ctx, "l_grandkidHelp", grandHelpScenes(s, g)), lead = ctx.w(sc.lead, v);
+      const gs = grandkids(s, ctx), g = gs[gs.length - 1];
+      const sc = pickScene(s, ctx, "l_grandkidHelp", grandHelpScenes(s, g, ctx)), v = { ...grandVars(g), ...sc.vars }, lead = ctx.w(sc.lead, v);
       const { daily, weekend, move, money, no, share } = sc;
       return {
-        prompt: ctx.w(`${lead}。${sc.ask}`, v),
+        prompt: ctx.w("{lead}。{ask}", { ...v, lead, ask: ctx.f(sc.ask, v) }),
         options: [
           { id: "l_grandkidHelp.daily", label: daily[0], hint: daily[1], act: "care", style: "family", weight: 0.35, apply: (s2, c) => ({ text: c.w(daily[2], v), mood: 3 }) },
           { id: "l_grandkidHelp.weekend", label: weekend[0], hint: weekend[1], act: "care", style: "safe", weight: 0.2, apply: (s2, c) => ({ text: c.w(weekend[2], v), mood: 2 }) },
           { id: "l_grandkidHelp.move", label: move[0], hint: move[1], act: "moveHome", style: "family", weight: 0.1, apply: (s2, c) => ({ text: c.w(move[2], v), mood: 2 }) },
           { id: "l_grandkidHelp.money", label: money[0], hint: money[1], act: "hireCare", style: "self", weight: 0.15, apply: (s2, c) => { spend(s2, 0.3); return { text: c.w(money[2], v), mood: 1 }; } },
-          { id: "l_grandkidHelp.no", label: no[0], hint: no[1], act: "wait", style: "health", weight: 0.1, apply: (s2, c) => ({ text: c.w(no[2], v), mood: -1 }) },
+          { id: "l_grandkidHelp.no", label: no[0], hint: no[1], act: "wait", style: "health", weight: 0.1, apply: (s2, c) => ({ text: c.w(no[2], { ...v, ...no[3] }), mood: -1 }) },
           { id: "l_grandkidHelp.share", label: share[0], hint: share[1], act: "shareCare", style: "social", weight: 0.15, apply: (s2, c) => ({ text: c.w(share[2], v), mood: 3 }) },
         ],
       };
@@ -427,7 +450,9 @@ export const LATER = [
         "寒假{g}來住了一個星期，{你教{gt}包水餃，|兩個人每天晚上一起看卡通，}{臨走前{gt}抱著你說還要再來。|你把{gt}留下的畫收進了抽屜。}",
         "{g}教你玩手機遊戲，{你一直輸，|你怎麼按都按不對，}{{gt}笑到在沙發上打滾。|最後{gt}說：「{grand}，我讓你一次。」}",
       ] : g.age <= 18 ? [
-        `{g}上${g.age <= 15 ? "國中" : "高中"}了，週末還是會來陪你吃飯，{滑手機的時間比說話多，但你不介意。|還會用新學的英文考你。}`,
+        g.age <= 15
+          ? "{g}上國中了，週末還是會來陪你吃飯，{滑手機的時間比說話多，但你不介意。|還會用新學的英文考你。}"
+          : "{g}上高中了，週末還是會來陪你吃飯，{滑手機的時間比說話多，但你不介意。|還會用新學的英文考你。}",
         g.age === 15 || g.age === 16
           ? "{g}考完{exam}，你包了一個大紅包，{gt}{害羞地說謝謝。|偷偷跟你說，其實考得不太好。}{你說考得怎樣都沒關係。|你說{grand}以前也考過不好。}"
           : "{g}的{畢業典禮|運動會}，你坐在最前排，{幫{gt}拍了好多照片。|{gt}在台上偷偷跟你揮手。}",
@@ -453,53 +478,55 @@ export const LATER = [
       const share = s.kids.length ? "孩子" : "老朋友";
       const grown = adultKids(s, 22), pals = s.friends.filter(x => x.alive !== false && x.call);
       const sv = { f: pals.length ? ctx.rng.pick(pals).call : "老朋友", k: grown.length ? ctx.rng.pick(grown).call : "孩子" };
-      const sc = pickScene(s, ctx, "l_retiredLife", retireScenes(s, pro, pals.length > 0)), open = ctx.w(sc.open, sv);
+      const sc = pickScene(s, ctx, "l_retiredLife", retireScenes(s, pro, pals.length > 0, ctx)), open = ctx.w(sc.open, sv);
       const named = (key, label, hint) => (sc.labels && sc.labels[key] ? { label: sc.labels[key][0], hint: sc.labels[key][1] } : { label, hint });
       const travel = {
         id: "l_retiredLife.travel", ...named("travel", "到處去旅行", "趁走得動多看看"), act: "travel", style: "self", weight: 0.25,
         apply: (s2, c) => { plan(s2, "travel"); c.remember("l_retiredLife", "退休後開始到處旅行", { mood: 4 }); spend(s2, 0.3); return { text: c.w([
-          `${open}${married(s2) ? "你和{partner}說走就走" : "你一個人背起了背包"}，{第一站就去了{trip}，|一年出去{兩|三}趟，}{行李箱上的貼紙一年比一年多。|手機裡存滿了風景照，每一張都要傳給${share}看。}`,
-          `${open}你{報名了旅行團，|和老同事組了一個旅遊團，}{把以前沒空去的地方一個一個去，|第一站就去了{trip}，}{家裡的冰箱貼滿了各地的磁鐵。|你說以前上班沒空，現在要一次補回來。}`,
-        ]), mood: 5 }; },
+          "{open}{go}，{第一站就去了{trip}，|一年出去{兩|三}趟，}{行李箱上的貼紙一年比一年多。|手機裡存滿了風景照，每一張都要傳給{share}看。}",
+          "{open}你{報名了旅行團，|和老同事組了一個旅遊團，}{把以前沒空去的地方一個一個去，|第一站就去了{trip}，}{家裡的冰箱貼滿了各地的磁鐵。|你說以前上班沒空，現在要一次補回來。}",
+        ], { open, share, go: married(s2) ? c.f("你和{partner}說走就走", { partner: s2.partner.call }) : "你一個人背起了背包" }), mood: 5 }; },
       };
       const volunteer = {
         id: "l_retiredLife.volunteer", ...named("volunteer", "去當志工", "把時間給需要的人"), act: "volunteer", style: "social", weight: 0.2,
         apply: (s2, c) => {
           const place = c.rng.pick(["火車站的服務台", "博物館", "社區關懷據點", "動物收容所", "國小的圖書室", "公園的導覽站"]);
-          plan(s2, "volunteer", place); c.remember("l_retiredLife", `退休後開始到${place}當志工`, { mood: 4 });
+          plan(s2, "volunteer", place); c.remember("l_retiredLife", c.f("退休後開始到{place}當志工", { place }), { mood: 4 });
           return { text: c.w([
-            `${open}你到{place}當志工，{穿上背心的那一刻，覺得自己又有了一份工作。|認識了一群一起值班的新朋友。|每週固定去{兩|三}個早上，比上班還準時。}`,
-            `${open}你每週去{place}幫忙，{有人叫你一聲「志工{elder}」，你就笑開了。|你說，被需要的感覺真好。}`,
-          ], { place, elder: s2.sex === "male" ? "阿伯" : "阿姨" }), mood: 4 };
+            "{open}你到{place}當志工，{穿上背心的那一刻，覺得自己又有了一份工作。|認識了一群一起值班的新朋友。|每週固定去{兩|三}個早上，比上班還準時。}",
+            s2.sex === "male" ? "{open}你每週去{place}幫忙，{有人叫你一聲「志工阿伯」，你就笑開了。|你說，被需要的感覺真好。}" : "{open}你每週去{place}幫忙，{有人叫你一聲「志工阿姨」，你就笑開了。|你說，被需要的感覺真好。}",
+          ], { place, open }), mood: 4 };
         },
       };
       const learn = {
         id: "l_retiredLife.learn", ...named("learn", "學一樣才藝", "樂器、跳舞、畫畫"), act: "hobby", style: "learn", weight: 0.2,
         apply: (s2, c) => {
           const [skill, show] = c.rng.pick(SKILLS);
-          plan(s2, "learn", skill, { show }); c.remember("l_retiredLife", `退休後開始學${skill}`, { mood: 4 });
+          plan(s2, "learn", skill, { show }); c.remember("l_retiredLife", c.f("退休後開始學{skill}", { skill }), { mood: 4 });
           return { text: c.w([
-            `${open}你開始學{skill}，{每天在家練一個小時，|每週去{city}的文化中心上課，}{老師說你進步得很快。|你說，學東西真的不怕晚。}`,
-            `${open}你報名了{skill}課，{班上同學的平均年紀七十歲，|第一堂課你就坐在第一排，}{你是最認真做筆記的那一個。|下課後大家還會一起去喝茶。}`,
-          ], { skill }), mood: 4 };
+            "{open}你開始學{skill}，{每天在家練一個小時，|每週去{city}的文化中心上課，}{老師說你進步得很快。|你說，學東西真的不怕晚。}",
+            "{open}你報名了{skill}課，{班上同學的平均年紀七十歲，|第一堂課你就坐在第一排，}{你是最認真做筆記的那一個。|下課後大家還會一起去喝茶。}",
+          ], { skill, open }), mood: 4 };
         },
       };
       const grand = g && {
-        id: "l_retiredLife.grandkids", ...named("grandkids", `專心陪${g.call}長大`, "含飴弄孫"), act: "care", style: "family", weight: 0.25,
-        apply: (s2, c) => { plan(s2, "grandkids", g.call); c.remember("l_retiredLife", `退休後專心陪${g.call}長大`, { mood: 4 }); return { text: c.w([
-          `${open}你把大部分的時間給了{g}：${g.age < 3 ? "{每天幫忙泡奶、哄睡，|推著娃娃車到處逛，}" : "{每天接送上下學，|陪{gt}寫功課、去公園，}"}{你說這比上班還累，臉上卻一直在笑。|{pk}說幸好有你。|鄰居都說你看起來年輕了十歲。}`,
-          `${open}你成了{g}最好的玩伴，{一起在陽台種豆芽，|一起去圖書館聽故事，|一起去公園餵魚，}{{gt}最常說的一句話是「{grand}陪我」。|你的行事曆上寫滿了{g}的名字。}`,
-        ], grandVars(g)), mood: 4 }; },
+        id: "l_retiredLife.grandkids", ...named("grandkids", ctx.f("專心陪{g}長大", { g: g.call }), "含飴弄孫"), act: "care", style: "family", weight: 0.25,
+        apply: (s2, c) => { plan(s2, "grandkids", g.call); c.remember("l_retiredLife", c.f("退休後專心陪{g}長大", { g: g.call }), { mood: 4 }); return { text: c.w([
+          g.age < 3
+            ? "{open}你把大部分的時間給了{g}：{每天幫忙泡奶、哄睡，|推著娃娃車到處逛，}{你說這比上班還累，臉上卻一直在笑。|{pk}說幸好有你。|鄰居都說你看起來年輕了十歲。}"
+            : "{open}你把大部分的時間給了{g}：{每天接送上下學，|陪{gt}寫功課、去公園，}{你說這比上班還累，臉上卻一直在笑。|{pk}說幸好有你。|鄰居都說你看起來年輕了十歲。}",
+          "{open}你成了{g}最好的玩伴，{一起在陽台種豆芽，|一起去圖書館聽故事，|一起去公園餵魚，}{{gt}最常說的一句話是「{grand}陪我」。|你的行事曆上寫滿了{g}的名字。}",
+        ], { ...grandVars(g), open }), mood: 4 }; },
       };
       const farm = {
-        id: "l_retiredLife.farm", ...named("farm", home ? "回鄉下種田" : "去郊區租地種菜", home ? `回${home}的老家` : "當個假日農夫"), act: "familyBusiness", style: "health", weight: 0.15,
+        id: "l_retiredLife.farm", ...named("farm", home ? "回鄉下種田" : "去郊區租地種菜", home ? ctx.f("回{home}的老家", { home }) : "當個假日農夫"), act: "familyBusiness", style: "health", weight: 0.15,
         apply: (s2, c) => {
           const crop = c.rng.pick(["高麗菜", "地瓜", "絲瓜", "芭樂", "玉米", "空心菜"]);
-          plan(s2, "farm", crop); c.remember("l_retiredLife", home ? `退休後搬回${home}的老家種田` : "退休後在郊區租了一塊地種菜", { mood: 4 });
+          plan(s2, "farm", crop); c.remember("l_retiredLife", home ? c.f("退休後搬回{home}的老家種田", { home }) : "退休後在郊區租了一塊地種菜", { mood: 4 });
           if (home) s2.county = home;
           return { text: home
-            ? c.w(`${open}你搬回{home}的老家，{整理了荒廢多年的那塊田，|在老家後面闢了一塊菜園，}種起了{crop}，{每天天一亮就去巡田。|收成時分送給左鄰右舍。}`, { home, crop })
-            : c.w(`${open}你在郊區租了一小塊地，{每個週末去種{crop}，|跟著老農夫學怎麼堆肥、搭棚架，}{第一次收成時，你拍照傳給所有人看。|曬得黑黑的，身體反而比上班時好。}`, { crop }), mood: 4 };
+            ? c.w("{open}你搬回{home}的老家，{整理了荒廢多年的那塊田，|在老家後面闢了一塊菜園，}種起了{crop}，{每天天一亮就去巡田。|收成時分送給左鄰右舍。}", { home, crop, open })
+            : c.w("{open}你在郊區租了一小塊地，{每個週末去種{crop}，|跟著老農夫學怎麼堆肥、搭棚架，}{第一次收成時，你拍照傳給所有人看。|曬得黑黑的，身體反而比上班時好。}", { crop, open }), mood: 4 };
         },
       };
       const shop = s.savings >= 1.2 && !s.health.serious && {
@@ -508,7 +535,9 @@ export const LATER = [
           const kind = c.rng.pick(SHOPS);
           plan(s2, "shop", kind); spend(s2, 0.8); c.arc.start("l_shop", { kind }, 2);
           // big: the first clause is what memoryLane quotes years later, so it stays 退休後你在巷口開了一間…
-          return { text: c.w(`退休後你在巷口開了一間{kind}，用的是${sc.key === "pension" ? "退休金和" : ""}存了半輩子的錢。{每天一早就去開門，|店裡的擺設都是自己一樣一樣挑的，}{開幕那天，老同事都來捧場。|第一個月，熟客就記住了你的名字。}`, { kind }), mood: 4, big: true };
+          return { text: c.w(sc.key === "pension"
+            ? "退休後你在巷口開了一間{kind}，用的是退休金和存了半輩子的錢。{每天一早就去開門，|店裡的擺設都是自己一樣一樣挑的，}{開幕那天，老同事都來捧場。|第一個月，熟客就記住了你的名字。}"
+            : "退休後你在巷口開了一間{kind}，用的是存了半輩子的錢。{每天一早就去開門，|店裡的擺設都是自己一樣一樣挑的，}{開幕那天，老同事都來捧場。|第一個月，熟客就記住了你的名字。}", { kind }), mood: 4, big: true };
         },
       };
       const consult = s.job && s.job.field !== "家業" && {
@@ -516,22 +545,24 @@ export const LATER = [
         apply: (s2, c) => {
           plan(s2, "consult", pro ? "顧問" : "帶新人"); s2.savings += 0.3; c.remember("l_retiredLife", pro ? "退休後回去當顧問" : "退休後回去帶新人", { mood: 3 });
           return { text: pro
-            ? c.w(`${open}{以前的公司|老客戶|朋友的公司}找你回去當顧問，{一個星期去兩天，|有案子才去，}{薪水不多，但被需要的感覺很好。|你把幾十年的經驗一點一點交給年輕人。}`)
-            : c.w(`${open}以前的老闆找你回去帶新人，{一個星期去三個早上，|只教不做，}{你把當{job}幾十年的訣竅一點一點教給年輕人。|年輕人都叫你一聲{前輩|老師}。}`), mood: 3 };
+            ? c.w("{open}{以前的公司|老客戶|朋友的公司}找你回去當顧問，{一個星期去兩天，|有案子才去，}{薪水不多，但被需要的感覺很好。|你把幾十年的經驗一點一點交給年輕人。}", { open })
+            : c.w("{open}以前的老闆找你回去帶新人，{一個星期去三個早上，|只教不做，}{你把當{job}幾十年的訣竅一點一點教給年輕人。|年輕人都叫你一聲{前輩|老師}。}", { open }), mood: 3 };
         },
       };
       const options = [travel, volunteer, learn, grand, farm, shop, consult].filter(Boolean);
       // Six at most: when everything applies, one of the side paths waits for another life.
       if (options.length > 6) options.splice(options.indexOf(ctx.rng() < 0.5 ? shop : consult), 1);
       if (options.length > 6) options.pop();
-      return { prompt: ctx.w(sc.prompt, sv), options };
+      return { prompt: ctx.w(sc.prompt, { ...sv, ...sc.vars }), options };
     },
   },
   {
     id: "l_firstWeekday", once: true, ages: [55, 80], when: s => justRetired(s, 1) && !s.abroad, p: () => 0.4,
     apply: (s, ctx) => ({ text: ctx.w([
       "退休後的第一個星期一，你不用趕著出門，{去菜市場繞了一圈，才發現平日早上的市場這麼熱鬧。|在公園看了一整個早上的人下棋。|坐在早餐店裡，把報紙從第一版看到最後一版。}",
-      `退休後的第一個上班日，{鬧鐘沒響，你卻還是準時醒來。|${s.year >= 2012 ? "你醒來時，手機裡的工作群組還在跳訊息。" : "電話一響，你還以為是公司打來的。"}}{你躺回床上，對著天花板笑了。|你乾脆起床，去河堤走了一圈。}`,
+      s.year >= 2012
+        ? "退休後的第一個上班日，{鬧鐘沒響，你卻還是準時醒來。|你醒來時，手機裡的工作群組還在跳訊息。}{你躺回床上，對著天花板笑了。|你乾脆起床，去河堤走了一圈。}"
+        : "退休後的第一個上班日，{鬧鐘沒響，你卻還是準時醒來。|電話一響，你還以為是公司打來的。}{你躺回床上，對著天花板笑了。|你乾脆起床，去河堤走了一圈。}",
       "退休後第一次在平日{去銀行|去郵局|去回診}，{不用請假，也不用趕時間，|排隊的人都跟你一樣頭髮花白，}{你忽然覺得有點好笑。|心裡有一種說不出的輕鬆。}",
       married(s)
         ? "退休後的第一個月，你{把家裡每一個抽屜都整理了一遍，|把陽台的花全部換過一輪，}{partner}{笑你閒不下來。|說家裡突然多了一個管家。}"
@@ -543,7 +574,7 @@ export const LATER = [
     id: "l_planLater", once: true, ages: [58, 95], p: () => 0.12,
     when: s => s.flags.l_plan && s.flags.l_plan.kind !== "shop" && s.age - s.flags.l_plan.at >= 3 && s.age - s.flags.l_plan.at <= 10 && !s.health.serious,
     apply: (s, ctx) => {
-      const { kind, what, show } = s.flags.l_plan, share = s.kids.length ? "孩子和老朋友" : "老朋友";
+      const { kind, what, show } = s.flags.l_plan;
       if (kind === "travel") return { text: ctx.w("退休後到處旅行了幾年，{行李箱換了第二個，|家裡的冰箱貼滿了各地的磁鐵，}{你把每一趟的照片都做成相簿，一本一本排在書架上。|朋友都說你比年輕人還常出門。}"), mood: 4 };
       if (kind === "volunteer") return { text: ctx.w("在{place}當志工滿{三|五}年，{拿到了一張服務獎狀，|大家幫志工們辦了一場感恩茶會，}{你把背心洗得乾乾淨淨，繼續值班。|你說這是退休後做過最有意義的事。}", { place: what }), mood: 4 };
       if (kind === "learn") return { text: ctx.w(show === "stage"
@@ -555,11 +586,19 @@ export const LATER = [
           ? ctx.w(g.age < 6
             ? "你陪著長大的{g}{會自己騎腳踏車了，|會自己綁鞋帶了，}{每次看到你就撲過來抱你。|最愛吃{grand}煮的稀飯。}"
             : g.age <= 11
-              ? `你陪著長大的{g}${g.age <= 7 ? "上國小了，" : "在學校拿到了一張獎狀，"}{{gt}在作文裡寫：「我最喜歡的人是{grand}。」|放學回家的第一件事，就是跑來跟你說學校的事。}`
-              : `你陪著長大的{g}${g.age <= 15 ? "上國中了" : g.age <= 18 ? "上高中了" : "上大學了"}，{還是常常打電話給你。|放假時常回來陪你吃飯。|個子都比你高了，還是會跟你撒嬌。}`, grandVars(g))
+              ? g.age <= 7
+                ? "你陪著長大的{g}上國小了，{{gt}在作文裡寫：「我最喜歡的人是{grand}。」|放學回家的第一件事，就是跑來跟你說學校的事。}"
+                : "你陪著長大的{g}在學校拿到了一張獎狀，{{gt}在作文裡寫：「我最喜歡的人是{grand}。」|放學回家的第一件事，就是跑來跟你說學校的事。}"
+              : g.age <= 15
+                ? "你陪著長大的{g}上國中了，{還是常常打電話給你。|放假時常回來陪你吃飯。|個子都比你高了，還是會跟你撒嬌。}"
+                : g.age <= 18
+                  ? "你陪著長大的{g}上高中了，{還是常常打電話給你。|放假時常回來陪你吃飯。|個子都比你高了，還是會跟你撒嬌。}"
+                  : "你陪著長大的{g}上大學了，{還是常常打電話給你。|放假時常回來陪你吃飯。|個子都比你高了，還是會跟你撒嬌。}", grandVars(g))
           : ctx.w("退休後陪孫子的這幾年，{你的手機裡全是孩子們的照片，|你學會了好幾首兒歌，}{你說這是你最忙、也最開心的日子。|你覺得自己好像也跟著長大了一次。}"), mood: 4 };
       }
-      if (kind === "farm") return { text: ctx.w(`種菜種了幾年，{你種的{crop}今年大豐收，|你的菜園成了左鄰右舍的菜市場，}{寄了好幾箱給${share}。|皮膚曬得黑黑的，身體比上班時還好。}`, { crop: what }), mood: 4 };
+      if (kind === "farm") return { text: ctx.w(s.kids.length
+        ? "種菜種了幾年，{你種的{crop}今年大豐收，|你的菜園成了左鄰右舍的菜市場，}{寄了好幾箱給孩子和老朋友。|皮膚曬得黑黑的，身體比上班時還好。}"
+        : "種菜種了幾年，{你種的{crop}今年大豐收，|你的菜園成了左鄰右舍的菜市場，}{寄了好幾箱給老朋友。|皮膚曬得黑黑的，身體比上班時還好。}", { crop: what }), mood: 4 };
       return { text: ctx.w(what === "顧問"
         ? "當了幾年顧問，{你帶過的年輕人都升上主管了，|你把幾十年的筆記整理成一本手冊，}{你決定這次真的退休了。|最後一次開會，大家幫你辦了一場小小的歡送會。}"
         : "帶新人帶了幾年，{你教出來的徒弟都能獨當一面了，|你把幾十年的訣竅寫成一本筆記，}{你決定這次真的退休了。|最後一天，年輕人合送了你一個蛋糕。}"), mood: 4 };
@@ -570,7 +609,7 @@ export const LATER = [
     id: "l_shopYear", domain: "wealth", channel: "change", ages: [55, 110],
     when: (s, ctx) => ctx.arc.at("l_shop", "start") || ctx.arc.at("l_shop", "keep"), p: () => 1,
     apply: (s, ctx) => {
-      const a = s.arcs.l_shop, v = { kind: a.data.kind, boss: s.sex === "male" ? "老闆" : "老闆娘" };
+      const a = s.arcs.l_shop, v = { kind: a.data.kind };
       if (a.stage === "keep") {
         ctx.arc.end("l_shop", "handedOn");
         return { text: ctx.w([
@@ -582,7 +621,9 @@ export const LATER = [
         s.savings += 0.3; ctx.arc.go("l_shop", "keep", 4 + ctx.rng.int(4));
         return { text: ctx.w([
           "你的{kind}開了兩年，{熟客越來越多，|成了巷子裡大家聊天的地方，}{雖然賺得不多，每個月都打平了。|你說這是退休後最好的決定。}",
-          "{kind}開到第二年，{附近的學生都叫你{boss}，|你記得每一位熟客的喜好，}{生意不大，卻很穩。|你每天都有說不完的話。}",
+          s.sex === "male"
+            ? "{kind}開到第二年，{附近的學生都叫你老闆，|你記得每一位熟客的喜好，}{生意不大，卻很穩。|你每天都有說不完的話。}"
+            : "{kind}開到第二年，{附近的學生都叫你老闆娘，|你記得每一位熟客的喜好，}{生意不大，卻很穩。|你每天都有說不完的話。}",
         ], v), mood: 6 };
       }
       spend(s, 0.3); ctx.arc.end("l_shop", "closed");
@@ -593,9 +634,11 @@ export const LATER = [
     id: "l_seniorCollege", domain: "study", channel: "good", once: true, ages: [60, 85], when: s => (s.retired || s.age >= 65) && !s.abroad && !s.health.serious, p: () => 0.025,
     apply: (s, ctx) => ({ text: ctx.w([
       "報名了{city}的長青學苑，{選了{日文|英文|電腦|歌唱|手機攝影}班，|一口氣報了兩門課，}{班上年紀最大的同學已經八十八歲了。|期末成果發表會上，你站在第一排。}",
-      "去長青學苑上課，{老師年輕得可以當你的孩子，|同學們上課前會先互相量血壓，}{大家都叫你「{senior}」。|下課後一群人一起去吃豆花。}",
+      s.sex === "male"
+        ? "去長青學苑上課，{老師年輕得可以當你的孩子，|同學們上課前會先互相量血壓，}{大家都叫你「學長」。|下課後一群人一起去吃豆花。}"
+        : "去長青學苑上課，{老師年輕得可以當你的孩子，|同學們上課前會先互相量血壓，}{大家都叫你「學姊」。|下課後一群人一起去吃豆花。}",
       "長青學苑開學那天，你{背著新買的帆布袋，|帶著老花眼鏡和筆記本，}{像小學生一樣提早半小時到。|在教室門口遇到了好多年沒見的老鄰居。}",
-    ], { senior: s.sex === "male" ? "學長" : "學姊" }), mood: 3 }),
+    ]), mood: 3 }),
   },
   {
     id: "l_communityMeal", ages: [65, 105], cooldown: 4, max: 3, when: s => !s.abroad, p: () => 0.04,
@@ -623,7 +666,6 @@ export const LATER = [
     choice: (s, ctx) => {
       const gs = s.flags.grandkids > 0 ? grandkids(s, ctx).filter(x => x.age >= 6 && x.age <= 18) : [];
       const g = gs.length ? ctx.rng.pick(gs) : null;
-      const group = s.year >= 2012 ? "回來後多了一個 LINE 群組。" : "回來後通訊錄裡多了好幾個電話。";
       const keep = (c, how) => c.remember("l_roundIsland", how, { mood: 5 });
       return {
         prompt: ctx.w([
@@ -641,7 +683,9 @@ export const LATER = [
           },
           {
             id: "l_roundIsland.drive", label: "自己開車", hint: "想停就停", act: "travel", style: "self", weight: 0.25,
-            apply: (s2, c) => { spend(s2, 0.15); keep(c, "開車環島一圈"); return { text: c.w(`${married(s2) ? "你載著{partner}" : "你一個人"}開車環島，{走蘇花公路時，一邊是山，一邊是海，|在南迴公路旁的小攤買了一袋{釋迦|洛神花}，}{想停就停，走了兩個星期。|在每一個休息站都蓋了紀念章。}`), mood: 5 }; },
+            apply: (s2, c) => { spend(s2, 0.15); keep(c, "開車環島一圈"); return { text: c.w(married(s2)
+              ? "你載著{partner}開車環島，{走蘇花公路時，一邊是山，一邊是海，|在南迴公路旁的小攤買了一袋{釋迦|洛神花}，}{想停就停，走了兩個星期。|在每一個休息站都蓋了紀念章。}"
+              : "你一個人開車環島，{走蘇花公路時，一邊是山，一邊是海，|在南迴公路旁的小攤買了一袋{釋迦|洛神花}，}{想停就停，走了兩個星期。|在每一個休息站都蓋了紀念章。}"), mood: 5 }; },
           },
           {
             id: "l_roundIsland.bike", label: "騎腳踏車環島", hint: "挑戰自己的體力", act: "exercise", style: "risk", weight: 0.1, when: s2 => s2.age <= 72,
@@ -649,15 +693,17 @@ export const LATER = [
           },
           {
             id: "l_roundIsland.tour", label: "跟旅行團", hint: "什麼都不用煩惱", act: "travel", style: "safe", weight: 0.2,
-            apply: (s2, c) => { spend(s2, 0.12); keep(c, "跟著旅行團環島一圈"); return { text: c.w(`你跟著{農會|社區|旅行社}辦的環島團，{一車都是年紀差不多的人，|導遊一路講笑話，}{八天七夜吃了好多{海產|小吃}，|在太魯閣幫大家拍了團體照，}{${group}|還和團員約好明年再一起出去。}`), mood: 4 }; },
+            apply: (s2, c) => { spend(s2, 0.12); keep(c, "跟著旅行團環島一圈"); return { text: c.w(s.year >= 2012
+              ? "你跟著{農會|社區|旅行社}辦的環島團，{一車都是年紀差不多的人，|導遊一路講笑話，}{八天七夜吃了好多{海產|小吃}，|在太魯閣幫大家拍了團體照，}{回來後多了一個 LINE 群組。|還和團員約好明年再一起出去。}"
+              : "你跟著{農會|社區|旅行社}辦的環島團，{一車都是年紀差不多的人，|導遊一路講笑話，}{八天七夜吃了好多{海產|小吃}，|在太魯閣幫大家拍了團體照，}{回來後通訊錄裡多了好幾個電話。|還和團員約好明年再一起出去。}"), mood: 4 }; },
           },
           {
             id: "l_roundIsland.friends", label: "和老朋友一起", hint: "幾個人包一台車", act: "socialize", style: "social", weight: 0.15,
             apply: (s2, c) => { keep(c, "和老朋友一起環島"); return { text: c.w("你和{f}幾個老朋友{包了一台小巴|租了一台九人座}環島，{一路上講年輕時的糗事，|每晚在民宿打牌聊天到半夜，}{笑到肚子痛。|約好每年都要再來一次。}", { f: oldFriend(s2, c).call }), mood: 5 }; },
           },
           {
-            id: "l_roundIsland.grandkid", label: g ? `帶${g.call}一起去` : "帶孫子一起去", hint: "三代同遊", act: "travel", style: "family", weight: 0.15, when: () => !!g,
-            apply: (s2, c) => { spend(s2, 0.12); keep(c, `帶著${g.call}環島`); return { text: c.w("你帶著{g}環島，{一路教{gt}認台灣的地名，|在墾丁的沙灘上一起堆沙堡，}{{gt}說這是最棒的暑假。|回來後，{gt}把照片做成了學校的作業。}", grandVars(g)), mood: 6 }; },
+            id: "l_roundIsland.grandkid", label: g ? ctx.f("帶{g}一起去", { g: g.call }) : "帶孫子一起去", hint: "三代同遊", act: "travel", style: "family", weight: 0.15, when: () => !!g,
+            apply: (s2, c) => { spend(s2, 0.12); keep(c, c.f("帶著{g}環島", { g: g.call })); return { text: c.w("你帶著{g}環島，{一路教{gt}認台灣的地名，|在墾丁的沙灘上一起堆沙堡，}{{gt}說這是最棒的暑假。|回來後，{gt}把照片做成了學校的作業。}", grandVars(g)), mood: 6 }; },
           },
         ],
       };
@@ -714,9 +760,9 @@ export const LATER = [
           ? ctx.w("拖了幾年，眼前的霧越來越濃，{連樓梯都看不太清楚了。|看電視只看得到人影。}醫生說白內障該處理了。這次要怎麼做？")
           : ctx.w([
             "看東西越來越霧，晚上看路燈都有一圈光暈。眼科醫生說是白內障，建議開刀。要怎麼做？",
-            `看報紙要拿得越來越遠，連${gs.length ? gs[0].call : "家人"}的臉都看不太清楚了。醫生說是白內障。要怎麼辦？`,
+            gs.length ? "看報紙要拿得越來越遠，連{gk}的臉都看不太清楚了。醫生說是白內障。要怎麼辦？" : "看報紙要拿得越來越遠，連家人的臉都看不太清楚了。醫生說是白內障。要怎麼辦？",
             "眼前好像蒙著一層毛玻璃。眼科醫生說，白內障已經可以開刀了。你的決定是？",
-          ]),
+          ], { gk: gs.length ? gs[0].call : "" }),
         options: [
           {
             id: "l_cataract.nhi", label: "用健保開刀", hint: "單焦點的人工水晶體", act: "seeDoctor", style: "health", weight: 0.45,
@@ -752,10 +798,10 @@ export const LATER = [
       return {
         prompt: ctx.w([
           married(s) && "電視越開越大聲，{partner}說連隔壁都聽得到了；跟人說話時，你也常常要問「啊？」。要怎麼辦？",
-          gs.length && `最近常聽不清楚別人說話，${gs[0].call}在電話裡講什麼，你都只能說「好、好」。要怎麼辦？`,
+          gs.length && "最近常聽不清楚別人說話，{gk}在電話裡講什麼，你都只能說「好、好」。要怎麼辦？",
           "跟朋友吃飯時，大家都笑了，你卻沒聽到笑點。耳朵好像越來越不靈光了。要怎麼辦？",
           "最近常常有人叫你，你卻沒聽見，等對方拍了你的肩膀才回頭。要怎麼辦？",
-        ].filter(Boolean)),
+        ].filter(Boolean), { gk: gs.length ? gs[0].call : "" }),
         options: [
           {
             id: "l_hearing.aid", label: "去配助聽器", hint: "花點錢，聽得清楚", act: "seeDoctor", style: "health", weight: 0.35,
@@ -834,7 +880,9 @@ export const LATER = [
           },
           {
             id: "l_knee.inject", label: "打玻尿酸或吃保健食品", hint: "先試試不開刀的方法", act: "seeDoctor", style: "safe", weight: 0.1,
-            apply: (s2, c) => { spend(s2, 0.05); return { text: c.w(`膝蓋退化，你{去骨科打了玻尿酸，|每天吃葡萄糖胺和魚油，${s2.year >= 2015 ? "|聽朋友介紹去打了 PRP，" : ""}}{痛好像減輕了一點，|有沒有效你也說不準，}{至少現在走去公園沒問題。|你說先這樣，以後再說。}`), mood: 0 }; },
+            apply: (s2, c) => { spend(s2, 0.05); return { text: c.w(s2.year >= 2015
+              ? "膝蓋退化，你{去骨科打了玻尿酸，|每天吃葡萄糖胺和魚油，|聽朋友介紹去打了 PRP，}{痛好像減輕了一點，|有沒有效你也說不準，}{至少現在走去公園沒問題。|你說先這樣，以後再說。}"
+              : "膝蓋退化，你{去骨科打了玻尿酸，|每天吃葡萄糖胺和魚油，}{痛好像減輕了一點，|有沒有效你也說不準，}{至少現在走去公園沒問題。|你說先這樣，以後再說。}"), mood: 0 }; },
           },
         ],
       };
@@ -892,7 +940,7 @@ export const LATER = [
           },
           {
             id: "l_coupleTrip.honeymoon", label: "回到當年蜜月的地方", hint: "重溫舊夢", act: "travel", style: "family", weight: 0.2,
-            apply: (s2, c) => { spend(s2, 0.15); c.remember("l_coupleTrip", `和${s2.partner.call}回到當年蜜月的${moon}`, { mood: 5 }); return { text: c.w("你和{partner}回到當年度蜜月的{moon}，{找到當年住的那家旅館，已經改建了。|在同一個地方，用同樣的姿勢拍了一張照片。}{兩張照片放在一起，{ta}看了好久。|你們手牽著手，走得比當年慢一點。}", v), mood: 6 }; },
+            apply: (s2, c) => { spend(s2, 0.15); c.remember("l_coupleTrip", c.f("和{partner}回到當年蜜月的{moon}", { partner: s2.partner.call, moon }), { mood: 5 }); return { text: c.w("你和{partner}回到當年度蜜月的{moon}，{找到當年住的那家旅館，已經改建了。|在同一個地方，用同樣的姿勢拍了一張照片。}{兩張照片放在一起，{ta}看了好久。|你們手牽著手，走得比當年慢一點。}", v), mood: 6 }; },
           },
           {
             id: "l_coupleTrip.spa", label: "國內小旅行泡溫泉", hint: "近一點、輕鬆一點", act: "travel", style: "health", weight: 0.2,
@@ -969,7 +1017,9 @@ export const LATER = [
           },
           {
             id: "l_aloneLife.kid", label: "搬去和孩子住", hint: "不想一個人", act: "moveHome", style: "family", weight: 0.2, when: () => !!k,
-            apply: (s2, c) => ({ text: c.w(`{late}走了以後，{name}把你接去一起住，{${grand ? "每天早上和孫子一起吃早餐，" : "每天晚上和{name}一起吃晚飯，"}|你在{name}家的陽台種了幾盆花，}{家裡很熱鬧，只是偶爾會想念老家的那張藤椅。|你慢慢習慣了新的生活。}`, v), mood: 1 }),
+            apply: (s2, c) => ({ text: c.w(grand
+              ? "{late}走了以後，{name}把你接去一起住，{每天早上和孫子一起吃早餐，|你在{name}家的陽台種了幾盆花，}{家裡很熱鬧，只是偶爾會想念老家的那張藤椅。|你慢慢習慣了新的生活。}"
+              : "{late}走了以後，{name}把你接去一起住，{每天晚上和{name}一起吃晚飯，|你在{name}家的陽台種了幾盆花，}{家裡很熱鬧，只是偶爾會想念老家的那張藤椅。|你慢慢習慣了新的生活。}", v), mood: 1 }),
           },
           {
             id: "l_aloneLife.out", label: "多出門參加活動", hint: "社區、廟口、老人會", act: "socialize", style: "social", weight: 0.2,
@@ -1019,13 +1069,13 @@ export const LATER = [
       if (s.edu === "五專") list.push(["五專", 20]);
       if (["大學", "科大", "碩士", "博士"].includes(s.edu)) list.push([s.edu === "科大" ? "科大" : "大學", 22]);
       const [sch, at] = ctx.rng.pick(list);
-      const f = ctx.person({ role: "friend", sex: ctx.rng() < 0.5 ? "male" : "female", birthYear: s.birthYear, how: `${sch}同學` });
+      const f = ctx.person({ role: "friend", sex: ctx.rng() < 0.5 ? "male" : "female", birthYear: s.birthYear, how: sch + "同學" });   // data, read in Chinese (young.js friendIntro)
       const meet = s2 => { if (!s2.friends.includes(f)) s2.friends.push(f); };
       const line = s.year >= 2012;
       const v = { sch, n: s.age - at, f: f.call, tage: s.age + 13 + ctx.rng.int(8) };
       return {
         prompt: ctx.w([
-          `${line ? "{sch}同學的 LINE 群組裡" : "{sch}同學打電話來"}說，要辦畢業 {n} 年的同學會。要去嗎？`,
+          line ? "{sch}同學的 LINE 群組裡說，要辦畢業 {n} 年的同學會。要去嗎？" : "{sch}同學打電話來說，要辦畢業 {n} 年的同學會。要去嗎？",
           "收到{sch}同學會的邀請，上一次見到大家，已經是好多年前的事了。要去嗎？",
           "{f}打電話來：「我們{sch}那一屆要辦同學會，你一定要來。」要去嗎？",
         ], v),
@@ -1040,12 +1090,16 @@ export const LATER = [
           },
           {
             id: "l_reunion.skip", label: "不去了", hint: "不想被比來比去", act: "avoid", style: "self", weight: 0.2,
-            apply: (s2, c) => ({ text: c.w(`{sch}要辦同學會，你{想了想還是沒去，|說那天剛好有事，}{怕被問起這些年過得怎麼樣。|${line ? "後來在群組裡看到大家的合照，你看了很久。" : "後來{f}寄來大家的合照，你看了很久。"}}`, v), mood: -1 }),
+            apply: (s2, c) => ({ text: c.w(line
+              ? "{sch}要辦同學會，你{想了想還是沒去，|說那天剛好有事，}{怕被問起這些年過得怎麼樣。|後來在群組裡看到大家的合照，你看了很久。}"
+              : "{sch}要辦同學會，你{想了想還是沒去，|說那天剛好有事，}{怕被問起這些年過得怎麼樣。|後來{f}寄來大家的合照，你看了很久。}", v), mood: -1 }),
           },
           {
             id: "l_reunion.album", label: "整理一份回憶給大家", hint: "把老照片做成影片或相簿", act: "hobby", style: "learn", weight: 0.1,
             apply: (s2, c) => { meet(s2); return { text: c.w([
-              `{sch}同學會前，你把大家的老照片收集起來，學著用${s2.year >= 2015 ? "手機" : "電腦"}剪成一部影片。{播出來的時候，全場先是一片安靜，然後大家笑著指認畫面裡的自己。|有人看到一半就哭了。}`,
+              s2.year >= 2015
+                ? "{sch}同學會前，你把大家的老照片收集起來，學著用手機剪成一部影片。{播出來的時候，全場先是一片安靜，然後大家笑著指認畫面裡的自己。|有人看到一半就哭了。}"
+                : "{sch}同學會前，你把大家的老照片收集起來，學著用電腦剪成一部影片。{播出來的時候，全場先是一片安靜，然後大家笑著指認畫面裡的自己。|有人看到一半就哭了。}",
               "{sch}同學會前，你把大家的老照片收集起來，{做成一本厚厚的相簿，|印成一本小小的紀念冊，}{大家搶著翻看，笑到停不下來。|每個人都在自己的那一頁簽了名。}",
             ], v), mood: 4 }; },
           },
@@ -1077,17 +1131,19 @@ export const LATER = [
     choice: (s, ctx) => {
       const gs = s.flags.grandkids > 0 ? grandkids(s, ctx).filter(g => g.age >= 7) : [], ks = adultKids(s, 20);
       const tc = gs.length ? ctx.rng.pick(gs).call : ks.length ? ctx.rng.pick(ks).call : null;
-      const pics = s.flags.grandkids > 0 ? "孫子" : "家人";
-      const f = oldFriend(s, ctx), v = { tc: tc || "", f: f.call, ft: pronoun(f), pics };
+      const pics = s.flags.grandkids > 0;
+      const f = oldFriend(s, ctx), v = { tc: tc || "", f: f.call, ft: pronoun(f) };
       return {
         prompt: ctx.w([
-          ks.length ? "孩子送你一支智慧型手機，說這樣就能用 LINE 看{pics}的照片。可是螢幕上那麼多圖示，要從哪裡學起？" : "手機行的店員說，現在大家都用智慧型手機了。螢幕上那麼多圖示，要從哪裡學起？",
+          ks.length
+            ? pics ? "孩子送你一支智慧型手機，說這樣就能用 LINE 看孫子的照片。可是螢幕上那麼多圖示，要從哪裡學起？" : "孩子送你一支智慧型手機，說這樣就能用 LINE 看家人的照片。可是螢幕上那麼多圖示，要從哪裡學起？"
+            : "手機行的店員說，現在大家都用智慧型手機了。螢幕上那麼多圖示，要從哪裡學起？",
           "身邊的朋友都在用 LINE 傳早安圖，只有你還拿著舊手機。要怎麼跟上？",
           "{f}換了一支智慧型手機，天天在群組裡聊天、傳照片。你要怎麼學？",
         ], v),
         options: [
           {
-            id: "l_smartphone.family", label: tc ? `請${tc}教你` : "請家人教你", hint: "家裡的老師最有耐心……大概吧", act: "seekHelp", style: "family", weight: 0.3, when: () => !!tc,
+            id: "l_smartphone.family", label: tc ? ctx.f("請{tc}教你", { tc }) : "請家人教你", hint: "家裡的老師最有耐心……大概吧", act: "seekHelp", style: "family", weight: 0.3, when: () => !!tc,
             apply: (s2, c) => ({ text: c.w("你請{tc}教你用智慧型手機，{{tc}把每一個步驟寫在一張紙上，|同一件事教了三遍，{tc}的聲音越來越大，}{你學會了拍照、傳貼圖，還有視訊。|第一次自己打視訊電話時，家人都嚇了一跳。}", v), mood: 3 }),
           },
           {
@@ -1118,7 +1174,7 @@ export const LATER = [
     apply: (s, ctx) => {
       const away = s.friends.filter(x => x.alive !== false && x.away);
       const f = away.length && ctx.rng() < 0.6 ? ctx.rng.pick(away) : oldFriend(s, ctx);
-      const v = { f: f.away ? `搬去${f.away}的${f.call}` : f.call, ff: f.call, ft: pronoun(f) };
+      const v = { f: f.away ? ctx.f("搬去{place}的{name}", { place: f.away, name: f.call }) : f.call, ff: f.call, ft: pronoun(f) };
       const line = s.year >= 2012 && !s.flags.l_noSmart;
       return { text: ctx.w(line ? [
         "每天早上，你都會傳一張{開滿荷花|太陽升起|寫著「平安喜樂」}的早安圖到老朋友的 LINE 群組，{{ff}總是第一個回貼圖。|哪天沒傳，就會有人私訊問你還好嗎。}",
@@ -1162,7 +1218,7 @@ export const LATER = [
       const gs = s.flags.grandkids > 0 ? grandkids(s, ctx).filter(g => g.age >= 10) : [];
       const tl = gs.length ? ctx.rng.pick(gs).call : k ? k.call : null;
       const sp = s.partner || lateSpouse(s);
-      const v = { ...(k ? kidVars(k) : {}), tl: tl || "", from: s.birthCounty || "老家", meet: sp ? `怎麼認識${sp.call}的` : "年輕時的夢想", helper: k ? k.call : "朋友" };
+      const v = { ...(k ? kidVars(k) : {}), tl: tl || "", from: s.birthCounty || "老家", meet: sp ? ctx.f("怎麼認識{sp}的", { sp: sp.call }) : "年輕時的夢想", helper: k ? k.call : "朋友" };
       return {
         prompt: ctx.w([
           k ? "{name}說：「你的故事好精彩，要不要寫下來？」你想用什麼方式，留下這一生？" : "整理抽屜時，翻出年輕時的日記。你也想把這一生留下來，要怎麼做？",
@@ -1203,7 +1259,7 @@ export const LATER = [
     choice: (s, ctx) => {
       // Brothers and sisters are never written out of the story, so they only stand in while you are under 80.
       const ks = adultKids(s, 20), k = ks.length ? ctx.rng.pick(ks) : null, sibs = s.flags.estranged || s.age >= 80 ? [] : bornSiblings(s, 18);
-      const kin = k ? k.call : married(s) ? s.partner.call : sibs.length ? siblingCall(sibs[0]) : null;
+      const kin = k ? k.call : married(s) ? s.partner.call : sibs.length ? sibling(sibs[0], ctx) : null;
       const f = oldFriend(s, ctx);
       const v = { kin: kin || "最信任的朋友", f: f.call, ft: pronoun(f), all: s.kids.length > 1 ? "孩子們" : s.kids.length ? s.kids[0].call : married(s) ? s.partner.call : "最親近的人" };
       const done = s2 => { s2.flags.l_adDone = true; };
@@ -1211,39 +1267,41 @@ export const LATER = [
       // A button: the scene's own words when it has them ({kin}, {f} filled in), else the usual ones.
       const named = (key, label, hint) => {
         const [l, h] = (sc.labels && sc.labels[key]) || [label, hint];
-        return { label: l.replace(/\{(\w+)\}/g, (m, x) => v[x] ?? m), hint: h };
+        return { label: ctx.f(l, v), hint: h };
       };
       return {
-        prompt: `${lead}。${s.count.l_directive > 1 ? "上次你把這件事放著，這幾年又想起來好幾次。這次要怎麼做？" : ctx.w(sc.ask, v)}`,
+        prompt: ctx.f("{lead}。{ask}", { lead, ask: s.count.l_directive > 1 ? "上次你把這件事放著，這幾年又想起來好幾次。這次要怎麼做？" : ctx.w(sc.ask, v) }),
         options: [
           {
             id: "l_directive.sign", ...named("sign", "去醫院諮商，簽下預立醫療決定", "把自己的意願寫清楚"), act: "seeDoctor", style: "self", weight: 0.25,
-            apply: (s2, c) => { done(s2); return { text: c.w([
-              `${then}你帶著${kin ? "{kin}" : "一位信任的朋友"}去醫院做了預立醫療照護諮商，{醫師、護理師和社工一條一條解釋給你們聽，|你一題一題想清楚，}簽下了預立醫療決定書。{健保卡上多了一個註記，你覺得心裡一塊石頭放下了。|回家的路上，你們去吃了一頓飯，聊的都是開心的事。}`,
-              `${then}你去醫院做了諮商。{你說得很平靜：「如果有一天沒辦法好轉，不要插管、不要電擊，讓我舒服地走。」|你說，不想讓家人替你做那個最難的決定。}簽下預立醫療決定書以後，{你把文件交給{kin}收好。|健保卡註記好的那天，你睡得特別安穩。}`,
-            ], v), mood: 1 }; },
+            apply: (s2, c) => { done(s2); return { text: c.w(asNew(s2, [
+              kin
+                ? "{then}你帶著{kin}去醫院做了預立醫療照護諮商，{醫師、護理師和社工一條一條解釋給你們聽，|你一題一題想清楚，}簽下了預立醫療決定書。{健保卡上多了一個註記，你覺得心裡一塊石頭放下了。|回家的路上，你們去吃了一頓飯，聊的都是開心的事。}"
+                : "{then}你帶著一位信任的朋友去醫院做了預立醫療照護諮商，{醫師、護理師和社工一條一條解釋給你們聽，|你一題一題想清楚，}簽下了預立醫療決定書。{健保卡上多了一個註記，你覺得心裡一塊石頭放下了。|回家的路上，你們去吃了一頓飯，聊的都是開心的事。}",
+              "{then}你去醫院做了諮商。{你說得很平靜：「如果有一天沒辦法好轉，不要插管、不要電擊，讓我舒服地走。」|你說，不想讓家人替你做那個最難的決定。}簽下預立醫療決定書以後，{你把文件交給{kin}收好。|健保卡註記好的那天，你睡得特別安穩。}",
+            ]), { ...v, then }), mood: 1 }; },
           },
           {
             id: "l_directive.talk", ...named("talk", "先和家人討論", "讓大家知道你的想法"), act: "talk", style: "family", weight: 0.3,
-            apply: (s2, c) => ({ text: c.w([
-              `${then}你找了一個週末，把{all}找來，{泡了一壺茶，|吃完晚飯後，}慢慢說出自己的想法：如果有一天沒辦法好轉，不要插管急救。{一開始大家都不想談，說到後來，{kin}握著你的手說會尊重你。|這是你們家最難、也最溫暖的一次談話。|有人哭了，也有人笑你想太多，但大家都記住了。}`,
-              `${then}你把自己對臨終照顧的想法寫在一張紙上，{趁過年大家都在的時候拿出來，|一個一個打電話說，}{大家雖然捨不得，還是答應會照你的意思。|說完以後，你覺得心裡輕鬆多了。}`,
-            ], v), mood: 1 }),
+            apply: (s2, c) => ({ text: c.w(asNew(s2, [
+              "{then}你找了一個週末，把{all}找來，{泡了一壺茶，|吃完晚飯後，}慢慢說出自己的想法：如果有一天沒辦法好轉，不要插管急救。{一開始大家都不想談，說到後來，{kin}握著你的手說會尊重你。|這是你們家最難、也最溫暖的一次談話。|有人哭了，也有人笑你想太多，但大家都記住了。}",
+              "{then}你把自己對臨終照顧的想法寫在一張紙上，{趁過年大家都在的時候拿出來，|一個一個打電話說，}{大家雖然捨不得，還是答應會照你的意思。|說完以後，你覺得心裡輕鬆多了。}",
+            ]), { ...v, then }), mood: 1 }),
           },
           {
             id: "l_directive.wait", ...named("wait", "再想想", "還沒準備好面對"), act: "wait", style: "safe", weight: 0.25,
-            apply: (s2, c) => ({ text: c.w([
-              `${then}你${sc.away}，{說等身體真的不好再說。|想說家人還沒準備好聽這些。|告訴自己，下次回診再問問看。}`,
-              `${then}要不要簽預立醫療決定，你想了好幾個晚上，{還是覺得太早了。|一想到要寫下這些就鼻酸，}{決定過一陣子再說。|你把這件事放在心裡，沒有跟任何人提。}`,
-            ], v), mood: 0 }),
+            apply: (s2, c) => ({ text: c.w(asNew(s2, [
+              "{then}你{away}，{說等身體真的不好再說。|想說家人還沒準備好聽這些。|告訴自己，下次回診再問問看。}",
+              "{then}要不要簽預立醫療決定，你想了好幾個晚上，{還是覺得太早了。|一想到要寫下這些就鼻酸，}{決定過一陣子再說。|你把這件事放在心裡，沒有跟任何人提。}",
+            ]), { ...v, then, away: c.f(sc.away, v) }), mood: 0 }),
           },
           {
             id: "l_directive.ask", ...named("ask", "請醫師說明清楚", "先弄懂再決定"), act: "seeDoctor", style: "learn", weight: 0.2,
-            apply: (s2, c) => ({ text: c.w(`${sc.askOpen || `${then}你趁回診時問醫師什麼是預立醫療決定。`}{醫師畫了一張圖，解釋什麼是維持生命治療、什麼是安寧照護，|醫師請你去掛諮商門診，護理師花了一個小時跟你說明，|醫師說，這是替自己做決定，也是替家人減輕負擔，}{你把問題寫在小本子上，一題一題地問。|聽完以後，你說要回家跟家人商量。|你拿了一份文件回家，放在桌上看了好幾天。}`), mood: 1 }),
+            apply: (s2, c) => ({ text: c.w("{open}{醫師畫了一張圖，解釋什麼是維持生命治療、什麼是安寧照護，|醫師請你去掛諮商門診，護理師花了一個小時跟你說明，|醫師說，這是替自己做決定，也是替家人減輕負擔，}{你把問題寫在小本子上，一題一題地問。|聽完以後，你說要回家跟家人商量。|你拿了一份文件回家，放在桌上看了好幾天。}", { open: sc.askOpen || c.f("{then}你趁回診時問醫師什麼是預立醫療決定。", { then }) }), mood: 1 }),
           },
           {
             id: "l_directive.hospice", ...named("hospice", "先簽安寧緩和意願書", "簡單、不用錢，也能註記在健保卡"), act: "seeDoctor", style: "health", weight: 0.1,
-            apply: (s2, c) => { done(s2); return { text: c.w(`${then}你先簽了一份安寧緩和醫療意願書，{請兩位朋友當見證人，|在醫院的社工室就辦好了，}{十分鐘就完成，也不用花錢。|過了幾個星期，健保卡上就有了註記。}{你說，至少最重要的一件事先講清楚了。|你把影本交給{kin}收著。}`, v), mood: 1 }; },
+            apply: (s2, c) => { done(s2); return { text: c.w("{then}你先簽了一份安寧緩和醫療意願書，{請兩位朋友當見證人，|在醫院的社工室就辦好了，}{十分鐘就完成，也不用花錢。|過了幾個星期，健保卡上就有了註記。}{你說，至少最重要的一件事先講清楚了。|你把影本交給{kin}收著。}", { ...v, then }), mood: 1 }; },
           },
         ],
       };
@@ -1256,8 +1314,8 @@ export const LATER = [
     choice: (s, ctx) => {
       const sib = ctx.rng.pick(bornSiblings(s, 18));
       // A go-between of the right generation: aunts and uncles while you are younger, nephews and cousins later.
-      const v = { x: siblingCall(sib), xt: sibPronoun(sib), rel: ctx.rng.pick(s.age < 68 ? ["表哥", "舅舅", "姑姑", "堂姊"] : ["表妹", "堂弟", "姪子", "外甥女"]) };
-      const made = (s2, c, text, mood) => { s2.flags.estranged = false; c.remember("l_mend", `和${v.x}和好了`, { mood }); return { text, mood }; };
+      const v = { x: sibling(sib, ctx), xt: sibPronoun(sib), rel: ctx.rng.pick(s.age < 68 ? ["表哥", "舅舅", "姑姑", "堂姊"] : ["表妹", "堂弟", "姪子", "外甥女"]) };
+      const made = (s2, c, text, mood) => { s2.flags.estranged = false; c.remember("l_mend", c.f("和{x}和好了", v), { mood }); return { text, mood }; };
       return {
         prompt: ctx.w([
           s.age <= 70
@@ -1305,11 +1363,13 @@ export const LATER = [
     when: s => s.year >= 2010 && s.home === "own" && URBAN.includes(s.county) && !s.abroad, p: () => 0.02,
     choice: (s, ctx) => {
       const k = s.kids.length ? ctx.rng.pick(s.kids) : null;
-      const v = { ...(k ? kidVars(k) : {}), floor: ctx.rng.pick(["四", "五"]) };
+      const v = { ...(k ? kidVars(k) : {}), floor: ctx.rng.pick(["四樓", "五樓"]) };
       return {
         prompt: ctx.w([
           "你住了幾十年的老公寓，建商來談都更。左鄰右舍有人同意、有人反對。你要怎麼做？",
-          `老公寓沒有電梯，爬{floor}樓越來越吃力。${s.year >= 2017 ? "鄰居說可以申請危老重建，也有建商來談都更。" : "里長說，有建商想來談都更。"}你怎麼打算？`,
+          s.year >= 2017
+            ? "老公寓沒有電梯，爬{floor}越來越吃力。鄰居說可以申請危老重建，也有建商來談都更。你怎麼打算？"
+            : "老公寓沒有電梯，爬{floor}越來越吃力。里長說，有建商想來談都更。你怎麼打算？",
           "社區公布欄貼出了都更說明會的通知，整棟樓的人都在討論。你的想法是？",
         ], v),
         options: [
@@ -1323,7 +1383,9 @@ export const LATER = [
           },
           {
             id: "l_renewal.refuse", label: "不簽，住慣了", hint: "這裡有一輩子的回憶", act: "insist", style: "self", weight: 0.15,
-            apply: (s2, c) => ({ text: c.w(`建商來談都更，你{不肯簽同意書|說這間房子不賣也不拆}。${k ? "門框上還有{name}小時候的身高刻痕，" : "陽台上那盆老蘭花養了二十年，"}鄰居來勸了好幾次，你還是搖頭。{後來案子沒過，你繼續爬你的{floor}樓。|你說，住慣了，哪裡都不想去。|搬走的老鄰居回來看你，說還是這裡住得最舒服。}`, v), mood: 0 }),
+            apply: (s2, c) => ({ text: c.w(k
+              ? "建商來談都更，你{不肯簽同意書|說這間房子不賣也不拆}。門框上還有{name}小時候的身高刻痕，鄰居來勸了好幾次，你還是搖頭。{後來案子沒過，你繼續爬你的{floor}。|你說，住慣了，哪裡都不想去。|搬走的老鄰居回來看你，說還是這裡住得最舒服。}"
+              : "建商來談都更，你{不肯簽同意書|說這間房子不賣也不拆}。陽台上那盆老蘭花養了二十年，鄰居來勸了好幾次，你還是搖頭。{後來案子沒過，你繼續爬你的{floor}。|你說，住慣了，哪裡都不想去。|搬走的老鄰居回來看你，說還是這裡住得最舒服。}", v), mood: 0 }),
           },
           {
             id: "l_renewal.advice", label: "找律師和建築師問清楚", hint: "弄懂權利再決定", act: "dispute", style: "learn", weight: 0.15,
@@ -1341,21 +1403,25 @@ export const LATER = [
     id: "l_faith", once: true, ages: [60, 105], p: () => 0.02,
     choice: (s, ctx) => {
       const l = s.rel === "widowed" ? lateSpouse(s) : null, f = oldFriend(s, ctx);
-      const v = { f: f.call, late: l ? l.call : "", bro: s.sex === "male" ? "師兄" : "師姊", sis: s.sex === "male" ? "弟兄" : "姊妹" };
+      const v = { f: f.call, late: l ? l.call : "" };
       return {
         prompt: ctx.w([
           "年紀越大，越常想一些以前沒空想的事。{f}約你去{廟裡|教會|道場}走走。你想怎麼安頓自己的心？",
-          l ? "{late}走了以後，你開始想找一個讓心安定下來的地方。你想怎麼做？" : `${s.retired ? "退休以後" : "這幾年"}日子慢了下來，你開始想找一個讓心安定下來的地方。你想怎麼做？`,
+          l ? "{late}走了以後，你開始想找一個讓心安定下來的地方。你想怎麼做？" : s.retired ? "退休以後日子慢了下來，你開始想找一個讓心安定下來的地方。你想怎麼做？" : "這幾年日子慢了下來，你開始想找一個讓心安定下來的地方。你想怎麼做？",
           "清晨在公園，看到一群人安安靜靜地打坐，你看了好久。你也想找一個讓心靜下來的方法嗎？",
         ], v),
         options: [
           {
             id: "l_faith.temple", label: "去廟裡當志工", hint: "幫忙點燈、整理供品", act: "spiritual", style: "safe", weight: 0.25,
-            apply: (s2, c) => ({ text: c.w("你開始每週去{家附近的媽祖廟|巷口的土地公廟|山上的寺廟}幫忙，{整理供品、教香客怎麼點光明燈，|過年時幫忙發平安符，}{廟裡的人都叫你一聲{bro}。|那裡的香味讓你覺得很安心。}", v), mood: 3 }),
+            apply: (s2, c) => ({ text: c.w(s.sex === "male"
+              ? "你開始每週去{家附近的媽祖廟|巷口的土地公廟|山上的寺廟}幫忙，{整理供品、教香客怎麼點光明燈，|過年時幫忙發平安符，}{廟裡的人都叫你一聲師兄。|那裡的香味讓你覺得很安心。}"
+              : "你開始每週去{家附近的媽祖廟|巷口的土地公廟|山上的寺廟}幫忙，{整理供品、教香客怎麼點光明燈，|過年時幫忙發平安符，}{廟裡的人都叫你一聲師姊。|那裡的香味讓你覺得很安心。}", v), mood: 3 }),
           },
           {
             id: "l_faith.church", label: "跟著去教會", hint: "唱詩歌、讀經", act: "spiritual", style: "learn", weight: 0.2,
-            apply: (s2, c) => ({ text: c.w("你跟著{f}去了教會，{第一次聽詩班唱歌就紅了眼眶，|週三晚上的查經班成了你最期待的時間，}{大家叫你{sis}，牧師也記得你的名字。|你說不一定信什麼，但在那裡心很平靜。|你開始每天睡前禱告。}", v), mood: 3 }),
+            apply: (s2, c) => ({ text: c.w(s.sex === "male"
+              ? "你跟著{f}去了教會，{第一次聽詩班唱歌就紅了眼眶，|週三晚上的查經班成了你最期待的時間，}{大家叫你弟兄，牧師也記得你的名字。|你說不一定信什麼，但在那裡心很平靜。|你開始每天睡前禱告。}"
+              : "你跟著{f}去了教會，{第一次聽詩班唱歌就紅了眼眶，|週三晚上的查經班成了你最期待的時間，}{大家叫你姊妹，牧師也記得你的名字。|你說不一定信什麼，但在那裡心很平靜。|你開始每天睡前禱告。}", v), mood: 3 }),
           },
           {
             id: "l_faith.sit", label: "學打坐禪修", hint: "練習讓心靜下來", act: "spiritual", style: "health", weight: 0.2,

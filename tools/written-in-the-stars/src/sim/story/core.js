@@ -590,7 +590,7 @@ export const CORE = [
     // The partner from the family input, when there is one, is the first partner once you are both adults
     // (people.js realPartnerDue); everyone else is drawn at random.
     id: "dating", domain: "love", channel: "good", tags: ["spouse"], ages: [17, 80], when: (s, ctx) => (s.rel === "single" || s.rel === "divorced" || s.rel === "widowed") && !realPartnerWaiting(s, ctx),
-    p: (s, ctx) => rate(ctx, "dating", s.age, s.rel, s.year) * (s.flags.pursueUntil >= s.age ? 1.8 : 1) * (keptForPartner(s, ctx) ? 2 : 1),
+    p: (s, ctx) => rate(ctx, "dating", s.age, s.rel, s.year, s.sex) * (s.flags.pursueUntil >= s.age ? 1.8 : 1) * (keptForPartner(s, ctx) ? 2 : 1),
     apply: (s, ctx) => {
       s.prevRel = s.rel; s.rel = "dating"; s.datingSince = s.age;
       const real = realPartnerDue(s, ctx);
@@ -636,7 +636,7 @@ export const CORE = [
   },
   {
     id: "breakup", domain: "love", channel: "bad", tags: ["spouse"], about: "partner", cooldown: 1, when: (s, ctx) => s.rel === "dating" && s.age > s.datingSince && !realPartnerEngaged(s, ctx) && !realPartnerSteady(s, ctx),
-    p: (s, ctx) => rate(ctx, "breakup", s.age) * (s.guard > 0 ? 0.6 : 1) * (s.crisis > 0 ? 1.5 : 1),
+    p: (s, ctx) => rate(ctx, "breakup", s.age, s.year, s.sex) * (s.guard > 0 ? 0.6 : 1) * (s.crisis > 0 ? 1.5 : 1),
     apply: (s, ctx) => {
       const name = s.partner ? s.partner.call : "them", pr = they(s.partner);
       endRelationship(s, ctx);

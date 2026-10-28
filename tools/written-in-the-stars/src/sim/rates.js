@@ -172,8 +172,12 @@ export const seriousFatality = (type, years, checkups, diagnosedAt = 70, sex = "
 // CHRONIC_RATES: people with each per 100,000 by sex and age group (either one, taking the two as independent;
 // straight between the groups' middles). The share rises with age, and the yearly onset is that rise over the share
 // not yet affected. From 75 on the share stops rising (those affected die sooner), so the onset stays at its level at 75.
+// The story finds it from CHRONIC_FROM on (story/core.js `chronic`, ages 30+), so the onset at that age is the whole
+// share reached by then (about one in ten at 30), none before: the share by age then follows the table from 30 on,
+// and the mortality baseline below sees the same onsets as the lives.
+export const CHRONIC_FROM = 30;
 const CHRONIC_MIDDLES = CHRONIC_AGES.map((a, i) => (i + 1 < CHRONIC_AGES.length ? (a + CHRONIC_AGES[i + 1]) / 2 : a + 2.5));
-const chronicShare = (age, sex) => {
+export const chronicShare = (age, sex) => {
   const r = CHRONIC_RATES[sex], at = rates => interp(CHRONIC_MIDDLES.map((m, g) => [m, rates[g] / 1e5]), age);
   return 1 - (1 - at(r.hypertension)) * (1 - at(r.diabetes));
 };
@@ -181,7 +185,7 @@ const ONSET = Object.fromEntries(["male", "female"].map(sex => {
   const out = [];
   for (let x = 0; x <= MAX; x++) {
     const a = Math.min(x, 75), p = chronicShare(a, sex);
-    out.push(Math.max(0, (chronicShare(a + 1, sex) - p) / (1 - p)));
+    out.push(x < CHRONIC_FROM ? 0 : x === CHRONIC_FROM ? chronicShare(a + 1, sex) : Math.max(0, (chronicShare(a + 1, sex) - p) / (1 - p)));
   }
   return [sex, out];
 }));
@@ -246,34 +250,123 @@ function baseline(sex, year) {
 export const death = (age, sex, year) => baseline(sex, year)[Math.min(MAX, Math.max(0, Math.round(age)))];
 
 // ---------- births ----------
-// Total fertility rate (CDC/NCHS National Vital Statistics: 1950 3.03, the baby-boom peak 3.77 in 1957, 2.48 in 1970,
-// the low of 1.74 in 1976, 2.08 in 1990, 2.12 in 2007, 1.64 in 2020, 1.62 in 2023); after 2024 about the Congressional
-// Budget Office's demographic outlook (2025), easing toward 1.55. Years between anchors are interpolated.
-export const TFR = D.TFR || [[1950, 3.03], [1957, 3.77], [1960, 3.65], [1965, 2.91], [1970, 2.48], [1973, 1.88], [1976, 1.74], [1980, 1.84], [1985, 1.84], [1990, 2.08], [1995, 1.98], [2000, 2.06], [2007, 2.12], [2010, 1.93], [2015, 1.84], [2020, 1.64], [2021, 1.66], [2023, 1.62], [2024, 1.6], [2035, 1.55], [2075, 1.55]];
-const TFR_AT_ASFR = 1.62;
-// Births per woman per year by age, 2023 (NCHS, Births: Final Data for 2023): 15–19 0.0127, 20–24 0.0566,
-// 25–29 0.0920, 30–34 0.0951, 35–39 0.0544, 40–44 0.0124, 45–49 0.0012.
-export const ASFR = D.ASFR || [[15, 0.0127], [20, 0.0566], [25, 0.092], [30, 0.0951], [35, 0.0544], [40, 0.0124], [45, 0.0012], [50, 0]];
-const asfr = age => (age < 15 || age >= 50 ? 0 : ASFR.reduce((v, [a, r]) => (age >= a ? r : v), 0));
-// About 40 % of US births are to unmarried mothers (NCHS 2023: 40.0 %), far fewer at older ages: the marital share of
-// births by mother's age (NCHS, approximately: under 20 about 0.1, 20–24 0.33, 25–29 0.6, 30–34 0.77, 35+ 0.78).
-const MARITAL_SHARE = [[17, 0.1], [22, 0.33], [27, 0.6], [32, 0.77], [37, 0.79], [45, 0.75]];
-// The share of women married at each age (Census ACS 2023, approximately), and of those dating or living with a
-// partner (design: the simulation's "dating"), so the rate per married or partnered woman gives the population rate.
-const MARRIED_SHARE = [[18, 0.02], [22, 0.11], [27, 0.33], [32, 0.5], [37, 0.58], [42, 0.6], [50, 0.6]];
-const DATING_SHARE = [[18, 0.3], [22, 0.4], [27, 0.35], [32, 0.25], [37, 0.2], [45, 0.15]];
-// Births by how many children came before (design, to be tuned by the calibration test: in the simulation births come
-// to couples, and the order matters as the US has more third children than bazi-life's Taiwan).
-const PARITY = [1.55, 1.45, 0.95, 0.6, 0.3];
+// Total fertility rate by year (us-rates.js TFR, NCHS: 3.09 in 1950, 3.65 in 1960, 2.48 in 1970, the low of 1.74 in
+// 1976, 2.08 in 1990, 2.12 in 2007, 1.64 in 2020, 1.62 in 2023); after 2023 the Social Security Trustees' intermediate
+// path (TFR_PROJECTION, back up to 1.9 by 2050).
+export const TFR = D.TFR || [[1950, 3.03], [1957, 3.77], [1960, 3.65], [1965, 2.91], [1970, 2.48], [1973, 1.88], [1976, 1.74], [1980, 1.84], [1985, 1.84], [1990, 2.08], [1995, 1.98], [2000, 2.06], [2007, 2.12], [2010, 1.93], [2015, 1.84], [2020, 1.64], [2021, 1.66], [2023, 1.62]];
+const TFR_PROJECTION = D.TFR_PROJECTION || [[2023, 1.62], [2050, 1.9], [2150, 1.9]];
+const TFR_LAST = TFR[TFR.length - 1][0];
+export const tfrAt = year => (year <= TFR_LAST ? interp(TFR, year) : interp(TFR_PROJECTION, year));
+// Births per woman per year by mother's age group (us-rates.js ASFR_BY_YEAR, NCHS: anchor years 1950–2023, 10–14,
+// 15–19, …, 45–49), straight between the anchors and scaled to the year's TFR; after 2023, 2023's ages scaled to the
+// projected TFR.
+const ASFR_2023 = [[10, 0.0002], [15, 0.0131], [20, 0.0577], [25, 0.091], [30, 0.0943], [35, 0.0543], [40, 0.0125], [45, 0.0011], [50, 0]];
+const ASFR_BY_YEAR = D.ASFR_BY_YEAR || [[2023, ASFR_2023]];
+const groupRate = (row, age) => row.reduce((v, [a, r]) => (age >= a ? r : v), 0);
+const asfrRows = new Map();
+function asfrRow(year) {
+  const y = Math.round(year);
+  if (!asfrRows.has(y)) {
+    const k = ASFR_BY_YEAR.findIndex(t => t[0] >= y);
+    const last = ASFR_BY_YEAR[ASFR_BY_YEAR.length - 1];
+    let row;
+    if (k === -1) row = last[1].map(([a, r]) => [a, r]);
+    else if (k === 0 || ASFR_BY_YEAR[k][0] === y) row = ASFR_BY_YEAR[k][1].map(([a, r]) => [a, r]);
+    else {
+      const [y0, r0] = ASFR_BY_YEAR[k - 1], [y1, r1] = ASFR_BY_YEAR[k], w = (y - y0) / (y1 - y0);
+      row = r0.map(([a, r], i) => [a, (1 - w) * r + w * r1[i][1]]);
+    }
+    const total = 5 * row.reduce((t, [, r]) => t + r, 0), k2 = tfrAt(y) / total;
+    asfrRows.set(y, row.map(([a, r]) => [a, r * k2]));
+  }
+  return asfrRows.get(y);
+}
+// The population's births per woman of `age` in `year`.
+export const asfr = (age, year = 2023) => (age < 10 || age >= 50 ? 0 : groupRate(asfrRow(yr(year)), age));
+// The share of births to unmarried mothers (us-rates.js NONMARITAL_BIRTH_SHARE, NCHS: 3.9 % in 1950, 5.3 % in 1960,
+// 10.7 % in 1970, 18.4 % in 1980, 28 % in 1990, 33 % in 2000, 41 % at the 2009 peak, 40 % in 2023), spread over the
+// mother's age as in recent years (NCHS, approximately: under 20 about 9 in 10, 20–24 two thirds, 25–29 two in five,
+// 30–34 a quarter, 35+ a fifth): each year's age profile is moved in log-odds so the year's births add up to its share.
+export const NONMARITAL_BIRTH_SHARE = D.NONMARITAL_BIRTH_SHARE || [[1950, 0.039], [1960, 0.053], [1970, 0.107], [1980, 0.184], [1990, 0.28], [2000, 0.332], [2009, 0.41], [2023, 0.4]];
+const NONMARITAL_BY_AGE = [[10, 0.95], [15, 0.89], [20, 0.66], [25, 0.4], [30, 0.24], [35, 0.21], [40, 0.24], [45, 0.25]];
+const logit = p => Math.log(p / (1 - p)), expit = z => 1 / (1 + Math.exp(-z));
+const nonmaritalShifts = new Map();
+function nonmaritalShift(year) {
+  const y = Math.round(year);
+  if (!nonmaritalShifts.has(y)) {
+    const row = asfrRow(y), target = interp(NONMARITAL_BIRTH_SHARE, y), total = row.reduce((t, [, r]) => t + r, 0);
+    const share = d => row.reduce((t, [a, r]) => t + r * expit(logit(groupRate(NONMARITAL_BY_AGE, a)) + d), 0) / total;
+    let lo = -8, hi = 8;
+    for (let i = 0; i < 50; i++) { const mid = (lo + hi) / 2; if (share(mid) < target) lo = mid; else hi = mid; }
+    nonmaritalShifts.set(y, (lo + hi) / 2);
+  }
+  return nonmaritalShifts.get(y);
+}
+export const nonmaritalShare = (age, year) => expit(logit(groupRate(NONMARITAL_BY_AGE, Math.max(10, age))) + nonmaritalShift(yr(year)));
+// Births by how many children came before (design: in the simulation births come to couples, and the order shapes
+// family sizes; the US has more third children than bazi-life's Taiwan).
+export const PARITY = [1.55, 1.45, 0.95, 0.6, 0.3];
+// In the simulation births come only to couples: married, or together a year or more (story/core.js `baby`), who have
+// not decided against more children. EXPOSURE is, per 5-year age group (15–19 … 45–49) and year, the share of all women
+// who are such couples, weighted by PARITY and by the "trying" boost (×1.8 for three years after deciding to have a
+// child), measured on the simulated population itself (fitted: test/calibration.test.js prints it with CAL=fit). The
+// rate per couple is then the population rate for married (or unmarried) mothers over that share, so the simulated
+// population has the US births by age, year and marital status.
+const EXPOSURE_YEARS = [1965, 1970, 1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2025, 2030, 2035];
+// BEGIN EXPOSURE (fitted)
+const EXPOSURE = {
+  married: [
+    [0.0348, 0.7, 1.1, 1, 0.75, 0.5, 0.3],
+    [0.1045, 0.5433, 1.05, 1, 0.75, 0.5, 0.3],
+    [0.1061, 0.5298, 0.4305, 1, 0.75, 0.5, 0.3],
+    [0.0765, 0.4825, 0.4098, 0.2344, 0.75, 0.5, 0.3],
+    [0.0622, 0.4456, 0.4017, 0.2557, 0.1081, 0.5, 0.3],
+    [0.0422, 0.3828, 0.4078, 0.2423, 0.1138, 0.0601, 0.3],
+    [0.036, 0.3168, 0.3698, 0.2271, 0.1123, 0.0828, 0.0695],
+    [0.0263, 0.273, 0.3836, 0.2181, 0.1269, 0.079, 0.0838],
+    [0.022, 0.2578, 0.3424, 0.2264, 0.1281, 0.0832, 0.0778],
+    [0.0136, 0.2331, 0.3449, 0.2225, 0.109, 0.0754, 0.0896],
+    [0.0106, 0.1965, 0.3553, 0.2352, 0.1205, 0.0719, 0.0903],
+    [0.0093, 0.1521, 0.3633, 0.2803, 0.1455, 0.081, 0.0895],
+    [0.0051, 0.1345, 0.3575, 0.3389, 0.1664, 0.0972, 0.0877],
+    [0.0053, 0.1362, 0.3539, 0.3523, 0.1953, 0.105, 0.1019],
+    [0.0055, 0.1329, 0.3394, 0.3371, 0.214, 0.1373, 0.1358],
+  ],
+  partnered: [
+    [0.0231, 0.2, 0.15, 0.1, 0.08, 0.06, 0.05],
+    [0.0754, 0.1747, 0.15, 0.1, 0.08, 0.06, 0.05],
+    [0.0901, 0.1529, 0.0975, 0.11, 0.08, 0.06, 0.05],
+    [0.0816, 0.149, 0.1194, 0.0986, 0.09, 0.06, 0.05],
+    [0.0735, 0.1434, 0.1252, 0.1083, 0.093, 0.07, 0.05],
+    [0.0703, 0.1495, 0.1185, 0.113, 0.1102, 0.0881, 0.05],
+    [0.0707, 0.1712, 0.134, 0.1097, 0.101, 0.0967, 0.0771],
+    [0.0776, 0.1857, 0.1411, 0.1112, 0.1, 0.095, 0.0711],
+    [0.0829, 0.1861, 0.1534, 0.1188, 0.1062, 0.0922, 0.0863],
+    [0.0718, 0.1907, 0.1575, 0.1338, 0.104, 0.114, 0.0814],
+    [0.062, 0.1967, 0.148, 0.1222, 0.1068, 0.109, 0.0926],
+    [0.0482, 0.2102, 0.1447, 0.1085, 0.1002, 0.0911, 0.0897],
+    [0.0396, 0.204, 0.1581, 0.1207, 0.1028, 0.1004, 0.0933],
+    [0.0436, 0.2017, 0.1653, 0.1284, 0.1082, 0.1008, 0.0839],
+    [0.0488, 0.1991, 0.1651, 0.1367, 0.1223, 0.1078, 0.0968],
+  ],
+};
+// END EXPOSURE
+export const BIRTH_EXPOSURE = { years: EXPOSURE_YEARS, ...EXPOSURE };
+export function exposure(kind, age, year) {
+  const g = Math.max(0, Math.min(6, Math.floor((age - 15) / 5))), rows = EXPOSURE[kind], y = yr(year);
+  const pts = EXPOSURE_YEARS.map((t, i) => [t, rows[i][g]]);
+  return Math.max(0.005, interp(pts, y));
+}
 // The chance of a birth this year for a woman of `motherAge` with `parity` children, married (or, with
-// married = false, dating or living with a partner).
+// married = false, together with a partner a year or more).
 export function birth(motherAge, parity, year, married = true) {
-  const a = Math.round(motherAge), base = asfr(a) * PARITY[Math.min(4, parity)] * interp(TFR, yr(year)) / TFR_AT_ASFR;
-  const share = interp(MARITAL_SHARE, a);
-  return clamp01(married ? base * share / interp(MARRIED_SHARE, a) : base * (1 - share) / interp(DATING_SHARE, a));
+  const a = Math.round(motherAge);
+  if (a < 15 || a >= 50) return 0;
+  const nm = nonmaritalShare(a, year), base = asfr(a, year) * (married ? 1 - nm : nm);
+  return clamp01(base / exposure(married ? "married" : "partnered", a, year) * PARITY[Math.min(4, parity)]);
 }
 export function siblings(birthYear, rng) {
-  const tfr = interp(TFR, birthYear);
+  const tfr = tfrAt(birthYear);
   let n = 0;
   for (let i = 1; i < 8; i++) if (rng() < Math.min(0.95, Math.max(0, tfr - 1) / i)) n++;
   const older = Math.floor(rng() * (n + 1));
@@ -281,29 +374,41 @@ export function siblings(birthYear, rng) {
 }
 
 // ---------- marriage ----------
-// Median age at first marriage (Census Bureau, Current Population Survey, table MS-2): men 22.8 and women 20.3 in 1950,
-// 23.2 and 20.8 in 1970, 26.1 and 23.9 in 1990, 26.8 and 25.1 in 2000, 28.2 and 26.1 in 2010, 30.5 and 28.1 in 2020,
-// 30.2 and 28.6 in 2024. The age curves below have their shape from bazi-life (fitted there) and are moved by the
-// difference between the year's median and 2024's, so that the timing follows the era. Dating, breakups and
-// proposals have no official statistic: design parameters, to be tuned to these medians and to the share never
-// married at 40–44 (Census ACS 2023: about a quarter of men and a fifth of women).
+// Median age at first marriage (Census Bureau, Current Population Survey, table MS-2; us-rates.js, every year
+// 1947–2025): men 22.8 and women 20.3 in 1950, 23.2 and 20.8 in 1970, 26.1 and 23.9 in 1990, 26.8 and 25.1 in 2000,
+// 28.2 and 26.1 in 2010, 30.5 and 28.1 in 2020, 30.2 and 28.6 in 2024. Every age curve below is read at the age's
+// 2024 equivalent, x = age − (the year's median − 2024's median), so the timing follows the era. Dating, breakups and
+// proposals have no official statistic: they are design curves (their shape from bazi-life) with an era level, fitted
+// in a micro-simulation of core.js's love events and checked by test/calibration.test.js against the cohorts' median
+// age at first marriage (MS-2 in the year they married) and the share ever married by 45 (Census CPS/ACS: about 9 in
+// 10 of the 1950s cohorts, three quarters of men and four in five women of the 1980s ones; NSFG 2006–10, probability
+// of a first marriage by 40: women 0.84, men 0.78).
 export const MEDIAN_FIRST_MARRIAGE = D.MEDIAN_FIRST_MARRIAGE || {
   male: [[1950, 22.8], [1960, 22.8], [1970, 23.2], [1980, 24.7], [1990, 26.1], [2000, 26.8], [2010, 28.2], [2020, 30.5], [2024, 30.2]],
   female: [[1950, 20.3], [1960, 20.3], [1970, 20.8], [1980, 22.0], [1990, 23.9], [2000, 25.1], [2010, 26.1], [2020, 28.1], [2024, 28.6]],
 };
-const marriageShift = (sex, year) => interp(MEDIAN_FIRST_MARRIAGE[sex === "female" ? "female" : "male"], yr(year)) - interp(MEDIAN_FIRST_MARRIAGE[sex === "female" ? "female" : "male"], 2024);
-// The year 2024 sits 1.5 (women) and 1.9 (men) years younger than the curves' own centre (bazi-life's Taiwan, mean ages
-// at first marriage 31.1 and 33.1), so the curves are read that much older.
-const CENTRE = { female: 1.5, male: 1.9 };
-const atAge = (age, sex, year) => age + CENTRE[sex === "female" ? "female" : "male"] - marriageShift(sex, year);
+const sexKey = sex => (sex === "female" ? "female" : "male");
+export const marriageShift = (sex, year) => interp(MEDIAN_FIRST_MARRIAGE[sexKey(sex)], yr(year)) - interp(MEDIAN_FIRST_MARRIAGE[sexKey(sex)], 2024);
+const eqAge = (age, sex, year) => age - marriageShift(sex, year);
+// Era levels (fitted): more dating and more proposals while the whole country married young.
+const DATING_ERA = [[1960, 2.43], [1985, 1.2], [2024, 1]];
+const PROPOSAL_ERA = [[1960, 1.57], [1985, 1.37], [2005, 1.04], [2024, 1]];
+// The proposal curves' centres in 2024-equivalent ages (fitted), and their slower decline after 27 (+40 % by 37).
+const CENTRE = { female: 0.33, male: 0.54 };
 export const dating = (age, rel, year = 2024, sex = "female") => {
-  const a = rel === "single" ? Math.max(15, age - marriageShift(sex, year) / 2) : age;
-  return rel === "single" ? interp([[15, 0.08], [17, 0.12], [22, 0.28], [30, 0.3], [40, 0.18], [55, 0.08], [70, 0.03]], a) : interp([[30, 0.2], [45, 0.12], [60, 0.05], [75, 0.02]], age);
+  if (rel !== "single") return interp([[30, 0.2], [45, 0.12], [60, 0.05], [75, 0.02]], age);
+  const x = Math.max(15, eqAge(age, sex, year));
+  return Math.min(0.9, 0.766 * interp(DATING_ERA, yr(year)) * interp([[15, 0.08], [17, 0.12], [22, 0.28], [30, 0.3], [40, 0.18], [55, 0.08], [70, 0.03]], x));
 };
-export const breakup = age => interp([[18, 0.4], [25, 0.3], [35, 0.25], [50, 0.2]], age);
-export const proposal = (age, sex, year, marriages) => interp(sex === "female"
-  ? [[18, 0.035], [22, 0.18], [25, 0.31], [27, 0.35], [30, 0.29], [35, 0.18], [45, 0.09], [60, 0.04]]
-  : [[20, 0.025], [24, 0.11], [27, 0.23], [30, 0.28], [34, 0.22], [39, 0.14], [48, 0.065], [60, 0.03]], marriages ? age : atAge(age, sex, year)) * (marriages ? 0.6 : 1);
+export const breakup = (age, year = 2024, sex = "female") => 1.013 * interp([[18, 0.4], [25, 0.3], [35, 0.25], [50, 0.2]], eqAge(age, sex, year));
+export function proposal(age, sex, year = 2024, marriages = 0) {
+  const curve = sex === "female"
+    ? [[18, 0.035], [22, 0.18], [25, 0.31], [27, 0.35], [30, 0.29], [35, 0.18], [45, 0.09], [60, 0.04]]
+    : [[20, 0.025], [24, 0.11], [27, 0.23], [30, 0.28], [34, 0.22], [39, 0.14], [48, 0.065], [60, 0.03]];
+  if (marriages) return interp(curve, age) * 0.6;
+  const x = eqAge(age, sex, year) + CENTRE[sexKey(sex)];
+  return Math.min(0.9, 1.09 * interp(PROPOSAL_ERA, yr(year)) * interp(curve, x) * (1 + 0.4 * Math.max(0, Math.min(1, (x - 27) / 10))));
+}
 
 // ---------- divorce ----------
 // The refined divorce rate, divorces per 1,000 married women a year (CDC/NCHS and the National Center for Family &

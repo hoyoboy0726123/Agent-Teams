@@ -8,9 +8,15 @@
 //
 // Probabilities here are assumptions (design values, not statistics). Effects are small and two-sided so that
 // test/calibration.test.js keeps passing.
+//
+// The English edition (README「英文版（翻譯層）」, src/i18n/en/young.json) looks each template up as written here, so
+// what changes from life to life goes in as {vars}. A part that is itself a choice ({甲|乙}, picked as the sentence
+// is told) stays in the template: a scene's own wording is a template of its own, and a choice among words that
+// change with the era is written {{a}|{b}} with the words as vars, which draws the same as the words written in.
 import { COUNTIES, JOBS, regionOf, moveTo, bornSiblings } from "../world.js";
 import { pronoun } from "../people.js";
 import { siblingCall } from "../words.js";
+import { fill } from "../grammar.js";
 
 // ---------- who is where ----------
 const COLLEGE = ["大學", "科大"];
@@ -32,8 +38,8 @@ const placeOf = s => (SHOP.includes(s.job.title) ? "店" : "公司");
 const officeJob = s => desk(s) && !SHOP.includes(s.job.title);
 // Where the work happens, for 「工廠缺人」.
 const siteOf = s => ({ 製造: "工廠", 營造: "工地", 醫療: "醫院", 餐飲: "店裡", 零售: "店裡" }[s.job.field] || (SHOP.includes(s.job.title) ? "店裡" : "公司"));
-// Who would try to hire you away.
-const rivalOf = s => ({ 教育: "{另一間學校|一間私立學校}", 醫療: "{另一家醫院|一間診所}", 社福: "另一個社福機構" }[s.job.field] || (SHOP.includes(s.job.title) ? "{另一家店|附近新開的店}" : "{另一家公司|對手公司}"));
+// Who would try to hire you away: the two words of a {甲|乙} choice, or one word.
+const rivalOf = s => ({ 教育: ["另一間學校", "一間私立學校"], 醫療: ["另一家醫院", "一間診所"], 社福: ["另一個社福機構"] }[s.job.field] || (SHOP.includes(s.job.title) ? ["另一家店", "附近新開的店"] : ["另一家公司", "對手公司"]));
 const BASIC = new Set(JOBS.basic.map(j => j[0]));   // jobs nobody sends a headhunter for
 const dating = s => s.rel === "dating" && !!s.partner;
 const parentsAlive = s => s.father.alive || s.mother.alive;
@@ -52,6 +58,22 @@ const warm = s => { s.guard = Math.max(s.guard, 1); };
 const cool = s => { s.crisis = Math.max(s.crisis, 1); };
 // The same yearly market swings as the invest action (act.js).
 const marketYear = y => (y === 1990 ? -0.45 : y === 2000 || y === 2001 ? -0.25 : y === 2008 ? -0.3 : y === 2020 || y === 2021 ? 0.3 : y === 2022 ? -0.15 : 0.05);
+
+// ---------- wording ----------
+// ctx.w for an event that comes back, with a list of templates whose {vars} change from one time to the next: a
+// template counts as already told only when it was told with these same values (as when the values were written into
+// it), so a later time picks among the same templates as before the values became {vars}.
+function told(s, ctx, list, vars) {
+  const id = t => fill(t, vars);
+  const fresh = list.filter(t => !s.used.has(id(t)));
+  const pool = fresh.length ? fresh : list;
+  const had = pool.filter(t => s.used.has(t));
+  for (const t of had) s.used.delete(t);
+  const text = ctx.w(pool, vars);
+  for (const t of pool) if (s.used.has(t)) { s.used.delete(t); s.used.add(id(t)); }
+  for (const t of had) s.used.add(t);
+  return text;
+}
 
 // ---------- scenes ----------
 // A question told through one concrete situation out of several, so the same question reads differently from life to
@@ -79,9 +101,12 @@ const smallShop = s => employee(s) && (BASIC.has(s.job.title) || SHOP.includes(s
 
 // ---------- friends ----------
 const FRIEND_HOW = /同學|同事|室友|隊友|同梯|鄰居|社友|同好|朋友/;
-// How the story first names a friend: 大學室友阿傑, or 好友阿傑 when we do not know how you met.
-const friendIntro = f => (typeof f.how === "string" && f.how.length <= 6 && FRIEND_HOW.test(f.how) && !/[{}|]/.test(f.how) ? `${f.how}${f.call}` : `好友${f.call}`);
-const defaultHow = s => (inCollege(s) || ["大學", "科大", "碩士", "博士"].includes(s.edu) ? "大學同學" : s.employed && s.age >= 20 ? "同事" : s.edu === "none" ? "朋友" : `${s.edu}同學`);
+// How the story first names a friend: 大學室友阿傑, or 好友阿傑 when we do not know how you met. A few ways of meeting
+// have their own template, since their English word comes with "a" ("a classmate").
+const INTRO = { 同學: "同學{name}", 同事: "同事{name}", 鄰居: "鄰居{name}", 老同學: "老同學{name}", 老朋友: "老朋友{name}" };
+const friendIntro = (f, ctx) => (typeof f.how === "string" && f.how.length <= 6 && FRIEND_HOW.test(f.how) && !/[{}|]/.test(f.how)
+  ? ctx.f(INTRO[f.how] || "{how}{name}", { how: f.how, name: f.call }) : ctx.f("好友{name}", { name: f.call }));
+const defaultHow = s => (inCollege(s) || ["大學", "科大", "碩士", "博士"].includes(s.edu) ? "大學同學" : s.employed && s.age >= 20 ? "同事" : s.edu === "none" ? "朋友" : s.edu + "同學");
 // A friend for the story: one from earlier in this life (preferably met the way `prefer` says), else someone new.
 //   fresh   always someone new (a roommate, a teammate)
 function friendOf(s, ctx, { sex = null, how = null, fresh = false, prefer = null } = {}) {
@@ -119,7 +144,7 @@ function pickDept(s, ctx, group = null, not = null) {
 const deptOf = (s, ctx) => s.flags.dept || (s.flags.dept = pickDept(s, ctx));
 const isArts = s => DEPTS.arts.some(([d]) => d === s.flags.dept);
 // 「高中念自然組，」 when the teen years chose a group, else nothing.
-const majorLead = s => (s.edu === "高中" && (SCI.test(majorOf(s)) || ART.test(majorOf(s))) ? `高中念${majorOf(s)}，` : "");
+const majorLead = (s, ctx) => (s.edu === "高中" && (SCI.test(majorOf(s)) || ART.test(majorOf(s))) ? ctx.f("高中念{major}，", { major: majorOf(s) }) : "");
 
 // ---------- places and things by region and era ----------
 const RIDE = {
@@ -137,7 +162,9 @@ const DATES = {
   islands: [["海邊看夕陽", 0], ["老街吃小吃", 0]],
 };
 const pickSpot = (list, y, ctx) => ctx.rng.pick(list.filter(([, from]) => from <= y).map(([n]) => n));
-const scooterOf = y => (y < 1974 ? "偉士牌機車" : y < 1990 ? "{偉士牌機車|野狼 125|光陽機車}" : y < 2003 ? "{光陽|三陽|山葉}機車" : y < 2016 ? "{勁戰|雷霆}" : "{新勁戰|雷霆| JET S}");
+// The scooter of the era: one model, or the models of a {甲|乙|丙} choice ("{光陽|三陽|山葉}機車" picks the same
+// as three whole names). From 2016 the third is written with its space (一台 JET S), see y_vehicle.
+const scooterOf = y => (y < 1974 ? ["偉士牌機車"] : y < 1990 ? ["偉士牌機車", "野狼 125", "光陽機車"] : y < 2003 ? ["光陽機車", "三陽機車", "山葉機車"] : y < 2016 ? ["勁戰", "雷霆"] : ["新勁戰", "雷霆", "JET S"]);
 
 export const YOUNG = [
   // ---------- college ----------
@@ -146,24 +173,24 @@ export const YOUNG = [
     id: "y_freshman", once: true, domain: "study", channel: "good", ages: [17, 22],
     when: s => undergrad(s) && s.flags.uniAt === s.age, p: () => 0.75,
     apply: (s, ctx) => {
-      const dept = deptOf(s, ctx), lead = majorLead(s), y = s.year;
+      const dept = deptOf(s, ctx), lead = majorLead(s, ctx), y = s.year;
       s.flags.dorm = ctx.rng() < 0.6;
       const t = y < 1985 ? [
-        `${lead}進了{dept}。新生訓練完，學長姊帶全班去{郊遊|烤肉|爬山}，大家圍著營火{跳土風舞|唱歌}到半夜。`,
-        `${lead}進了{dept}，系上辦了第一場{聯誼|舞會}，你{緊張得只敢站在牆邊。|連對方的名字都不敢問。|跳錯了好幾次舞步，大家笑成一團。}`,
-        `${lead}開始讀{dept}，{第一次自己去郵局寄信回家報平安。|宿舍熄燈後，大家拿著手電筒在走廊聊天。|每個月最期待家裡寄來的生活費和一罐肉鬆。}`,
+        "{lead}進了{dept}。新生訓練完，學長姊帶全班去{郊遊|烤肉|爬山}，大家圍著營火{跳土風舞|唱歌}到半夜。",
+        "{lead}進了{dept}，系上辦了第一場{聯誼|舞會}，你{緊張得只敢站在牆邊。|連對方的名字都不敢問。|跳錯了好幾次舞步，大家笑成一團。}",
+        "{lead}開始讀{dept}，{第一次自己去郵局寄信回家報平安。|宿舍熄燈後，大家拿著手電筒在走廊聊天。|每個月最期待家裡寄來的生活費和一罐肉鬆。}",
       ] : y < 2005 ? [
-        `${lead}進了{dept}。迎新宿營三天兩夜，{你被抓上台跳了一支舞。|小隊輔帶著你們玩到天亮。|你認識了後來最常一起吃飯的同學。}`,
-        `${lead}開始讀{dept}，直屬學長姊塞給你一疊{共筆|考古題}，說：「{這個比課本重要。|期中考全靠它了。}」`,
+        "{lead}進了{dept}。迎新宿營三天兩夜，{你被抓上台跳了一支舞。|小隊輔帶著你們玩到天亮。|你認識了後來最常一起吃飯的同學。}",
+        "{lead}開始讀{dept}，直屬學長姊塞給你一疊{共筆|考古題}，說：「{這個比課本重要。|期中考全靠它了。}」",
         y >= 1995
-          ? `${lead}進了{dept}，{第一次學會上 BBS，|在宿舍接上了宿網，}{每天晚上都泡在看板上。|跟高中同學在網路上聊到半夜。}`
-          : `${lead}進了{dept}，{學長姊帶著大家去夜市吃宵夜，|第一次參加系上的烤肉，}{你覺得大學生活好自由。|宿舍的門禁比家裡還晚。}`,
+          ? "{lead}進了{dept}，{第一次學會上 BBS，|在宿舍接上了宿網，}{每天晚上都泡在看板上。|跟高中同學在網路上聊到半夜。}"
+          : "{lead}進了{dept}，{學長姊帶著大家去夜市吃宵夜，|第一次參加系上的烤肉，}{你覺得大學生活好自由。|宿舍的門禁比家裡還晚。}",
       ] : [
-        `${lead}進了{dept}。迎新宿營三天兩夜，{你被抓上台跳了一支舞。|小隊輔帶著你們玩到天亮。|你認識了後來最常一起吃飯的同學。}`,
-        `${lead}開始讀{dept}，{一入學就被拉進系上的${y < 2012 ? "臉書社團" : " LINE 群組"}，{訊息多到看不完。|學長姊每天都在上面公告活動。}|直屬學長姊傳了一份「必修課生存指南」給你，你默默把它存了起來。}`,
-        `${lead}進了{dept}，第一次自己{上網選課，熱門的通識課一下就被搶光。|排課表，把早八全部避開。|在學校附近找到一家便宜又大碗的自助餐。}`,
+        "{lead}進了{dept}。迎新宿營三天兩夜，{你被抓上台跳了一支舞。|小隊輔帶著你們玩到天亮。|你認識了後來最常一起吃飯的同學。}",
+        "{lead}開始讀{dept}，{一入學就被拉進系上的{group}，{訊息多到看不完。|學長姊每天都在上面公告活動。}|直屬學長姊傳了一份「必修課生存指南」給你，你默默把它存了起來。}",
+        "{lead}進了{dept}，第一次自己{上網選課，熱門的通識課一下就被搶光。|排課表，把早八全部避開。|在學校附近找到一家便宜又大碗的自助餐。}",
       ];
-      return { text: ctx.w(t, { dept }), mood: 4 };
+      return { text: ctx.w(t, { dept, lead, group: y < 2012 ? "臉書社團" : " LINE 群組" }), mood: 4 };
     },
   },
   {
@@ -171,8 +198,7 @@ export const YOUNG = [
     when: s => undergrad(s) && !!s.flags.dept && uniYear(s) <= 2, p: () => 0.18,
     choice: (s, ctx) => {
       const dept = s.flags.dept, other = pickDept(s, ctx, s.track === "科大" ? "tech" : ctx.rng.pick(["science", "arts"]), dept);
-      const who = parentsWord(s);
-      const self = s.year >= 2008 ? "{上網看{other}的開放式課程|跑去旁聽{other}的課}" : "{找{other}的書來讀|跑去旁聽{other}的課}";
+      const who = parentsWord(s), online = s.year >= 2008;
       return {
         prompt: ctx.w([
           "讀了{一個學期|一年}的{dept}，你發現自己{對系上的課提不起勁|上課常常在想別的事}，反而對{other}比較有興趣。要怎麼辦？",
@@ -198,12 +224,14 @@ export const YOUNG = [
               : { text: c.w("對{dept}提不起勁，你還是決定先讀下去，{把該修的學分一門一門修完。|每天告訴自己，至少要拿到畢業證書。}", { dept }), mood: -1 }),
           },
           {
-            id: "y_major.family", label: `回家跟${who}商量`, hint: "學費是家裡出的", act: "talk", style: "family", weight: 0.15, when: s2 => parentsAlive(s2),
-            apply: (s2, c) => ({ text: c.w(`想讀{other}的事，你回家跟${who}說了。${who}{沉默了很久，最後說：「你自己決定就好。」|說：「讀什麼都好，你快樂比較重要。」|還是希望你讀完{dept}，你們說好先修{other}的課看看。}`, { dept, other }), mood: 1 }),
+            id: "y_major.family", label: ctx.f("回家跟{who}商量", { who }), hint: "學費是家裡出的", act: "talk", style: "family", weight: 0.15, when: s2 => parentsAlive(s2),
+            apply: (s2, c) => ({ text: c.w("想讀{other}的事，你回家跟{who}說了。{who}{沉默了很久，最後說：「你自己決定就好。」|說：「讀什麼都好，你快樂比較重要。」|還是希望你讀完{dept}，你們說好先修{other}的課看看。}", { dept, other, who }), mood: 1 }),
           },
           {
             id: "y_major.self", label: "把心力放在社團和自學", hint: "學校教的不是全部", act: "hobby", style: "self", weight: 0.15,
-            apply: (s2, c) => ({ text: c.w(`對{dept}提不起勁，你把重心放到社團和自學，${self}，{成績普普通通，但每天都過得很充實。|期末差點被當，你一點也不後悔。}`, { dept, other }), mood: 2 }),
+            apply: (s2, c) => ({ text: c.w(online
+              ? "對{dept}提不起勁，你把重心放到社團和自學，{上網看{other}的開放式課程|跑去旁聽{other}的課}，{成績普普通通，但每天都過得很充實。|期末差點被當，你一點也不後悔。}"
+              : "對{dept}提不起勁，你把重心放到社團和自學，{找{other}的書來讀|跑去旁聽{other}的課}，{成績普普通通，但每天都過得很充實。|期末差點被當，你一點也不後悔。}", { dept, other }), mood: 2 }),
           },
         ],
       };
@@ -215,16 +243,17 @@ export const YOUNG = [
       const y = s.year, they = s.sex === "female" ? "她們" : "他們";
       const late = y < 1990 ? "在寢室打牌打到半夜" : y < 2005 ? "上網打電動打到半夜三點" : "打線上遊戲打到半夜三點";
       const fuss = y >= 1995 ? "冷氣要開幾度" : "誰該掃地倒垃圾";
+      const music = y < 1980 ? "收音機" : "音響";
       return {
         prompt: ctx.w([
-          `住宿舍{的第一年|以後}，室友{每天${late}|的鬧鐘一早響個不停，自己卻不起床|常常帶朋友回寢室聊到半夜}，你已經好幾個晚上沒睡好。要怎麼辦？`,
-          `宿舍{四人|六人}一間，你和室友的作息完全相反：{你早睡早起，${they}是夜貓子。|你習慣安靜讀書，${they}喜歡開著${y < 1980 ? "收音機" : "音響"}。}要怎麼辦？`,
-          `寢室裡{泡麵的味道散不掉|垃圾一個禮拜沒人倒|天天為了${fuss}鬥嘴}，室友之間的氣氛越來越僵。要怎麼辦？`,
-        ]),
+          "住宿舍{的第一年|以後}，室友{每天{late}|的鬧鐘一早響個不停，自己卻不起床|常常帶朋友回寢室聊到半夜}，你已經好幾個晚上沒睡好。要怎麼辦？",
+          "宿舍{四人|六人}一間，你和室友的作息完全相反：{你早睡早起，{they}是夜貓子。|你習慣安靜讀書，{they}喜歡開著{music}。}要怎麼辦？",
+          "寢室裡{泡麵的味道散不掉|垃圾一個禮拜沒人倒|天天為了{fuss}鬥嘴}，室友之間的氣氛越來越僵。要怎麼辦？",
+        ], { late, they, music, fuss }),
         options: [
           {
             id: "y_dorm.talk", label: "直接跟室友談", hint: "把話講開", act: "talk", style: "self", weight: 0.3,
-            apply: (s2, c) => ({ text: c.w(`和宿舍室友處不來，你找了一個晚上跟${they}把話講開，{大家說好十二點以後戴耳機、關大燈。|沒想到${they}也覺得不好意思，之後安靜多了。|${they}答應會改，雖然只撐了兩個禮拜。}`), mood: 1 }),
+            apply: (s2, c) => ({ text: c.w("和宿舍室友處不來，你找了一個晚上跟{they}把話講開，{大家說好十二點以後戴耳機、關大燈。|沒想到{they}也覺得不好意思，之後安靜多了。|{they}答應會改，雖然只撐了兩個禮拜。}", { they }), mood: 1 }),
           },
           {
             id: "y_dorm.rules", label: "訂一份寢室公約", hint: "大家一起遵守", act: "negotiate", style: "social", weight: 0.2,
@@ -243,7 +272,9 @@ export const YOUNG = [
           },
           {
             id: "y_dorm.move", label: "申請換寢室", hint: "換個環境", act: "moveHome", style: "risk", weight: 0.15,
-            apply: (s2, c) => ({ text: c.w(`和宿舍室友處不來，你申請換寢室，{等了一個學期才換成。|新室友是個安靜的${s2.sex === "female" ? "學姊" : "學長"}，你終於睡得著了。}`), mood: 1 }),
+            apply: (s2, c) => ({ text: c.w(s2.sex === "female"
+              ? "和宿舍室友處不來，你申請換寢室，{等了一個學期才換成。|新室友是個安靜的學姊，你終於睡得著了。}"
+              : "和宿舍室友處不來，你申請換寢室，{等了一個學期才換成。|新室友是個安靜的學長，你終於睡得著了。}"), mood: 1 }),
           },
         ],
       };
@@ -254,9 +285,10 @@ export const YOUNG = [
     choice: (s, ctx) => {
       const y = s.year;
       const music = y >= 1977 && y < 1986 ? "民歌社" : y < 1995 ? "吉他社" : ctx.rng.pick(["吉他社", "熱音社"]);
-      const booths = y < 1985 ? "{合唱團|國樂社|登山社|校刊社}" : y < 2005 ? "{吉他社|熱舞社|登山社|攝影社}" : "{熱音社|熱舞社|桌遊社|動漫社|山服社}";
       return {
-        prompt: ctx.w(`開學的社團博覽會擺了一整排攤位，${booths}和系隊都在招新生。你想參加什麼？`),
+        prompt: ctx.w(y < 1985 ? "開學的社團博覽會擺了一整排攤位，{合唱團|國樂社|登山社|校刊社}和系隊都在招新生。你想參加什麼？"
+          : y < 2005 ? "開學的社團博覽會擺了一整排攤位，{吉他社|熱舞社|登山社|攝影社}和系隊都在招新生。你想參加什麼？"
+            : "開學的社團博覽會擺了一整排攤位，{熱音社|熱舞社|桌遊社|動漫社|山服社}和系隊都在招新生。你想參加什麼？"),
         options: [
           {
             id: "y_club.team", label: "加入系隊", hint: "每天練球，也交到朋友", act: "exercise", style: "health", weight: 0.2,
@@ -267,10 +299,12 @@ export const YOUNG = [
             },
           },
           {
-            id: "y_club.music", label: `參加${music}`, hint: "學一樣樂器，上台表演", act: "hobby", style: "learn", weight: 0.2,
+            id: "y_club.music", label: music === "民歌社" ? "參加民歌社" : music === "吉他社" ? "參加吉他社" : "參加熱音社", hint: "學一樣樂器，上台表演", act: "hobby", style: "learn", weight: 0.2,
             apply: (s2, c) => ({ text: c.w(music === "民歌社"
               ? "校園民歌正流行，你參加了民歌社，{抱著吉他在草地上唱〈橄欖樹〉。|和社員組團去參加民歌比賽，雖然沒得名，卻唱得好開心。}"
-              : `大學參加${music}，{從按不好和弦練到可以上台表演。|期末成果發表會上，你在台上{唱|彈}了一首歌，台下的同學一起拍手。|和社員組了一個樂團，每週在社辦練團到半夜。}`), mood: 3 }),
+              : music === "吉他社"
+                ? "大學參加吉他社，{從按不好和弦練到可以上台表演。|期末成果發表會上，你在台上{唱|彈}了一首歌，台下的同學一起拍手。|和社員組了一個樂團，每週在社辦練團到半夜。}"
+                : "大學參加熱音社，{從按不好和弦練到可以上台表演。|期末成果發表會上，你在台上{唱|彈}了一首歌，台下的同學一起拍手。|和社員組了一個樂團，每週在社辦練團到半夜。}"), mood: 3 }),
           },
           {
             id: "y_club.service", label: "參加服務性社團", hint: "寒暑假去偏鄉辦營隊", act: "volunteer", style: "social", weight: 0.15,
@@ -298,7 +332,6 @@ export const YOUNG = [
     choice: (s, ctx) => {
       const y = s.year;
       const shop = ctx.rng.pick([...(y >= 1980 ? ["便利商店"] : []), ...(y >= 1985 ? ["速食店"] : []), ...(y >= 1990 ? ["飲料店"] : []), "餐廳", "書店"]);
-      const goods = y < 1995 ? "{飾品|髮夾|雞蛋糕}" : "{飾品|手機殼|雞蛋糕}";
       return {
         prompt: ctx.w(["{生活費有點不夠用|想自己賺點零用錢|看到同學都在打工}，你想去打工。要做什麼？", "{下學期的學費|想買的東西}還差一點，你打算找個打工。要做什麼？"]),
         options: [
@@ -307,12 +340,12 @@ export const YOUNG = [
             apply: (s2, c) => { s2.savings += 0.04; return { text: c.w("課餘去當家教，教{國中生數學|高中生英文|小學生寫功課}，{學生月考進步了二十分，家長送你一盒水果。|一個小時的家教費，抵得上在餐廳打工的兩倍。|你發現教會別人，比自己讀懂還難。}"), mood: 2 }; },
           },
           {
-            id: "y_parttime.shop", label: `去${shop}打工`, hint: "排班制，薪水穩定", act: "sideJob", style: "self", weight: 0.3,
+            id: "y_parttime.shop", label: ctx.f("去{shop}打工", { shop }), hint: "排班制，薪水穩定", act: "sideJob", style: "self", weight: 0.3,
             apply: (s2, c) => {
               s2.savings += 0.05; stress(s2, 0.03);
               return { text: c.w(shop === "便利商店"
                 ? "在便利商店打工，{值大夜班時，凌晨三點的店裡只剩你和冰櫃的聲音。|學會了繳費、寄包裹、煮關東煮，什麼都要會。|有個熟客每天都買一樣的早餐，你不用問就幫他拿好。}"
-                : `在${shop}打工，{學會了一邊招呼客人一邊記住熟客的口味。|週末一站就是八個小時，下班時腳都腫了。|領到第一份薪水，你請室友吃了一頓宵夜。}`), mood: 1 };
+                : "在{shop}打工，{學會了一邊招呼客人一邊記住熟客的口味。|週末一站就是八個小時，下班時腳都腫了。|領到第一份薪水，你請室友吃了一頓宵夜。}", { shop }), mood: 1 };
             },
           },
           {
@@ -325,7 +358,9 @@ export const YOUNG = [
               s2.savings += 0.06; stress(s2, 0.05);
               return { text: c.w(y >= 2016
                 ? "下課後騎車跑外送，{一個晚上跑了十幾單，|下雨天單價比較高，你穿著雨衣跑到半夜，}{存到了下學期的學費。|整個城市的巷子你都摸熟了。}"
-                : `跟同學在夜市擺攤賣${goods}，{第一天只賣出三樣，|喊到喉嚨都啞了，}{一個學期下來竟然存了一筆錢。|學會了怎麼跟客人應對。}`), mood: 1 };
+                : y < 1995
+                  ? "跟同學在夜市擺攤賣{飾品|髮夾|雞蛋糕}，{第一天只賣出三樣，|喊到喉嚨都啞了，}{一個學期下來竟然存了一筆錢。|學會了怎麼跟客人應對。}"
+                  : "跟同學在夜市擺攤賣{飾品|手機殼|雞蛋糕}，{第一天只賣出三樣，|喊到喉嚨都啞了，}{一個學期下來竟然存了一筆錢。|學會了怎麼跟客人應對。}"), mood: 1 };
             },
           },
           {
@@ -342,15 +377,14 @@ export const YOUNG = [
     id: "y_examWeek", ages: [17, 27], cooldown: 2, max: 2, when: s => inCollege(s), p: () => 0.12,
     apply: (s, ctx) => {
       const y = s.year, good = ctx.roll("study", "good", 0.55);
-      const where = y >= 1984 ? "{二十四小時的麥當勞|系館| K 書中心}" : "{宿舍交誼廳|系館|圖書館}";
-      const notes = y >= 1990 ? "{共筆|學長姊的考古題}" : "{學長姊的筆記|考古題}";
-      const end = good ? "{一科都沒被當。|成績比想像中好。}" : "{還是被當了一科。|有一科低空飛過，有一科沒過。}";
+      // How the exams went: the two sentences of its {甲|乙} choice.
+      const [e1, e2] = good ? ["一科都沒被當。", "成績比想像中好。"] : ["還是被當了一科。", "有一科低空飛過，有一科沒過。"];
       return {
-        text: ctx.w([
-          `期末考週，你和同學在${where}讀到天亮，${end}`,
-          `期末考{前一週才開始讀，|全靠${notes}，}{熬了三個通宵，|喝掉了一整打提神飲料，}${end}`,
-          `期中考週，{整棟宿舍半夜都還亮著燈，|全班擠在圖書館${y >= 2005 ? "搶插座" : "搶位子"}，}你{把一學期的課在三天裡讀完，|一邊讀一邊懷疑人生，}${end}`,
-        ]),
+        text: told(s, ctx, [
+          y >= 1984 ? "期末考週，你和同學在{二十四小時的麥當勞|系館| K 書中心}讀到天亮，{{e1}|{e2}}" : "期末考週，你和同學在{宿舍交誼廳|系館|圖書館}讀到天亮，{{e1}|{e2}}",
+          y >= 1990 ? "期末考{前一週才開始讀，|全靠{共筆|學長姊的考古題}，}{熬了三個通宵，|喝掉了一整打提神飲料，}{{e1}|{e2}}" : "期末考{前一週才開始讀，|全靠{學長姊的筆記|考古題}，}{熬了三個通宵，|喝掉了一整打提神飲料，}{{e1}|{e2}}",
+          "期中考週，{整棟宿舍半夜都還亮著燈，|全班擠在圖書館{grab}，}你{把一學期的課在三天裡讀完，|一邊讀一邊懷疑人生，}{{e1}|{e2}}",
+        ], { e1, e2, grab: y >= 2005 ? "搶插座" : "搶位子" }),
         mood: good ? 2 : -2,
       };
     },

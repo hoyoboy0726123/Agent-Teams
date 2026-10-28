@@ -117,13 +117,23 @@ const STYLE_NUDGE = { risk: [["drive", 0.02], ["caution", -0.02]], safe: [["caut
 //                   Everyday questions among them come up less often (NOVELTY) and the others a little more (FRESH);
 //                   the big decisions, and questions certain in their year, are as always.
 //   events          the yearly events (default: story/index.js ALL_EVENTS)
+// mulberry32 streams started from neighbouring seeds (1, 2, 3, …) are not independent enough for a population: lives
+// with seeds 5000..5799 died about 1.5 years later than the life table says, though every yearly chance was right.
+// So the seed goes through a 32-bit hash finaliser (murmur3's fmix32) first; well-spread seeds (monte.js hashSeed)
+// are unaffected in kind.
+const mixSeed = seed => {
+  let h = seed >>> 0;
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+  return h >>> 0;
+};
+
 export function createLife({ prep, sex = null, birthYear = null, place = null, seed = 1, auto = false, policy = null, majorOnly = false, seen = null, events = ALL_EVENTS }) {
   const input = (prep && prep.input) || {};
-  const rng = makeRng(seed);
+  const rng = makeRng(mixSeed(seed));
   const recent = seen && seen.length ? new Set(seen) : null;
   // A separate stream decides whether the calibrated core events happen and who dies when, so adding a story
   // event (which draws from rng) does not reshuffle the statistics.
-  const fate = makeRng((seed ^ 0x5bd1e995) >>> 0);
+  const fate = makeRng(mixSeed((seed ^ 0x5bd1e995) >>> 0));
   const luck = prep.luck && prep.luck.normalized ? prep.luck : normalizeLuck(prep.luck, MAX_AGE);
   const jobFit = safeJobFit(prep.jobFit), family = prep.family || null;
   const year0 = birthYear ?? (input.date && input.date.y) ?? 1990;
