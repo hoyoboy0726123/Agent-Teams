@@ -274,7 +274,7 @@ function startLife() {
   if (wed !== undefined) partner.marriedYear = Number.isInteger(wed) ? wed : NaN;
   const family = { siblings: [], onlyChild: false, partner };
   setReadingLang(englishNow());
-  const problems = checkFamily(family, a.date, a.sex, { english: en() });
+  const problems = checkFamily(family, a.date, a.sex, { english: lang() === "en" && !!englishNow() });
   if (problems.length) { lifeError(problems.join(" ")); return; }
   lifeError("");
   hooks.begin({ date: a.date, time: a.time, place: a.place, sex: a.sex, ...(a.zi === "late" ? { zi: "late" } : {}) }, null, { name: a.name, family });

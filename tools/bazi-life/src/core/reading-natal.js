@@ -325,6 +325,11 @@ const J = (list, zhSep = "、") => join(list.map(trw), zhSep);   // Chinese word
 // Phrases from the tables above are read as sentences (tr), so a phrase never takes the English of a word spelt the
 // same (金 the colour, not the element; 太陽 the image, not the spirit). Trades and careers are words (trw).
 const JP = (list, zhSep = "、") => join(list.map(t => tr(t)), zhSep);
+// A few trades and classical phrases are spelt like a line of the story or the year reading, which has its own English
+// (創業 "Start a business", 傷官見官 as a clause). In English these are looked up under a key of their own.
+const OWN_KEY = { 創業: "創業（行業）", 財務: "財務（行業）", 銀行: "銀行（行業）", 投資: "投資（行業）", 顧問: "顧問（行業）", 傷官見官: "傷官見官（格局）", 財星壞印: "財星壞印（格局）" };
+const own = t => trw(en() && OWN_KEY[t] ? OWN_KEY[t] : t);
+const JW = (list, zhSep = "、") => join(list.map(own), zhSep);
 const para = (...parts) => join(parts.filter(Boolean), "");      // sentences one after another
 const stop = t => `${t}${en() ? "." : "。"}`;
 // A sentence that starts with a piece of another sentence starts with a capital in English.
@@ -697,7 +702,7 @@ function useFunction(c, e) {
     if (g === "財") return tr(c.share[c.ge.印] >= 0.3 ? "取其制印" : "取其耗身生財");
     if (g === "官殺") return tr(CONTROL_IMAGE[c.de]);
   }
-  if (v.likes.includes("格局")) return tr("合{pattern}所喜的{what}", { pattern: patName(c.a.pattern), what: (PATTERN_LIKES[c.a.pattern] || {})[g] ? trw(PATTERN_LIKES[c.a.pattern][g]) : trw(GROUP_WORD[g]) });
+  if (v.likes.includes("格局")) return tr("合{pattern}所喜的{what}", { pattern: patName(c.a.pattern), what: (PATTERN_LIKES[c.a.pattern] || {})[g] ? own(PATTERN_LIKES[c.a.pattern][g]) : trw(GROUP_WORD[g]) });
   if (v.likes.includes("調候")) return tr("取其調候");
   return tr("取{g}之用", { g: trw(GROUP_WORD[g]) });
 }
@@ -971,13 +976,13 @@ function patternCheck(c) {
   const vis = g => visibleOf(c, g).length > 0, hid = g => hiddenOf(c, g, ["本氣", "中氣"]).length > 0;
   const okStrength = s === "身強" || s === "中和" || s === "專旺";
   const good = [], hidden = [], bad = [];
-  const shows = (where, text) => tr("{where}透出，{text}", { where, text: trw(text) });
+  const shows = (where, text) => tr("{where}透出，{text}", { where, text: own(text) });
   const support = (g, text) => {
     if (vis(g)) good.push(shows(whereVisible(c, g), text));
     else if (hid(g)) hidden.push({ where: whereHidden(c, g), text });
   };
   // The short classical phrases are words (trw), so each keeps one English whatever sentence it stands in.
-  const add = (list, text) => list.push(trw(text));
+  const add = (list, text) => list.push(own(text));
   switch (pat) {
     case "正官格":
       support("財", "財星生官"); support("印", "印星護官");
@@ -1044,7 +1049,7 @@ function patternCheck(c) {
   verdict = tr(verdict);
   // A clash on the month branch shakes the structure rather than breaking it: said, but not counted against it.
   if (monthClashed(c)) verdict = tr("{verdict}；只是月令受沖，格局根基較易動搖，遇到沖月令的年份要穩住本業", { verdict });
-  const hv = { where: andJoin(hidden.map(h => h.where)), what: J(hidden.map(h => h.text)) };
+  const hv = { where: andJoin(hidden.map(h => h.where)), what: JW(hidden.map(h => h.text)) };
   const hiddenText = hidden.length ? tr(hidden.length > 1 ? "{where}都藏而未透，暗有{what}之勢" : "{where}藏而未透，暗有{what}之勢", hv) : "";
   return { good, hidden: hiddenText, bad, verdict };
 }
@@ -1073,7 +1078,7 @@ function schoolReason(c, school, e, like) {
     return tr({ 水: "冬天水寒，忌再添水", 火: "夏天火燥，忌再添火" }[e] || "依季節調候所忌");
   }
   const reason = ((like ? PATTERN_LIKES : PATTERN_DISLIKES)[pat] || {})[g];
-  return tr(like ? "{pattern}喜{what}" : "{pattern}忌{what}", { pattern: patName(pat), what: trw(reason || GROUP_WORD[g]) });
+  return tr(like ? "{pattern}喜{what}" : "{pattern}忌{what}", { pattern: patName(pat), what: reason ? own(reason) : trw(GROUP_WORD[g]) });
 }
 function roleText(c, e) {
   const v = c.a.views[e], role = c.roles[e];
@@ -1327,7 +1332,7 @@ const CAREER_STARS = [
 function careerSection(c) {
   const { a, dm } = c, pt = PATTERN_TEXT[a.pattern];
   const v = { dm: se(dm), pattern: patName(a.pattern) };
-  const s1 = pt ? tr("{dm}{pattern}的人{nature}，傳統上適合{careers}等工作。", { ...v, nature: tr(pt.nature), careers: J(pt.careers) })
+  const s1 = pt ? tr("{dm}{pattern}的人{nature}，傳統上適合{careers}等工作。", { ...v, nature: tr(pt.nature), careers: JW(pt.careers) })
     : tr("{dm}日主以{pattern}論，選擇工作時宜順著用神的五行與自己的專長。", v);
   const drivers = ["官殺", "食傷", "財", "印", "比劫"].filter(g => visibleOf(c, g).length).sort((x, y) => c.share[c.ge[y]] - c.share[c.ge[x]]).slice(0, 2);
   const shownAs = g => { const list = visibleOf(c, g); return tr("{g}{stems}透出{where}，{driver}", { g: trw(GROUP_WORD[g]), stems: join(uniq(list.map(x => se(x.stem))), "、"), where: rolesWord(list.map(x => x.role), "干"), driver: tr(DRIVER[g]) }); };
@@ -1348,7 +1353,7 @@ function careerSection(c) {
       : "受雇與自營都可行：前期在組織裡累積實力，等資源與時機成熟再考慮自立");
   const stars = CAREER_STARS.map(([star, text]) => [star, text, starWhere(c, star)]).filter(x => x[2]).slice(0, 2);
   const s3 = stars.length ? tr("整體而言，{way}；{stars}。", { way, stars: join(stars.map(([star, text, w]) => tr("{where}見{star}，{text}", { where: w, star: trw(star), text: tr(text) })), "，") }) : tr("整體而言，{way}。", { way });
-  const items = a.useful.slice(0, 3).map((e, i) => ({ label: tr(i ? "喜神・{e}" : "用神・{e}", { e: trw(e) }), text: stop(J(ELEMENT_INDUSTRIES[e])) }));
+  const items = a.useful.slice(0, 3).map((e, i) => ({ label: tr(i ? "喜神・{e}" : "用神・{e}", { e: trw(e) }), text: stop(JW(ELEMENT_INDUSTRIES[e])) }));
   if (!items.length) items.push({ label: tr("五行行業"), text: tr("命局喜忌不明顯，選擇行業時可以興趣與專長為主。") });
   return section("career", [para(s1, s2, s3)], items);
 }
@@ -1515,7 +1520,7 @@ function adviceOf(c) {
   };
 }
 // The advice lists as the page shows them (the numbers stay numbers).
-const adviceShown = adv => Object.fromEntries(Object.entries(adv).map(([k, list]) => [k, k === "numbers" ? list : list.map(x => (["elements", "zodiac", "industries"].includes(k) ? trw(x) : tr(x)))]));
+const adviceShown = adv => Object.fromEntries(Object.entries(adv).map(([k, list]) => [k, k === "numbers" ? list : list.map(x => (k === "industries" ? own(x) : ["elements", "zodiac"].includes(k) ? trw(x) : tr(x)))]));
 function adviceSection(c, adv) {
   const { a, dm } = c, yb = c.P.year.branch.name, db = c.P.day.branch.name;
   const base = a.useful.length ? tr("這張{dm}命盤開運以用神{u}為主{xi}{ji}。", { dm: se(dm), u: trw(a.useful[0]), xi: a.useful.length > 1 ? tr("，喜神{list}為輔", { list: listWords(a.useful.slice(1).map(trw)) }) : "", ji: a.avoid.length ? tr("，忌神{e}不宜過多", { e: trw(a.avoid[0]) }) : "" })
@@ -1530,7 +1535,7 @@ function adviceSection(c, adv) {
     { label: tr("顏色"), text: stop(`${join(adv.elements.map(e => `${JP(ELEMENT_LUCK[e].colors)}${tag(e)}`), "，")}${avoidColor}`) },
     { label: tr("方位"), text: tr("{list}，求學、工作或居家擺設可多往這些方向。", { list: join(adv.elements.map(e => `${tr(ELEMENT_LUCK[e].direction)}${tag(e)}`), "，") }) },
     { label: tr("數字"), text: tr("{list}，取自河圖數，可用在車牌、門牌或密碼等小地方。", { list: join(adv.elements.map(e => `${join(ELEMENT_LUCK[e].numbers, "、")}${tag(e)}`), "，") }) },
-    { label: tr("行業"), text: stop(J(adv.industries)) },
+    { label: tr("行業"), text: stop(JW(adv.industries)) },
     { label: tr("生活習慣"), text: stop(JP(adv.habits, "；")) },
   ];
   return section("advice", [para(base, zod)], items);

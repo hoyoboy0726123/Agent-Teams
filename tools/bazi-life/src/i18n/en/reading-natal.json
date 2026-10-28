@@ -991,11 +991,7 @@
    "外科": "surgery",
    "工程": "engineering",
    "業務開發": "business development",
-   "創業": "starting a business",
-   "財務": "finance",
-   "銀行": "banking",
    "貿易": "trade",
-   "投資": "investment",
    "學術": "academia",
    "文化出版": "culture and publishing",
    "醫藥": "medicine and pharmacy",
@@ -1005,7 +1001,6 @@
    "休閒觀光": "leisure and tourism",
    "表演": "performing",
    "科技研發": "technology R&D",
-   "顧問": "consulting",
    "技術專業": "technical professions",
    "運動": "sport",
    "醫療護理": "healthcare and nursing",
@@ -1029,7 +1024,12 @@
    "業務行銷": "sales and marketing",
    "媒體傳播": "media and communications",
    "旅遊觀光": "travel and tourism",
-   "水產飲品": "seafood and drinks"
+   "水產飲品": "seafood and drinks",
+   "創業（行業）": "starting a business",
+   "財務（行業）": "finance",
+   "銀行（行業）": "banking",
+   "投資（行業）": "investment",
+   "顧問（行業）": "consulting"
   },
   "terms": {
    "冬至": "Winter Solstice (Dongzhi)",
@@ -1111,7 +1111,6 @@
    "偏印透出奪食（梟神奪食）": "the Maverick shows and steals the Creator's food (the Owl Spirit stealing the food)",
    "傷官佩印": "the Rebel wearing the Nurturer's seal",
    "傷官生財": "the Rebel feeding Wealth",
-   "傷官見官": "the Rebel meeting Authority",
    "傷官透出剋官（傷官見官）": "the Rebel shows and attacks Authority (the Rebel meeting Authority)",
    "傷官駕殺": "the Rebel harnessing the Challenger",
    "制刃": "taming the Blade",
@@ -1142,7 +1141,6 @@
    "缺少透出的官殺或食傷來疏導": "no Authority, Challenger, Creator or Rebel in the stems to channel it",
    "財多身弱，力不從心": "too much Wealth for a weak Day Master, more than it can handle",
    "財旺生官": "strong Wealth feeding Authority",
-   "財星壞印": "Wealth spoiling the Nurturer",
    "財星得用": "Wealth put to good use",
    "財星生官": "Wealth feeding Authority",
    "財星生殺": "Wealth feeding the Challenger",
@@ -1157,7 +1155,9 @@
    "食傷洩秀": "the Creator and Rebel letting its talent out",
    "食傷生財": "the Creator and Rebel feeding Wealth",
    "食神制殺": "the Creator taming the Challenger",
-   "食神生財": "the Creator feeding Wealth"
+   "食神生財": "the Creator feeding Wealth",
+   "傷官見官（格局）": "the Rebel meeting Authority",
+   "財星壞印（格局）": "Wealth spoiling the Nurturer"
   }
  }
 }
