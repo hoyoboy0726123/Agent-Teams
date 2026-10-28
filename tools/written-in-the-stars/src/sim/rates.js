@@ -114,15 +114,15 @@ export const deathRaw = (age, sex, year) => lifeTable(sex, year)[Math.min(MAX, M
 // patients survive more often, and a regular health check lowers the fatality by a quarter (design). α and β are
 // solved so that the simulated diagnoses of 2019 (among people not already ill) reproduce the US registry
 // (us-rates.js CANCER_INCIDENCE, U.S. Cancer Statistics 2019–23, on the 2000 US standard population, US_STANDARD_2000):
-// the age-standardised rate of each sex exactly (men 490.4, women 428.9 per 100,000), β (shared) as the best fit to
-// the rates by age group (0–14 21 vs 16, 15–39 66 vs 77, 40–64 698 vs 549, 65–74 1,726 vs 1,795, 75+ 2,177 vs 2,277;
-// no single slope fits the middle ages better) and a median age at diagnosis of 66.8 (SEER: 67). That gives a
-// five-year survival of about 81 % after a diagnosis at 50, 73 % at 65 and 63 % at 80 (SEER's relative survival:
-// about 69 % overall). test/calibration.test.js checks the fit (us-rates.js CANCER_FATALITY would override it).
+// the age-standardised rate of each sex (men 490.4, women 428.9 per 100,000), β (shared) as the best fit to the rates
+// by age group (0–14 20 vs 16, 15–39 65 vs 77, 40–64 686 vs 549, 65–74 1,720 vs 1,795, 75+ 2,260 vs 2,277; no single
+// slope fits the middle ages better) and a median age at diagnosis of 67.1 (SEER: 67). That gives a five-year
+// survival of about 80 % after a diagnosis at 50, 73 % at 65 and 63 % at 80 (SEER's relative survival: about 69 %
+// overall). test/calibration.test.js checks the fit (us-rates.js CANCER_FATALITY would override it).
 export const WHO_STANDARD = [[0, 8.86], [5, 8.69], [10, 8.60], [15, 8.47], [20, 8.22], [25, 7.93], [30, 7.61], [35, 7.15], [40, 6.59], [45, 6.04], [50, 5.37], [55, 4.55], [60, 3.72], [65, 2.96], [70, 2.21], [75, 1.52], [80, 0.91], [85, 0.63]];
 export const CANCER_REFERENCE = D.CANCER_REFERENCE || null;
 const FATALITY = { cancer: [0.15, 0.1, 0.07, 0.05, 0.04], stroke: [0.17, 0.06, 0.05, 0.04, 0.04], "heart disease": [0.14, 0.05, 0.04, 0.04, 0.03] };
-export const CANCER_FATALITY = D.CANCER_FATALITY || { male: [-0.1694, 0.25], female: [-0.2011, 0.25] };   // [α, β]
+export const CANCER_FATALITY = D.CANCER_FATALITY || { male: [-0.133, 0.25], female: [-0.179, 0.25] };   // [α, β]
 const CAUSE = { cancer: "cancer", stroke: "stroke", "heart disease": "heart" };
 export const SERIOUS_TYPES = Object.keys(CAUSE);
 const CHECKUP_SHARE = 0.55;   // the share of people who keep up regular checkups from 40 (story/core.js `checkups`)
@@ -213,12 +213,13 @@ function solve(sex, year) {
   const key = `${sex}:${Math.round(year)}`;
   if (solved.has(key)) return solved.get(key);
   const Y = Math.round(year), q = lifeTable(sex, Y), n = q.length, T = SERIOUS_TYPES.length;
-  const base = new Float64Array(n), sudden = Array.from({ length: n }, () => new Float64Array(T));
+  const base = new Float64Array(n), healthy = new Float64Array(n), sudden = Array.from({ length: n }, () => new Float64Array(T));
   // Per diagnosis age: the type mix of diagnoses and the yearly fatality k years on, by type.
   const mix = [], fat = [];
   // pop[c][st]: c chronic 0/1; st 0 healthy, 1..5 ill in year st − 1 after the diagnosis, 6 the fifth year after it
   let pop = [[1, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]];
   for (let x = 0; x < n; x++) {
+    healthy[x] = pop[0][0] + pop[1][0];
     const w = SERIOUS_TYPES.map(t => incidence(t, x, sex, Y)), total = w.reduce((a, v) => a + v, 0), inc = Math.min(1, total);
     mix.push(w.map(v => (total ? v / total : 0)));
     fat.push(SERIOUS_TYPES.map(t => [0, 1, 2, 3, 4].map(k => fatality(t, k, x, sex, null))));
@@ -253,13 +254,16 @@ function solve(sex, year) {
     const alive = next[0].reduce((a, v) => a + v, 0) + next[1].reduce((a, v) => a + v, 0);
     pop = alive > 0 ? next.map(row => row.map(v => v / alive)) : next;
   }
-  const out = { base, sudden };
+  const out = { base, healthy, sudden };
   solved.set(key, out);
   return out;
 }
 const ageIndex = age => Math.min(MAX, Math.max(0, Math.round(age)));
 // The healthy baseline: what life.js uses each year, raised by chronic disease (CHRONIC_HR) and a serious illness.
 export const death = (age, sex, year) => solve(sex, year).base[ageIndex(age)];
+// New diagnoses per person a year, as a registry counts them: the chance of a diagnosis for someone not already ill
+// (incidence) times the share not already ill.
+export const diagnosisRate = (type, age, sex, year) => incidence(type, age, sex, year) * solve(sex, year).healthy[ageIndex(age)];
 // The cause of a death the illness did not cause (or of anyone's death without one): a serious type, or null for
 // any other cause. `u` is uniform in 0..1 (life.js passes the death's own draw, rescaled).
 export function suddenCause(age, sex, year, u) {
@@ -336,38 +340,38 @@ const EXPOSURE_YEARS = [1965, 1970, 1975, 1980, 1985, 1990, 1995, 2000, 2005, 20
 // BEGIN EXPOSURE (fitted)
 const EXPOSURE = {
   married: [
-    [0.0508, 0.529, 0.445, 0.236, 0.115, 0.0723, 0.0724],
-    [0.1024, 0.538, 0.445, 0.236, 0.115, 0.0723, 0.0724],
-    [0.1087, 0.5297, 0.4743, 0.236, 0.115, 0.0723, 0.0724],
-    [0.085, 0.5237, 0.4526, 0.2617, 0.115, 0.0723, 0.0724],
-    [0.0553, 0.4498, 0.4478, 0.2463, 0.1323, 0.0723, 0.0724],
-    [0.0461, 0.3892, 0.4334, 0.2498, 0.125, 0.0818, 0.0724],
-    [0.0372, 0.3317, 0.3912, 0.2492, 0.1172, 0.0776, 0.0769],
-    [0.0256, 0.2934, 0.3677, 0.2448, 0.1281, 0.0713, 0.0814],
-    [0.0235, 0.2627, 0.3684, 0.2386, 0.1236, 0.0763, 0.0746],
-    [0.0172, 0.233, 0.3528, 0.2492, 0.1216, 0.0759, 0.0762],
-    [0.012, 0.1945, 0.3678, 0.2652, 0.1255, 0.0775, 0.0864],
-    [0.0067, 0.1551, 0.3547, 0.2937, 0.1445, 0.0807, 0.0925],
-    [0.0051, 0.1179, 0.3381, 0.3139, 0.1755, 0.0923, 0.0943],
-    [0.0053, 0.1235, 0.3323, 0.3312, 0.1996, 0.1066, 0.1048],
-    [0.0052, 0.1325, 0.3456, 0.3351, 0.2144, 0.1362, 0.1378],
+    [0.101, 0.553, 0.48, 0.258, 0.119, 0.0741, 0.0742],
+    [0.101, 0.553, 0.48, 0.258, 0.119, 0.0741, 0.0742],
+    [0.104, 0.553, 0.48, 0.258, 0.119, 0.0741, 0.0742],
+    [0.0855, 0.542, 0.48, 0.258, 0.119, 0.0741, 0.0742],
+    [0.0597, 0.467, 0.463, 0.258, 0.119, 0.0741, 0.0742],
+    [0.0423, 0.381, 0.443, 0.262, 0.119, 0.0741, 0.0742],
+    [0.0342, 0.325, 0.416, 0.252, 0.118, 0.0741, 0.0742],
+    [0.0245, 0.3, 0.381, 0.253, 0.129, 0.0755, 0.0742],
+    [0.0235, 0.259, 0.362, 0.233, 0.123, 0.0783, 0.0776],
+    [0.0149, 0.234, 0.349, 0.236, 0.116, 0.0748, 0.0804],
+    [0.01, 0.193, 0.363, 0.26, 0.127, 0.0719, 0.0828],
+    [0.0067, 0.159, 0.354, 0.283, 0.144, 0.0799, 0.0897],
+    [0.005, 0.128, 0.345, 0.313, 0.173, 0.0947, 0.0937],
+    [0.0055, 0.126, 0.342, 0.334, 0.197, 0.111, 0.105],
+    [0.0051, 0.134, 0.349, 0.339, 0.216, 0.137, 0.137],
   ],
   partnered: [
-    [0.0432, 0.155, 0.106, 0.103, 0.0992, 0.0937, 0.0885],
-    [0.0819, 0.1431, 0.106, 0.103, 0.0992, 0.0937, 0.0885],
-    [0.0853, 0.1485, 0.1124, 0.103, 0.0992, 0.0937, 0.0885],
-    [0.0855, 0.1411, 0.1073, 0.0936, 0.0992, 0.0937, 0.0885],
-    [0.079, 0.1431, 0.1129, 0.0989, 0.087, 0.0937, 0.0885],
-    [0.0804, 0.1474, 0.1139, 0.0991, 0.0879, 0.0825, 0.0885],
-    [0.0796, 0.1653, 0.1172, 0.1046, 0.0884, 0.0921, 0.0753],
-    [0.0771, 0.1866, 0.1268, 0.1083, 0.098, 0.092, 0.0867],
-    [0.0738, 0.187, 0.1362, 0.1106, 0.0992, 0.0838, 0.0801],
-    [0.0662, 0.2036, 0.1445, 0.1233, 0.0983, 0.0907, 0.0782],
-    [0.0643, 0.2097, 0.1494, 0.1148, 0.1007, 0.0941, 0.0865],
-    [0.0507, 0.2158, 0.1532, 0.1125, 0.0927, 0.0877, 0.0866],
-    [0.0436, 0.2158, 0.1579, 0.1179, 0.0954, 0.0861, 0.0831],
-    [0.0448, 0.2066, 0.163, 0.1363, 0.1027, 0.0909, 0.0813],
-    [0.057, 0.2089, 0.1656, 0.1386, 0.1186, 0.1041, 0.094],
+    [0.0836, 0.153, 0.0995, 0.0882, 0.0842, 0.0866, 0.0775],
+    [0.0836, 0.153, 0.0995, 0.0882, 0.0842, 0.0866, 0.0775],
+    [0.0894, 0.153, 0.0995, 0.0882, 0.0842, 0.0866, 0.0775],
+    [0.0852, 0.142, 0.0995, 0.0882, 0.0842, 0.0866, 0.0775],
+    [0.0821, 0.136, 0.106, 0.0882, 0.0842, 0.0866, 0.0775],
+    [0.0795, 0.144, 0.113, 0.0916, 0.0842, 0.0866, 0.0775],
+    [0.0793, 0.169, 0.125, 0.102, 0.0847, 0.0866, 0.0775],
+    [0.0805, 0.185, 0.133, 0.104, 0.0967, 0.094, 0.0775],
+    [0.077, 0.193, 0.139, 0.117, 0.0985, 0.0901, 0.0761],
+    [0.0715, 0.199, 0.141, 0.119, 0.102, 0.0849, 0.0725],
+    [0.0621, 0.209, 0.146, 0.118, 0.103, 0.0959, 0.0796],
+    [0.0485, 0.207, 0.15, 0.118, 0.0958, 0.0922, 0.09],
+    [0.044, 0.214, 0.157, 0.124, 0.101, 0.0886, 0.0857],
+    [0.0454, 0.209, 0.163, 0.136, 0.113, 0.0828, 0.076],
+    [0.0539, 0.199, 0.165, 0.138, 0.117, 0.107, 0.0931],
   ],
 };
 // END EXPOSURE

@@ -26,6 +26,7 @@ import { extract } from "../scripts/extract-strings.mjs";
 const EN = fileURLToPath(new URL("../src/i18n/en/", import.meta.url));
 const TAIWAN = PLACE_GROUPS.filter(g => g.group.startsWith("臺灣・")).map(g => g.places[0]);
 const BROKEN = /[{}]|undefined|null|NaN|\[object/;
+const CJK_RUN = /[\u3000-\u303f\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]+/g;
 const EVENTS = [...CORE, ...WORK, deathEvent];
 const MINE = new Set(EVENTS.map(e => e.id));
 
@@ -225,14 +226,18 @@ test("whole English lives with written answers show no Chinese from these files"
       } else if (r < 0.45) life.autoChoose();
       else life.choose(rng.int(p.options.length));
     }
+    // The lines of these events, and every written answer (act.js): Chinese left in them may only be a value from
+    // another part of the story (a memory or a course from there), never a sentence, label or word of these files;
+    // nor may a job this life held (a shop of your own is "<shop>老闆").
     for (const e of life.log) {
       if (!MINE.has(e.id) && !e.free) continue;
       seen.add(e.id); if (e.free) freeLines.n++;
-      for (const t of [e.text, e.choice]) if (t && BROKEN.test(t)) broken.push(`${e.id}: ${t}`);
+      for (const t of [e.text, e.choice]) {
+        if (!t) continue;
+        if (BROKEN.test(t)) broken.push(`${e.id}: ${t}`);
+        for (const run of t.match(CJK_RUN) || []) if (ours.has(run)) missingOurs.add(`${e.id}: ${run} in ${t}`);
+      }
     }
-    // Chinese the reader saw that has no English: none of it may be a sentence, label or word of these files, nor a
-    // job this life held (a shop of your own is "<shop>老闆").
-    for (const m of en.missing) if (ours.has(m)) missingOurs.add(m);
     for (const j of life.state.jobsHeld) if (hasCJK(en.word(j.title))) missingOurs.add(j.title);
   }
   assert.deepEqual(broken.slice(0, 10), []);
