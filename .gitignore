@@ -4,3 +4,4 @@ data/
 *.db-*
 .env
 .openmontage/
+!tools/100-lives/src/data/
