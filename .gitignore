@@ -4,4 +4,4 @@ data/
 *.db-*
 .env
 .openmontage/
-!tools/100-lives/src/data/
+!tools/written-in-the-stars/src/data/

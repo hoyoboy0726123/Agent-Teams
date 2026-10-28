@@ -1,9 +1,9 @@
-# 100 Lives — plan
+# Written in the Stars — plan
 
-**100 Lives** is the Western-astrology sister of 命盤人生 (`../bazi-life`, live at https://bazi-life.mingpan.workers.dev).
+**Written in the Stars** (working title was "100 Lives", dropped: an existing life-sim game uses that name) is the Western-astrology sister of 命盤人生 (`../bazi-life`, live at https://bazi-life.mingpan.workers.dev).
 You enter a birth date, time and place, live a whole **American** life year by year (school, work, love, marriage,
 home, health), with the odds of each year tilted by your **Western birth chart** and calibrated on **US statistics**,
-then the same chart lives 99 more times: *is your life written in the stars, or just luck?*
+then the same chart lives 99 more times: *is your life written in the stars, or just luck? Live it 100 times.*
 
 It is a separate site (its own Worker and URL) built for the English-speaking market. It reuses the ideas and much of
 the engine of 命盤人生, copied here and adapted, not shared.

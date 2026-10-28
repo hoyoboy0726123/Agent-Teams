@@ -15,7 +15,7 @@ export function interpretPrompt({ situation, context = "", options = [], text, c
   const general = compact
     ? Object.entries(ACTIONS).map(([id, a]) => `${id} (${a.label})`).join(", ")
     : Object.entries(ACTIONS).map(([id, a]) => `- ${id}: ${a.desc}`).join("\n");
-  return `You read the player's choices for the life-simulation game "100 Lives". The player faces a decision in their simulated life and, instead of tapping a button, wrote what they want to do. Decide which action below their words are closest to.
+  return `You read the player's choices for the life-simulation game "Written in the Stars". The player faces a decision in their simulated life and, instead of tapping a button, wrote what they want to do. Decide which action below their words are closest to.
 
 Decision: ${situation}
 Protagonist: ${context || "(not given)"}

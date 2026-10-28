@@ -1,9 +1,9 @@
 {
-  "name": "100-lives",
+  "name": "written-in-the-stars",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "100 Lives: live a whole American life year by year, steered by your Western birth chart, then live it 99 more times.",
+  "description": "Written in the Stars: live a whole American life year by year, steered by your Western birth chart, then live it 99 more times.",
   "scripts": {
     "test": "node --test \"test/**/*.test.js\""
   },

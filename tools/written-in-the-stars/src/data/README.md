@@ -1,6 +1,6 @@
 # US base rates (`us-rates.js`)
 
-`us-rates.js` holds the US statistics behind 100 Lives. It is the US counterpart of
+`us-rates.js` holds the US statistics behind Written in the Stars. It is the US counterpart of
 `../bazi-life/src/sim/official-data.js` and of the Taiwan figures that `../bazi-life/src/sim/rates.js` keeps inline.
 The five tables `rates.js` imports (`LIFE_TABLES`, `CAUSE_AGES`, `CAUSE_SHARES`, `CHRONIC_AGES`, `CHRONIC_RATES`) keep
 the same names and shapes, so the ported `rates.js` can import this file unchanged. The other exports are US

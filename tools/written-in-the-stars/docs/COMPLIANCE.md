@@ -12,7 +12,7 @@ Research, not legal advice; consult a US lawyer before charging. Points marked â
 4. Analytics without cookies, localStorage IDs, fingerprinting or IP logging (then no EU consent banner and no COPPA trigger).
 5. Swiss Ephemeris only in test fixtures, never shipped; include the astronomy-engine MIT notice.
 6. **Name clearance: "100 Lives" is already a life-sim roguelike (Gamebook Entertainment / Tycoon Publishing, PC/Mac,
-   https://nodal.gg/game/100-lives-3864430).** Rename, or search USPTO classes 9 and 41 first.
+   https://nodal.gg/game/100-lives-3864430).** Renamed to **Written in the Stars**; still search USPTO classes 9 and 41 before charging.
 7. Basic WCAG 2.1 AA: keyboard, contrast, labels, alt text. No accessibility overlays.
 
 ## Before charging
