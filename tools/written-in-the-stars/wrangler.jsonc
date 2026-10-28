@@ -1,0 +1,27 @@
+// Written in the Stars on Cloudflare: one Worker (worker/index.js) serves the pages in public/, built into it as text,
+// plus /api/stats, /api/live and /admin. Deploy from this folder: npm run build && npx wrangler deploy.
+// Once, after the first deploy: npx wrangler secret put ADMIN_KEY (opens /admin#key=…).
+{
+  "name": "written-in-the-stars",
+  "account_id": "a535bb4f35cdac784e0806f0c58b4944",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  // The built pages are imported as text modules (static HTML, no asset upload).
+  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }],
+  // The anonymous counts (/api/stats): a page sends a few a minute. namespace_id must be unique in the account (bazi-life
+  // uses 4721–4723).
+  "ratelimits": [
+    { "name": "STATS_LIMIT", "namespace_id": "4731", "simple": { "limit": 60, "period": 60 } }
+  ],
+  // The daily totals for /admin and the welcome page's live numbers, in one SQLite-backed Durable Object
+  // (worker/stats-store.js).
+  "durable_objects": { "bindings": [{ "name": "STATS", "class_name": "StatsStore" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StatsStore"] }],
+  "vars": {
+    // "1": the welcome page's live numbers are demo numbers (plausible, growing through the day) with the real ones
+    // added on top, while the site is new. Remove to show only the real numbers.
+    "LIVE_DEMO": "1"
+  },
+  "observability": { "enabled": true }
+}

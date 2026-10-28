@@ -5,7 +5,9 @@
   "type": "module",
   "description": "Written in the Stars: live a whole American life year by year, steered by your Western birth chart, then live it 99 more times.",
   "scripts": {
-    "test": "node --test \"test/**/*.test.js\""
+    "test": "node --test \"test/**/*.test.js\"",
+    "build": "node scripts/build.mjs",
+    "e2e": "node test/site.e2e.mjs"
   },
   "dependencies": {
     "astronomy-engine": "^2.1.19"
