@@ -1,7 +1,7 @@
 {
   "_": "English for the ending (src/life-app.js: the 100-rerun cards, the chart, name and family cards, the K-line, the reasons in the story, the report's lede and the share card). Keys are the Chinese templates as written in the code (core/tr.js tr()).",
   "story": {
-    "{reasonPillar}年：{domainText}": "{reasonPillar} year: {domainText}",
+    "{reasonPillar}年：{domainText}": "The {reasonPillar} year: {domainText}",
     "命理：{chartWhy}": "BaZi: {chartWhy}",
     "為什麼在這個歲數": "Why at this age",
     "合盤：{familyWhy}": "Family charts: {familyWhy}",

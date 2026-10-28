@@ -391,8 +391,9 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 
 - 切到英文時，`life-app.js` 的 `ensureEnglish()` 抓 `/i18n/story-en.json`（Worker 提供，約 1 MB，壓縮後約 0.4 MB），之後開始的人生都用英文（`createLife({ lang: "en", english })`）；一段人生用它開始時的語言走完。抓不到時（直接開檔案、Claude Artifact 預覽）故事維持中文，旁邊那行說明（`#play-en-note`）才出現。
 - 英文人生的開頭一句（出生日期、地點、名字）、紀錄裡的「Your choice」、問題框的回顧和「your nature」標籤、結局的工作和名字，都由 `life-app.js` 用英文寫。
-- 英文人生**暫時不顯示**命理和合盤的說明（`命理：…`、`合盤：…`，`reading-year.js` 還是中文），也不提供「寫下你自己的決定」（比對玩家文字的 `intent.js` 是中文的）。
-- 還是中文的：八字命理詳批、同盤重跑和命盤的卡片、合婚和準爸媽的結果、分享圖；結局頁有一行說明。
+- **解讀也有英文**：本命詳批（`reading-natal.js`、`analysis.js`、`detail.js`）、大運流年和事件的命理說明（`reading-year.js`、`luck.js`）、綜合論斷、合婚和伴侶／家人合盤（`hehun.js`、`partner.js`、`family.js`）、姓名學（`name-*.js`）、準爸媽、結局頁的卡片、K 線、排盤表和分享圖。解讀的程式照舊寫中文，每一句經過 `src/core/tr.js` 的 `tr()`／`trw()`：中文模式就是原本的填空（`test/lang-readings.test.js` 記下 40 張命盤每一份解讀的指紋，一個字都不能變），英文模式查 `src/i18n/en/*.json`。結局時 `life-app.js` 的 `finish()` 呼叫 `setReadingLang(run.L)`；合婚分頁和準爸媽也各自設定。八字術語的英文統一在 `src/i18n/en/bazi-terms.json`（照 `src/i18n/glossary.md` 第一欄：Day Master、Useful Element、十神 Peer／Rival／Creator／Rebel／Steady Wealth／Windfall Wealth／Authority／Challenger／Nurturer／Maverick），第一次出現的術語在括號裡附中文。
+- 英文人生的「命理：」說明整句有英文才顯示；還沒有英文的就不顯示。
+- 還是中文的：AI 解讀的內容（AI 用中文寫）、「寫下你自己的決定」（英文人生不提供，比對玩家文字的 `intent.js` 是中文的）。
 
 **原則：引擎裡永遠是中文。** 狀態、抉擇、每一次亂數都和中文版一樣，英文只在「給人看的字」出口換掉，所以同一個 seed 在中英文是同一段人生（`test/lang.test.js` 檢查事件、年齡、心情、選項逐一相同）。中文模式完全不變：50 段固定 seed 的人生，和加上翻譯層之前記下的摘要逐字相同（`test/fixtures/zh-lives.json`）。
 

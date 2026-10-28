@@ -104,6 +104,7 @@ const plainEn = t => !/[\u3400-\u9fff]/.test(String(t).replace(/\([^()]{1,12}\)/
 const lastSlide = await busy.textContent("#story");
 check("the story recap's last slide is English", /You lived to \d+\./.test(lastSlide) && /See how this life ended/.test(lastSlide) && plainEn(lastSlide), lastSlide.slice(0, 160));
 await busy.click("#story .go");
+// The page's AI card is open here (the preview switch): its reading is the one part still in Chinese, and the note says so.
 check("the ending's headline and facts are English", /^This time, you lived to \d+\.$/.test(await busy.textContent("#end-title")) && /Education/.test(await busy.textContent("#end-facts")) && /Happiest yearAge \d+ \(\d{4}\)/.test(await busy.textContent("#end-facts")) && await busy.isVisible("#end-en-part") && await busy.isHidden("#end-en-note"));
 // The ending of an English life (life-app.js, report.js, reading-overall.js): the 100-rerun cards, the chart card, the
 // K-line and the report's frame are English; the readings inside the report come from their own files.

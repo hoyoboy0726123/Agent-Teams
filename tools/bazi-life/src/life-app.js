@@ -607,24 +607,24 @@ function finish() {
   // The welcome page's 剛剛走完的人生: the decade, the day stem, the age and three big things; nothing that points back.
   sendLife({ decade: decadeOf(input.date.y), stem: chart.dayMaster.name, age: s.age, married: s.marriages, home: s.home === "own", kids: s.kids.length });
   $("#end").hidden = false;
-  endNotes();
   drawKline();
   drawTable();
   drawCards();
   drawPersonal();
   drawReport();
   drawAI();
+  endNotes();
   drawShare(peak);
   $("#end").scrollIntoView({ block: "start" });
   openStory(s, age => luckAt(prep, age), () => { $("#end").scrollIntoView({ block: "start" }); $("#end-title").focus({ preventScroll: true }); });
 }
 
-// The ending's en-notes: a life lived in Chinese on the English page has its cards and reading in Chinese; an English
-// life says what of it is still Chinese.
+// The ending's en-notes: a life lived in Chinese on the English page has its cards and reading in Chinese; in an English
+// life only the AI reading is still Chinese (the AI writes Chinese), said when that card is offered.
 function endNotes() {
   const en = lang() === "en";
   $("#end-en-note").hidden = !(en && run && !run.L);
-  $("#end-en-part").hidden = !(en && run && run.L);
+  $("#end-en-part").hidden = !(en && run && run.L && !$("#ai").hidden && !aiOff());
 }
 
 function drawKline() {
