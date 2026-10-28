@@ -51,7 +51,10 @@ export function setLang(l) {
 // no English for it.
 export function t(zh, vars) {
   let s = current === "en" && Object.hasOwn(EN, zh) ? EN[zh] : zh;
-  if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
+  if (!vars) return s;
+  // {n:child:children}: the first word when n is 1, else the second.
+  s = s.replace(/\{(\w+):([^:}]*):([^}]*)\}/g, (all, k, one, many) => (Object.hasOwn(vars, k) ? (Number(vars[k]) === 1 ? one : many) : all));
+  for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
   return s;
 }
 
