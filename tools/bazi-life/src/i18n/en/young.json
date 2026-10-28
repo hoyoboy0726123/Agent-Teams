@@ -1819,7 +1819,10 @@
     "你主動把大學同學會辦了起來，{訂了一間熱炒店，|請了以前的導師一起來，}{來了二十幾個人，|大家一個拉一個地出現，}{熱鬧得像回到了大一。|老師說你們都長大了。}": "You organised the university reunion yourself, {booking a stir-fry restaurant.|inviting your old tutor along.} {Over twenty people came,|People turned up one after another, bringing others with them,} {and it felt like first year all over again.|and your tutor said you had all grown up.}",
     "只約幾個最好的朋友": "Just meet a few close friends",
     "人少比較能聊": "Fewer people, better talk",
-    "大學同學會人太多，你只約了{f}幾個最好的朋友吃飯，{聊到餐廳打烊。|聊彼此的工作和感情，像回到宿舍的夜晚。}": "The reunion was too big, so you just had dinner with {f} and a few of your closest friends, {and talked until the restaurant closed.|talking about work and love, like nights back in the dorm.}"
+    "大學同學會人太多，你只約了{f}幾個最好的朋友吃飯，{聊到餐廳打烊。|聊彼此的工作和感情，像回到宿舍的夜晚。}": "The reunion was too big, so you just had dinner with {f} and a few of your closest friends, {and talked until the restaurant closed.|talking about work and love, like nights back in the dorm.}",
+    "{host}拉你去聽{item}的說明會，": "When {host} dragged you along to a sales talk on {item},",
+    "{host}拉你去聽{item}的說明會，說去聽聽就好，還有送贈品。要怎麼辦？": "{host:cap} dragged you along to a sales talk on {item}, saying you need only listen, and there were free gifts. What do you do?",
+    "對方{done}": "the recruiter{done}"
   },
   "words": {
     "young": {
@@ -2252,7 +2255,8 @@
       "班代在 LINE 群組上發起同學會": "your class rep started a reunion in the LINE group",
       "班代在臉書上發起同學會": "your class rep set up a reunion on Facebook",
       "班代寄了 email，約大家開同學會": "your class rep emailed everyone about a reunion",
-      "班代一個一個打電話，約大家開同學會": "your class rep rang round everyone, one by one, to arrange a reunion"
+      "班代一個一個打電話，約大家開同學會": "your class rep rang round everyone, one by one, to arrange a reunion",
+      "民歌社": "folk-song club"
     }
   }
 }

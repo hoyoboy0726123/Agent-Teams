@@ -2040,9 +2040,10 @@ export const YOUNG = [
       const item = ctx.rng.pick(y >= 2014 ? ["面膜", "保健食品", "咖啡"] : ["保健食品", "清潔用品", "保養品", ...(y >= 1995 ? ["淨水器"] : [])]);
       const f = k === "coffee" || k === "online" ? friendOf(s, ctx, { prefer: /國小|國中|高中|高職/, how: ctx.rng.pick(["國中同學", "高中同學"]) }) : null;
       // Someone the story names by who they are to you (同事, 阿姨) is "your co-worker" in English: {yourRole}. (學長 is
-      // "an older schoolmate" on its own.)
+      // "an older schoolmate" on its own. The stranger at the school gate, 對方, is "the recruiter"; {done} is empty and
+      // gives it a key of its own, since the word 對方 alone is "they".)
       const role = k === "seminar" ? (work ? "同事" : "學長") : k === "relative" ? ctx.rng.pick(["阿姨", "表姊", "舅媽"]) : null;
-      const host = f ? f.call : role === "學長" ? role : role ? ctx.f("{yourRole}", { yourRole: role }) : "對方", campus = k === "campus";
+      const host = f ? f.call : role === "學長" ? role : role ? ctx.f("{yourRole}", { yourRole: role }) : ctx.f("對方{done}", { done: "" }), campus = k === "campus";
       const event = y >= 2012 ? "財富自由講座" : "成功人士分享會";
       const intro = f && friendIntro(f, ctx), fta = f && pronoun(f);
       const S = {

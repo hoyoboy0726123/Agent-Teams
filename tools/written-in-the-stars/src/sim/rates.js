@@ -43,7 +43,9 @@ const MAX = 120;
 const OPEN = LIFE_TABLES[0][1].length;
 const FIRST = LIFE_TABLES[0][0], LAST = LIFE_TABLES[LIFE_TABLES.length - 1][0];
 export const LATEST_TABLE_YEAR = LAST;
-export const E0_PROJECTION = D.E0_PROJECTION || { year: 2070, male: 82.4, female: 86.3 };
+// us-rates.js gives the projection as rows [year, male, female]; its last row is the target here.
+const E0_ROWS = Array.isArray(D.E0_PROJECTION) ? D.E0_PROJECTION : null;
+export const E0_PROJECTION = E0_ROWS ? { year: E0_ROWS.at(-1)[0], male: E0_ROWS.at(-1)[1], female: E0_ROWS.at(-1)[2] } : D.E0_PROJECTION || { year: 2070, male: 82.4, female: 86.3 };
 const COLUMN = { male: 1, female: 2 };
 
 export function expectancy(q) {
