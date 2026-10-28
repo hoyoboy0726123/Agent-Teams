@@ -30,6 +30,7 @@ import { trait } from "./sim/words.js";
 import { initBaby } from "./baby-app.js";
 import { initMatch, onMatchTab, openMatch } from "./hehun-app.js";
 import { aiSoon } from "./ai-mode.js";
+import { initI18n, lang, t } from "./i18n.js";
 import { initStats, track, trackOnce, sendLife, heartbeat, LIVE_URL } from "./stats.js";
 import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
@@ -141,6 +142,9 @@ function setup() {
   $("#again-same").addEventListener("click", () => begin(run.input, run.born, run.extra));
   $("#again-new").addEventListener("click", () => { stop(); $("#end").hidden = true; $("#play").hidden = true; $("#setup").hidden = false; $("#setup").scrollIntoView({ behavior: "smooth", block: "start" }); });
   window.addEventListener("resize", () => { if (run && run.summary && !$("#end").hidden) drawKline(); });
+  // 中／英: the page's own words swap by themselves (i18n.js); the welcome lines built here are drawn again.
+  initI18n();
+  document.addEventListener("langchange", () => { drawNow(); if (lastLive) drawLive(lastLive); });
 }
 
 const TABS = ["welcome", "me", "random", "baby", "match"];
@@ -1077,7 +1081,9 @@ async function loadLive() {
   try { const r = await fetch(LIVE_URL, { cache: "no-store" }); if (!r.ok) return; d = await r.json(); } catch { return; }
   drawLive(d);
 }
+let lastLive = null;
 function drawLive(d) {
+  lastLive = d;
   const strip = $("#live-strip");
   strip.hidden = !(d.total >= 1);
   if (!strip.hidden) {
@@ -1086,21 +1092,23 @@ function drawLive(d) {
     $("#live-now-box").hidden = !more; $("#live-today-box").hidden = !more;
     if (more) { $("#live-now").textContent = n0(d.nowPlaying); $("#live-today").textContent = n0(d.today); }
   }
-  const t = d.todayLives, today = $("#live-day");
-  today.hidden = !t;
-  if (t) {
-    $("#live-avg").textContent = `${t.avgAge} 歲`; $("#live-max").textContent = `${t.maxAge} 歲`;
-    $("#live-married").textContent = `${t.married}%`; $("#live-home").textContent = `${t.home}%`;
-    const max = Math.max(1, ...Object.values(t.elements || {}));
-    $("#live-elements").innerHTML = ["木", "火", "土", "金", "水"].map(e => `<div class="bar" style="--h:${Math.round(((t.elements || {})[e] || 0) / max * 100)}%; --c:${ELEMENT_COLOR[e]}"><i></i><span>${e}</span></div>`).join("");
-    $("#live-day-n").textContent = `今天 ${n0(t.n)} 段人生`;
+  const tl = d.todayLives, today = $("#live-day");
+  today.hidden = !tl;
+  if (tl) {
+    $("#live-avg").textContent = `${tl.avgAge} 歲`; $("#live-max").textContent = `${tl.maxAge} 歲`;
+    $("#live-married").textContent = `${tl.married}%`; $("#live-home").textContent = `${tl.home}%`;
+    const max = Math.max(1, ...Object.values(tl.elements || {}));
+    $("#live-elements").innerHTML = ["木", "火", "土", "金", "水"].map(e => `<div class="bar" style="--h:${Math.round(((tl.elements || {})[e] || 0) / max * 100)}%; --c:${ELEMENT_COLOR[e]}"><i></i><span>${e}</span></div>`).join("");
+    $("#live-day-n").textContent = `今天 ${n0(tl.n)} 段人生`;
   }
   const recent = $("#live-recent");
   recent.hidden = !(d.recent && d.recent.length);
+  const comma = lang() === "en" ? ", " : "，";
   if (!recent.hidden) $("#live-recent-list").innerHTML = d.recent.map(l => {
-    const things = [l.married ? `結了 ${l.married} 次婚` : "沒有結婚", l.home ? "買了房" : "", l.kids ? `有 ${l.kids} 個孩子` : ""].filter(Boolean);
+    const things = [l.married ? t("結了 {n} 次婚", { n: l.married }) : t("沒有結婚"), l.home ? t("買了房").toLowerCase() : "", l.kids ? t("有 {n} 個孩子", { n: l.kids }) : ""].filter(Boolean);
     const el = ELEMENT_OF[l.stem] || "土";
-    return `<li><span class="stem" style="background:${ELEMENT_COLOR[el]}">${esc(l.stem)}</span><span><b>${esc(l.decade)}、${esc(l.stem)}${el}日主</b>，活到 ${l.age} 歲，${esc(things.join("，"))}<small>${l.ago < 1 ? "剛剛" : l.ago < 60 ? `${l.ago} 分鐘前` : l.ago < 1440 ? `${Math.floor(l.ago / 60)} 小時前` : `${Math.floor(l.ago / 1440)} 天前`}</small></span></li>`;
+    const ago = l.ago < 1 ? t("剛剛") : l.ago < 60 ? t("{n} 分鐘前", { n: l.ago }) : l.ago < 1440 ? t("{n} 小時前", { n: Math.floor(l.ago / 60) }) : t("{n} 天前", { n: Math.floor(l.ago / 1440) });
+    return `<li><span class="stem" style="background:${ELEMENT_COLOR[el]}">${esc(l.stem)}</span><span><b>${esc(t("{decade}、{stem}{el}日主", { decade: t(l.decade), stem: l.stem, el: t(el) }))}</b>${comma}${esc(t("活到 {n} 歲", { n: l.age }))}${comma}${esc(things.join(comma))}<small>${esc(ago)}</small></span></li>`;
   }).join("");
 }
 // 此刻出生的寶寶 in Taipei, by the clock (no true-solar correction: the point is the moment, not a real birth).
@@ -1112,10 +1120,10 @@ function drawNow() {
   let p;
   try { p = fourPillars({ date, time, place: findPlace("臺北市"), options: { solar: "clock" } }); } catch { box.hidden = true; return; }
   box.hidden = false;
-  const stem = p.day[0], t = DAY_MASTER_TEXT[stem] || {};
+  const stem = p.day[0], dt = DAY_MASTER_TEXT[stem] || {};
   $("#now-clock").textContent = `臺北 ${String(time.h).padStart(2, "0")}:${String(time.mi).padStart(2, "0")}`;
   for (const [k, id] of [["year", "now-y"], ["month", "now-m"], ["day", "now-d"], ["hour", "now-h"]]) $(`#${id}`).textContent = p[k];
-  $("#now-text").textContent = `${stem}${ELEMENT_OF[stem]}日主，如${t.image || ""}：${(t.nature || "").split("，").slice(0, 2).join("，")}。時柱每兩小時換一次，日主每天換一個。`;
+  $("#now-text").textContent = t("{stem}{el}日主，如{image}：{nature}。時柱每兩小時換一次，日主每天換一個。", { stem, el: t(ELEMENT_OF[stem]), image: dt.image || "", nature: (dt.nature || "").split("，").slice(0, 2).join("，") });
 }
 
 setup();

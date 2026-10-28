@@ -76,6 +76,12 @@ header { display: grid; gap: 10px; }
 .rt-ticks .lg { stroke: rgba(246, 241, 231, 0.42); stroke-width: 1.5; }
 .rt-branches text { fill: rgba(246, 241, 231, 0.38); font-family: var(--display); font-size: 13px; text-anchor: middle; dominant-baseline: central; }
 .rt-branches { transform-origin: 180px 180px; }
+.lang-toggle { position: absolute; top: 14px; right: 14px; z-index: 2; min-width: 52px; height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(238, 241, 240, 0.35); background: rgba(20, 26, 36, 0.72); color: #eef1f0; font: 600 14px/1 system-ui, sans-serif; letter-spacing: 0.06em; cursor: pointer; backdrop-filter: blur(4px); }
+.lang-toggle:hover { border-color: #93b2ea; color: #fff; }
+.lang-toggle:focus-visible { outline: 2px solid #93b2ea; outline-offset: 2px; }
+.en-note { font-size: 13px; color: var(--muted); border-left: 3px solid var(--rule); padding: 4px 10px; margin: 8px 0; }
+.en-note[hidden] { display: none; }
+html[lang="en"] .masthead h1 { letter-spacing: 0.02em; margin-right: 0; font-size: clamp(44px, 12vw, 84px); }
 @media (min-width: 600px) { .masthead { padding: 34px 32px 28px; } .mast-reticle { right: -90px; top: -120px; width: 400px; height: 400px; } .rt-branches { display: block; } .masthead h1 { letter-spacing: 0.14em; } .seal { width: 54px; height: 54px; font-size: 32px; margin-bottom: 14px; } }
 @media (prefers-reduced-motion: no-preference) { .rt-rings .dash { animation: spin 120s linear infinite; } .rt-branches { animation: spin 240s linear infinite; } }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -599,6 +605,7 @@ footer a { color: var(--indigo); }
 
 <div class="wrap">
   <header class="masthead">
+    <button type="button" class="lang-toggle" id="lang-toggle" lang="en" aria-label="Switch to English">EN</button>
     <svg class="mast-reticle" viewBox="0 0 360 360" aria-hidden="true" focusable="false">
       <g class="rt-ticks"><line x1="180.0" y1="40.0" x2="180.0" y2="30.0" class="lg"/><line x1="195.2" y1="35.8" x2="195.7" y2="30.8"/><line x1="210.1" y1="38.2" x2="211.2" y2="33.3"/><line x1="224.8" y1="42.1" x2="226.4" y2="37.3"/><line x1="239.0" y1="47.5" x2="241.0" y2="43.0"/><line x1="250.0" y1="58.8" x2="255.0" y2="50.1" class="lg"/><line x1="265.2" y1="62.7" x2="268.2" y2="58.6"/><line x1="277.0" y1="72.2" x2="280.4" y2="68.5"/><line x1="287.8" y1="83.0" x2="291.5" y2="79.6"/><line x1="297.3" y1="94.8" x2="301.4" y2="91.8"/><line x1="301.2" y1="110.0" x2="309.9" y2="105.0" class="lg"/><line x1="312.5" y1="121.0" x2="317.0" y2="119.0"/><line x1="317.9" y1="135.2" x2="322.7" y2="133.6"/><line x1="321.8" y1="149.9" x2="326.7" y2="148.8"/><line x1="324.2" y1="164.8" x2="329.2" y2="164.3"/><line x1="320.0" y1="180.0" x2="330.0" y2="180.0" class="lg"/><line x1="324.2" y1="195.2" x2="329.2" y2="195.7"/><line x1="321.8" y1="210.1" x2="326.7" y2="211.2"/><line x1="317.9" y1="224.8" x2="322.7" y2="226.4"/><line x1="312.5" y1="239.0" x2="317.0" y2="241.0"/><line x1="301.2" y1="250.0" x2="309.9" y2="255.0" class="lg"/><line x1="297.3" y1="265.2" x2="301.4" y2="268.2"/><line x1="287.8" y1="277.0" x2="291.5" y2="280.4"/><line x1="277.0" y1="287.8" x2="280.4" y2="291.5"/><line x1="265.2" y1="297.3" x2="268.2" y2="301.4"/><line x1="250.0" y1="301.2" x2="255.0" y2="309.9" class="lg"/><line x1="239.0" y1="312.5" x2="241.0" y2="317.0"/><line x1="224.8" y1="317.9" x2="226.4" y2="322.7"/><line x1="210.1" y1="321.8" x2="211.2" y2="326.7"/><line x1="195.2" y1="324.2" x2="195.7" y2="329.2"/><line x1="180.0" y1="320.0" x2="180.0" y2="330.0" class="lg"/><line x1="164.8" y1="324.2" x2="164.3" y2="329.2"/><line x1="149.9" y1="321.8" x2="148.8" y2="326.7"/><line x1="135.2" y1="317.9" x2="133.6" y2="322.7"/><line x1="121.0" y1="312.5" x2="119.0" y2="317.0"/><line x1="110.0" y1="301.2" x2="105.0" y2="309.9" class="lg"/><line x1="94.8" y1="297.3" x2="91.8" y2="301.4"/><line x1="83.0" y1="287.8" x2="79.6" y2="291.5"/><line x1="72.2" y1="277.0" x2="68.5" y2="280.4"/><line x1="62.7" y1="265.2" x2="58.6" y2="268.2"/><line x1="58.8" y1="250.0" x2="50.1" y2="255.0" class="lg"/><line x1="47.5" y1="239.0" x2="43.0" y2="241.0"/><line x1="42.1" y1="224.8" x2="37.3" y2="226.4"/><line x1="38.2" y1="210.1" x2="33.3" y2="211.2"/><line x1="35.8" y1="195.2" x2="30.8" y2="195.7"/><line x1="40.0" y1="180.0" x2="30.0" y2="180.0" class="lg"/><line x1="35.8" y1="164.8" x2="30.8" y2="164.3"/><line x1="38.2" y1="149.9" x2="33.3" y2="148.8"/><line x1="42.1" y1="135.2" x2="37.3" y2="133.6"/><line x1="47.5" y1="121.0" x2="43.0" y2="119.0"/><line x1="58.8" y1="110.0" x2="50.1" y2="105.0" class="lg"/><line x1="62.7" y1="94.8" x2="58.6" y2="91.8"/><line x1="72.2" y1="83.0" x2="68.5" y2="79.6"/><line x1="83.0" y1="72.2" x2="79.6" y2="68.5"/><line x1="94.8" y1="62.7" x2="91.8" y2="58.6"/><line x1="110.0" y1="58.8" x2="105.0" y2="50.1" class="lg"/><line x1="121.0" y1="47.5" x2="119.0" y2="43.0"/><line x1="135.2" y1="42.1" x2="133.6" y2="37.3"/><line x1="149.9" y1="38.2" x2="148.8" y2="33.3"/><line x1="164.8" y1="35.8" x2="164.3" y2="30.8"/></g>
       <g class="rt-rings"><circle cx="180" cy="180" r="160"/><circle cx="180" cy="180" r="106" class="dash"/><circle cx="180" cy="180" r="62" class="red"/><circle cx="180" cy="180" r="4" class="dot"/></g>
@@ -649,7 +656,7 @@ footer a { color: var(--indigo); }
           <div class="dm"><small>日柱</small><b id="now-d"></b></div>
           <div><small>時柱</small><b id="now-h"></b></div>
         </div>
-        <p id="now-text"></p>
+        <p id="now-text" data-no-i18n></p>
       </div>
       <div class="welcome-go">
         <button type="button" class="primary big" data-goto="me">輸入生日，開始我的人生</button>
@@ -658,7 +665,7 @@ footer a { color: var(--indigo); }
       <p class="privacy-pill"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg>免費、不用註冊。資料在你的手機裡計算，網站不保存</p>
       <section id="live-recent" hidden>
         <h3>剛剛走完的人生 <small>匿名，只留下大事</small></h3>
-        <ul class="recent" id="live-recent-list"></ul>
+        <ul class="recent" id="live-recent-list" data-no-i18n></ul>
       </section>
       <section id="live-day" hidden>
         <h3>今天大家活得怎麼樣 <small id="live-day-n"></small></h3>
@@ -889,19 +896,21 @@ footer a { color: var(--indigo); }
   </section>
 
   <section class="panel" id="baby" hidden aria-label="準爸媽模式的比較">
-    <div class="report-head"><h2>寶寶的名字比較</h2><p class="lede" id="baby-lede"></p></div>
+    <p class="en-note" hidden>名字比較的解說目前是中文，英文版正在準備中。</p>
+    <div class="report-head"><h2>寶寶的名字比較</h2><p class="lede" id="baby-lede" data-no-i18n></p></div>
     <canvas class="pixel baby-scene" id="baby-scene" width="128" height="44" aria-hidden="true"></canvas>
-    <div id="baby-chart"></div>
+    <div id="baby-chart" data-no-i18n></div>
     <p class="fine" id="baby-progress" aria-live="polite"></p>
-    <div class="name-cards" id="baby-names"></div>
-    <div id="baby-advice"></div>
-    <div id="baby-parents"></div>
-    <div id="baby-slots"></div>
-    <div id="baby-report"></div>
+    <div class="name-cards" id="baby-names" data-no-i18n></div>
+    <div id="baby-advice" data-no-i18n></div>
+    <div id="baby-parents" data-no-i18n></div>
+    <div id="baby-slots" data-no-i18n></div>
+    <div id="baby-report" data-no-i18n></div>
   </section>
 
   <section class="panel match-result" id="match" hidden aria-label="合婚結果">
-    <div id="hh-body"></div>
+    <p class="en-note" hidden>合婚的解說目前是中文，英文版正在準備中。</p>
+    <div id="hh-body" data-no-i18n></div>
     <div class="report ai" id="hh-soon" hidden>
       <div class="report-head"><h3>AI 深度合婚</h3><p class="lede">AI 命理師讀你們兩個人的命盤，寫成白話長文：合婚總評、兩個人的個性、相處的優點、容易摩擦的地方、給你們的建議，以及接下來十年每一年的感情。</p></div>
       <div class="ai-go"><button type="button" class="primary" id="hh-soon-btn">AI 深度合婚</button></div>
@@ -912,7 +921,7 @@ footer a { color: var(--indigo); }
       <p class="fine" id="hh-ai-consent">按下按鈕，會把兩個人的出生日期、時間、出生地和性別送到伺服器，交給 AI 寫解讀。不含暱稱，寫完不保存。</p>
       <div class="ai-go" id="hh-ai-go"><button type="button" class="primary" id="hh-ai-btn">AI 深度合婚</button></div>
       <p class="ai-status" id="hh-ai-status" role="status" aria-live="polite"></p>
-      <div class="ai-body" id="hh-ai-body"></div>
+      <div class="ai-body" id="hh-ai-body" data-no-i18n></div>
     </div>
     <section class="hh-life-box" id="hh-life-box" aria-labelledby="hh-life-title">
       <h3 id="hh-life-title">用這對伴侶過一生</h3>
@@ -954,9 +963,10 @@ footer a { color: var(--indigo); }
       </div>
     </div>
     <p class="ai-auto" id="c-ai-wrap"><label class="major"><input type="checkbox" id="c-ai" checked> 結局自動 AI 解讀</label><span>打勾時，走完一生會自動把出生日期、時間、出生地和性別送給 AI 命理師寫解讀（不含姓名和家人，寫完不保存）。</span></p>
-    <p class="born" id="born"></p>
-    <ol class="feed" id="feed"></ol>
-    <div class="choice" id="choice" hidden></div>
+    <p class="en-note" hidden>人生故事和命理詳批目前是中文，英文版正在準備中。</p>
+    <p class="born" id="born" data-no-i18n></p>
+    <ol class="feed" id="feed" data-no-i18n></ol>
+    <div class="choice" id="choice" data-no-i18n hidden></div>
   </section>
 
   <section id="end" hidden aria-label="結局">
@@ -964,6 +974,7 @@ footer a { color: var(--indigo); }
       <h2 id="end-title" tabindex="-1"></h2>
       <p id="end-sub"></p>
     </div>
+    <p class="en-note" hidden>人生故事和命理詳批目前是中文，英文版正在準備中。</p>
     <dl class="facts" id="end-facts"></dl>
 
     <div class="chartbox">
@@ -980,12 +991,12 @@ footer a { color: var(--indigo); }
 
     <div class="runs">
       <div><h3>同盤重跑 100 次</h3><p class="lede">同一張命盤再過 100 次人生。每一次的抉擇和運氣都不同，下面是這 100 次裡發生的次數。</p></div>
-      <div class="cards" id="cards"></div>
+      <div class="cards" id="cards" data-no-i18n></div>
     </div>
 
     <div class="runs" id="personal" hidden>
       <div><h3 id="personal-title">命盤、名字和家人</h3><p class="lede" id="personal-lede">命盤、姓名學和家人合盤，在這一生裡怎麼出現。</p></div>
-      <div class="cards" id="personal-cards"></div>
+      <div class="cards" id="personal-cards" data-no-i18n></div>
     </div>
 
     <div class="report ai" id="ai-soon" hidden>
@@ -1013,15 +1024,15 @@ footer a { color: var(--indigo); }
         <div class="ai-go"><button type="button" class="secondary" id="ai-match-go">看合婚解讀</button><button type="button" class="secondary" id="ai-match-tab">到「合婚」分頁看完整合婚</button></div>
       </details>
       <p class="ai-status"><span id="ai-status" role="status" aria-live="polite"></span><span id="ai-secs" aria-hidden="true"></span></p>
-      <div class="ai-body" id="ai-body"></div>
+      <div class="ai-body" id="ai-body" data-no-i18n></div>
     </div>
 
     <div class="report" id="report" hidden>
-      <div class="report-head"><h3>八字命理詳批</h3><p class="lede" id="report-lede"></p></div>
-      <div id="report-body"></div>
+      <div class="report-head"><h3>八字命理詳批</h3><p class="lede" id="report-lede" data-no-i18n></p></div>
+      <div id="report-body" data-no-i18n></div>
     </div>
 
-    <div class="share" id="share"></div>
+    <div class="share" id="share" data-no-i18n></div>
     <div class="again">
       <button type="button" class="primary" id="again-same">同一張命盤，再活一次</button>
       <button type="button" class="secondary" id="again-new">換一個人</button>
@@ -1034,6 +1045,6 @@ footer a { color: var(--indigo); }
     <p><a id="chart-link" href="__CHART_URL__">看完整命盤（排盤引擎）</a></p>
   </footer>
 </div>
-<div class="story" id="story" hidden role="dialog" aria-modal="true" aria-label="人生回顧" tabindex="-1"></div>
+<div class="story" id="story" data-no-i18n hidden role="dialog" aria-modal="true" aria-label="人生回顧" tabindex="-1"></div>
 
 <script id="app">/*__APP__*/</script>
