@@ -224,7 +224,7 @@
   "結婚": "Wedding",
   "成家": "Family",
   "退休": "Retirement",
-  "人生故事和命理詳批目前是中文，英文版正在準備中。": "The life story and the readings are in Chinese for now; English is on its way.",
+  "人生故事和命理詳批目前是中文，英文版正在準備中。": "The life story is in Chinese here (English needs the live site); the readings are in Chinese for now.",
   "{n} 歲": "Age {n}",
   "{y} 年": "{y}",
   "這一次，你活到 {n} 歲。": "This time, you lived to {n}.",
@@ -308,5 +308,6 @@
   "略過": "Skip",
   "點一下畫面繼續": "Tap to continue",
   "同一張命盤再過 100 次，會走出哪些不同的路？": "Live the same chart 100 more times: which other paths appear?",
-  "看這一生的結局": "See how this life ended"
+  "看這一生的結局": "See how this life ended",
+  "命理詳批和結果卡片目前是中文，英文版正在準備中。": "The BaZi reading and the result cards are in Chinese for now; English is on its way."
 }

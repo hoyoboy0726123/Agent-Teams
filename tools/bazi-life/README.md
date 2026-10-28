@@ -387,7 +387,12 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 
 ### 英文版（翻譯層）
 
-給新加坡、馬來西亞、菲律賓和海外華人讀者的英文版：故事和詳批也要能變成英文。目前做好的是翻譯層和一個試點檔案（`src/sim/story/era.js`，42 個時代事件全部有英文）；網頁還沒有接上，故事容器仍標著 `data-no-i18n`，等故事都翻完再接。
+給新加坡、馬來西亞、菲律賓和海外華人讀者的英文版：故事和詳批也要能變成英文。**人生故事已經全部有英文**（9 個故事檔、`act.js`/`actions.js`/`monte.js` 的句子，共約 9,200 句、1,100 個詞，`src/i18n/en/*.json`），網頁也接上了：
+
+- 切到英文時，`life-app.js` 的 `ensureEnglish()` 抓 `/i18n/story-en.json`（Worker 提供，約 1 MB，壓縮後約 0.4 MB），之後開始的人生都用英文（`createLife({ lang: "en", english })`）；一段人生用它開始時的語言走完。抓不到時（直接開檔案、Claude Artifact 預覽）故事維持中文，旁邊那行說明（`#play-en-note`）才出現。
+- 英文人生的開頭一句（出生日期、地點、名字）、紀錄裡的「Your choice」、問題框的回顧和「your nature」標籤、結局的工作和名字，都由 `life-app.js` 用英文寫。
+- 英文人生**暫時不顯示**命理和合盤的說明（`命理：…`、`合盤：…`，`reading-year.js` 還是中文），也不提供「寫下你自己的決定」（比對玩家文字的 `intent.js` 是中文的）。
+- 還是中文的：八字命理詳批、同盤重跑和命盤的卡片、合婚和準爸媽的結果、分享圖；結局頁有一行說明。
 
 **原則：引擎裡永遠是中文。** 狀態、抉擇、每一次亂數都和中文版一樣，英文只在「給人看的字」出口換掉，所以同一個 seed 在中英文是同一段人生（`test/lang.test.js` 檢查事件、年齡、心情、選項逐一相同）。中文模式完全不變：50 段固定 seed 的人生，和加上翻譯層之前記下的摘要逐字相同（`test/fixtures/zh-lives.json`）。
 

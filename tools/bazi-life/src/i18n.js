@@ -116,7 +116,7 @@ export function applyLang(root = document.body) {
   document.documentElement.lang = en ? "en" : "zh-Hant-TW";
   const title = document.querySelector("title");
   if (title) { const s = memo.get(title) || { zh: title.textContent }; memo.set(title, s); title.textContent = en ? english(s.zh.trim()) || s.zh : s.zh; }
-  for (const n of document.querySelectorAll(".en-note")) n.hidden = !en;
+  for (const n of document.querySelectorAll(".en-note:not(.en-note-story)")) n.hidden = !en;   // .en-note-story: life-app.js decides (only when the English story is not there)
   const b = document.getElementById("lang-toggle");
   if (b) { b.textContent = en ? "中文" : "EN"; b.setAttribute("aria-label", en ? "切換到中文" : "Switch to English"); b.lang = en ? "zh-Hant" : "en"; }
   observe(en);

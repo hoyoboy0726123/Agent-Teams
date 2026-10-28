@@ -32,8 +32,10 @@ async function fresh(opts, { welcomed = true, soon = false } = {}) {
 // Served over http, as the Worker serves it: /api/interpret answers like worker/index.js would. A Worker that is
 // busy or out of quota (503), or a request that fails, leaves the player with the local options, with no message.
 const html = await readFile(fileURLToPath(new URL("../public/life.html", import.meta.url)));
+const storyEn = await readFile(fileURLToPath(new URL("../public/i18n/story-en.json", import.meta.url)));
 const server = createServer((req, res) => {
   if (req.url === "/life.html") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(html); }
+  else if (req.url === "/i18n/story-en.json") { res.writeHead(200, { "content-type": "application/json" }); res.end(storyEn); }
   else { res.writeHead(404); res.end(); }
 });
 await new Promise(done => server.listen(0, "127.0.0.1", done));
@@ -92,7 +94,7 @@ check("the form is English, including what the page adds later (a sibling row)",
 await busy.click("#form-me button[type=submit]");
 await busy.waitForSelector("#play:not([hidden])");
 await busy.waitForSelector("#feed li");
-check("while living, the status bar is English and the page says the story is Chinese for now", /^Age \d+$/.test(await busy.textContent("#s-age")) && await busy.textContent("#c-skip") === "Skip to the end" && await busy.isVisible("#play .en-note") && /[\u4e00-\u9fff]/.test(await busy.textContent("#feed")), [await busy.textContent("#s-age"), await busy.textContent("#c-skip"), await busy.isVisible("#play .en-note")].join(" | "));
+check("while living, the status bar and the story are English (the story's catalog came from the site)", /^Age \d+$/.test(await busy.textContent("#s-age")) && await busy.textContent("#c-skip") === "Skip to the end" && await busy.isHidden("#play-en-note") && !/[\u4e00-\u9fff]/.test(await busy.textContent("#feed")) && /^(Born|.+, born) \w+ \d+, \d{4}, in /.test(await busy.textContent("#born")), [await busy.textContent("#s-age"), await busy.textContent("#c-skip"), await busy.isVisible("#play .en-note")].join(" | "));
 await busy.click("#c-skip");
 await ended(busy, 45000);
 check("the ending's headline and facts are English", /^This time, you lived to \d+\.$/.test(await busy.textContent("#end-title")) && /Education/.test(await busy.textContent("#end-facts")) && /Happiest yearAge \d+ \(\d{4}\)/.test(await busy.textContent("#end-facts")) && await busy.isVisible("#end .en-note"));
@@ -898,7 +900,7 @@ await phone.waitForTimeout(700);
 const inBox = await phone.evaluate(() => { const log = document.querySelector("#play-log"), s = document.querySelector(".status").getBoundingClientRect(), c = document.querySelector("#choice").getBoundingClientRect(), l = log.getBoundingClientRect(); return { scrolled: log.scrollTop > 0, scene: Math.abs(s.top) < 5, choice: c.top >= l.top - 1 && c.top < l.bottom, st: Math.round(s.top), y: Math.round(scrollY), play: Math.round(document.querySelector("#play").getBoundingClientRect().top), active: document.activeElement.tagName + "." + document.activeElement.className }; });
 check("with years behind it, the story has scrolled, the scene is still at the top and the question is in view", inBox.scrolled && inBox.scene && inBox.choice, JSON.stringify(inBox));
 await phone.click("#choice [data-option]");
-await phone.waitForTimeout(900);
+await phone.waitForTimeout(2000);   // the smooth scroll to the next event takes about a second
 // The next thing is either the year the choice led to, or at once the next question.
 const after = await phone.evaluate(() => { const a = document.activeElement, r = a.getBoundingClientRect(), l = document.querySelector("#play-log").getBoundingClientRect(); return { li: a.matches("#feed li"), q: !!a.closest("#choice:not([hidden])"), top: Math.round(r.top - l.top), inView: r.top >= l.top - 1 && r.top < l.bottom, scene: Math.round(document.querySelector(".status").getBoundingClientRect().top) }; });
 check("after a choice, the next event has the focus and is in view under the scene", (after.li || after.q) && after.inView && after.scene === 0, JSON.stringify(after));

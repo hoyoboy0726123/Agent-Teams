@@ -81,6 +81,7 @@ header { display: grid; gap: 10px; }
 .lang-toggle:focus-visible { outline: 2px solid #93b2ea; outline-offset: 2px; }
 .en-note { font-size: 13px; color: var(--muted); border-left: 3px solid var(--rule); padding: 4px 10px; margin: 8px 0; }
 .en-note[hidden] { display: none; }
+html[lang="en"] .facts dd::first-letter { text-transform: uppercase; }
 html[lang="en"] .masthead .lede { max-width: 54ch; text-wrap: pretty; }
 html[lang="en"] .masthead h1 { letter-spacing: 0.02em; margin-right: 0; font-size: clamp(44px, 12vw, 84px); }
 @media (min-width: 600px) { .masthead { padding: 34px 32px 28px; } .mast-reticle { right: -90px; top: -120px; width: 400px; height: 400px; } .rt-branches { display: block; } .masthead h1 { letter-spacing: 0.14em; } .seal { width: 54px; height: 54px; font-size: 32px; margin-bottom: 14px; } }
@@ -997,7 +998,7 @@ footer a { color: var(--indigo); }
     </div>
     <div class="play-log" id="play-log">
     <p class="ai-auto" id="c-ai-wrap"><label class="major"><input type="checkbox" id="c-ai" checked> 結局自動 AI 解讀</label><span>打勾時，走完一生會自動把出生日期、時間、出生地和性別送給 AI 命理師寫解讀（不含姓名和家人，寫完不保存）。</span></p>
-    <p class="en-note" hidden>人生故事和命理詳批目前是中文，英文版正在準備中。</p>
+    <p class="en-note en-note-story" id="play-en-note" hidden>人生故事和命理詳批目前是中文，英文版正在準備中。</p>
     <p class="born" id="born" data-no-i18n></p>
     <ol class="feed" id="feed" data-no-i18n></ol>
     <div class="choice" id="choice" data-no-i18n hidden></div>
@@ -1009,7 +1010,7 @@ footer a { color: var(--indigo); }
       <h2 id="end-title" tabindex="-1"></h2>
       <p id="end-sub"></p>
     </div>
-    <p class="en-note" hidden>人生故事和命理詳批目前是中文，英文版正在準備中。</p>
+    <p class="en-note" hidden>命理詳批和結果卡片目前是中文，英文版正在準備中。</p>
     <dl class="facts" id="end-facts"></dl>
 
     <div class="chartbox">

@@ -31,6 +31,7 @@ import { initBaby } from "./baby-app.js";
 import { initMatch, onMatchTab, openMatch } from "./hehun-app.js";
 import { aiSoon } from "./ai-mode.js";
 import { initI18n, lang, t } from "./i18n.js";
+import { makeLang, loadStoryBundle } from "./sim/lang.js";
 import { initStats, track, trackOnce, sendLife, heartbeat, LIVE_URL } from "./stats.js";
 import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
@@ -141,7 +142,8 @@ function setup() {
   window.addEventListener("resize", () => { if (run && run.summary && !$("#end").hidden) drawKline(); });
   // 中／英: the page's own words swap by themselves (i18n.js); the welcome lines built here are drawn again.
   initI18n();
-  document.addEventListener("langchange", () => { drawNow(); if (lastLive) drawLive(lastLive); });
+  if (lang() === "en") ensureEnglish();
+  document.addEventListener("langchange", () => { drawNow(); if (lastLive) drawLive(lastLive); if (lang() === "en") ensureEnglish(); });
 }
 
 const TABS = ["welcome", "me", "random", "baby", "match"];
@@ -294,10 +296,33 @@ function startRandom() {
   const input = { date: { y, m, d }, time: { h: rng.int(24), mi: rng.int(60) }, place, sex };
   const name = randomName(rng, y, sex);
   const pad = n => String(n).padStart(2, "0");
-  begin(input, `你投胎成為 ${y} 年 ${m} 月 ${d} 日 ${pad(input.time.h)}:${pad(input.time.mi)}，在${county}出生的${sex === "female" ? "女孩" : "男孩"}，名叫${name}。`, { name });
+  begin(input, `你投胎成為 ${y} 年 ${m} 月 ${d} 日 ${pad(input.time.h)}:${pad(input.time.mi)}，在${county}出生的${sex === "female" ? "女孩" : "男孩"}，名叫${name}。`, { name, random: true });
 }
 
-function begin(input, born, extra = {}) {
+// The story in English (README「英文版（翻譯層）」): the catalog is fetched only once English is on. A life starts in the
+// language that is on when it starts; without the catalog (an opened file, the Artifact preview) it stays Chinese.
+const STORY_URL = "/i18n/story-en.json";
+let english = null, englishLoading = null;
+function ensureEnglish() {
+  if (english || englishLoading) return englishLoading;
+  if (!/^https?:$/.test(location.protocol)) return null;
+  englishLoading = loadStoryBundle(STORY_URL).then(b => (english = makeLang(b))).catch(() => null);
+  return englishLoading;
+}
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+// The opening line in English: who, when and where.
+function bornEnglish(input, L, extra) {
+  const { y, m, d } = input.date, pad = n => String(n).padStart(2, "0");
+  const when = `${MONTHS[m - 1]} ${d}, ${y}${input.time && Number.isFinite(input.time.h) && extra.random ? `, ${pad(input.time.h)}:${pad(input.time.mi)}` : ""}`;
+  // A town (新竹縣竹北) has no English of its own yet: its county does.
+  let where = L.word(input.place.name);
+  if (/[\u4e00-\u9fff]/.test(where)) { const county = (input.place.name.match(/^..[縣市]/) || [])[0]; where = county ? L.word(county) : where; }
+  return extra.random ? `You were born ${when}, in ${where}: a ${input.sex === "female" ? "girl" : "boy"} named ${L.word(extra.name)}.` : `${extra.name ? `${L.word(extra.name)}, born` : "Born"} ${when}, in ${where}.`;
+}
+
+function begin(input, born, extra = {}, waited = false) {
+  // English is on but its catalog is still coming: start as soon as it is here (or without it, if it fails).
+  if (lang() === "en" && !english && !waited) { const p = ensureEnglish(); if (p) { p.finally(() => begin(input, born, extra, true)); return; } }
   stop();
   let chart, prep;
   // 夜子時 (input.zi, from the birth form or the 合婚 tab) keeps a 23:00–24:00 birth on that day; otherwise 23 點換日.
@@ -306,11 +331,13 @@ function begin(input, born, extra = {}) {
   // A name without Kangxi strokes still appears in the story; it just isn't scored.
   const name = prep.name || (extra.name ? { full: extra.name, effects: null } : null);
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-  run = { input, extra, chart, prep, name, seed, born, life: createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed, name, family: prep.family, majorOnly: $("#c-major").checked, seen: startSeen() }), summary: null };
+  const L = lang() === "en" && english ? english : null;
+  run = { input, extra, chart, prep, name, seed, born, L, life: createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed, name, family: prep.family, majorOnly: $("#c-major").checked, seen: startSeen(), ...(L ? { lang: "en", english: L } : {}) }), summary: null };
   startScene(seed, run.life.state, age => luckAt(prep, age));
   $("#setup").hidden = true; $("#baby").hidden = true; $("#match").hidden = true; $("#end").hidden = true; $("#play").hidden = false;
   $("#feed").innerHTML = ""; $("#choice").hidden = true; recap = [];
-  $("#born").textContent = born || `${input.date.y} 年 ${input.date.m} 月 ${input.date.d} 日在${input.place.name}出生。`;
+  $("#born").textContent = L ? bornEnglish(input, L, extra) : born || `${input.date.y} 年 ${input.date.m} 月 ${input.date.d} 日在${input.place.name}出生。`;
+  $("#play-en-note").hidden = !(lang() === "en" && !L);
   $("#c-ai-wrap").hidden = noAutoBox();   // nothing to switch on while the AI is not open or today's quota is used up
   track("start");
   heartbeat(() => !!run && !run.life.done && !$("#play").hidden);
@@ -387,8 +414,10 @@ function chartReason(id, age, channel = null) {
   return clear ? { short: `${r.pillar}年：${d.text}`, why: null } : null;
 }
 const reasonLine = (r, tag = "span") => (r ? `<${tag} class="why">命理：${esc(r.short)}</${tag}>${r.why ? `<details class="why-more"><summary>為什麼在這個歲數</summary><p>${esc(r.why)}</p></details>` : ""}` : "");
-const lineOf = e => `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">${e.free ? "你自己的決定" : e.picked ? "依你的個性" : "你的選擇"}：${esc(e.choice)}</span>` : ""}`
-  + (e.reason && e.reasonFrom === "family" ? `<span class="why">合盤：${esc(e.reason)}</span>` : "") + reasonLine(chartReason(e.id, e.age, e.channel));
+const lineOf = e => (run && run.L
+  ? `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">${e.free ? "Your own decision" : e.picked ? "As your nature leads" : "Your choice"}: ${esc(e.choice)}</span>` : ""}`
+  : `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">${e.free ? "你自己的決定" : e.picked ? "依你的個性" : "你的選擇"}：${esc(e.choice)}</span>` : ""}`
+    + (e.reason && e.reasonFrom === "family" ? `<span class="why">合盤：${esc(e.reason)}</span>` : "") + reasonLine(chartReason(e.id, e.age, e.channel)));
 
 // `focus`: right after a choice, what it led to is scrolled to the top and takes the focus (the choice box is gone).
 function render(entries, { focus = false } = {}) {
@@ -399,7 +428,7 @@ function render(entries, { focus = false } = {}) {
     if (!li || Number(li.dataset.age) !== e.age) {
       li = document.createElement("li");
       li.dataset.age = e.age;
-      li.innerHTML = `<span class="when">${e.age} 歲<small>${e.year}</small></span><div class="lines"></div>`;
+      li.innerHTML = `<span class="when">${run && run.L ? `Age ${e.age}` : `${e.age} 歲`}<small>${e.year}</small></span><div class="lines"></div>`;
       feed.appendChild(li);
     }
     li.querySelector(".lines").insertAdjacentHTML("beforeend", lineOf(e));
@@ -443,16 +472,20 @@ function updateStatus() {
 
 function showChoice() {
   stop();
-  const p = run.life.pending, box = $("#choice");
+  const p = run.life.pending, box = $("#choice"), L = run.L;
   markSeen(p.id);
-  const why = reasonLine(chartReason(p.id, run.life.state.age), "p") + (p.why && p.why.from === "family" ? `<p class="why">合盤：${esc(p.why.text)}</p>` : "");
+  // English lives leave out the chart's and the family's reasons (Chinese for now) and the written decision, which is
+  // read by a Chinese matcher.
+  const why = L ? "" : reasonLine(chartReason(p.id, run.life.state.age), "p") + (p.why && p.why.from === "family" ? `<p class="why">合盤：${esc(p.why.text)}</p>` : "");
   const dm = run.prep.analysis.dayMaster, nature = (trait(run.prep.analysis) || "").split("，").pop();
-  const leanNote = p.lean >= 0 && !leanNoted ? `<p class="lean-note">標著「個性傾向」的選項，是從你的${esc(dm.stem + dm.element)}日主（${esc(nature)}）和這一生做過的選擇推算的。選哪一個都可以。</p>` : "";
+  const leanNote = p.lean >= 0 && !leanNoted ? (L
+    ? `<p class="lean-note">Options marked “your nature” come from your Day Master (${esc(L.word(dm.stem))} ${esc(L.word(dm.element))}) and the choices you have made in this life. Any of them is fine.</p>`
+    : `<p class="lean-note">標著「個性傾向」的選項，是從你的${esc(dm.stem + dm.element)}日主（${esc(nature)}）和這一生做過的選擇推算的。選哪一個都可以。</p>`) : "";
   if (p.lean >= 0) leanNoted = true;
   const since = recap.slice(-3);
-  const recapBox = since.length ? `<div class="recap"><p>上次選擇之後</p><ul>${since.map(e => `<li><b>${e.age} 歲</b>${esc(e.text)}</li>`).join("")}</ul></div>` : "";
-  box.innerHTML = `${recapBox}<p class="q">${esc(p.prompt)}</p>${why}<div class="options">${p.options.map((o, i) => `<button type="button" data-option="${i}"><b>${esc(o.label)}</b>${o.hint ? `<small>${esc(o.hint)}</small>` : ""}${o.lean ? `<span class="lean">個性傾向</span>` : ""}</button>`).join("")}</div>${leanNote}`
-    + (p.free ? `<form class="free" id="free-form" autocomplete="off">
+  const recapBox = since.length ? `<div class="recap"><p>${L ? "Since your last choice" : "上次選擇之後"}</p><ul>${since.map(e => `<li><b>${L ? `Age ${e.age}` : `${e.age} 歲`}</b>${esc(e.text)}</li>`).join("")}</ul></div>` : "";
+  box.innerHTML = `${recapBox}<p class="q">${esc(p.prompt)}</p>${why}<div class="options">${p.options.map((o, i) => `<button type="button" data-option="${i}"><b>${esc(o.label)}</b>${o.hint ? `<small>${esc(o.hint)}</small>` : ""}${o.lean ? `<span class="lean">${L ? "your nature" : "個性傾向"}</span>` : ""}</button>`).join("")}</div>${leanNote}`
+    + (p.free && !L ? `<form class="free" id="free-form" autocomplete="off">
       <label for="free-text">或者，寫下你自己的決定</label>
       <div class="free-row"><input type="text" id="free-text" maxlength="80" placeholder="例如：先跟家人商量看看"><button type="submit" id="free-go">這樣做</button></div>
       <div class="free-out" id="free-out" aria-live="polite"></div>
@@ -556,9 +589,9 @@ function finish() {
   $("#end-sub").textContent = `這只是同一張命盤的其中一種人生。下面的 100 次重跑，才看得出哪些事情比較常發生。`;
   const peak = life.kline.reduce((a, b) => (b.close > a.close ? b : a), life.kline[0]);
   const facts = [
-    ...(s.name ? [["姓名", s.name]] : []),
+    ...(s.name ? [["姓名", run.L ? run.L.word(s.name) : s.name]] : []),
     ["學歷", EDU[s.edu] || s.edu],
-    ["工作", s.retired ? `退休（最後是${s.job ? s.job.title : "上班族"}）` : s.job ? s.job.title : "沒有固定工作"],
+    ["工作", run.L ? (s.retired ? `Retired (last job: ${run.L.word(s.job ? s.job.title : "上班族")})` : s.job ? run.L.word(s.job.title) : "沒有固定工作") : s.retired ? `退休（最後是${s.job ? s.job.title : "上班族"}）` : s.job ? s.job.title : "沒有固定工作"],
     ["婚姻", s.marriages ? `${s.marriages} 次婚姻${s.divorces ? `，離婚 ${s.divorces} 次` : ""}` : "沒有結婚"],
     ["子女", s.kids.length ? `${s.kids.length} 個孩子` : "沒有孩子"],
     ["房子", s.home === "own" ? "有自己的房子" : "租屋"],
