@@ -10,6 +10,7 @@ export const LANG_KEY = "bazi-life.lang";
 const LANGS = ["zh", "en"];
 let current = "zh";
 
+const BRANCH = { 子: "Zi", 丑: "Chou", 寅: "Yin", 卯: "Mao", 辰: "Chen", 巳: "Si", 午: "Wu", 未: "Wei", 申: "Shen", 酉: "You", 戌: "Xu", 亥: "Hai" };
 const GOD = { 比肩: "Companion", 劫財: "Rob Wealth", 食神: "Eating God", 傷官: "Hurting Officer", 正財: "Direct Wealth", 偏財: "Indirect Wealth", 正官: "Direct Officer", 七殺: "Seven Killings", 正印: "Direct Resource", 偏印: "Indirect Resource" };
 const PATTERNS = [
   [/^(\d+) 歲$/, m => `Age ${m[1]}`],
@@ -22,6 +23,8 @@ const PATTERNS = [
   [/^退休（最後是(.+)）$/, m => `Retired (last job: ${m[1]})`],
   [/^(\d+) 歲・(\d{4})$/, m => `Age ${m[1]} · ${m[2]}`],
   [/^你走完了 (\d+) 歲的一生。$/, m => `You lived to ${m[1]}.`],
+  [/^(.)時 (\d+)–(\d+) 點$/, m => (BRANCH[m[1]] ? `${BRANCH[m[1]]} ${m[2]}–${m[3]}h` : null)],
+  [/^(.)時（(\d\d:\d\d–\d\d:\d\d)(，凌晨|，深夜)?）$/, m => (BRANCH[m[1]] ? `${BRANCH[m[1]]} hour (${m[2]}${m[3] === "，凌晨" ? ", after midnight" : m[3] === "，深夜" ? ", before midnight" : ""})` : null)],
   [/^今天 ([\d,]+) 段人生$/, m => `${m[1]} lives today`],
   [/^臺北 (\d\d:\d\d)$/, m => `Taipei ${m[1]}`],
   [/^(\S{2})・(\S{2})$/, m => (GOD[m[1]] && GOD[m[2]] ? `${GOD[m[1]]} · ${GOD[m[2]]}` : null)],
@@ -74,7 +77,9 @@ function swap(node, attr) {
   const zh = seen && seen.out === now ? seen.zh : now;
   const trimmed = zh.trim();
   if (!trimmed || !/[\u3400-\u9fff]/.test(trimmed)) return;
-  const en = current === "en" ? english(trimmed) : null;
+  // data-en on the element: its own English, where the shared one does not fit (a narrow select).
+  const own = !attr && node.parentElement && node.parentElement.getAttribute("data-en");
+  const en = current === "en" ? own || english(trimmed) : null;
   const value = en == null ? zh : zh.replace(trimmed, en);
   if (!store) { store = {}; memo.set(node, store); }
   store[key] = { zh, out: value };

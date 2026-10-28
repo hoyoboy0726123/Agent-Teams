@@ -88,7 +88,7 @@ check("the language chosen is kept on the next visit", await busy.textContent("#
 await busy.click("#tab-me");
 await busy.click("#family > summary");
 await busy.click("#add-sibling");
-check("the form is English, including what the page adds later (a sibling row)", /Date of birth/.test(await busy.textContent("#form-me")) && /Time unknown/.test(await busy.textContent("#sibling-list")) && await busy.getAttribute("#f-name", "placeholder") === "e.g. Yi-chun");
+check("the form is English, including what the page adds later (a sibling row)", /Date of birth/.test(await busy.textContent("#form-me")) && /Older brother/.test(await busy.textContent("#sibling-list")) && /Unknown/.test(await busy.textContent("#sibling-list")) && await busy.getAttribute("#f-name", "placeholder") === "e.g. Yi-chun");
 await busy.click("#form-me button[type=submit]");
 await busy.waitForSelector("#play:not([hidden])");
 await busy.waitForSelector("#feed li");

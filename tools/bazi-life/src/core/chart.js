@@ -24,9 +24,9 @@ export const ZI_RULES = {
   late: "夜子時：23–24 點日柱算當天",
 };
 export const YUN_METHODS = {
-  default: { label: "精確（3 天折 1 年，算到分鐘）", make: () => new DefaultChildLimitProvider() },
+  default: { label: "精確（3 天折 1 年）", make: () => new DefaultChildLimitProvider() },
   china95: { label: "元亨利貞（算到天）", make: () => new China95ChildLimitProvider() },
-  sect1: { label: "傳統（按時辰數，1 天折 4 個月）", make: () => new LunarSect1ChildLimitProvider() },
+  sect1: { label: "傳統（1 天折 4 個月）", make: () => new LunarSect1ChildLimitProvider() },
   sect2: { label: "傳統（算到小時）", make: () => new LunarSect2ChildLimitProvider() },
 };
 export const ROLES = { year: "年柱", month: "月柱", day: "日柱", hour: "時柱" };

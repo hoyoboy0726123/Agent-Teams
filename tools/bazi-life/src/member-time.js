@@ -3,7 +3,7 @@
 // 填確切時間 is picked.
 import { SHICHEN, shichenTime } from "./core/shichen.js";
 
-const OPTIONS = `<option value="">時辰不詳</option><option value="clock">填確切時間</option><optgroup label="時辰">${SHICHEN.map(s => `<option value="${s.key}">${s.short}</option>`).join("")}</optgroup>`;
+const OPTIONS = `<option value="" data-en="Unknown">時辰不詳</option><option value="clock">填確切時間</option><optgroup label="時辰">${SHICHEN.map(s => `<option value="${s.key}">${s.short}</option>`).join("")}</optgroup>`;
 
 // The hour part of a family row built in script; `who` names the person for screen readers.
 export const memberHourHTML = who => `<select class="m-hour" aria-label="${who}的出生時辰">${OPTIONS}</select><input type="time" class="m-time" aria-label="${who}的出生時間" hidden>`;
