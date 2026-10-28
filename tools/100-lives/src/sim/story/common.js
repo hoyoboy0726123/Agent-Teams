@@ -37,6 +37,17 @@ export const isBrother = x => /Brother/.test(x.relation || "");
 export const bornSibs = (s, minAge = 0) => s.siblings.list.filter(x => x.born && x.alive !== false && s.age - x.bornAt >= minAge);
 export const olderSibs = s => bornSibs(s).filter(x => x.older);
 export const youngerSibs = (s, minAge = 3) => bornSibs(s, minAge).filter(x => !x.older);
+// Several brothers and sisters in a few words: "your brother and sister", "your two brothers", "your sisters";
+// one is named with sibName.
+export function sibsWord(list) {
+  if (list.length === 1) return sibName(list[0]);
+  const b = list.filter(isBrother).length, g = list.length - b, n = ["", "", "two", "three", "four"];
+  if (!g) return `your ${n[b] || ""} brothers`.replace("  ", " ");
+  if (!b) return `your ${n[g] || ""} sisters`.replace("  ", " ");
+  return `your ${b > 1 ? "brothers" : "brother"} and ${g > 1 ? "sisters" : "sister"}`;
+}
+// A number of years in words, up to twelve.
+export const yearsWord = n => (["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"][n] || String(n)) + (n === 1 ? " year" : " years");
 // "Linda and Tom", "Linda, Tom and Amy".
 export const listWords = items => (items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
 
@@ -241,7 +252,7 @@ export const FALLBACK = {
   proposal: (age, sex, year, marriages) => interp(sex === "female" ? [[17, 0.03], [20, 0.18], [23, 0.3], [26, 0.32], [30, 0.25], [35, 0.16], [45, 0.08], [60, 0.04]] : [[18, 0.02], [22, 0.12], [25, 0.25], [28, 0.3], [32, 0.24], [38, 0.14], [48, 0.065], [60, 0.03]], age - interp([[1950, -3.5], [1970, -2.5], [1990, 0], [2010, 2.5], [2020, 3.5]], year)) * (marriages ? 0.6 : 1),
   divorce: (years, year) => interp([[1, 0.02], [4, 0.03], [8, 0.025], [15, 0.015], [25, 0.008]], years) * interp([[1950, 0.5], [1970, 0.8], [1980, 1.2], [2000, 1], [2020, 0.75]], year),
   crisis: years => interp([[0, 0.03], [3, 0.06], [10, 0.04], [25, 0.02]], years),
-  birth: (motherAge, parity, year) => Math.min(0.9, interp([[18, 0.2], [25, 0.24], [30, 0.2], [35, 0.11], [40, 0.035], [45, 0.003]], motherAge) * [1, 1, 0.55, 0.3, 0.2][Math.min(4, parity)] * interp([[1950, 1.4], [1960, 1.5], [1970, 1], [1976, 0.85], [1990, 0.95], [2007, 0.95], [2020, 0.8]], year)),
+  birth: (motherAge, parity, year, married = true) => (married ? 1 : 0.2) * Math.min(0.9, interp([[18, 0.2], [25, 0.24], [30, 0.2], [35, 0.11], [40, 0.035], [45, 0.003]], motherAge) * [1, 1, 0.55, 0.3, 0.2][Math.min(4, parity)] * interp([[1950, 1.4], [1960, 1.5], [1970, 1], [1976, 0.85], [1990, 0.95], [2007, 0.95], [2020, 0.8]], year)),
   deathRaw: (age, sex) => Math.min(1, age < 1 ? 0.007 : Math.exp(-10.4 + 0.088 * age) * (sex === "male" ? 1.4 : 1)),
   serious: age => interp([[30, 0.001], [50, 0.006], [65, 0.015], [80, 0.03]], age),
   seriousType: (age, sex, year, rng) => rng.weighted([["cancer", 0.5], ["heart", 0.3], ["stroke", 0.2]]),

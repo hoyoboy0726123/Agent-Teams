@@ -1,7 +1,11 @@
 // A self-check of the story events, independent of the engine: it loads every event module (with the engine's
 // helpers stubbed, unless --real), then for each event draws sample lives where it can happen and runs it.
 //
-//   node src/sim/story/check.mjs [--real] [--samples 40] [--verbose]
+//   node src/sim/story/check.mjs [--real] [--samples 40] [--verbose] [--show id,id] [--lives 300]
+//
+// --lives N also runs N whole lives through a minimal yearly loop (the same queue, pacing and choice rules as
+// bazi-life's life.js, without the chart's tilt) and reports choices per life, story events per stage, rough
+// demographics, broken lines, and the events that never happened.
 //
 // Errors (exit code 1):
 //   ids        unique event ids; option ids in `event.option` form with the event's own id, unique everywhere
@@ -203,17 +207,22 @@ function sampleState(rng, ev) {
   if (rng() < 0.3) s.flags.talent = rng.pick(["piano", "soccer", "art"]);
   if (rng() < 0.3) s.flags.firstCar = { name: "a Ford Escort", age: 16 };
   if (rng() < 0.5) s.flags.license = 16;
+  if (age >= 14 && age <= 19) {
+    if (rng() < 0.4) s.flags.firstLove = { name: "Sam", sex: sex === "male" ? "female" : "male", age: age - rng.int(3), way: "asked" };
+    if (rng() < 0.4) s.flags.parttime = "bagging groceries at the A&P";
+    if (rng() < 0.5) { s.flags.club = rng.pick(["sports", "band", "theater", "debate", "paper", "none"]); s.flags.sport = "soccer"; }
+    if (rng() < 0.3) s.flags.talent = "scouts";
+  }
   if (age >= 40) s.memory.push({ kind: "graduateUni", text: "You graduated from college!", age: age - 25, year: year - 25, mood: 3 }, { kind: "divorce", text: "You and Sam divorced.", age: age - 21, year: year - 21, mood: -12 });
   // a few done events, so `done.has` conditions can hold
   for (const id of ["primary", "middle", "kindergarten", "crush", "senior"]) if (rng() < 0.5) s.done.add(id);
   return s;
 }
 
-function makeCtx(rng, s, R, seen) {
-  const scene = {};
+function makeCtx(rng, s, R, seen, scene = {}) {
   const slots = () => ({ city: s.abroad || s.county || "Ohio", job: s.job ? s.job.title : "work", partner: s.partner ? s.partner.call : "your partner", kid: s.kids.length ? s.kids[s.kids.length - 1].call : "your kid", kids: s.kids.length > 1 ? "kids" : "kid", friend: () => (scene.friend ??= (s.friends.length ? s.friends[0].call : "an old friend")), trip: () => (scene.trip ??= rng.pick(["Yellowstone", "Disney World", "the Grand Canyon", "Paris"])), age: s.age, year: s.year });
   const ctx = {
-    rng, R, s, prep: { intro: "Sun in Leo, Moon in Pisces, Scorpio rising", jobFit: () => rng.between(-1, 1) }, analysis: null, family: null, name: null,
+    scene, rng, R, s, prep: { intro: "Sun in Leo, Moon in Pisces, Scorpio rising", jobFit: () => rng.between(-1, 1) }, analysis: null, family: null, name: null,
     w(templates, vars = {}) {
       const list = Array.isArray(templates) ? templates : [templates];
       for (const t of list) { if (typeof t !== "string") seen.errors.push(`ctx.w got a ${typeof t}`); else if (!balanced(t)) seen.errors.push(`unbalanced braces in template: ${t.slice(0, 120)}`); seen.templates.push(t); }
@@ -304,12 +313,12 @@ for (const [name, events] of Object.entries(modules)) {
             if (!(Number.isFinite(w) && w >= 0)) err(o.id, `weight ${w}`);
             total += w;
           }
-          if (opts.length && (total < 0.9 || total > 1.1)) err(id, `weights add up to ${total.toFixed(3)} (age ${s.age}, ${s.year})`);
+          if (opts.length && (total < 0.9 || total > 1.1)) err(id, `weights add up to ${total.toFixed(2)}`);
           const offered = opts.filter(o => !o.when || o.when(s, ctx));
           if (offered.length < 2) err(id, `only ${offered.length} option(s) on offer (age ${s.age}, ${s.year})`);
           else if (offered.length < 3) warn(id, `only ${offered.length} options on offer at age ${s.age} in ${s.year}`);
           for (const o of offered) {
-            const s2 = structuredClone(s), ctx2 = makeCtx(rng, s2, R, seen);
+            const s2 = structuredClone(s), ctx2 = makeCtx(rng, s2, R, seen, ctx.scene);
             const out = o.apply ? o.apply(s2, ctx2) : null;
             if (o.apply && (!out || !out.text || BROKEN.test(out.text))) err(o.id, `line: ${out && out.text}`);
             if (out && typeof out.mood === "number" && (out.mood < -16 || out.mood > 12)) warn(o.id, `mood ${out.mood}`);
@@ -337,6 +346,88 @@ if (index.deathEvent) for (const age of [5, 30, 60, 90]) {
   s.health.diedOf = age === 60 ? "cancer" : null;
   const out = index.deathEvent.apply(s, ctx);
   if (!out || !out.text || BROKEN.test(out.text)) err("death", `line: ${out && out.text}`);
+}
+
+// ---------- whole lives (--lives N) ----------
+const LIVES = args.includes("--lives") ? Number(args[args.indexOf("--lives") + 1]) || 300 : 0;
+if (LIVES) {
+  const { FALLBACK } = await import(pathToFileURL(join(HERE, "common.js")).href);
+  const order = index.ALL_EVENTS, fired = new Map(), stage = { child: [], teen: [] }, perLife = [];
+  const demo = { college: 0, degree: 0, married35: 0, firstMarriage: [], divorced: 0, kids: [], women: 0, own45: 0, alive45: 0, retireAge: [], death: [], served: 0, men: 0, dropout: 0 };
+  for (let n = 0; n < LIVES; n++) {
+    const s = sampleState(rng, { ages: [0, 0] });
+    Object.assign(s, { edu: "none", studying: false, track: null, employed: false, job: null, rel: "single", partner: null, kids: [], friends: [], marriages: 0, divorces: 0, savings: 0, debt: 0, home: "parents", done: new Set(), last: {}, count: {}, flags: {}, memory: [], spells: [], since: null, career: 0, retired: false, unemployedFor: 0, health: { chronic: false, serious: null, checkups: false, hr: 1, fitness: 0.5, smoke: false, drink: false, stress: 0.3 } });
+    s.father = { alive: true, age: 26 + rng.int(10), name: "" }; s.mother = { alive: true, age: 24 + rng.int(8), name: "" };
+    s.siblings = { list: [], unborn: rng.int(3) };
+    for (let i = rng.int(3); i > 0; i--) s.siblings.list.push({ relation: rng() < 0.5 ? "olderBrother" : "olderSister", label: "", name: "", older: true, bornAt: -2 * i, born: true });
+    let choices = 0, cStory = 0, cChoice = 0, tStory = 0, tChoice = 0;
+    while (s.alive && s.age <= 110) {
+      let thisYear = 0;
+      for (const ev of order) {
+        if (ev.choice && !ev.core && thisYear > 0) continue;
+        if (ev.once && s.done.has(ev.id)) continue;
+        if (ev.max && (s.count[ev.id] || 0) >= ev.max) continue;
+        if (ev.ages && (s.age < ev.ages[0] || s.age > ev.ages[1])) continue;
+        if (ev.cooldown && s.last[ev.id] !== undefined && s.age - s.last[ev.id] < ev.cooldown) continue;
+        const seen = { errors: [], templates: [] }, ctx = makeCtx(rng, s, R, seen);
+        if (ev.when && !ev.when(s, ctx)) continue;
+        if (!(rng() < ev.p(s, ctx))) continue;
+        s.done.add(ev.id); s.count[ev.id] = (s.count[ev.id] || 0) + 1; s.last[ev.id] = s.age;
+        fired.set(ev.id, (fired.get(ev.id) || 0) + 1);
+        let out;
+        if (ev.choice) {
+          const c = ev.choice(s, ctx);
+          if (!c) continue;
+          const opts = c.options.filter(o => !o.when || o.when(s, ctx));
+          if (!opts.length) continue;
+          if (opts.length > 1) { thisYear++; choices++; }
+          const o = rng.weighted(opts.map(x => [x, Math.max(0.0001, typeof x.weight === "function" ? x.weight(s, ctx) : x.weight ?? 1)]));
+          out = o.apply(s, ctx);
+          if (!out || !out.text || BROKEN.test(out.text)) err(o.id, `line in a life: ${out && out.text}`);
+        } else {
+          out = ev.apply(s, ctx);
+          if (!out || !out.text || BROKEN.test(out.text)) err(ev.id, `line in a life: ${out && out.text}`);
+        }
+        for (const m of seen.errors) err(ev.id, m);
+        if (out && out.big && ev.id !== "birth") s.memory.push({ kind: ev.id, text: out.text, age: s.age, year: s.year, mood: out.mood || 0 });
+        if (/^c_/.test(ev.id)) { cStory++; if (ev.choice) cChoice++; }
+        if (/^t_/.test(ev.id)) { tStory++; if (ev.choice) tChoice++; }
+        if (ev.id === "senior" || ev.id === "serviceEnd") demo.college += s.track === "college" || s.track === "community" ? 1 : 0;
+        if (s.rel === "married" && !demo.firstMarriage[n]) demo.firstMarriage[n] = s.age;
+      }
+      // the end of the year, roughly as life.js
+      const q = Math.min(0.999, FALLBACK.deathRaw(s.age, s.sex) * s.health.hr + (s.health.serious && s.age - s.health.serious.since < 5 ? 0.08 : 0));
+      if (s.age >= 110 || rng() < q) { s.alive = false; demo.death.push(s.age); break; }
+      if (s.age === 45) { demo.alive45++; if (s.home === "own") demo.own45++; }
+      s.age++; s.year++; s.father.age++; s.mother.age++;
+      if (s.partner) s.partner.age++;
+      for (const k of s.kids) k.age++;
+      if (s.guard > 0) s.guard--; if (s.crisis > 0) s.crisis--;
+      if (!s.employed && s.done.has("firstJob") && !s.retired) s.unemployedFor++;
+      if (s.employed) s.savings += 0.15 * (s.income || 1) * (s.rel === "married" ? 1.5 : 1) - 0.04 * s.kids.filter(k => k.age < 22).length;
+      if (s.debt > 0) { const pay = Math.min(s.debt, 0.15, Math.max(0, s.savings)); s.debt -= pay; s.savings -= pay; }
+      s.savings = Math.max(0, s.savings);
+    }
+    perLife.push(choices); stage.child.push([cStory, cChoice]); stage.teen.push([tStory, tChoice]);
+    if (["bachelor", "master", "professional", "doctorate"].includes(s.edu)) demo.degree++;
+    if (demo.firstMarriage[n] !== undefined && demo.firstMarriage[n] <= 35) demo.married35++;
+    if (s.divorces) demo.divorced++;
+    if (s.sex === "female") { demo.women++; demo.kids.push(s.kids.length); } else demo.men++;
+    if (s.flags.served) demo.served++;
+    if (s.flags.dropout !== undefined && s.edu === "middle") demo.dropout++;
+    if (s.done.has("retire") && s.retired) demo.retireAge.push(s.last.retire);
+  }
+  const mean = a => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0), pct = x => `${(100 * x / LIVES).toFixed(0)}%`;
+  console.log(`\n${LIVES} lives (no chart tilt; stand-in engine and design rates where rates.js is missing)`);
+  console.log(`  choices per life ${mean(perLife).toFixed(1)}   childhood stories ${mean(stage.child.map(x => x[0])).toFixed(1)} (${mean(stage.child.map(x => x[1])).toFixed(1)} choices)   teen stories ${mean(stage.teen.map(x => x[0])).toFixed(1)} (${mean(stage.teen.map(x => x[1])).toFixed(1)} choices)`);
+  const fm = demo.firstMarriage.filter(x => x !== undefined);
+  console.log(`  bachelor's+ ${pct(demo.degree)}   married by 35 ${pct(demo.married35)}   first marriage at ${mean(fm).toFixed(1)}   ever divorced ${pct(demo.divorced)}   kids per woman ${mean(demo.kids).toFixed(2)}`);
+  console.log(`  own a home at 45 ${demo.alive45 ? `${(100 * demo.own45 / demo.alive45).toFixed(0)}%` : "-"}   retire at ${mean(demo.retireAge).toFixed(1)}   age at death ${mean(demo.death).toFixed(1)}   served ${demo.men ? `${(100 * demo.served / demo.men).toFixed(0)}% of men` : "-"}   no diploma ${pct(demo.dropout)}`);
+  if (args.includes("--rates")) for (const [name, events] of Object.entries(modules)) if (events.length) console.log(`  ${name}: ` + events.map(e => [e.id, (fired.get(e.id) || 0) / LIVES]).sort((a, b) => b[1] - a[1]).map(([i, r]) => `${i} ${r.toFixed(2)}`).join(", "));
+  for (const [name, events] of Object.entries(modules)) {
+    const silent = events.filter(e => !e.rare && !fired.has(e.id)).map(e => e.id);
+    if (silent.length) warn(name, `never happened in ${LIVES} lives: ${silent.join(", ")}`);
+  }
 }
 
 console.log("module    events  choices");

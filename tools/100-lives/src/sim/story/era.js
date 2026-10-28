@@ -13,7 +13,7 @@ import { cap, scene, parentWord, olderSibs, sibName, isBrother, inStates } from 
 const at = (year, ages, more = () => true) => s => s.year === year && s.age >= ages[0] && s.age <= ages[1] && !s.abroad && more(s);
 const field = s => (s.job ? s.job.field : "");
 // A short event: id, year, ages, chance, the line (a function of s and ctx), and extra fields.
-const E = (id, year, ages, p, line, more = {}) => ({ id, once: true, years: [year, year], ages, when: at(year, ages, more.when), p: typeof p === "function" ? p : () => p, apply: line, ...(more.domain ? { domain: more.domain, channel: more.channel } : {}) });
+const E = (id, year, ages, p, line, more = {}) => ({ id, once: true, years: [year, year], ages, when: at(year, ages, more.when), p: typeof p === "function" ? p : () => p, apply: line, ...(more.domain ? { domain: more.domain, channel: more.channel } : {}), ...(more.rare ? { rare: true } : {}) });
 
 // The draft lottery: the year each birth cohort's numbers were drawn, and the highest number called up from it.
 // Men born 1950 were drawn on December 1, 1969 and called through 195 in 1970; 1951 on July 1, 1970 (125, in 1971);
@@ -23,7 +23,7 @@ const LOTTERY = { 1950: [1969, 195], 1951: [1970, 125], 1952: [1971, 95], 1953: 
 export const ERA = [
   // ---------- the 1950s and early 1960s ----------
   {
-    id: "e_korea", once: true, years: [1950, 1953], ages: [0, 3], when: s => s.year >= 1950 && s.year <= 1953 && s.father.alive && !s.abroad, p: () => 0.12,
+    id: "e_korea", rare: true, once: true, years: [1950, 1953], ages: [0, 3], when: s => s.year >= 1950 && s.year <= 1953 && s.father.alive && !s.abroad, p: () => 0.12,
     apply: (s, ctx) => ({ text: ctx.w(["Your father was overseas in Korea for part of your first years. {Your mother held you up to his photo on the mantel every night.|He came home to a toddler who hid behind your mother's skirt.}", "Dad shipped out to Korea when you were small, and {his letters came on thin blue airmail paper.|you met him properly at the train station when he came home.}"]), mood: -1 }),
   },
   {
@@ -36,7 +36,7 @@ export const ERA = [
     id: "e_duckCover", once: true, years: [1955, 1963], ages: [6, 12], when: s => s.year >= 1955 && s.year <= 1963 && s.studying && !s.abroad, p: () => 0.35,
     apply: (s, ctx) => ({ text: ctx.w(["At school you practiced “duck and cover,” crouching under your desk with your hands over your neck, {and the boy next to you giggled the whole time.|and that night you asked your father what it was for.}", "The siren tested every month, and {you practiced crawling under the desk.|your teacher marched the class to the basement shelter with the yellow sign.}"]), mood: -1 }),
   },
-  E("e_1957sputnik", 1957, [5, 12], 0.5, (s, ctx) => ({ text: ctx.w(["That October, the Russians put Sputnik in the sky, and {you stood in the backyard with your father trying to spot it.|your school suddenly wanted everyone to be good at science.}", "Sputnik went up, and {the grown-ups talked about it at every dinner.|you built a rocket out of a paper towel tube.}"]), mood: 1 })),
+  E("e_1957sputnik", 1957, [5, 12], 0.5, (s, ctx) => ({ text: ctx.w(["That October, the Russians put Sputnik in the sky, and {you stood in the backyard with your father trying to spot it.|your school suddenly wanted everyone to be good at science.}", "Sputnik went up, and {the grown-ups talked about it at every dinner.|you built a rocket out of a paper towel tube.}"]), mood: 1 }), { rare: true }),
   E("e_1962sabin", 1962, [0, 12], 0.6, (s, ctx) => ({ text: ctx.w(["On “Sabin Sunday” you got the polio vaccine on a sugar cube {at the elementary school gym.|and asked if you could have another.}", "The family stood in line at the school for the oral polio vaccine, {a pink drop on a sugar cube.|and you thought it was candy.}"]), mood: 1 })),
   E("e_1962cuba", 1962, [6, 12], 0.6, (s, ctx) => ({ text: ctx.w(["For thirteen days that October, the grown-ups watched the news about Cuba and spoke in low voices. {Your father filled jugs of water in the basement.|You prayed at bedtime without being told.}", "During the missile crisis your teacher was quiet and kind all week, {and when it was over she let the class have an extra recess.|and you didn't understand why until much later.}"]), mood: -2 })),
   E("e_1963jfk", 1963, [5, 13], 0.9, (s, ctx) => ({ text: ctx.w(["On November 22, the principal came over the loudspeaker: President Kennedy had been shot. {Your teacher put her head down on her desk.|School let out early, and the bus was silent all the way home.}", "The day President Kennedy died, {your mother was crying at the ironing board when you got home.|the TV stayed on all weekend, and nobody changed the channel.}"]), mood: -4 })),
@@ -63,13 +63,16 @@ export const ERA = [
       const watched = ctx.rng.pick(["You listened to the drawing on the radio with your friends", "The whole family watched the drawing on TV", "You heard your number read at the dorm, crowded around a radio"]);
       if (ceiling === 0) return { text: `${watched}: your birthday came up number ${n}. As it turned out, the draft ended before anyone from your year was called.`, mood: 1 };
       if (n > ceiling) return { text: ctx.w(`${watched}: number ${n}. {Your mother sat down on the kitchen floor with relief.|You let out a breath you had been holding for a year.} Your number would never be called.`), mood: 4, big: true };
+      // About four in ten men with a low number were never inducted: they failed the physical (4-F), had a
+      // deferment, or the call-ups stopped short of them (an approximation from Selective Service figures).
+      if (ctx.rng() < 0.4) return { text: ctx.w(`${watched}: number ${n}, low enough to be called. {At the physical you were classified 4-F for your eyesight, and never served.|In the end the call-ups stopped a few numbers short of yours.|A deferment came through, and you were never called.}`), mood: 1, big: true };
       s.flags.draftLow = s.year + 1;
       return { text: ctx.w(`${watched}: number ${n}. {The room went quiet.|Your father put a hand on your shoulder and left it there.} A number that low would be called next year.`), mood: -8, big: true };
     },
   },
   {
     // A low number: the year it was called.
-    id: "e_draftCall", once: true, years: [1970, 1972], ages: [19, 23], when: s => s.flags.draftLow === s.year && !s.abroad && !inService(s), p: () => 1,
+    id: "e_draftCall", rare: true, once: true, years: [1970, 1972], ages: [19, 23], when: s => s.flags.draftLow === s.year && !s.abroad && !inService(s), p: () => 1,
     choice: (s, ctx) => {
       const student = s.studying && s.year <= 1971;
       const lead = scene(ctx, [
@@ -122,7 +125,7 @@ export const ERA = [
     id: "e_1979gas", once: true, years: [1979, 1979], ages: [16, 29], when: at(1979, [16, 29]), p: () => 0.35,
     apply: (s, ctx) => { s.savings = Math.max(0, s.savings - 0.02); return { text: ctx.w(["The gas lines were back that summer, and {you got up at five to beat them.|you ran out of gas waiting in one, and three strangers pushed your car to the pump.}", "Gas prices jumped again, and {you traded the big car for a little Japanese one.|you started riding your bike to work.}"]), mood: -2 }; },
   },
-  E("e_1980helens", 1980, [3, 30], 0.8, (s, ctx) => ({ text: ctx.w(["When Mount St. Helens blew in May, {gray ash fell on your town like snow, and everyone wore masks to the store.|you heard the boom from a hundred miles away.} {You kept a jar of the ash for years.|The cars all had ash on the windshields for weeks.}"]), mood: -2 }), { when: s => inStates(s, ["WA", "OR", "ID"]) }),
+  E("e_1980helens", 1980, [3, 30], 0.8, (s, ctx) => ({ text: ctx.w(["When Mount St. Helens blew in May, {gray ash fell on your town like snow, and everyone wore masks to the store.|you heard the boom from a hundred miles away.} {You kept a jar of the ash for years.|The cars all had ash on the windshields for weeks.}"]), mood: -2 }), { rare: true, when: s => inStates(s, ["WA", "OR", "ID"]) }),
 
   // ---------- the 1980s ----------
   E("e_1981mtv", 1981, [9, 25], 0.4, (s, ctx) => ({ text: ctx.w(["MTV came on the air, and {you watched music videos for six hours straight.|you begged your parents for cable.|your friend's house, which had cable, became the place to be.}", "The first video MTV ever played was “Video Killed the Radio Star,” and {you could not stop humming it.|your radio suddenly looked very old.}"]), mood: 3 })),
@@ -141,7 +144,7 @@ export const ERA = [
     apply: (s, ctx) => ({ text: s.studying && s.age <= 17 ? ctx.w(["Your class watched the Challenger launch on a TV wheeled in on a cart, because a teacher, Christa McAuliffe, was aboard. {Then it was gone, and your teacher turned off the TV and didn't know what to say.|Nobody talked on the bus home.}", "The whole school watched the Challenger launch, and seventy-three seconds later {the room went silent.|your teacher sent everyone to recess, and nobody played.}"]) : ctx.w(["You heard about the Challenger at work, and {everyone gathered around a radio.|the office was quiet the rest of the day.} That night the president said they had “slipped the surly bonds of earth.”"]), mood: -4 }),
   },
   E("e_1987crash", 1987, [22, 37], 0.35, (s, ctx) => { s.savings *= 0.88; return { text: ctx.w(["On Black Monday the stock market fell 22 percent in one day, and {your retirement account took a gut punch.|you made yourself stop checking the paper.}"]), mood: -3 }; }, { when: s => s.savings >= 1 }),
-  E("e_1989quake", 1989, [3, 39], 0.3, (s, ctx) => ({ text: ctx.w(["The Loma Prieta earthquake hit just before the World Series game in October, and {your house shook like a dog shaking off water.|the power was out for two days, and the neighbors grilled everything in their freezers.}"]), mood: -3 }), { when: s => inStates(s, ["CA"]) }),
+  E("e_1989quake", 1989, [3, 39], 0.3, (s, ctx) => ({ text: ctx.w(["The Loma Prieta earthquake hit just before the World Series game in October, and {your house shook like a dog shaking off water.|the power was out for two days, and the neighbors grilled everything in their freezers.}"]), mood: -3 }), { rare: true, when: s => inStates(s, ["CA"]) }),
   E("e_1989wall", 1989, [8, 39], 0.6, (s, ctx) => ({ text: ctx.w(["You watched people dancing on the Berlin Wall on the evening news, {and your father, who had worried about the Russians your whole life, just kept saying “Look at that.”|and your history teacher said the textbooks were already out of date.}", "The Berlin Wall came down, and {you stayed up watching people chip at it with hammers.|it felt like the whole world exhaled.}"]), mood: 3 })),
 
   // ---------- the 1990s ----------
@@ -149,10 +152,10 @@ export const ERA = [
     id: "e_1991gulf", once: true, years: [1991, 1991], ages: [8, 41], when: at(1991, [8, 41]), p: s => (inService(s) ? 0.6 : 0.5),
     apply: (s, ctx) => ({ text: inService(s) ? ctx.w(["Your unit deployed to the Gulf for Desert Storm. {You spent most of it in the sand, waiting, and writing letters.|It was over in weeks, and you came home to yellow ribbons on every tree.}"]) : ctx.w(["The Gulf War played on CNN around the clock, {and yellow ribbons went up on the trees all down your street.|and your class wrote letters to soldiers in the desert.}"]), mood: -1 }),
   },
-  E("e_1992andrew", 1992, [3, 42], 0.25, (s, ctx) => { s.savings = Math.max(0, s.savings - 0.1); return { text: ctx.w(["Hurricane Andrew tore through South Florida in August. {You rode it out in the bathtub under a mattress.|Your roof went, and so did half the trees on the street.} {For weeks the neighbors shared generators and ice.|The National Guard handed out water at the shopping center.}"]), mood: -6 }; }, { when: s => inStates(s, ["FL"]) }),
+  E("e_1992andrew", 1992, [3, 42], 0.25, (s, ctx) => { s.savings = Math.max(0, s.savings - 0.1); return { text: ctx.w(["Hurricane Andrew tore through South Florida in August. {You rode it out in the bathtub under a mattress.|Your roof went, and so did half the trees on the street.} {For weeks the neighbors shared generators and ice.|The National Guard handed out water at the shopping center.}"]), mood: -6 }; }, { rare: true, when: s => inStates(s, ["FL"]) }),
   E("e_1993flood", 1993, [8, 43], 0.25, (s, ctx) => ({ text: ctx.w(["The Great Flood of 1993 swelled the rivers for months, and {you filled sandbags at the levee until your arms gave out.|the water came up to the second step of the porch and stayed there.|your church turned into a shelter, and you served a lot of chili.}"]), mood: -4 }), { when: s => inStates(s, ["MO", "IA", "IL", "MN", "WI", "KS", "NE", "SD", "ND"]) }),
-  E("e_1994northridge", 1994, [3, 44], 0.3, (s, ctx) => ({ text: ctx.w(["The Northridge earthquake woke you at 4:31 in the morning, {and everything in the kitchen cabinets ended up on the floor.|and you slept in the backyard for a week.}"]), mood: -3 }), { when: s => inStates(s, ["CA"]) }),
-  E("e_1995okc", 1995, [5, 45], 0.6, (s, ctx) => ({ text: ctx.w(["In April a bomb destroyed the federal building in Oklahoma City. {The whole state lined up to give blood.|Your church held a vigil, and you lit a candle for the children in the day care.}"]), mood: -6 }), { when: s => inStates(s, ["OK"]) }),
+  E("e_1994northridge", 1994, [3, 44], 0.3, (s, ctx) => ({ text: ctx.w(["The Northridge earthquake woke you at 4:31 in the morning, {and everything in the kitchen cabinets ended up on the floor.|and you slept in the backyard for a week.}"]), mood: -3 }), { rare: true, when: s => inStates(s, ["CA"]) }),
+  E("e_1995okc", 1995, [5, 45], 0.6, (s, ctx) => ({ text: ctx.w(["In April a bomb destroyed the federal building in Oklahoma City. {The whole state lined up to give blood.|Your church held a vigil, and you lit a candle for the children in the day care.}"]), mood: -6 }), { rare: true, when: s => inStates(s, ["OK"]) }),
   {
     // The early web: an AOL trial CD in the mail, the dial-up screech, a chat room.
     id: "e_web", once: true, years: [1995, 1999], ages: [8, 70], when: s => s.year >= 1995 && s.year <= 1999 && !s.abroad, p: () => 0.15,
@@ -207,7 +210,7 @@ export const ERA = [
       return { text, mood: -6, big: s.age >= 10 };
     },
   },
-  E("e_2003iraq", 2003, [18, 53], 0.5, (s, ctx) => ({ text: ctx.w(["Your unit deployed to Iraq in the spring. {You called home on a satellite phone and kept it light.|Your family put a blue-star flag in the window.} You came home a year later, and it took a while to sleep through the night."]), mood: -4, big: true }), { when: s => inService(s) }),
+  E("e_2003iraq", 2003, [18, 53], 0.5, (s, ctx) => ({ text: ctx.w(["Your unit deployed to Iraq in the spring. {You called home on a satellite phone and kept it light.|Your family put a blue-star flag in the window.} You came home a year later, and it took a while to sleep through the night."]), mood: -4, big: true }), { when: s => inService(s), rare: true }),
   {
     id: "e_2005katrina", once: true, years: [2005, 2005], ages: [3, 55], when: at(2005, [3, 55]), p: s => (inStates(s, ["LA", "MS"]) ? 0.6 : inStates(s, ["AL", "TX"]) ? 0.25 : 0.15),
     apply: (s, ctx) => {
@@ -245,7 +248,7 @@ export const ERA = [
       };
     },
   },
-  E("e_2012sandy", 2012, [3, 62], 0.35, (s, ctx) => ({ text: ctx.w(["Hurricane Sandy flooded the coast in October, and {your power was out for nine days.|you waited two hours in a gas line again, like it was 1974.|you helped a neighbor tear out soaked drywall.}"]), mood: -4 }), { when: s => inStates(s, ["NY", "NJ", "CT"]) }),
+  E("e_2012sandy", 2012, [3, 62], 0.35, (s, ctx) => ({ text: ctx.w(["Hurricane Sandy flooded the coast in October, and {your power was out for nine days.|you waited two hours in a gas line again, like it was 1974.|you helped a neighbor tear out soaked drywall.}"]), mood: -4 }), { rare: true, when: s => inStates(s, ["NY", "NJ", "CT"]) }),
   {
     // June 26, 2015: same-sex couples could marry in every state.
     id: "e_2015marriage", once: true, years: [2015, 2015], ages: [14, 65], when: at(2015, [14, 65]), p: s => (s.partner && s.partner.sex === s.sex ? 1 : 0.2),
@@ -261,18 +264,20 @@ export const ERA = [
     id: "e_2017eclipse", once: true, years: [2017, 2017], ages: [3, 90], when: at(2017, [3, 90]), p: s => (inStates(s, ["OR", "ID", "WY", "NE", "KS", "MO", "IL", "KY", "TN", "GA", "NC", "SC"]) ? 0.8 : 0.4),
     apply: (s, ctx) => ({ text: inStates(s, ["OR", "ID", "WY", "NE", "KS", "MO", "IL", "KY", "TN", "GA", "NC", "SC"]) ? ctx.w(["On August 21 the total eclipse passed right over you. {For two minutes it was dusk at noon, the crickets started, and everyone in the parking lot cheered.|You looked up through paper glasses and forgot to breathe.}"]) : ctx.w(["On August 21 you watched the solar eclipse through {cardboard glasses|a pinhole in a cereal box}, {with your whole office out in the parking lot.|and the light went strange and silver.}"]), mood: 4 }),
   },
-  E("e_2020fireSky", 2020, [3, 70], 0.35, (s, ctx) => ({ text: ctx.w(["In September the wildfire smoke turned the sky orange at noon. {You kept the windows shut and the air purifier on for weeks.|The streetlights stayed on all day.} {You packed a go-bag and kept it by the door.|The ash on the car was soft as snow.}"]), mood: -4 }), { when: s => inStates(s, ["CA", "OR", "WA"]) }),
+  E("e_2020fireSky", 2020, [3, 70], 0.35, (s, ctx) => ({ text: ctx.w(["In September the wildfire smoke turned the sky orange at noon. {You kept the windows shut and the air purifier on for weeks.|The streetlights stayed on all day.} {You packed a go-bag and kept it by the door.|The ash on the car was soft as snow.}"]), mood: -4 }), { rare: true, when: s => inStates(s, ["CA", "OR", "WA"]) }),
   {
     // March 2020: the pandemic, by where you were in life.
     id: "e_2020covid", once: true, years: [2020, 2020], ages: [1, 75], when: at(2020, [1, 75]), p: () => 1,
     apply: (s, ctx) => {
       let text;
       if (s.age < 5) text = ctx.w("When the pandemic came, {your whole world shrank to the house and the backyard,|everyone you saw wore a mask,} and {your grandparents waved at you through the window.|you learned to talk to people on a screen.}");
+      else if (s.studying && s.age < 13) text = ctx.w(["In March 2020 school closed “for two weeks,” and then for the rest of the year. {You did class on a laptop at the kitchen table, muted.|You missed recess and your friends more than anything.}", "When the pandemic hit, your class met in little squares on a screen, and {your teacher read stories aloud every afternoon.|you showed your cat to everyone during math.}"]);
       else if (s.studying && s.age < 18) text = ctx.w(["In March 2020 school closed “for two weeks,” and then for the rest of the year. {You did class on a laptop at the kitchen table, muted.|You missed your friends more than you thought possible.}", "When the pandemic hit, {your school went online,|spring sports were canceled,} and {prom happened on Zoom, which is not really prom.|you spent a lot of time in your room.}"]);
       else if (s.studying && s.age < 26) text = ctx.w("In March 2020 your college sent everyone home, and {you finished the semester on Zoom from your childhood bedroom.|you packed your dorm room in an afternoon.}");
-      else if (field(s) === "health") text = ctx.w("When the pandemic hit, you were working in health care. {You wore the same N95 for a week.|Every night at seven, the neighbors banged pots for people like you.} {You showered in the garage before hugging anyone.|It was the hardest year of your working life.}");
+      else if (/health/.test(field(s))) text = ctx.w("When the pandemic hit, you were working in health care. {You wore the same N95 for a week.|Every night at seven, the neighbors banged pots for people like you.} {You showered in the garage before hugging anyone.|It was the hardest year of your working life.}");
       else if (s.employed) text = ctx.w(["When the pandemic hit, {you started working from the kitchen table, in sweatpants.|your job was “essential,” and you went in every day past empty streets.} {You learned to say “you're on mute.”|The grocery store shelves were bare of toilet paper for a month.}", "In March 2020 everything shut down. {You baked a lot of sourdough.|You did a puzzle with a thousand pieces.} {You saw your parents through a window on their birthday.|You worried about everyone, all the time.}"]);
-      else text = ctx.w("When the pandemic came, {you stayed home and learned to video-call the grandkids.|your days got very small and very quiet,} and {a neighbor dropped off groceries every week.|you missed hugging people more than anything.}");
+      else if (s.age >= 60) text = ctx.w("When the pandemic came, {you stayed home and learned to video-call the grandkids,|your days got very small and very quiet,} and {a neighbor dropped off groceries every week.|you missed hugging people more than anything.}");
+      else text = ctx.w("When the pandemic came, {you were between jobs, and the job listings vanished overnight.|you stayed home and watched the news too much.} {A neighbor checked on you every week.|You called your parents every single day.}");
       return { text, mood: -5, big: s.age >= 8 };
     },
   },
@@ -290,7 +295,7 @@ export const ERA = [
     }),
   },
   E("e_2021vaccine", 2021, [12, 75], 0.75, (s, ctx) => ({ text: ctx.w(["You got your COVID vaccine {at a pharmacy|in a stadium parking lot|at a school gym}, {took a selfie with the bandage,|felt rough for a day,} and {hugged your mother for the first time in a year.|cried a little in the car.}"]), mood: 4 })),
-  E("e_2021freeze", 2021, [3, 75], 0.45, (s, ctx) => ({ text: ctx.w(["In February the big freeze knocked out the power for days. {You slept in your coat with the whole family in one room.|You melted snow in the bathtub to flush the toilet.|The neighbors with a gas stove cooked for the whole street.}"]), mood: -4 }), { when: s => inStates(s, ["TX"]) }),
+  E("e_2021freeze", 2021, [3, 75], 0.45, (s, ctx) => ({ text: ctx.w(["In February the big freeze knocked out the power for days. {You slept in your coat with the whole family in one room.|You melted snow in the bathtub to flush the toilet.|The neighbors with a gas stove cooked for the whole street.}"]), mood: -4 }), { rare: true, when: s => inStates(s, ["TX"]) }),
   E("e_2023ai", 2023, [12, 70], 0.3, (s, ctx) => ({ text: s.studying ? ctx.w("Everyone at school was suddenly using AI chatbots, and {your teachers went back to essays written by hand in class.|you asked one to explain calculus and it actually helped.}") : ctx.w(["AI chatbots were suddenly everywhere, and {you asked one to write a toast for your friend's wedding.|your boss announced a “strategy” about them.|you were not sure whether to be impressed or worried, so you were both.}"]), mood: 1 })),
   {
     // The total solar eclipse of April 8, 2024: totality from Texas to Maine.

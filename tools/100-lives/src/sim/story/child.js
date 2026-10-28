@@ -52,101 +52,8 @@ const NEW_KID = {
 const toothMoney = y => (y < 1970 ? "a dime" : y < 1990 ? "a quarter" : y < 2010 ? "a dollar" : "five dollars");
 
 export const CHILD = [
-  // ---------- the first years ----------
-  A("c_firstWord", [1, 1], 0.9, s => {
-    const pet = s.flags.pet ? s.flags.pet.name : "the dog";
-    return [`Your first word was {“Mama,” and your mother has never let anyone forget it.|“Dada,” and your father bought a cigar he didn't smoke.|“no,” and you used it a lot after that.|“uh-oh,” which turned out to be a lifestyle.|“ball,” said with great authority.}`, `Your first word was {“kitty”|“cookie”|“light”}, {shouted at the ceiling fan.|and the whole family cheered so loudly you cried.}`, "You said your first word, {“more,”|“bye-bye,”|“hot,”} at {the dinner table|Grandma's house|the grocery store}, and {nobody heard it but you.|three people claimed to have heard it first.}"];
-  }, { mood: 2 }),
-  A("c_firstSteps", [1, 1], 0.9, ["You took your first steps {toward the dog|across the living room rug|at a family barbecue}, {and fell straight into Grandpa's lap.|three wobbly ones, then sat down very surprised.|while your mother scrambled for the camera and missed it.}", "You learned to walk {holding the edge of the coffee table|chasing your older cousin|in your father's shoes}, and {there was no stopping you after that.|nothing below three feet was ever safe again.}", "Your first steps happened {on a Tuesday, in the kitchen|on the back porch|in a department store aisle}, {and you looked more surprised than anyone.|toward a cookie someone was holding just out of reach.}"]),
   {
-    // Who watched you while the grown-ups worked: a mother at home in most 1950s families, daycare and grandparents
-    // more often later (an assumption from the share of mothers of young children at work: about 1 in 5 in 1960, 6 in 10 by 2000).
-    id: "c_care", once: true, ages: [2, 3], when: atHome, p: () => 0.8,
-    apply: (s, ctx) => {
-      const work = ctx.rng() < (s.year < 1965 ? 0.2 : s.year < 1985 ? 0.45 : 0.62);
-      s.flags.daycare = work;
-      return { text: work ? ctx.w(["While your parents worked, {Grandma watched you, and you learned to play gin rummy at three.|you went to a daycare in a church basement with a parachute and a hundred toddlers.|a neighbor lady watched you along with four other kids and a parakeet.}", "You spent your days at daycare, {where you bit exactly one kid and never again.|and cried at drop-off for a month, then cried at pickup because you wanted to stay.}"]) : ctx.w(["You spent your little-kid days at home, {following your mother from room to room.|watching Sesame Street and helping with laundry.|in the backyard sandbox with the neighbor kids.}", "Your days were the kitchen floor, pots and pans for drums, and {the mailman's daily visit, which you considered a social event.|a long nap after lunch.}"]), mood: 1 };
-    },
-  },
-  {
-    id: "c_bedtime", once: true, ages: [2, 5], when: atHome, p: () => 0.25,
-    apply: (s, ctx) => {
-      const y = s.year;
-      const book = ctx.rng.pick([...(y >= 1950 ? ["Goodnight Moon"] : []), ...(y >= 1957 ? ["The Cat in the Hat"] : []), ...(y >= 1960 ? ["Green Eggs and Ham"] : []), ...(y >= 1964 ? ["Where the Wild Things Are"] : []), ...(y >= 1970 ? ["The Very Hungry Caterpillar", "Corduroy"] : []), ...(y >= 1985 ? ["Love You Forever"] : []), ...(y >= 1990 ? ["Chicka Chicka Boom Boom"] : []), ...(y >= 2008 ? ["Llama Llama Red Pajama"] : []), ...(y >= 2013 ? ["The Day the Crayons Quit"] : [])]);
-      const who = grownUp(s, ctx);
-      return { text: ctx.w([`Every night you made ${who} read ${book}, {and woe to anyone who skipped a page.|until ${who} could recite it with eyes closed.|and you said the last line together.}`, `${book} was your favorite bedtime book. {You wore the cover right off it.|You “read” it to your stuffed animals, from memory.}`, `Bedtime was ${book}, a glass of water, and {checking under the bed for monsters, twice.|one more song, then one more.}`]), mood: 2 };
-    },
-  },
-  {
-    id: "c_blankie", once: true, ages: [3, 5], when: atHome, p: () => 0.12,
-    choice: (s, ctx) => {
-      const thing = ctx.rng.pick(["blankie", "teddy bear", "stuffed rabbit", "stuffed dog"]), who = grownUp(s, ctx);
-      const lead = scene(ctx, [
-        `Your ${thing} is more hole than ${thing} now, and ${who} says it's time to let it go.`,
-        `${who} wants to wash your ${thing}, and you are sure it will not survive.`,
-        `Your ${thing} got left at a restaurant, and ${who} drove back for it. Now ${who} says you are getting too big for it.`,
-      ]);
-      return {
-        prompt: `${lead} What do you do?`,
-        options: [
-          { id: "c_blankie.hide", label: `Hide your ${thing}`, hint: "under the mattress", act: "avoid", style: "risk", weight: 0.25, apply: () => ({ text: `When ${who} wanted to retire your ${thing}, you hid it under the mattress. It was found during spring cleaning years later, and ${who} kept it.`, mood: 2 }) },
-          { id: "c_blankie.fix", label: `Ask ${who} to fix it`, hint: "a patch, a few stitches", act: "seekHelp", style: "family", weight: 0.3, apply: () => ({ text: `You asked ${who} to fix your ${thing} instead of throwing it out, and ${who} sewed patches on it until it was more patch than ${thing}.`, mood: 3 }) },
-          { id: "c_blankie.deal", label: "Make a deal: bedtime only", hint: "a fair compromise", act: "negotiate", style: "social", weight: 0.25, apply: () => ({ text: `You and ${who} made a deal about your ${thing}: bedtime only. You stuck to it, mostly.`, mood: 1 }) },
-          { id: "c_blankie.brave", label: "Say goodbye like a big kid", hint: "a brave little ceremony", act: "wait", style: "safe", weight: 0.12, apply: () => ({ text: `You said goodbye to your ${thing} with a little ceremony, and got a sticker for being brave. You cried a bit that night, and then you were fine.`, mood: -1 }) },
-          { id: "c_blankie.everywhere", label: "Take it everywhere, forever", hint: "no surrender", act: "insist", style: "self", weight: 0.08, apply: () => ({ text: `Asked to give up your ${thing}, you refused, and took it to kindergarten, to the dentist and on vacation. It is still in a box somewhere.`, mood: 2 }) },
-        ],
-      };
-    },
-  },
-  A("c_imaginary", [3, 6], 0.08, ["You had an imaginary friend named {Pickles|Mr. Bigglesworth|Zippy|Captain Steve|Lulu}, who {needed a seat at dinner.|got blamed for most of the messes.|had very strong opinions about bedtime.}", "Your imaginary friend {lived in the closet|was a dragon|was a horse named Thunder}, and {your parents set a place for it at Thanksgiving, as a joke you took seriously.|it moved away the summer you started school.}", "For a whole year you talked to an imaginary friend {in the backyard|under the kitchen table}, {and your grandmother politely asked how it was doing.|until your little cousin swore she could see it too.}"], { when: atHome }),
-  A("c_lostStore", [3, 7], 0.06, s => [`You got lost in ${s.year < 1990 ? "the Sears" : s.year < 2005 ? "the Kmart" : "the Target"}, {hid inside a circular clothes rack,|wandered to the toy aisle,} and {heard your name over the loudspeaker.|a nice lady walked you to the customer service desk.}`, `You lost ${s.year < 1980 ? "Mom" : "your parents"} at {the county fair|the mall|the beach}, {and a security guard bought you an ice cream while they found you.|and decided to live there now, until they showed up five minutes later.}`, "At the grocery store you followed the wrong pair of legs for two aisles, {and when the stranger turned around you both screamed.|and learned to hold onto the cart after that.}"], { when: atHome, mood: -1 }),
-  A("c_haircut", [3, 8], 0.05, (s, ctx) => [`You gave yourself a haircut with the kitchen scissors, {and school picture day was the next morning.|and ${grownUp(s, ctx)} just said “Oh, honey.”|leaving one long piece in front, on purpose.}`, `You cut ${youngerSibs(s, 2).length ? sibName(youngerSibs(s, 2)[0]) + "'s" : "your best friend's"} bangs “to help,” {and both of you were in trouble.|and it took three months to grow out.}`, "You tried to give the dog a haircut, {and the dog has never fully trusted you since.|and it looked like a lawn mowed by a raccoon.}"], { when: atHome, mood: 1 }),
-  {
-    id: "c_checkout", once: true, ages: [3, 6], when: atHome, p: () => 0.12,
-    choice: (s, ctx) => {
-      const who = grownUp(s, ctx), snack = ctx.rng.pick(snackOf(s.year)), store = s.year < 1975 ? "the A&P" : s.year < 2000 ? "the grocery store" : "Walmart";
-      return {
-        prompt: `At the checkout at ${store}, ${snack} is right at your eye level, and ${who} said no. What do you do?`,
-        options: [
-          { id: "c_checkout.scream", label: "Lie down on the floor and wail", hint: "maximum volume", act: "insist", style: "self", weight: 0.2, apply: () => ({ text: `At the checkout at ${store}, you threw a full tantrum over ${snack}. ${who} carried you out like a sack of potatoes, and an old man gave ${who} a sympathetic nod.`, mood: -2 }) },
-          { id: "c_checkout.ask", label: "Ask very, very nicely", hint: "please and thank you", act: "talk", style: "social", weight: 0.3, apply: (s2, c) => (c.rng() < 0.5 ? { text: `At the checkout, you asked for ${snack} with your best please and thank you, and ${who} was so impressed you got it.`, mood: 3 } : { text: `At the checkout, you asked for ${snack} with your best manners. ${who} still said no, but told you it was the politest no ever.`, mood: 0 }) },
-          { id: "c_checkout.sneak", label: "Sneak it onto the belt", hint: "maybe nobody notices", act: "avoid", style: "risk", weight: 0.15, apply: () => ({ text: `At the checkout, you slid ${snack} onto the belt behind the milk. The cashier noticed, ${who} noticed, and everyone in line noticed.`, mood: -1 }) },
-          { id: "c_checkout.deal", label: "Offer to carry the groceries", hint: "earn it", act: "negotiate", style: "family", weight: 0.2, apply: () => ({ text: `At the checkout, you offered to carry the groceries to the car in exchange for ${snack}. You carried one loaf of bread, heroically, and got your treat.`, mood: 3 }) },
-          { id: "c_checkout.wait", label: "Let it go, and look at the gumball machine", hint: "next time", act: "wait", style: "safe", weight: 0.15, apply: () => ({ text: `At the checkout, you let ${snack} go without a fuss, and on the way out ${who} gave you a penny for the gumball machine.`, mood: 2 }) },
-        ],
-      };
-    },
-  },
-  A("c_tooth", [5, 7], 0.6, s => [`You lost your first tooth {biting an apple|on the playground|in a piece of taffy}, and the Tooth Fairy left ${toothMoney(s.year)} under your pillow.`, `Your first tooth came out {while you were wiggling it during a spelling test.|tied to a doorknob, which you would not recommend.} {You put it in a little envelope for the Tooth Fairy.|The Tooth Fairy left ${toothMoney(s.year)} and a note in suspiciously familiar handwriting.}`, `You lost a front tooth {right before school pictures,|the week of the Christmas pageant,} and {whistled through the gap for a month.|the Tooth Fairy left ${toothMoney(s.year)}.}`], { when: atHome, mood: 2 }),
-  A("c_er", [2, 9], 0.04, ["You stuck a {dried pea|bead|crayon tip} up your nose to see what would happen, and what happened was a trip to the emergency room.", "You swallowed a {penny|Lego piece|marble}, and {your parents spent two days checking.|the doctor said it would “pass,” and it did.}", "You jumped off the {top bunk|garage roof|back porch} with a bedsheet for a cape, {and learned that it does not work.|and got four stitches in your chin.}"], { when: atHome, mood: -1, max: 2, once: false, cooldown: 3 }),
-  A("c_firstMovie", [3, 7], 0.2, (s, ctx) => {
-    const y = s.year;
-    const film = y < 1964 ? "a Disney movie at the old downtown theater" : y < 1975 ? "Mary Poppins on a re-release" : y < 1982 ? "Star Wars" : y < 1989 ? "E.T." : y < 1994 ? "The Little Mermaid" : y < 1995 ? "The Lion King" : y < 2003 ? "Toy Story" : y < 2013 ? "Finding Nemo" : y < 2020 ? "Frozen" : "Encanto";
-    return [`Your first movie in a real theater was ${film}, {and you were so scared of the dark you sat on ${grownUp(s, ctx)}'s lap.|and you spilled a whole box of popcorn in the first five minutes.|and you walked out singing.}`, `${cap(film)} was your first trip to the movies, {and the screen was the biggest thing you had ever seen.|and you fell asleep halfway through and insisted you saw it all.}`, `The first movie you saw in a theater: ${film}. {You talked about it for a month.|You cried at the sad part and pretended you had something in your eye.}`];
-  }, { when: atHome, mood: 3 }),
-  {
-    id: "c_newBaby", once: true, ages: [2, 9], when: s => youngerSibs(s, 0).some(x => s.age - x.bornAt <= 1), p: () => 0.25,
-    choice: (s, ctx) => {
-      const b = youngerSibs(s, 0).find(x => s.age - x.bornAt <= 1), name = sibName(b), dad = s.father.alive ? "Dad" : "Grandma";
-      return {
-        prompt: `Since ${name} came home, everyone only seems to look at the baby. How do you handle it?`,
-        options: [
-          { id: "c_newBaby.help", label: "Be the big helper", hint: "fetch diapers, sing songs", act: "care", style: "family", weight: 0.35, apply: () => ({ text: `When ${name} came home and took all the attention, you decided to be the big helper, fetching diapers and singing songs. ${cap(name)}'s first laugh was at you.`, mood: 3 }) },
-          { id: "c_newBaby.baby", label: "Act like a baby too", hint: "two can play this game", act: "insist", style: "self", weight: 0.2, apply: () => ({ text: `When ${name} came home and took all the attention, you started crawling and asking for a bottle. It got you some laughs and, eventually, a talk.`, mood: 0 }) },
-          { id: "c_newBaby.alone", label: `Ask ${dad} for a day just you two`, hint: "special time", act: "talk", style: "social", weight: 0.2, apply: () => ({ text: `When ${name} came home, you asked ${dad} for a day just for you. You went for pancakes and the hardware store, and it was one of the best days of your life.`, mood: 4 }) },
-          { id: "c_newBaby.draw", label: "Draw a picture for the baby", hint: "a gift", act: "hobby", style: "learn", weight: 0.15, apply: () => ({ text: `When ${name} came home, you drew a picture of the whole family, with the baby very small and you very large. It went on the fridge.`, mood: 2 }) },
-          { id: "c_newBaby.ignore", label: "Ignore the baby completely", hint: "it'll go away", act: "avoid", style: "self", weight: 0.1, apply: () => ({ text: `When ${name} came home, you refused to look at the baby for a week. Then ${name} grabbed your finger, and that was the end of that.`, mood: 1 }) },
-        ],
-      };
-    },
-  },
-  A("c_cartoons", [4, 10], 0.25, s => {
-    const w = kidsCulture(s.year).watch;
-    return [`You ${w[0]}, {in your pajamas with a bowl of sugary cereal balanced on your knees.|lying on your stomach a foot from the TV.|and nobody could get a word out of you.}`, `You ${w[1 % w.length]}, {so often you knew every line.|fighting your siblings for the good spot on the couch.|and then acted out every episode in the backyard.}`, `You ${w[2 % w.length]}{, and it was the best part of the week.|, and sang the theme song in the bathtub.|, even when you were supposed to be getting ready for church.}`];
-  }, { when: atHome, mood: 2 }),
-  // ---------- friends and the things kids want ----------
-  {
-    id: "c_bestFriend", domain: "family", channel: "good", tags: ["friends"], once: true, ages: [5, 9], when: s => atHome(s) && !bestFriend(s), p: () => 0.25,
+    id: "c_bestFriend", domain: "family", channel: "good", tags: ["friends"], once: true, ages: [5, 9], when: s => atHome(s) && !bestFriend(s), p: () => 0.136,
     choice: (s, ctx) => {
       const k = kidsCulture(s.year), toy = ctx.rng.pick(k.toys), snack = ctx.rng.pick(snackOf(s.year));
       const f = ctx.person({ role: "friend", sex: ctx.rng() < 0.85 ? s.sex : s.sex === "male" ? "female" : "male", birthYear: s.birthYear, how: "school" });
@@ -170,7 +77,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_bike", once: true, ages: [5, 8], when: atHome, p: () => 0.3,
+    id: "c_bike", once: true, ages: [5, 8], when: atHome, p: () => 0.122,
     choice: (s, ctx) => {
       const bike = s.year < 1965 ? "a red Schwinn" : s.year < 1980 ? "a Schwinn with a banana seat" : s.year < 1995 ? "a BMX bike" : "a bike with streamers on the handlebars";
       const dad = s.father.alive && !s.flags.parentsSplit ? "Dad" : grownUp(s, ctx), sib = olderSibs(s)[0];
@@ -187,7 +94,148 @@ export const CHILD = [
     },
   },
   {
-    id: "c_pet", domain: "family", channel: "good", once: true, ages: [5, 12], when: s => atHome(s) && !s.flags.pet, p: () => 0.07,
+    // The activity a kid takes up, by era: Little League from 1939, karate classes spread in the 1970s, youth soccer boomed in the 1970s–80s.
+    id: "c_talent", domain: "study", channel: "good", once: true, ages: [6, 10], when: s => atHome(s) && !s.flags.talent, p: () => 0.068,
+    choice: (s, ctx) => {
+      const who = grownUp(s, ctx), money = homeMoney(s, ctx) === "tight";
+      const lead = scene(ctx, [
+        `${who} wants you to try an activity this year, and the sign-up sheet is on the fridge.`,
+        money ? `Money is tight, but ${who} says you can pick one activity this year, and ${who} will find a way to pay for it.` : null,
+        `Your best friend just signed up for something, and ${who} asked what you'd like to do.`,
+        "The community center flyer came home in your backpack with a whole list of things to try.",
+      ]);
+      const set = (key, text, mood = 4) => (s2, c) => { s2.flags.talent = key; return { text: c.w(text), mood }; };
+      const sport = s.year >= 1975 ? ["soccer", "Sign up for soccer", "orange slices at halftime", "You signed up for soccer, ran in a herd with eleven other kids chasing the ball, and {loved the orange slices at halftime.|scored a goal for the other team once, which you still hear about.}"] : ["baseball", s.sex === "female" && s.year < 1974 ? "Sign up for softball" : "Sign up for Little League", "a glove that smells like leather", "You signed up for {Little League|softball}, {broke in your glove by sleeping with it under your mattress,|played right field and picked a lot of dandelions,} and {hit a double in the last game of the season.|ate a lot of snow cones.}"];
+      return {
+        prompt: `${lead} What do you pick?`,
+        options: [
+          { id: "c_talent.piano", label: "Piano lessons", hint: money ? "the most expensive" : "practice every day", act: "study", style: "learn", weight: 0.2, apply: set("piano", "You started piano lessons with {an old lady who smelled like peppermints|a teacher at the church|a college student who was very patient}, {and practiced scales while the other kids played outside.|and by spring you could play “Heart and Soul” with anyone.}") },
+          { id: "c_talent.sport", label: sport[1], hint: sport[2], act: "exercise", style: "health", weight: 0.3, apply: set(sport[0], sport[3]) },
+          { id: "c_talent.scouts", label: s.sex === "female" && s.year < 2018 ? "Join the Girl Scouts" : "Join the Scouts", hint: "badges and campouts", act: "socialize", style: "social", weight: 0.18, apply: set("scouts", `You joined the ${s.sex === "female" && s.year < 2018 ? "Girl Scouts" : "Scouts"}, {earned a sash full of badges,|sold ${s.sex === "female" && s.year < 2018 ? "Girl Scout cookies door to door" : "popcorn door to door"},} and {learned to build a fire on the first campout.|got very good at knots.}`) },
+          { id: "c_talent.dance", label: s.year >= 1975 ? ctx.rng.pick(["Karate classes", "Dance classes"]) : "Dance classes", hint: "a recital, or a belt", act: "exercise", style: "risk", weight: 0.14, apply: (s2, c) => { const karate = s2.year >= 1975 && c.rng() < 0.5; s2.flags.talent = karate ? "karate" : "dance"; return { text: karate ? c.w("You started karate, {bowed to the sensei every time,|yelled “Hi-yah!” at everything for a year,} and {earned your yellow belt by spring.|broke a board at the demonstration.}") : c.w("You started dance classes, {in tap shoes that clicked all over the kitchen,|and wore a sequined costume at the recital,} and {missed one step and kept smiling anyway.|did not want to take the costume off.}"), mood: 4 }; } },
+          { id: "c_talent.art", label: s.year >= 2012 ? "A coding club" : "Art classes", hint: s.year >= 2012 ? "make your own game" : "paint and clay", act: "hobby", style: "learn", weight: 0.1, apply: s.year >= 2012 ? set("code", "You joined a coding club and {made a game where a cat eats tacos.|learned that computers do exactly what you say, not what you mean.}") : set("art", "You took art classes, {made a lopsided clay pot that your grandmother used for thirty years,|painted a horse that looked like a dog,} and {loved every minute.|got your painting hung at the library.}") },
+          { id: "c_talent.none", label: "Nothing. Just play", hint: "free time is the best time", act: "rest", style: "self", weight: 0.08, apply: s2 => { s2.flags.talent = "none"; return { text: "You didn't want any activity. You just wanted to play outside until dinner, and that's what you did.", mood: 2 }; } },
+        ],
+      };
+    },
+  },
+  {
+    // For the families who keep Christmas: the year you figured it out.
+    id: "c_santa", once: true, ages: [6, 9], when: (s, ctx) => atHome(s) && holidayOf(s, ctx) === "Christmas", p: () => 0.136,
+    choice: (s, ctx) => {
+      const little = youngerSibs(s, 2)[0], who = grownUp(s, ctx);
+      const lead = scene(ctx, [
+        `You found the presents in ${who === "Grandma" ? "Grandma's" : "your parents'"} closet a week before Christmas, still in the store bags.`,
+        "A kid at school says Santa isn't real, and the handwriting on Santa's gift tags looks a lot like Mom's.",
+        "You stayed up on Christmas Eve to see Santa, and saw your father eating the cookies.",
+      ]);
+      return {
+        prompt: `${lead} What do you do?`,
+        options: [
+          { id: "c_santa.keep", label: little ? `Keep the secret for ${sibShort(little)}` : "Keep the secret", hint: "the magic is worth it", act: "care", style: "family", weight: little ? 0.35 : 0.25, apply: s2 => { s2.flags.santa = "kept"; return { text: little ? `You figured out the truth about Santa and kept it to yourself, for ${sibName(little)}'s sake. You became one of the helpers, and loved it.` : "You figured out the truth about Santa and decided to keep the secret. You got presents from Santa for three more years.", mood: 2 }; } },
+          { id: "c_santa.ask", label: `Ask ${who} straight out`, hint: "the truth, please", act: "talk", style: "social", weight: 0.3, apply: s2 => { s2.flags.santa = "asked"; return { text: `You asked ${who} straight out about Santa. ${who} sat down with you and explained that Santa is a feeling people give each other. You cried a little, then felt very grown up.`, mood: 0 }; } },
+          { id: "c_santa.believe", label: "Decide to believe anyway", hint: "evidence is overrated", act: "spiritual", style: "self", weight: 0.2, apply: s2 => { s2.flags.santa = "believed"; return { text: "You saw the evidence about Santa and decided to believe anyway, on purpose, for one more year.", mood: 2 }; } },
+          { id: "c_santa.tell", label: "Tell everyone at school", hint: "you know something they don't", act: "insist", style: "risk", weight: 0.1, apply: s2 => { s2.flags.santa = "told"; return { text: "You announced the truth about Santa at recess, and three kids cried. Your teacher called home. It was not your finest moment.", mood: -2 }; } },
+          { id: "c_santa.test", label: "Set a trap to be sure", hint: "science", act: "study", style: "learn", weight: 0.1, apply: s2 => { s2.flags.santa = "tested"; return { text: "You set up a tripwire of yarn and jingle bells by the tree. At midnight you heard your father swear quietly. Case closed.", mood: 3 }; } },
+        ],
+      };
+    },
+  },
+  // ---------- the first years ----------
+  A("c_firstWord", [1, 1], 0.55, s => {
+    const pet = s.flags.pet ? s.flags.pet.name : "the dog";
+    return [`Your first word was {“Mama,” and your mother has never let anyone forget it.|“Dada,” and your father bought a cigar he didn't smoke.|“no,” and you used it a lot after that.|“uh-oh,” which turned out to be a lifestyle.|“ball,” said with great authority.}`, `Your first word was {“kitty,”|“cookie,”|“light,”} {shouted at the ceiling fan.|and the whole family cheered so loudly you cried.}`, "You said your first word, {“more,”|“bye-bye,”|“hot,”} at {the dinner table|Grandma's house|the grocery store}, and {nobody heard it but you.|three people claimed to have heard it first.}"];
+  }, { mood: 2 }),
+  A("c_firstSteps", [1, 1], 0.35, ["You took your first steps {toward the dog|across the living room rug|at a family barbecue}, {and fell straight into Grandpa's lap.|three wobbly ones, then sat down very surprised.|while your mother scrambled for the camera and missed it.}", "You learned to walk {holding the edge of the coffee table|chasing your older cousin|in your father's shoes}, and {there was no stopping you after that.|nothing below three feet was ever safe again.}", "Your first steps happened {on a Tuesday, in the kitchen|on the back porch|in a department store aisle}, {and you looked more surprised than anyone.|toward a cookie someone was holding just out of reach.}"]),
+  {
+    // Who watched you while the grown-ups worked: a mother at home in most 1950s families, daycare and grandparents
+    // more often later (an assumption from the share of mothers of young children at work: about 1 in 5 in 1960, 6 in 10 by 2000).
+    id: "c_care", once: true, ages: [2, 3], when: atHome, p: () => 0.4,
+    apply: (s, ctx) => {
+      const work = ctx.rng() < (s.year < 1965 ? 0.2 : s.year < 1985 ? 0.45 : 0.62);
+      s.flags.daycare = work;
+      return { text: work ? ctx.w(["While your parents worked, {Grandma watched you, and you learned to play gin rummy at three.|you went to a daycare in a church basement with a parachute and a hundred toddlers.|a neighbor lady watched you along with four other kids and a parakeet.}", "You spent your days at daycare, {where you bit exactly one kid and never again.|and cried at drop-off for a month, then cried at pickup because you wanted to stay.}"]) : ctx.w(["You spent your little-kid days at home, {following your mother from room to room.|watching Sesame Street and helping with laundry.|in the backyard sandbox with the neighbor kids.}", "Your days were the kitchen floor, pots and pans for drums, and {the mailman's daily visit, which you considered a social event.|a long nap after lunch.}"]), mood: 1 };
+    },
+  },
+  {
+    id: "c_bedtime", once: true, ages: [2, 5], when: atHome, p: () => 0.042,
+    apply: (s, ctx) => {
+      const y = s.year;
+      const book = ctx.rng.pick([...(y >= 1950 ? ["Goodnight Moon"] : []), ...(y >= 1957 ? ["The Cat in the Hat"] : []), ...(y >= 1960 ? ["Green Eggs and Ham"] : []), ...(y >= 1964 ? ["Where the Wild Things Are"] : []), ...(y >= 1970 ? ["The Very Hungry Caterpillar", "Corduroy"] : []), ...(y >= 1985 ? ["Love You Forever"] : []), ...(y >= 1990 ? ["Chicka Chicka Boom Boom"] : []), ...(y >= 2008 ? ["Llama Llama Red Pajama"] : []), ...(y >= 2013 ? ["The Day the Crayons Quit"] : [])]);
+      const who = grownUp(s, ctx);
+      return { text: ctx.w([`Every night you made ${who} read ${book}, {and woe to anyone who skipped a page.|until ${who} could recite it with eyes closed.|and you said the last line together.}`, `${book} was your favorite bedtime book. {You wore the cover right off it.|You “read” it to your stuffed animals, from memory.}`, `Bedtime was ${book}, a glass of water, and {checking under the bed for monsters, twice.|one more song, then one more.}`]), mood: 2 };
+    },
+  },
+  {
+    id: "c_blankie", once: true, ages: [3, 5], when: atHome, p: () => 0.021,
+    choice: (s, ctx) => {
+      const thing = ctx.rng.pick(["blankie", "teddy bear", "stuffed rabbit", "stuffed dog"]), who = grownUp(s, ctx);
+      const lead = scene(ctx, [
+        `Your ${thing} is more hole than ${thing} now, and ${who} says it's time to let it go.`,
+        `${who} wants to wash your ${thing}, and you are sure it will not survive.`,
+        `Your ${thing} got left at a restaurant, and ${who} drove back for it. Now ${who} says you are getting too big for it.`,
+      ]);
+      return {
+        prompt: `${lead} What do you do?`,
+        options: [
+          { id: "c_blankie.hide", label: `Hide your ${thing}`, hint: "under the mattress", act: "avoid", style: "risk", weight: 0.25, apply: () => ({ text: `When ${who} wanted to retire your ${thing}, you hid it under the mattress. It was found during spring cleaning years later, and ${who} kept it.`, mood: 2 }) },
+          { id: "c_blankie.fix", label: `Ask ${who} to fix it`, hint: "a patch, a few stitches", act: "seekHelp", style: "family", weight: 0.3, apply: () => ({ text: `You asked ${who} to fix your ${thing} instead of throwing it out, and ${who} sewed patches on it until it was more patch than ${thing}.`, mood: 3 }) },
+          { id: "c_blankie.deal", label: "Make a deal: bedtime only", hint: "a fair compromise", act: "negotiate", style: "social", weight: 0.25, apply: () => ({ text: `You and ${who} made a deal about your ${thing}: bedtime only. You stuck to it, mostly.`, mood: 1 }) },
+          { id: "c_blankie.brave", label: "Say goodbye like a big kid", hint: "a brave little ceremony", act: "wait", style: "safe", weight: 0.12, apply: () => ({ text: `You said goodbye to your ${thing} with a little ceremony, and got a sticker for being brave. You cried a bit that night, and then you were fine.`, mood: -1 }) },
+          { id: "c_blankie.everywhere", label: "Take it everywhere, forever", hint: "no surrender", act: "insist", style: "self", weight: 0.08, apply: () => ({ text: `Asked to give up your ${thing}, you refused, and took it to kindergarten, to the dentist and on vacation. It is still in a box somewhere.`, mood: 2 }) },
+        ],
+      };
+    },
+  },
+  A("c_imaginary", [3, 6], 0.017, ["You had an imaginary friend named {Pickles|Mr. Bigglesworth|Zippy|Captain Steve|Lulu}, who {needed a seat at dinner.|got blamed for most of the messes.|had very strong opinions about bedtime.}", "Your imaginary friend {lived in the closet|was a dragon|was a horse named Thunder}, and {your parents set a place for it at Thanksgiving, as a joke you took seriously.|it moved away the summer you started school.}", "For a whole year you talked to an imaginary friend {in the backyard|under the kitchen table}, {and your grandmother politely asked how it was doing.|until your little cousin swore she could see it too.}"], { when: atHome }),
+  A("c_lostStore", [3, 7], 0.013, s => [`You got lost in ${s.year < 1990 ? "the Sears" : s.year < 2005 ? "the Kmart" : "the Target"}, {hid inside a circular clothes rack,|wandered to the toy aisle,} and {heard your name over the loudspeaker.|a nice lady walked you to the customer service desk.}`, `You lost ${s.year < 1980 ? "Mom" : "your parents"} at {the county fair|the mall|the beach}, {and a security guard bought you an ice cream while they found you.|and decided to live there now, until they showed up five minutes later.}`, "At the grocery store you followed the wrong pair of legs for two aisles, {and when the stranger turned around you both screamed.|and learned to hold onto the cart after that.}"], { when: atHome, mood: -1 }),
+  A("c_haircut", [3, 8], 0.013, (s, ctx) => [`You gave yourself a haircut with the kitchen scissors, {and school picture day was the next morning.|and ${grownUp(s, ctx)} just said “Oh, honey.”|leaving one long piece in front, on purpose.}`, `You cut ${youngerSibs(s, 2).length ? sibName(youngerSibs(s, 2)[0]) + "'s" : "your best friend's"} bangs “to help,” {and both of you were in trouble.|and it took three months to grow out.}`, "You tried to give the dog a haircut, {and the dog has never fully trusted you since.|and it looked like a lawn mowed by a raccoon.}"], { when: atHome, mood: 1 }),
+  {
+    id: "c_checkout", once: true, ages: [3, 6], when: atHome, p: () => 0.021,
+    choice: (s, ctx) => {
+      const who = grownUp(s, ctx), snack = ctx.rng.pick(snackOf(s.year)), store = s.year < 1975 ? "the A&P" : s.year < 2000 ? "the grocery store" : "Walmart";
+      return {
+        prompt: `At the checkout at ${store}, ${snack} is right at your eye level, and ${who} said no. What do you do?`,
+        options: [
+          { id: "c_checkout.scream", label: "Lie down on the floor and wail", hint: "maximum volume", act: "insist", style: "self", weight: 0.2, apply: () => ({ text: `At the checkout at ${store}, you threw a full tantrum over ${snack}. ${who} carried you out like a sack of potatoes, and an old man gave ${who} a sympathetic nod.`, mood: -2 }) },
+          { id: "c_checkout.ask", label: "Ask very, very nicely", hint: "please and thank you", act: "talk", style: "social", weight: 0.3, apply: (s2, c) => (c.rng() < 0.5 ? { text: `At the checkout, you asked for ${snack} with your best please and thank you, and ${who} was so impressed you got it.`, mood: 3 } : { text: `At the checkout, you asked for ${snack} with your best manners. ${who} still said no, but told you it was the politest no ever.`, mood: 0 }) },
+          { id: "c_checkout.sneak", label: "Sneak it onto the belt", hint: "maybe nobody notices", act: "avoid", style: "risk", weight: 0.15, apply: () => ({ text: `At the checkout, you slid ${snack} onto the belt behind the milk. The cashier noticed, ${who} noticed, and everyone in line noticed.`, mood: -1 }) },
+          { id: "c_checkout.deal", label: "Offer to carry the groceries", hint: "earn it", act: "negotiate", style: "family", weight: 0.2, apply: () => ({ text: `At the checkout, you offered to carry the groceries to the car in exchange for ${snack}. You carried one loaf of bread, heroically, and got your treat.`, mood: 3 }) },
+          { id: "c_checkout.wait", label: "Let it go, and look at the gumball machine", hint: "next time", act: "wait", style: "safe", weight: 0.15, apply: () => ({ text: `At the checkout, you let ${snack} go without a fuss, and on the way out ${who} gave you a penny for the gumball machine.`, mood: 2 }) },
+        ],
+      };
+    },
+  },
+  A("c_tooth", [5, 7], 0.35, s => [`You lost your first tooth {biting an apple|on the playground|in a piece of taffy}, and the Tooth Fairy left ${toothMoney(s.year)} under your pillow.`, `Your first tooth came out {while you were wiggling it during a spelling test.|tied to a doorknob, which you would not recommend.} {You put it in a little envelope for the Tooth Fairy.|The Tooth Fairy left ${toothMoney(s.year)} and a note in suspiciously familiar handwriting.}`, `You lost a front tooth {right before school pictures,|the week of the Christmas pageant,} and {whistled through the gap for a month.|the Tooth Fairy left ${toothMoney(s.year)}.}`], { when: atHome, mood: 2 }),
+  A("c_er", [2, 9], 0.008, ["You stuck a {dried pea|bead|crayon tip} up your nose to see what would happen, and what happened was a trip to the emergency room.", "You swallowed a {penny|Lego piece|marble}, and {your parents spent two days checking.|the doctor said it would “pass,” and it did.}", "You jumped off the {top bunk|garage roof|back porch} with a bedsheet for a cape, {and learned that it does not work.|and got four stitches in your chin.}"], { when: atHome, mood: -1, max: 2, once: false, cooldown: 3 }),
+  A("c_firstMovie", [3, 7], 0.038, (s, ctx) => {
+    const y = s.year;
+    const film = y < 1964 ? "a Disney movie at the old downtown theater" : y < 1975 ? "Mary Poppins on a re-release" : y < 1982 ? "Star Wars" : y < 1989 ? "E.T." : y < 1994 ? "The Little Mermaid" : y < 1995 ? "The Lion King" : y < 2003 ? "Toy Story" : y < 2013 ? "Finding Nemo" : y < 2020 ? "Frozen" : "Encanto";
+    return [`Your first movie in a real theater was ${film}, {and you were so scared of the dark you sat on ${grownUp(s, ctx)}'s lap.|and you spilled a whole box of popcorn in the first five minutes.|and you walked out singing.}`, `${cap(film)} was your first trip to the movies, {and the screen was the biggest thing you had ever seen.|and you fell asleep halfway through and insisted you saw it all.}`, `The first movie you saw in a theater: ${film}. {You talked about it for a month.|You cried at the sad part and pretended you had something in your eye.}`];
+  }, { when: atHome, mood: 3 }),
+  {
+    id: "c_newBaby", once: true, ages: [2, 9], when: s => youngerSibs(s, 0).some(x => s.age - x.bornAt <= 1), p: () => 0.054,
+    choice: (s, ctx) => {
+      const b = youngerSibs(s, 0).find(x => s.age - x.bornAt <= 1), name = sibName(b), dad = s.father.alive ? "Dad" : "Grandma";
+      return {
+        prompt: `Since ${name} came home, everyone only seems to look at the baby. How do you handle it?`,
+        options: [
+          { id: "c_newBaby.help", label: "Be the big helper", hint: "fetch diapers, sing songs", act: "care", style: "family", weight: 0.35, apply: () => ({ text: `When ${name} came home and took all the attention, you decided to be the big helper, fetching diapers and singing songs. ${cap(name)}'s first laugh was at you.`, mood: 3 }) },
+          { id: "c_newBaby.baby", label: "Act like a baby too", hint: "two can play this game", act: "insist", style: "self", weight: 0.2, apply: () => ({ text: `When ${name} came home and took all the attention, you started crawling and asking for a bottle. It got you some laughs and, eventually, a talk.`, mood: 0 }) },
+          { id: "c_newBaby.alone", label: `Ask ${dad} for a day just you two`, hint: "special time", act: "talk", style: "social", weight: 0.2, apply: () => ({ text: `When ${name} came home, you asked ${dad} for a day just for you. You went for pancakes and the hardware store, and it was one of the best days of your life.`, mood: 4 }) },
+          { id: "c_newBaby.draw", label: "Draw a picture for the baby", hint: "a gift", act: "hobby", style: "learn", weight: 0.15, apply: () => ({ text: `When ${name} came home, you drew a picture of the whole family, with the baby very small and you very large. It went on the fridge.`, mood: 2 }) },
+          { id: "c_newBaby.ignore", label: "Ignore the baby completely", hint: "it'll go away", act: "avoid", style: "self", weight: 0.1, apply: () => ({ text: `When ${name} came home, you refused to look at the baby for a week. Then ${name} grabbed your finger, and that was the end of that.`, mood: 1 }) },
+        ],
+      };
+    },
+  },
+  A("c_cartoons", [4, 10], 0.029, s => {
+    const w = kidsCulture(s.year).watch;
+    return [`You ${w[0]}, {in your pajamas with a bowl of sugary cereal balanced on your knees.|lying on your stomach a foot from the TV.|and nobody could get a word out of you.}`, `You ${w[1 % w.length]}, {so often you knew every line.|fighting your siblings for the good spot on the couch.|and then acted out every episode in the backyard.}`, `You ${w[2 % w.length]}{, and it was the best part of the week.|, and sang the theme song in the bathtub.|, even when you were supposed to be getting ready for church.}`];
+  }, { when: atHome, mood: 2 }),
+  // ---------- friends and the things kids want ----------
+  {
+    id: "c_pet", domain: "family", channel: "good", once: true, ages: [5, 12], when: s => atHome(s) && !s.flags.pet, p: () => 0.018,
     choice: (s, ctx) => {
       const who = grownUp(s, ctx);
       const sc = pickScene(ctx, [
@@ -213,33 +261,7 @@ export const CHILD = [
     },
   },
   {
-    // The activity a kid takes up, by era: Little League from 1939, karate classes spread in the 1970s, youth soccer boomed in the 1970s–80s.
-    id: "c_talent", domain: "study", channel: "good", once: true, ages: [6, 10], when: s => atHome(s) && !s.flags.talent, p: () => 0.12,
-    choice: (s, ctx) => {
-      const who = grownUp(s, ctx), money = homeMoney(s, ctx) === "tight";
-      const lead = scene(ctx, [
-        `${who} wants you to try an activity this year, and the sign-up sheet is on the fridge.`,
-        money ? `Money is tight, but ${who} says you can pick one activity this year, and ${who} will find a way to pay for it.` : null,
-        `Your best friend just signed up for something, and ${who} asked what you'd like to do.`,
-        "The community center flyer came home in your backpack with a whole list of things to try.",
-      ]);
-      const set = (key, text, mood = 4) => (s2, c) => { s2.flags.talent = key; return { text: c.w(text), mood }; };
-      const sport = s.year >= 1975 ? ["soccer", "Sign up for soccer", "orange slices at halftime", "You signed up for soccer, ran in a herd with eleven other kids chasing the ball, and {loved the orange slices at halftime.|scored a goal for the other team once, which you still hear about.}"] : ["baseball", s.sex === "female" && s.year < 1974 ? "Sign up for softball" : "Sign up for Little League", "a glove that smells like leather", "You signed up for {Little League|softball}, {broke in your glove by sleeping with it under your mattress,|played right field and picked a lot of dandelions,} and {hit a double in the last game of the season.|ate a lot of snow cones.}"];
-      return {
-        prompt: `${lead} What do you pick?`,
-        options: [
-          { id: "c_talent.piano", label: "Piano lessons", hint: money ? "the most expensive" : "practice every day", act: "study", style: "learn", weight: 0.2, apply: set("piano", "You started piano lessons with {an old lady who smelled like peppermints|a teacher at the church|a college student who was very patient}, {and practiced scales while the other kids played outside.|and by spring you could play “Heart and Soul” with anyone.}") },
-          { id: "c_talent.sport", label: sport[1], hint: sport[2], act: "exercise", style: "health", weight: 0.3, apply: set(sport[0], sport[3]) },
-          { id: "c_talent.scouts", label: s.sex === "female" && s.year < 2018 ? "Join the Girl Scouts" : "Join the Scouts", hint: "badges and campouts", act: "socialize", style: "social", weight: 0.18, apply: set("scouts", `You joined the ${s.sex === "female" && s.year < 2018 ? "Girl Scouts" : "Scouts"}, {earned a sash full of badges,|sold ${s.sex === "female" && s.year < 2018 ? "Girl Scout cookies door to door" : "popcorn door to door"},} and {learned to build a fire on the first campout.|got very good at knots.}`) },
-          { id: "c_talent.dance", label: s.year >= 1975 ? ctx.rng.pick(["Karate classes", "Dance classes"]) : "Dance classes", hint: "a recital, or a belt", act: "exercise", style: "risk", weight: 0.14, apply: (s2, c) => { const karate = s2.year >= 1975 && c.rng() < 0.5; s2.flags.talent = karate ? "karate" : "dance"; return { text: karate ? c.w("You started karate, {bowed to the sensei every time,|yelled “Hi-yah!” at everything for a year,} and {earned your yellow belt by spring.|broke a board at the demonstration.}") : c.w("You started dance classes, {in tap shoes that clicked all over the kitchen,|and wore a sequined costume at the recital,} and {missed one step and kept smiling anyway.|did not want to take the costume off.}"), mood: 4 }; } },
-          { id: "c_talent.art", label: s.year >= 2012 ? "A coding club" : "Art classes", hint: s.year >= 2012 ? "make your own game" : "paint and clay", act: "hobby", style: "learn", weight: 0.1, apply: s.year >= 2012 ? set("code", "You joined a coding club and {made a game where a cat eats tacos.|learned that computers do exactly what you say, not what you mean.}") : set("art", "You took art classes, {made a lopsided clay pot that your grandmother used for thirty years,|painted a horse that looked like a dog,} and {loved every minute.|got your painting hung at the library.}") },
-          { id: "c_talent.none", label: "Nothing. Just play", hint: "free time is the best time", act: "rest", style: "self", weight: 0.08, apply: s2 => { s2.flags.talent = "none"; return { text: "You didn't want any activity. You just wanted to play outside until dinner, and that's what you did.", mood: 2 }; } },
-        ],
-      };
-    },
-  },
-  {
-    id: "c_bullied", domain: "family", channel: "bad", once: true, ages: [7, 12], when: school, p: () => 0.06,
+    id: "c_bullied", domain: "family", channel: "bad", once: true, ages: [7, 12], when: school, p: () => 0.018,
     choice: (s, ctx) => {
       const who = grownUp(s, ctx), sib = olderSibs(s).find(x => s.age - x.bornAt >= 12), f = bestFriend(s);
       const [lead, then] = scene(ctx, [
@@ -262,7 +284,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_showTell", once: true, ages: [5, 8], when: school, p: () => 0.15,
+    id: "c_showTell", once: true, ages: [5, 8], when: school, p: () => 0.029,
     choice: (s, ctx) => {
       const baby = youngerSibs(s, 0).find(x => s.age - x.bornAt <= 2), pet = s.flags.pet;
       return {
@@ -278,7 +300,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_lemonade", domain: "wealth", channel: "good", once: true, ages: [6, 11], when: atHome, p: () => 0.1,
+    id: "c_lemonade", domain: "wealth", channel: "good", once: true, ages: [6, 11], when: atHome, p: () => 0.018,
     choice: (s, ctx) => {
       const price = s.year < 1970 ? "a nickel" : s.year < 1990 ? "a quarter" : s.year < 2010 ? "fifty cents" : "a dollar", f = bestFriend(s);
       return {
@@ -294,7 +316,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_allowance", once: true, ages: [7, 12], when: atHome, p: () => 0.1,
+    id: "c_allowance", once: true, ages: [7, 12], when: atHome, p: () => 0.018,
     choice: (s, ctx) => {
       const k = kidsCulture(s.year), buy = ctx.rng.pick(k.buy), snack = ctx.rng.pick(snackOf(s.year));
       const money = s.year < 1970 ? "a dollar" : s.year < 1990 ? "five dollars" : s.year < 2010 ? "ten dollars" : "twenty dollars";
@@ -311,7 +333,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_toyCraze", once: true, ages: [6, 11], when: atHome, p: () => 0.12,
+    id: "c_toyCraze", once: true, ages: [6, 11], when: atHome, p: () => 0.021,
     choice: (s, ctx) => {
       const toy = ctx.rng.pick(kidsCulture(s.year).toys), who = grownUp(s, ctx), money = homeMoney(s, ctx) === "tight";
       return {
@@ -327,7 +349,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_party", once: true, ages: [5, 10], when: atHome, p: () => 0.15,
+    id: "c_party", once: true, ages: [5, 10], when: atHome, p: () => 0.025,
     choice: (s, ctx, gu = grownUp(s, ctx)) => {
       const place = s.year >= 1980 ? "Chuck E. Cheese" : "the roller rink";
       return {
@@ -343,7 +365,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_camp", once: true, ages: [8, 12], when: atHome, p: () => 0.12,
+    id: "c_camp", once: true, ages: [8, 12], when: atHome, p: () => 0.021,
     choice: (s, ctx) => {
       const money = homeMoney(s, ctx) === "tight";
       return {
@@ -359,7 +381,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_halloween", once: true, ages: [5, 11], when: atHome, p: () => 0.2,
+    id: "c_halloween", once: true, ages: [5, 11], when: atHome, p: () => 0.029,
     choice: (s, ctx) => {
       const store = s.year < 1985 ? "a plastic mask with an elastic band from the drugstore" : "a store-bought costume", f = bestFriend(s);
       const hero = s.year < 1970 ? "Superman" : s.year < 1985 ? "Wonder Woman" : s.year < 2000 ? "a Ninja Turtle" : s.year < 2012 ? "Spider-Man" : s.year < 2020 ? "Elsa" : "a Minecraft creeper";
@@ -375,31 +397,9 @@ export const CHILD = [
       };
     },
   },
-  {
-    // For the families who keep Christmas: the year you figured it out.
-    id: "c_santa", once: true, ages: [6, 9], when: (s, ctx) => atHome(s) && holidayOf(s, ctx) === "Christmas", p: () => 0.3,
-    choice: (s, ctx) => {
-      const little = youngerSibs(s, 2)[0], who = grownUp(s, ctx);
-      const lead = scene(ctx, [
-        `You found the presents in ${who === "Grandma" ? "Grandma's" : "your parents'"} closet a week before Christmas, still in the store bags.`,
-        "A kid at school says Santa isn't real, and the handwriting on Santa's gift tags looks a lot like Mom's.",
-        "You stayed up on Christmas Eve to see Santa, and saw your father eating the cookies.",
-      ]);
-      return {
-        prompt: `${lead} What do you do?`,
-        options: [
-          { id: "c_santa.keep", label: little ? `Keep the secret for ${sibShort(little)}` : "Keep the secret", hint: "the magic is worth it", act: "care", style: "family", weight: little ? 0.35 : 0.25, apply: s2 => { s2.flags.santa = "kept"; return { text: little ? `You figured out the truth about Santa and kept it to yourself, for ${sibName(little)}'s sake. You became one of the helpers, and loved it.` : "You figured out the truth about Santa and decided to keep the secret. You got presents from Santa for three more years.", mood: 2 }; } },
-          { id: "c_santa.ask", label: `Ask ${who} straight out`, hint: "the truth, please", act: "talk", style: "social", weight: 0.3, apply: s2 => { s2.flags.santa = "asked"; return { text: `You asked ${who} straight out about Santa. ${who} sat down with you and explained that Santa is a feeling people give each other. You cried a little, then felt very grown up.`, mood: 0 }; } },
-          { id: "c_santa.believe", label: "Decide to believe anyway", hint: "evidence is overrated", act: "spiritual", style: "self", weight: 0.2, apply: s2 => { s2.flags.santa = "believed"; return { text: "You saw the evidence about Santa and decided to believe anyway, on purpose, for one more year.", mood: 2 }; } },
-          { id: "c_santa.tell", label: "Tell everyone at school", hint: "you know something they don't", act: "insist", style: "risk", weight: 0.1, apply: s2 => { s2.flags.santa = "told"; return { text: "You announced the truth about Santa at recess, and three kids cried. Your teacher called home. It was not your finest moment.", mood: -2 }; } },
-          { id: "c_santa.test", label: "Set a trap to be sure", hint: "science", act: "study", style: "learn", weight: 0.1, apply: s2 => { s2.flags.santa = "tested"; return { text: "You set up a tripwire of yarn and jingle bells by the tree. At midnight you heard your father swear quietly. Case closed.", mood: 3 }; } },
-        ],
-      };
-    },
-  },
   // ---------- small tests of character ----------
   {
-    id: "c_testSign", domain: "study", channel: "bad", once: true, ages: [7, 12], when: school, p: () => 0.08,
+    id: "c_testSign", domain: "study", channel: "bad", once: true, ages: [7, 12], when: school, p: () => 0.021,
     choice: (s, ctx) => {
       const who = grownUp(s, ctx), subject = ctx.rng.pick(["spelling", "math", "science", "social studies"]), sib = olderSibs(s).find(x => s.age - x.bornAt >= 14);
       const [lead, then] = scene(ctx, [
@@ -419,7 +419,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_window", once: true, ages: [7, 12], when: atHome, p: () => 0.06,
+    id: "c_window", once: true, ages: [7, 12], when: atHome, p: () => 0.021,
     choice: (s, ctx, gu = grownUp(s, ctx)) => {
       const ball = ctx.rng.pick(["baseball", "football", "kickball", "Frisbee"]), neighbor = ctx.rng.pick(["Mr. Kowalski", "Mrs. Henderson", "Mr. Russo", "Mrs. Washington", "Mrs. Park"]), sib = anySib(s, ctx, 4);
       return {
@@ -435,7 +435,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_classPet", once: true, ages: [6, 9], when: school, p: () => 0.1,
+    id: "c_classPet", once: true, ages: [6, 9], when: school, p: () => 0.036,
     choice: (s, ctx, gu = grownUp(s, ctx)) => {
       const pet = ctx.rng.pick([["hamster", "Mr. Whiskers"], ["guinea pig", "Cupcake"], ["gerbil", "Speedy"]]);
       return {
@@ -451,7 +451,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_scienceFair", domain: "study", channel: "good", once: true, ages: [8, 12], when: school, p: () => 0.12,
+    id: "c_scienceFair", domain: "study", channel: "good", once: true, ages: [8, 12], when: school, p: () => 0.029,
     choice: (s, ctx, gu = grownUp(s, ctx)) => ({
       prompt: `The science fair is in three weeks. What's your project?`,
       options: [
@@ -464,7 +464,7 @@ export const CHILD = [
     }),
   },
   {
-    id: "c_misjudged", once: true, ages: [7, 12], when: school, p: () => 0.06,
+    id: "c_misjudged", once: true, ages: [7, 12], when: school, p: () => 0.021,
     choice: (s, ctx, gu = grownUp(s, ctx)) => {
       const thing = ctx.rng.pick(["the broken pencil sharpener", "the missing recess ball", "a note passed in class", "the mess in the reading corner"]), f = bestFriend(s);
       return {
@@ -480,7 +480,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_found", once: true, ages: [6, 12], when: atHome, p: () => 0.06,
+    id: "c_found", once: true, ages: [6, 12], when: atHome, p: () => 0.021,
     choice: (s, ctx, gu = grownUp(s, ctx)) => {
       const bill = s.year < 1975 ? "a five-dollar bill" : s.year < 2000 ? "a twenty-dollar bill" : "a fifty-dollar bill", snack = ctx.rng.pick(snackOf(s.year));
       const where = ctx.rng.pick(["on the playground", "in the parking lot at the grocery store", "on the sidewalk outside church", "under the bleachers"]);
@@ -497,7 +497,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_sibBlame", domain: "family", channel: "bad", tags: ["siblings"], about: "siblings", once: true, ages: [6, 12], when: s => atHome(s) && bornSibs(s, 4).length > 0, p: () => 0.08,
+    id: "c_sibBlame", domain: "family", channel: "bad", tags: ["siblings"], about: "siblings", once: true, ages: [6, 12], when: s => atHome(s) && bornSibs(s, 4).length > 0, p: () => 0.029,
     choice: (s, ctx) => {
       const x = ctx.rng.pick(bornSibs(s, 4)), name = sibName(x), who = grownUp(s, ctx);
       const broke = ctx.rng.pick(["Mom's favorite vase", "the living room lamp", "the TV remote", "Grandma's cookie jar"]);
@@ -514,7 +514,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_newKid", domain: "family", channel: "good", tags: ["friends"], once: true, ages: [7, 12], when: school, p: () => 0.08,
+    id: "c_newKid", domain: "family", channel: "good", tags: ["friends"], once: true, ages: [7, 12], when: school, p: () => 0.029,
     choice: (s, ctx) => {
       const where = ctx.rng.pick(s.year < 1980 ? ["Italy", "Mexico", "Cuba", "Korea", "Poland"] : s.year < 2000 ? ["Vietnam", "Mexico", "India", "El Salvador", "Russia"] : ["Mexico", "India", "Somalia", "Guatemala", "Ukraine", "the Philippines"]);
       const sex = ctx.rng() < 0.7 ? s.sex : s.sex === "male" ? "female" : "male";
@@ -533,7 +533,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_picky", once: true, ages: [4, 9], when: atHome, p: () => 0.12,
+    id: "c_picky", once: true, ages: [4, 9], when: atHome, p: () => 0.025,
     choice: (s, ctx) => {
       const food = ctx.rng.pick(s.year < 1975 ? ["liver and onions", "lima beans", "creamed spinach", "tuna casserole"] : ["broccoli", "brussels sprouts", "meatloaf", "green beans"]), who = grownUp(s, ctx);
       return {
@@ -549,7 +549,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_chores", domain: "wealth", channel: "good", once: true, ages: [9, 12], when: atHome, p: () => 0.12,
+    id: "c_chores", domain: "wealth", channel: "good", once: true, ages: [9, 12], when: atHome, p: () => 0.025,
     choice: (s, ctx) => {
       const route = s.year < 2000;
       return {
@@ -565,7 +565,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_talentShow", once: true, ages: [7, 12], when: school, p: () => 0.08,
+    id: "c_talentShow", once: true, ages: [7, 12], when: school, p: () => 0.029,
     choice: (s, ctx) => {
       const f = bestFriend(s), song = s.year < 1965 ? "a Patsy Cline song" : s.year < 1980 ? "a Jackson 5 song" : s.year < 1995 ? "a Whitney Houston song" : s.year < 2010 ? "a Britney Spears song" : "a Taylor Swift song";
       return {
@@ -581,7 +581,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_twoHomes", domain: "family", channel: "bad", tags: ["father", "mother"], once: true, ages: [5, 12], when: s => atHome(s) && s.flags.parentsSplit && s.father.alive && s.mother.alive, p: () => 0.3,
+    id: "c_twoHomes", domain: "family", channel: "bad", tags: ["father", "mother"], once: true, ages: [5, 12], when: s => atHome(s) && s.flags.parentsSplit && s.father.alive && s.mother.alive, p: () => 0.107,
     choice: (s, ctx) => {
       const lives = liveWith(s, ctx), other = lives === "mother" ? "Dad" : "Mom", home = lives === "mother" ? "Mom" : "Dad";
       return {
@@ -597,7 +597,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_tvRules", once: true, ages: [6, 11], when: atHome, p: () => 0.08,
+    id: "c_tvRules", once: true, ages: [6, 11], when: atHome, p: () => 0.029,
     choice: (s, ctx) => {
       const screen = s.year < 1985 ? "TV" : s.year < 2008 ? "video games" : "the tablet", who = grownUp(s, ctx);
       return {
@@ -614,7 +614,7 @@ export const CHILD = [
   },
   {
     // The Scholastic book fair, in elementary school libraries from the 1980s.
-    id: "c_bookFair", once: true, ages: [6, 11], when: s => school(s) && s.year >= 1982, p: () => 0.15,
+    id: "c_bookFair", once: true, ages: [6, 11], when: s => school(s) && s.year >= 1982, p: () => 0.054,
     choice: (s, ctx) => {
       const book = s.year < 1995 ? "a Choose Your Own Adventure book" : s.year < 2005 ? "a Goosebumps book" : s.year < 2015 ? "a Diary of a Wimpy Kid book" : "a Dog Man book";
       return {
@@ -630,7 +630,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_dream", once: true, ages: [6, 9], when: school, p: () => 0.2,
+    id: "c_dream", once: true, ages: [6, 9], when: school, p: () => 0.072,
     choice: (s, ctx) => {
       const modern = s.year >= 2010 ? ["a YouTuber", "film your own videos"] : s.year >= 1985 ? ["a famous singer", "concerts in your bedroom"] : ["a cowboy", "a hat and a horse"];
       const space = s.year >= 1961 ? "an astronaut" : "a pilot";
@@ -649,7 +649,7 @@ export const CHILD = [
     },
   },
   {
-    id: "c_friendFight", domain: "family", channel: "bad", tags: ["friends"], once: true, ages: [8, 12], when: s => atHome(s) && !!bestFriend(s), p: () => 0.1,
+    id: "c_friendFight", domain: "family", channel: "bad", tags: ["friends"], once: true, ages: [8, 12], when: s => atHome(s) && !!bestFriend(s), p: () => 0.036,
     choice: (s, ctx, gu = grownUp(s, ctx)) => {
       const f = bestFriend(s), other = ctx.person({ role: "friend", sex: f.sex, birthYear: s.birthYear, how: "school" });
       return {
@@ -667,7 +667,7 @@ export const CHILD = [
 
   // ---------- everyday childhood ----------
   {
-    id: "c_recital", ages: [7, 12], max: 2, cooldown: 2, when: s => atHome(s) && s.flags.talent && s.flags.talent !== "none", p: () => 0.2,
+    id: "c_recital", ages: [7, 12], max: 2, cooldown: 2, when: s => atHome(s) && s.flags.talent && s.flags.talent !== "none", p: () => 0.05,
     apply: (s, ctx) => {
       const t = s.flags.talent;
       const lines = {
@@ -683,21 +683,21 @@ export const CHILD = [
       return { text: ctx.w(lines), mood: 4 };
     },
   },
-  A("c_fieldTrip", [6, 11], 0.12, s => {
+  A("c_fieldTrip", [6, 11], 0.017, s => {
     const place = s.year < 1975 ? ["the dairy farm", "the fire station", "the state capitol"] : ["the science museum", "the zoo", "the apple orchard", "the planetarium"];
     return [`On the class field trip to ${place[0]}, {you got to sit in the front seat of the bus.|a goat ate your permission slip.|you sang “99 Bottles of Pop on the Wall” all the way there.}`, `Your class went to ${place[1]}, {and you bought a souvenir pencil with your lunch money.|and the tour guide let you ask the most questions.|and you lost your partner in the gift shop.}`, `The field trip to ${place[2 % place.length]} {was the best day of the year.|ended with you asleep on the bus with your head on your best friend's shoulder.}`];
-  }, { when: school, max: 2, once: false, cooldown: 2, mood: 3 }),
-  A("c_fieldDay", [6, 11], 0.15, ["On field day you {won the sack race|came in last in the three-legged race, laughing too hard to run|anchored the tug-of-war team}, and {got a ribbon.|got a popsicle and a sunburn.}", "Field day: {an egg-and-spoon race, a water balloon toss, and a lot of grass stains.|the gym teacher's whistle, a parachute, and a hundred screaming kids.} You loved it.", "At field day your class {won the relay because of you.|lost every event and had the most fun.}"], { when: school, mood: 3 }),
-  A("c_sleepover", [7, 11], 0.12, s => [`At your first sleepover at ${friendName(s, "a friend")}'s house, {you got homesick at two in the morning and called home.|you stayed up until dawn and fell asleep during breakfast.|you played Light as a Feather, Stiff as a Board, and swore it worked.}`, `${s.year >= 1980 ? "At a sleepover you watched a scary movie you were not allowed to watch" : "At a sleepover you told ghost stories by flashlight"}, {and didn't sleep for two nights after.|and pretended you weren't scared.}`, "You went to your first slumber party, {where you ate a whole bowl of popcorn and a lot of candy.|and the dad made pancakes in the morning.}"], { when: atHome, mood: 3 }),
-  A("c_roadTrip", [4, 12], 0.12, s => {
+  }, { when: school, mood: 3 }),
+  A("c_fieldDay", [6, 11], 0.021, ["On field day you {won the sack race|came in last in the three-legged race, laughing too hard to run|anchored the tug-of-war team}, and {got a ribbon.|got a popsicle and a sunburn.}", "Field day: {an egg-and-spoon race, a water balloon toss, and a lot of grass stains.|the gym teacher's whistle, a parachute, and a hundred screaming kids.} You loved it.", "At field day your class {won the relay because of you.|lost every event and had the most fun.}"], { when: school, mood: 3 }),
+  A("c_sleepover", [7, 11], 0.021, s => [`At your first sleepover at ${friendName(s, "a friend")}'s house, {you got homesick at two in the morning and called home.|you stayed up until dawn and fell asleep during breakfast.|you played Light as a Feather, Stiff as a Board, and swore it worked.}`, `${s.year >= 1980 ? "At a sleepover you watched a scary movie you were not allowed to watch" : "At a sleepover you told ghost stories by flashlight"}, {and didn't sleep for two nights after.|and pretended you weren't scared.}`, "You went to your first slumber party, {where you ate a whole bowl of popcorn and a lot of candy.|and the dad made pancakes in the morning.}"], { when: atHome, mood: 3 }),
+  A("c_roadTrip", [4, 12], 0.021, s => {
     const car = s.year < 1985 ? "the station wagon" : s.year < 2005 ? "the minivan" : "the SUV", dest = ["the Grand Canyon", "Mount Rushmore", "Yellowstone", "Niagara Falls", "the Smoky Mountains", "the Gulf Coast"];
     const nav = s.year < 2005 ? "{Dad refused to ask for directions for two hundred miles.|Mom navigated with a giant fold-out map that never folded back.}" : "{The GPS sent you down a dirt road, and nobody let Dad forget it.|You watched movies on a portable DVD player the whole way.}";
     return [`The family drove to ${dest[0]} in ${car}. ${nav}`, `You spent a week in the back of ${car} on a road trip to ${dest[1 + (s.age % 5)]}, {asking “Are we there yet?” roughly every mile.|playing the license plate game until you found Alaska.|with your feet on the dashboard and a cooler of sandwiches.}`, `On the family road trip, {you saw ${dest[(s.age + 2) % 6]} and it was even bigger than the postcards.|you stayed in motels with pools, which was the best part.} ${nav}`];
   }, { when: atHome, mood: 4 }),
-  A("c_disney", [4, 10], 0.04, s => [`Your family went to ${s.year >= 1971 ? "Disney World" : "Disneyland"}, {and you met Mickey and could not speak.|and you rode Space Mountain three times.|and it rained, and you didn't care at all.}`, `The family saved up for a trip to ${s.year >= 1971 ? "Disney World" : "Disneyland"}, {and you wore your mouse ears for a month after.|and you cried when the fireworks ended.}`, `A trip to ${s.year >= 1971 ? "Disney World" : "Disneyland"}: {long lines, a turkey leg, and your father asleep on a bench.|the teacups until you were dizzy.}`], { when: s => atHome(s) && s.year >= 1956, mood: 5 }),
-  A("c_snowDay", [5, 12], 0.15, s => [`It snowed so hard school was canceled, and {you listened to the radio list the closings until your school came on.|you spent the whole day sledding down the big hill by the church.|you built a snow fort with a working door.}`, "Snow day! {You built a snowman with a carrot nose and Dad's old hat.|You came inside only for hot chocolate.|You had a snowball fight with every kid on the street.}", `${s.year >= 2020 ? "School tried to make the snow day a Zoom day, but" : "On the snow day"} {you made snow angels until you couldn't feel your feet.|you shoveled the neighbors' driveways for five dollars each.}`], { when: s => school(s) && snowy(s), max: 2, once: false, cooldown: 2, mood: 4 }),
+  A("c_disney", [4, 10], 0.013, s => [`Your family went to ${s.year >= 1971 ? "Disney World" : "Disneyland"}, {and you met Mickey and could not speak.|and you rode Space Mountain three times.|and it rained, and you didn't care at all.}`, `The family saved up for a trip to ${s.year >= 1971 ? "Disney World" : "Disneyland"}, {and you wore your mouse ears for a month after.|and you cried when the fireworks ended.}`, `A trip to ${s.year >= 1971 ? "Disney World" : "Disneyland"}: {long lines, a turkey leg, and your father asleep on a bench.|the teacups until you were dizzy.}`], { when: s => atHome(s) && s.year >= 1956, mood: 5 }),
+  A("c_snowDay", [5, 12], 0.021, s => [`It snowed so hard school was canceled, and {you listened to the radio list the closings until your school came on.|you spent the whole day sledding down the big hill by the church.|you built a snow fort with a working door.}`, "Snow day! {You built a snowman with a carrot nose and Dad's old hat.|You came inside only for hot chocolate.|You had a snowball fight with every kid on the street.}", `${s.year >= 2020 ? "School tried to make the snow day a Zoom day, but" : "On the snow day"} {you made snow angels until you couldn't feel your feet.|you shoveled the neighbors' driveways for five dollars each.}`], { when: s => school(s) && snowy(s), mood: 4 }),
   {
-    id: "c_holiday", ages: [3, 10], max: 2, cooldown: 3, when: atHome, p: () => 0.12,
+    id: "c_holiday", once: true, ages: [3, 10], when: atHome, p: () => 0.021,
     apply: (s, ctx) => {
       const h = holidayOf(s, ctx), toy = ctx.rng.pick(kidsCulture(s.year).toys);
       const lines = {
@@ -709,11 +709,11 @@ export const CHILD = [
       return { text: ctx.w(lines), mood: 4 };
     },
   },
-  A("c_treehouse", [7, 11], 0.08, s => [`You and ${friendName(s, "the neighbor kids")} built a {tree house|fort in the woods|clubhouse in the garage} out of {scrap wood and a lot of nails.|old pallets and a tarp.} {It had a secret password.|No grown-ups were allowed.}`, "You built a fort out of every couch cushion in the house, and {defended it all weekend.|refused to come out for dinner.}", "Your tree house had {a rope ladder and a sign that said KEEP OUT.|a bucket on a pulley for sending snacks up.}"], { when: atHome, mood: 4 }),
-  A("c_outside", [6, 11], 0.15, s => (s.year < 2000 ? ["You played outside until the streetlights came on, {kick the can, freeze tag, and ghost in the graveyard.|riding bikes in a pack all over the neighborhood.|and your mother rang a bell from the porch for dinner.}", "All summer you were outside from breakfast to dinner, {catching fireflies in a jar,|running through the sprinkler,} and nobody knew exactly where you were, and that was normal.", "The neighborhood kids played {kickball in the street, yelling “Car!”|wiffle ball in somebody's backyard} every evening that summer."] : ["You played outside with the neighbor kids {until your parents texted that dinner was ready.|on scooters up and down the cul-de-sac.}", "That summer you caught fireflies in a jar with your cousins and let them go at bedtime.", "You and the kids on your street ran a {lemonade-and-slime business|water balloon war} that lasted all summer."]), { when: atHome, mood: 3 }),
-  A("c_grandparents", [3, 10], 0.15, s => [`Your grandmother taught you to {make pie crust|play gin rummy|sew a button}, {and let you lick the spoon.|and cheated at cards, a little, to let you win.}`, `Your grandfather {let you help in his workshop, handing him nails.|took you fishing at dawn and let you keep the little ones.|told stories about the old days that may have been true.}`, s.year >= 2012 ? "You video-called your grandparents every Sunday, and they always held the phone too close to their faces." : "Sundays at your grandparents' house meant {pot roast and the TV on the game.|a quarter for the candy dish.}"], { when: atHome, mood: 3 }),
+  A("c_treehouse", [7, 11], 0.017, s => [`You and ${friendName(s, "the neighbor kids")} built a {tree house|fort in the woods|clubhouse in the garage} out of {scrap wood and a lot of nails.|old pallets and a tarp.} {It had a secret password.|No grown-ups were allowed.}`, "You built a fort out of every couch cushion in the house, and {defended it all weekend.|refused to come out for dinner.}", "Your tree house had {a rope ladder and a sign that said KEEP OUT.|a bucket on a pulley for sending snacks up.}"], { when: atHome, mood: 4 }),
+  A("c_outside", [6, 11], 0.021, s => (s.year < 2000 ? ["You played outside until the streetlights came on, {kick the can, freeze tag, and ghost in the graveyard.|riding bikes in a pack all over the neighborhood.|and your mother rang a bell from the porch for dinner.}", "All summer you were outside from breakfast to dinner, {catching fireflies in a jar,|running through the sprinkler,} and nobody knew exactly where you were, and that was normal.", "The neighborhood kids played {kickball in the street, yelling “Car!”|wiffle ball in somebody's backyard} every evening that summer."] : ["You played outside with the neighbor kids {until your parents texted that dinner was ready.|on scooters up and down the cul-de-sac.}", "That summer you caught fireflies in a jar with your cousins and let them go at bedtime.", "You and the kids on your street ran a {lemonade-and-slime business|water balloon war} that lasted all summer."]), { when: atHome, mood: 3 }),
+  A("c_grandparents", [3, 10], 0.021, s => [`Your grandmother taught you to {make pie crust|play gin rummy|sew a button}, {and let you lick the spoon.|and cheated at cards, a little, to let you win.}`, `Your grandfather {let you help in his workshop, handing him nails.|took you fishing at dawn and let you keep the little ones.|told stories about the old days that may have been true.}`, s.year >= 2012 ? "You video-called your grandparents every Sunday, and they always held the phone too close to their faces." : "Sundays at your grandparents' house meant {pot roast and the TV on the game.|a quarter for the candy dish.}"], { when: atHome, mood: 3 }),
   {
-    id: "c_faith", once: true, ages: [5, 11], when: atHome, p: () => 0.12,
+    id: "c_faith", once: true, ages: [5, 11], when: atHome, p: () => 0.021,
     apply: (s, ctx) => {
       const f = faithOf(s, ctx);
       const lines = {
@@ -726,23 +726,23 @@ export const CHILD = [
       return { text: ctx.w(lines), mood: 2 };
     },
   },
-  A("c_library", [5, 9], 0.15, s => [`You got your first library card, {signed your name in careful capital letters,|and checked out the maximum number of books,} and {read them all in a week.|the librarian started saving books for you.}`, s.year >= 1985 ? "You did the summer reading program and earned a free personal pan pizza from Pizza Hut for every five books." : "You did the summer reading program at the library and got a gold star for every book.", "The library became your second home, {especially the beanbag chairs in the kids' corner.|and you read every horse book they had.}"], { when: atHome, mood: 3 }),
-  A("c_computerLab", [7, 12], 0.15, s => (s.year < 2000 ? ["In the school computer lab you played The Oregon Trail, {and your whole wagon party died of dysentery.|and named your oxen after your teachers.|and shot far more buffalo than you could carry.}", "You learned to type in the computer lab on Apple computers, {racing the kid next to you.|with a cover over the keyboard so you couldn't look.}"] : ["In the computer lab you learned to make a slideshow, {with way too many spinning transitions.|about your dog.}", "At school you got a laptop to use in class, and {learned to type faster than you could write.|figured out how to change the desktop background.}"]), { when: s => school(s) && s.year >= 1983, mood: 2 }),
-  A("c_parentsWork", [6, 12], 0.08, (s, ctx) => [`${s.year >= 1993 ? "On Take Your Child to Work Day" : "One day"} you went to work with ${grownUp(s, ctx)}, {and sat in a swivel chair and spun.|and got to use the copy machine, which was thrilling.|and saw what all those hours away actually looked like.}`, "You visited your parent's job and {everyone there already knew your name.|they gave you a hard hat and a lollipop.}", "You spent a day at your parent's work and {came home very proud of them.|decided you never want an office job, or that you definitely do.}"], { when: atHome, mood: 2 }),
-  A("c_stitches", [5, 12], 0.05, ["You fell off the monkey bars and broke your arm, {and everyone at school signed your cast.|and the cast itched for six weeks.}", "You split your chin open on the edge of the pool and got {four|six} stitches, {and were very brave about it.|and a lollipop.}", "You crashed your bike into a mailbox and {got a scar on your knee you still have.|walked it home crying.}"], { when: atHome, mood: -1 }),
-  A("c_fair", [5, 12], 0.12, s => ["At the county fair you {rode the Ferris wheel and saw the whole town from the top.|ate a corn dog, cotton candy and a funnel cake, in that order.|won a stuffed animal at the ring toss.}", "You went to the state fair and {saw a butter sculpture of a cow.|petted a pig the size of a couch.|threw up on the Tilt-A-Whirl.}", `At the fair ${s.flags.talent === "scouts" || inStates(s, ["IA", "NE", "KS", "WI", "MN", "OH", "IN", "MO"]) ? "your 4-H rabbit won a ribbon" : "you won a goldfish"}, {and you carried it home in a plastic bag on your lap.|and it was the proudest day of the summer.}`], { when: atHome, mood: 3 }),
-  A("c_chickenPox", [3, 9], 0.25, ["You got chicken pox and stayed home for a week {in oatmeal baths, trying not to scratch.|with calamine lotion all over and cartoons all day.|and your siblings got it right after you.}", "Chicken pox: {a week of itching, mittens on your hands at night,|you were covered in spots,} and {you got to eat popsicles for every meal.|Grandma came over with comic books.}", "You and half your class got chicken pox the same month, {and the school was nearly empty.|and your mother said it was better to get it over with.}"], { when: s => atHome(s) && s.year < 1996, mood: -1 }),
-  A("c_glasses", [6, 11], 0.08, ["You got your first pair of glasses, and on the drive home you saw individual leaves on the trees and couldn't stop staring.", "You got glasses {with thick plastic frames|that slid down your nose}, and {a kid called you four-eyes once, and then everyone forgot.|you could finally read the board.}", "The eye doctor said you needed glasses, and {you picked frames that were very bold.|you felt very smart in them.}"], { when: atHome, mood: 1 }),
-  A("c_latchkey", [8, 12], 0.12, ["You were a latchkey kid, {with a house key on a shoelace around your neck,|letting yourself in after school,} and {making yourself a snack and watching TV until your parents got home.|calling your mother at work to say you were home safe.}", "After school you let yourself into the empty house, {did your homework at the kitchen table,|fed the dog,} and {started dinner.|felt very grown up and a little lonely.}", "You came home to an empty house every day, {and you and your siblings ran the place until six.|and you learned to make a mean grilled cheese.}"], { when: s => atHome(s) && s.year >= 1972 && s.year <= 2005 && (s.flags.parentsSplit || s.flags.daycare), mood: 0 }),
-  A("c_cursive", [7, 9], 0.25, ["You learned cursive in third grade, {practicing loops on lined paper.|and signed your name about four hundred times.|and your capital Q looked like a 2 forever.}", "You learned cursive and {wrote a letter to your grandmother just to show off.|discovered you could read your parents' grocery lists.}"], { when: s => school(s) && s.year < 2012, mood: 1 }),
-  A("c_sickDay", [6, 12], 0.12, s => [`You stayed home sick and {watched The Price Is Right on the couch with a bowl of soup.|got to sleep in your parents' bed with the TV on.|got ginger ale and saltines and a lot of attention.}`, s.year >= 2005 ? "You stayed home sick and spent the day watching videos with a blanket and a bucket." : "You stayed home sick and spent the day watching game shows and soap operas with Grandma.", "You faked a fever to stay home from school {by holding the thermometer near a lamp.|and were found out by lunchtime.}"], { when: school, mood: 1 }),
+  A("c_library", [5, 9], 0.021, s => [`You got your first library card, {signed your name in careful capital letters,|and checked out the maximum number of books,} and {read them all in a week.|the librarian started saving books for you.}`, s.year >= 1985 ? "You did the summer reading program and earned a free personal pan pizza from Pizza Hut for every five books." : "You did the summer reading program at the library and got a gold star for every book.", "The library became your second home, {especially the beanbag chairs in the kids' corner.|and you read every horse book they had.}"], { when: atHome, mood: 3 }),
+  A("c_computerLab", [7, 12], 0.021, s => (s.year < 2000 ? ["In the school computer lab you played The Oregon Trail, {and your whole wagon party died of dysentery.|and named your oxen after your teachers.|and shot far more buffalo than you could carry.}", "You learned to type in the computer lab on Apple computers, {racing the kid next to you.|with a cover over the keyboard so you couldn't look.}"] : ["In the computer lab you learned to make a slideshow, {with way too many spinning transitions.|about your dog.}", "At school you got a laptop to use in class, and {learned to type faster than you could write.|figured out how to change the desktop background.}"]), { when: s => school(s) && s.year >= 1983, mood: 2 }),
+  A("c_parentsWork", [6, 12], 0.015, (s, ctx) => [`${s.year >= 1993 ? "On Take Your Child to Work Day" : "One day"} you went to work with ${grownUp(s, ctx)}, {and sat in a swivel chair and spun.|and got to use the copy machine, which was thrilling.|and saw what all those hours away actually looked like.}`, "You visited your parent's job and {everyone there already knew your name.|they gave you a hard hat and a lollipop.}", "You spent a day at your parent's work and {came home very proud of them.|decided you never want an office job, or that you definitely do.}"], { when: atHome, mood: 2 }),
+  A("c_stitches", [5, 12], 0.013, ["You fell off the monkey bars and broke your arm, {and everyone at school signed your cast.|and the cast itched for six weeks.}", "You split your chin open on the edge of the pool and got {four|six} stitches, {and were very brave about it.|and a lollipop.}", "You crashed your bike into a mailbox and {got a scar on your knee you still have.|walked it home crying.}"], { when: atHome, mood: -1 }),
+  A("c_fair", [5, 12], 0.017, s => ["At the county fair you {rode the Ferris wheel and saw the whole town from the top.|ate a corn dog, cotton candy and a funnel cake, in that order.|won a stuffed animal at the ring toss.}", "You went to the state fair and {saw a butter sculpture of a cow.|petted a pig the size of a couch.|threw up on the Tilt-A-Whirl.}", `At the fair ${s.flags.talent === "scouts" || inStates(s, ["IA", "NE", "KS", "WI", "MN", "OH", "IN", "MO"]) ? "your 4-H rabbit won a ribbon" : "you won a goldfish"}, {and you carried it home in a plastic bag on your lap.|and it was the proudest day of the summer.}`], { when: atHome, mood: 3 }),
+  A("c_chickenPox", [3, 9], 0.1, ["You got chicken pox and stayed home for a week {in oatmeal baths, trying not to scratch.|with calamine lotion all over and cartoons all day.|and your siblings got it right after you.}", "Chicken pox: {a week of itching, mittens on your hands at night,|you were covered in spots,} and {you got to eat popsicles for every meal.|Grandma came over with comic books.}", "You and half your class got chicken pox the same month, {and the school was nearly empty.|and your mother said it was better to get it over with.}"], { when: s => atHome(s) && s.year < 1996, mood: -1 }),
+  A("c_glasses", [6, 11], 0.017, ["You got your first pair of glasses, and on the drive home you saw individual leaves on the trees and couldn't stop staring.", "You got glasses {with thick plastic frames|that slid down your nose}, and {a kid called you four-eyes once, and then everyone forgot.|you could finally read the board.}", "The eye doctor said you needed glasses, and {you picked frames that were very bold.|you felt very smart in them.}"], { when: atHome, mood: 1 }),
+  A("c_latchkey", [8, 12], 0.025, ["You were a latchkey kid, {with a house key on a shoelace around your neck,|letting yourself in after school,} and {making yourself a snack and watching TV until your parents got home.|calling your mother at work to say you were home safe.}", "After school you let yourself into the empty house, {did your homework at the kitchen table,|fed the dog,} and {started dinner.|felt very grown up and a little lonely.}", "You came home to an empty house every day, {and you and your siblings ran the place until six.|and you learned to make a mean grilled cheese.}"], { when: s => atHome(s) && s.year >= 1972 && s.year <= 2005 && (s.flags.parentsSplit || s.flags.daycare), mood: 0 }),
+  A("c_cursive", [7, 9], 0.1, ["You learned cursive in third grade, {practicing loops on lined paper.|and signed your name about four hundred times.|and your capital Q looked like a 2 forever.}", "You learned cursive and {wrote a letter to your grandmother just to show off.|discovered you could read your parents' grocery lists.}"], { when: s => school(s) && s.year < 2012, mood: 1 }),
+  A("c_sickDay", [6, 12], 0.015, s => [`You stayed home sick and {watched The Price Is Right on the couch with a bowl of soup.|got to sleep in your parents' bed with the TV on.|got ginger ale and saltines and a lot of attention.}`, s.year >= 2005 ? "You stayed home sick and spent the day watching videos with a blanket and a bucket." : "You stayed home sick and spent the day watching game shows and soap operas with Grandma.", "You faked a fever to stay home from school {by holding the thermometer near a lamp.|and were found out by lunchtime.}"], { when: school, mood: 1 }),
   {
     // A pet's end: a goldfish's or a hamster's in a year or two, a dog's or a cat's much later.
-    id: "c_petLoss", once: true, ages: [6, 17], when: s => s.flags.pet && ["fish", "hamster"].includes(s.flags.pet.kind) && s.age - s.flags.pet.since >= 2, p: () => 0.4,
+    id: "c_petLoss", once: true, ages: [6, 17], when: s => s.flags.pet && ["fish", "hamster"].includes(s.flags.pet.kind) && s.age - s.flags.pet.since >= 2, p: () => 0.168,
     apply: (s, ctx) => {
       const pet = s.flags.pet; s.flags.pet = null;
       return { text: ctx.w([`${pet.name} the ${pet.noun} died, and you {held a funeral in the backyard with a shoebox and a popsicle-stick cross.|said a few words over the toilet before the flush.} {Your whole family stood with you.|You were sad for a week.}`, `You woke up and ${pet.name} the ${pet.noun} was gone. {You buried ${pet.name} under the tree in the yard and painted a rock for the grave.|Your father said ${pet.name} had a good life, which helped a little.}`]), mood: -4 };
     },
   },
-  A("c_moonWish", [5, 12], 0.06, ["One night you lay in the backyard and {counted shooting stars until you lost count.|found the Big Dipper all by yourself.|made a wish on the first star you saw.}", "You stayed up with your father on the porch watching a meteor shower, {and you saw eleven.|and he named the constellations, some of them made up.}", "You got a little telescope for your birthday and {saw the rings of Saturn, and yelled.|spent every clear night that summer in the yard.}"], { when: atHome, mood: 3 }),
+  A("c_moonWish", [5, 12], 0.013, ["One night you lay in the backyard and {counted shooting stars until you lost count.|found the Big Dipper all by yourself.|made a wish on the first star you saw.}", "You stayed up with your father on the porch watching a meteor shower, {and you saw eleven.|and he named the constellations, some of them made up.}", "You got a little telescope for your birthday and {saw the rings of Saturn, and yelled.|spent every clear night that summer in the yard.}"], { when: atHome, mood: 3 }),
 ];

@@ -109,10 +109,10 @@ choice: (s, ctx) => ({
 ## Templates
 
 - `{a|b|c}` picks one at random. They nest and may be empty (`{|really }`).
-- `{name}` puts in a variable. The usual ones need no passing: `{city}` (where you live now), `{job}`, `{partner}`,
-  `{kid}` (the youngest child), `{kids}`, `{friend}` (a friend of yours), `{trip}` (a trip destination), `{age}`,
-  `{year}`. For pronouns use `they(p)`, `them(p)`, `their(p)` from `common.js` (he/she, him/her, his/her) in the code,
-  not a template slot.
+- `{name}` puts in a variable. The engine fills these without passing: `{city}` ("Columbus, Ohio", or the country
+  abroad), `{town}`, `{state}`, `{job}`, `{ajob}` ("a nurse"), `{partner}`, `{he}`/`{him}`/`{his}` (the partner's),
+  `{kid}` (the youngest child), `{kids}`, `{friend}` (a friend of yours), `{grand}`, `{chat}`, `{trip}` (a trip
+  destination), `{age}`, `{year}`. For anyone else's pronouns use `they(p)`, `them(p)`, `their(p)` from `common.js`.
 - Only `ctx.w()` expands templates. Never put `{` or `}` in a plain string.
 - Variables go in as they are: a `{a|b}` inside a variable's value is not expanded; expand it with `ctx.w()` first.
 - `{friend}` and `{trip}` stay the same person and place through one event, from the question to the result.
@@ -155,17 +155,27 @@ send a veteran to college afterwards.
 
 ### Flags the story files leave for later ones
 
-`common.js` and the files' top comments list them. The main ones: `s.flags.bff` (the best friend's id),
-`s.flags.pet`, `s.flags.talent` (piano, Little League, Scouts…), `s.flags.homeMoney` ("tight"/"ok"),
-`s.flags.liveWith` (after a divorce), `s.flags.collegeMajor`, `s.flags.served` (`{ branch, from }`),
-`s.flags.drafted`, `s.flags.firstCar`, `s.flags.license`, `s.flags.gedPlan`, `s.flags.nightSchool`.
+The files' top comments list them. The main ones:
+
+- childhood: `bff` (the best friend's id), `pet` (`{ kind, name, noun, since }`), `talent` (piano, baseball, soccer,
+  scouts, dance, karate, art, code, none), `dream`, `faith`, `homeMoney` ("tight"/"ok"), `liveWith` (after a
+  divorce), `santa`, `honest` (+1/−1 per honesty test), `daycare`;
+- teens: `club` (sports, band, theater, debate, paper, none) and `sport`, `parttime` (the teen job), `license` (age),
+  `firstCar` (`{ name, age }`), `firstLove` (`{ name, sex, age, way }`), `prom`, `out` (the age you came out to
+  someone; `datingSex` may read it), `testScore` (high/mid/low/none), `honors`, `vocational`;
+- schooling and service (core.js): `trackAt`, `uniAt`, `ccAt`, `tradeAt`, `trade`, `gradAt`, `doneSenior`,
+  `dropout`, `gedPlan`, `nightSchool`, `awayCollege`, `served` (`{ branch, from }`), `serviceUntil`, `vet`,
+  `drafted`, `draftNumber`, `guard`, `co`, `backAt` (the age a fixed stay abroad ends: Peace Corps, Canada);
+- money and home: `ownedBefore`, `ssDelay`, `partTimeRetired`.
 
 ## Don't touch the statistics
 
 `test/calibration.test.js` checks that the simulated population still matches US statistics (births, age at first
 marriage, divorce, retirement, home ownership, schooling, lifespan). Story files:
 
-- never marry, divorce, have a baby, buy a home, retire, kill anyone or make anyone seriously ill; `core.js` does those;
+- never marry, divorce, have a baby, buy a home, retire, kill anyone or make anyone seriously ill; `core.js` does those
+  (births come to married couples and, at the rate `R.birth(…, married = false)` gives, to couples together a year or
+  more; the choice after high school takes its five shares from `R.afterHighSchool`);
 - may change a job (quit, switch) or health (`hr`) only a little (`hr` by at most ×0.97 or ×1.03 at a time), both ways;
 - say in a comment that their probabilities are assumptions (no statistic exists for "you got a puppy");
 - respect the age floors of the general actions (`act.js`): work from 14–16, marriage, loans, investing, lottery
@@ -192,7 +202,12 @@ marriage, divorce, retirement, home ownership, schooling, lifespan). Story files
 
 ## Checking
 
+`check.mjs` stubs the engine's helpers (world.js, people.js, act.js), so it runs before the engine port lands; pass
+`--real` to use the real modules and rates.js once they exist.
+
 ```bash
-node src/sim/story/check.mjs   # ids, options, weights, templates, ages, characters; tries every choice on sample lives
+node src/sim/story/check.mjs              # ids, options, weights, templates, ages, characters; runs every event on sample lives
+node src/sim/story/check.mjs --lives 500  # also whole lives: choices per life, stories per stage, rough demographics, silent events
+node src/sim/story/check.mjs --show t_prom,senior   # print an event's prompts, buttons and lines, to proofread
 npm test                       # everything, calibration included
 ```
