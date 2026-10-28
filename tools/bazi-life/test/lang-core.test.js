@@ -213,13 +213,10 @@ test("whole English lives with written answers show no Chinese from these files"
 
 test("the English keeps the shape of each Chinese template, and every template of these files is translated", () => {
   const all = new Set(Object.values(entries).map(e => e.zh));
-  for (const f of ["core.json", "work.json", "sim.json"]) {
-    // every key is a string in the code (checked by extract-strings --check too)
-    // and no English has Chinese in it
-    // (the full check of {vars} and {a|b} parts is test/lang.test.js and extract-strings --check)
-  }
+  // every key is a string in the code, and no English has Chinese in it (extract-strings --check also compares the
+  // {vars} and the {a|b} parts)
   for (const [zh, text] of Object.entries(bundle.story)) {
-    assert.ok(all.has(zh) || zh.startsWith("{") , `not in the code: ${zh}`);
+    assert.ok(all.has(zh), `not in the code: ${zh}`);
     assert.ok(!hasCJK(text), text);
   }
   // the shown templates and strings of these files: those in a ctx.w / ctx.f call or a shown field
@@ -241,14 +238,13 @@ const opened = t => (t ? `${t.replace(/[。，,.!！？?\s]+$/, "")}。` : "");
 
 test("in Chinese, a choice's own topic opens a written answer exactly as its first sentence did", () => {
   let n = 0;
-  const zh = { w: null };
   for (const [j, st] of states().entries()) {
     for (const ev of EVENTS.filter(e => e.choice)) {
       for (let seed = 0; seed < 4; seed++) {
         const s = structuredClone(st.s), rng = makeRng(j * 97 + seed);
         const en = { w: (t, v, tr, text) => text, f: (t, v) => fill(t, v) };
         const ctx = makeCtx(s, en, rng, st);
-        ctx.f = fill; ctx.lang = "zh"; zh.w = ctx.w;
+        ctx.f = fill; ctx.lang = "zh";
         const c = ev.choice(s, ctx);
         if (!c || !c.prompt) continue;
         n++;
