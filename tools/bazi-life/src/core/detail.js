@@ -10,6 +10,7 @@
 import { SixtyCycle } from "tyme4ts";
 import { pillarOf, tenGod, groupOf, ELEMENTS } from "./analysis.js";
 import { zh } from "./zh.js";
+import { tr, trw, readingLang } from "./tr.js";
 
 export const STEMS = "甲乙丙丁戊己庚辛壬癸";
 export const BRANCHES = "子丑寅卯辰巳午未申酉戌亥";
@@ -18,6 +19,10 @@ export const ROLE_NAME = { year: "年", month: "月", day: "日", hour: "時", d
 const bi = b => BRANCHES.indexOf(b);
 const at = (b, k) => BRANCHES[(bi(b) + k + 120) % 12];
 const GENERATES = { 木: "火", 火: "土", 土: "金", 金: "水", 水: "木" };
+// Two words side by side: nothing between them in Chinese (年干甲), a space in English (Year stem Jia).
+export const glue = (...parts) => parts.join(readingLang() === "en" ? " " : "");
+// A pillar's name for a reader: 甲子, or Jia Zi.
+export const pillarWord = name => glue(trw(name[0]), trw(name[1]));
 const CONTROLS = { 木: "土", 土: "水", 水: "火", 火: "金", 金: "木" };
 
 // What each pillar stands for (宮位), and the stage of life it colours most.
@@ -27,6 +32,17 @@ export const PALACE = {
   day: { stem: "自己", branch: "配偶（夫妻宮）", life: "中年" },
   hour: { stem: "子女", branch: "子女、晚輩與晚年", life: "晚年" },
 };
+
+// The tables' shown text (PALACE, STARS, SPIRITS) stays Chinese in the code and is read in the reading's language:
+// each field becomes a getter through trw (src/core/tr.js), so every reader of the tables gets the English too.
+function shownIn(table, fields) {
+  for (const row of Object.values(table)) for (const f of fields) {
+    const zhText = row[f];
+    Object.defineProperty(row, f, { get: () => trw(zhText), enumerable: true });
+  }
+  return table;
+}
+shownIn(PALACE, ["stem", "branch", "life"]);
 
 // ---------- 干支關係 ----------
 const STEM_COMBINE = { 甲: ["己", "土"], 己: ["甲", "土"], 乙: ["庚", "金"], 庚: ["乙", "金"], 丙: ["辛", "水"], 辛: ["丙", "水"], 丁: ["壬", "木"], 壬: ["丁", "木"], 戊: ["癸", "火"], 癸: ["戊", "火"] };
@@ -57,24 +73,24 @@ const stemsControl = (p, q) => p.yang === q.yang && (CONTROLS[p.stemEl] === q.st
 // that include that pillar.
 export function relationsAmong(items, focus = null) {
   const out = [];
-  const label = (it, part) => `${ROLE_NAME[it.role]}${part === "stem" ? "干" : "支"}${part === "stem" ? it.stem : it.branch}`;
+  const label = (it, part) => glue(trw(`${ROLE_NAME[it.role]}${part === "stem" ? "干" : "支"}`), trw(part === "stem" ? it.stem : it.branch));
   const keep = list => !focus || list.some(it => it.role === focus);
   for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
     const a = items[i], b = items[j];
     if (!keep([a, b])) continue;
     const pair = [a.role, b.role];
-    if (STEM_COMBINE[a.stem] && STEM_COMBINE[a.stem][0] === b.stem) out.push({ kind: "天干五合", part: "stem", roles: pair, element: STEM_COMBINE[a.stem][1], text: `${label(a, "stem")}與${label(b, "stem")}相合（合${STEM_COMBINE[a.stem][1]}）` });
-    if (STEM_CLASH[a.stem] === b.stem) out.push({ kind: "天干相沖", part: "stem", roles: pair, text: `${label(a, "stem")}與${label(b, "stem")}相沖` });
-    if (sixCombine(a.branch, b.branch)) out.push({ kind: "六合", part: "branch", roles: pair, element: SIX_COMBINE[a.branch][1], text: `${label(a)}與${label(b)}六合（合${SIX_COMBINE[a.branch][1]}）` });
-    if (clash(a.branch, b.branch)) out.push({ kind: "六沖", part: "branch", roles: pair, text: `${label(a)}與${label(b)}相沖` });
+    if (STEM_COMBINE[a.stem] && STEM_COMBINE[a.stem][0] === b.stem) out.push({ kind: "天干五合", part: "stem", roles: pair, element: STEM_COMBINE[a.stem][1], text: tr("{a}與{b}相合（合{el}）", { a: label(a, "stem"), b: label(b, "stem"), el: trw(STEM_COMBINE[a.stem][1]) }) });
+    if (STEM_CLASH[a.stem] === b.stem) out.push({ kind: "天干相沖", part: "stem", roles: pair, text: tr("{a}與{b}相沖", { a: label(a, "stem"), b: label(b, "stem") }) });
+    if (sixCombine(a.branch, b.branch)) out.push({ kind: "六合", part: "branch", roles: pair, element: SIX_COMBINE[a.branch][1], text: tr("{a}與{b}六合（合{el}）", { a: label(a), b: label(b), el: trw(SIX_COMBINE[a.branch][1]) }) });
+    if (clash(a.branch, b.branch)) out.push({ kind: "六沖", part: "branch", roles: pair, text: tr("{a}與{b}相沖", { a: label(a), b: label(b) }) });
     const pu = punish(a.branch, b.branch);
-    if (pu) out.push({ kind: pu === "自刑" ? "自刑" : "相刑", part: "branch", roles: pair, name: pu, text: `${label(a)}與${label(b)}${pu === "自刑" ? "自刑" : `相刑（${pu}）`}` });
-    if (harm(a.branch, b.branch)) out.push({ kind: "六害", part: "branch", roles: pair, text: `${label(a)}與${label(b)}相害` });
-    if (breaks(a.branch, b.branch)) out.push({ kind: "相破", part: "branch", roles: pair, text: `${label(a)}與${label(b)}相破` });
+    if (pu) out.push({ kind: pu === "自刑" ? "自刑" : "相刑", part: "branch", roles: pair, name: pu, text: pu === "自刑" ? tr("{a}與{b}自刑", { a: label(a), b: label(b) }) : tr("{a}與{b}相刑（{name}）", { a: label(a), b: label(b), name: trw(pu) }) });
+    if (harm(a.branch, b.branch)) out.push({ kind: "六害", part: "branch", roles: pair, text: tr("{a}與{b}相害", { a: label(a), b: label(b) }) });
+    if (breaks(a.branch, b.branch)) out.push({ kind: "相破", part: "branch", roles: pair, text: tr("{a}與{b}相破", { a: label(a), b: label(b) }) });
     for (const [set, el] of TRIADS) {
       if (a.branch === b.branch || !set.includes(a.branch) || !set.includes(b.branch)) continue;
       const kind = a.branch === set[1] || b.branch === set[1] ? "半合" : "拱合";
-      out.push({ kind, part: "branch", roles: pair, element: el, text: `${label(a)}與${label(b)}${kind}${el}局` });
+      out.push({ kind, part: "branch", roles: pair, element: el, text: kind === "半合" ? tr("{a}與{b}半合{el}局", { a: label(a), b: label(b), el: trw(el) }) : tr("{a}與{b}拱合{el}局", { a: label(a), b: label(b), el: trw(el) }) });
     }
   }
   // Whole 三合, 三會 and 三刑: one branch from each of three different pillars.
@@ -84,17 +100,19 @@ export function relationsAmong(items, focus = null) {
     const roles = holders.map(h => h[0].role);
     if (!keep(holders.flat())) continue;
     out.push(side
-      ? { kind: "三會", part: "branch", roles, element: el, text: `${[...set].join("")}三會${side}${el}` }
-      : { kind: "三合", part: "branch", roles, element: el, text: `${[...set].join("")}三合${el}局` });
+      ? { kind: "三會", part: "branch", roles, element: el, text: tr("{set}三會{side}{el}", { set: branchSet(set), side: trw(side), el: trw(el) }) }
+      : { kind: "三合", part: "branch", roles, element: el, text: tr("{set}三合{el}局", { set: branchSet(set), el: trw(el) }) });
   }
   for (const [set, name] of PUNISH) {
     const holders = [...set].map(b => items.filter(it => it.branch === b));
     if (holders.some(h => !h.length) || !keep(holders.flat())) continue;
-    out.push({ kind: "三刑", part: "branch", roles: holders.map(h => h[0].role), name, text: `${[...set].join("")}三刑（${name}）` });
+    out.push({ kind: "三刑", part: "branch", roles: holders.map(h => h[0].role), name, text: tr("{set}三刑（{name}）", { set: branchSet(set), name: trw(name) }) });
   }
   return out;
 }
 
+// 申子辰, or Shen-Zi-Chen.
+const branchSet = set => (readingLang() === "en" ? [...set].map(trw).join("-") : set);
 const itemsOf = names => names.map((n, i) => { const p = pillarOf(n); return { role: ROLES[i], stem: p.stem, branch: p.branch, name: n }; });
 export const natalRelations = names => relationsAmong(itemsOf(names));
 
@@ -108,8 +126,9 @@ export function luckRelations(names, decadeName, flowName = null) {
   const out = relationsAmong([...natal, ...extra], focus);
   const me = extra.find(x => x.role === focus);
   for (const it of [...natal, ...extra.filter(x => x !== me)]) {
-    if (it.name === me.name) out.push({ kind: it.role === "decade" ? "歲運並臨" : "伏吟", roles: [focus, it.role], text: it.role === "decade" ? `流年與大運同為${me.name}（歲運並臨）` : `${ROLE_NAME[focus]}${me.name}與${ROLE_NAME[it.role]}柱相同（伏吟）` });
-    else if (clash(me.branch, it.branch) && stemsControl(pillarOf(me.name), pillarOf(it.name))) out.push({ kind: "反吟", roles: [focus, it.role], text: `${ROLE_NAME[focus]}${me.name}與${ROLE_NAME[it.role]}柱${it.name}天剋地沖（反吟）` });
+    const vars = { who: trw(ROLE_NAME[focus]), name: pillarWord(me.name), pillar: trw(`${ROLE_NAME[it.role]}柱`), other: pillarWord(it.name) };
+    if (it.name === me.name) out.push({ kind: it.role === "decade" ? "歲運並臨" : "伏吟", roles: [focus, it.role], text: it.role === "decade" ? tr("流年與大運同為{name}（歲運並臨）", vars) : tr("{who}{name}與{pillar}相同（伏吟）", vars) });
+    else if (clash(me.branch, it.branch) && stemsControl(pillarOf(me.name), pillarOf(it.name))) out.push({ kind: "反吟", roles: [focus, it.role], text: tr("{who}{name}與{pillar}{other}天剋地沖（反吟）", vars) });
   }
   return out;
 }
@@ -260,6 +279,8 @@ export const STARS = {
   天羅地網: { nature: "凶", domains: ["career", "health"], text: "做事容易受阻、身不由己，凡事宜謹慎" },
 };
 
+shownIn(STARS, ["text"]);
+
 // The stars of one branch (and stem) against this chart: used for each natal pillar, and for a luck pillar.
 //   ctx: { yearStem, dayStem, yearBranch, dayBranch, monthBranch, sex, yearNayin, dayVoid, yearVoid }
 //   own: the role of the pillar being checked (the stars keyed on that very pillar skip it)
@@ -357,6 +378,7 @@ export const SPIRITS = {
   吊客: { nature: "凶", domains: ["family"], text: "吊客星，傳統上要防親友的喪病之事，心情容易低落" },
   病符: { nature: "凶", domains: ["health"], text: "病符星，要留意身體的小毛病，定期檢查" },
 };
+shownIn(SPIRITS, ["text"]);
 export function taisui(natalYearBranch, flowBranch) {
   const spirit = TAISUI_SPIRITS[(bi(natalYearBranch) - bi(flowBranch) + 12) % 12];
   const kinds = [];

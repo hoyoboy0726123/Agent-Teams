@@ -33,6 +33,7 @@ import { zh } from "./zh.js";
 import { analyse, pillarOf, elementScores, tenGod, ELEMENTS } from "./analysis.js";
 import { clash, sixCombine, harm, breaks, punish, elementRoles } from "./detail.js";
 import { relate } from "./family.js";
+import { tr, trw, readingLang } from "./tr.js";
 
 // ---------- 靜態表 ----------
 const SECTIONS = [

@@ -10,6 +10,8 @@
 import { SixtyCycle, HeavenStem } from "tyme4ts";
 import { zh } from "./zh.js";
 import { tiaohouStems } from "./tiaohou.js";
+import { fill } from "../sim/grammar.js";
+import { tr, trw, trJoin } from "./tr.js";
 
 export const ELEMENTS = ["木", "火", "土", "金", "水"];
 export const GROUPS = ["比劫", "食傷", "財", "官殺", "印"];
@@ -139,9 +141,19 @@ function tiaohou(dayStem, monthBranch) {
   const cold = season === "冬" && !votes.水, hot = season === "夏" && !votes.火;
   if (cold) votes.水 = -1;
   if (hot) votes.火 = -1;
-  const climate = season === "冬" ? "生在冬天，命局偏寒，" : season === "夏" ? "生在夏天，命局偏燥，" : "";
-  return { verdict: `${season}生`, note: `${climate}依《窮通寶鑑》，${dayStem}${STEM_ELEMENT[dayStem]}日主生於${monthBranch}月，調候用${stems.join("、")}`, votes, stems };
+  // The note stays Chinese in the analysis (it is data); tiaohouNote below is the same sentence for a reader.
+  return { verdict: `${season}生`, note: fill(TIAOHOU_NOTE, tiaohouVars(dayStem, monthBranch, stems, false)), votes, stems };
 }
+const TIAOHOU_NOTE = "{climate}依《窮通寶鑑》，{stem}日主生於{branch}月，調候用{stems}";
+function tiaohouVars(dayStem, monthBranch, stems, shown) {
+  const season = SEASON[monthBranch];
+  const climate = season === "冬" ? "生在冬天，命局偏寒，" : season === "夏" ? "生在夏天，命局偏燥，" : "";
+  const stem = `${dayStem}${STEM_ELEMENT[dayStem]}`;
+  return shown ? { climate: climate && trw(climate), stem: trw(stem), branch: trw(monthBranch), stems: trJoin(stems.map(trw)) }
+    : { climate, stem, branch: monthBranch, stems: stems.join("、") };
+}
+// The 調候 note of a day stem and month branch, in the reading's language, ending with a full stop.
+export const tiaohouNote = (dayStem, monthBranch) => tr("{climate}依《窮通寶鑑》，{stem}日主生於{branch}月，調候用{stems}。", tiaohouVars(dayStem, monthBranch, tiaohouStems(dayStem, monthBranch), true));
 
 // Likes and dislikes per structure, by ten-god group (simplified from 子平真詮).
 const PATTERNS = {
@@ -218,6 +230,7 @@ export function describeViews(a) {
   return ELEMENTS.flatMap(e => {
     const v = a.views[e];
     const side = a.favor[e] > 0 ? ["喜", v.likes] : a.favor[e] < 0 ? ["忌", v.dislikes] : null;
-    return side && side[1].length ? [`${v.voting} 派中有 ${side[1].length} 派認為${side[0]}${e}（${side[1].join("、")}）`] : [];
+    const vars = side && { voting: v.voting, n: side[1].length, e: trw(e), schools: trJoin(side[1].map(trw)) };
+    return side && side[1].length ? [side[0] === "喜" ? tr("{voting} 派中有 {n} 派認為喜{e}（{schools}）", vars) : tr("{voting} 派中有 {n} 派認為忌{e}（{schools}）", vars)] : [];
   });
 }
