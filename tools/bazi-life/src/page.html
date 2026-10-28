@@ -40,8 +40,8 @@ header { display: grid; gap: 8px; }
 
 /* form */
 form { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; display: grid; gap: 16px; }
-.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 16px; }
-.field { display: grid; gap: 6px; min-width: 0; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 16px; align-items: start; }
+.field { display: grid; gap: 6px; min-width: 0; align-content: start; }
 .field > span, .field > .name, legend { font-size: 13px; font-weight: 500; color: var(--muted); }
 .tmode { display: inline-flex; width: max-content; border: 1px solid var(--rule); border-radius: 999px; overflow: hidden; }
 .tmode label { display: inline-flex; align-items: center; padding: 3px 14px; font-size: 13px; color: var(--muted); cursor: pointer; }
@@ -145,7 +145,7 @@ section { display: grid; gap: 14px; min-width: 0; }
 .year.now { border-color: var(--seal); }
 .year .y { font-family: var(--mono); font-size: 12px; color: var(--muted); }
 .year .gz { font-family: var(--display); font-size: 20px; font-weight: 700; }
-.year .meta { font-size: 12px; color: var(--muted); }
+.year .meta { font-size: 12px; color: var(--muted); word-break: keep-all; }
 footer { display: grid; gap: 8px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
 footer p { max-width: 70ch; }
 </style>

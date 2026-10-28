@@ -377,6 +377,7 @@ function readingAt(age) {
 function chartReason(id, age, channel = null) {
   if (!explainable(id)) return null;
   const r = readingAt(age), kind = kindOf(id), ev = EVENT_BY_ID.get(id), ch = channel || (ev && ev.channel) || null;
+  if (!r) return null;
   if (kind) {
     // The channel says which way the event went (a 學業 setback is not explained by 文昌).
     const x = eventReason(kind, r, { sex: run.chart.input.sex, channel: ch });
@@ -574,7 +575,9 @@ function drawKline() {
   const median = band.map(b => `${x(b.age).toFixed(1)},${y(b.p50).toFixed(1)}`).join(" ");
   const grid = [0, 25, 50, 75, 100].map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--wash)" stroke-width="1"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="var(--muted)">${v}</text>`).join("");
   const ticks = [];
-  for (let a = 0; a <= maxAge; a += 10) ticks.push(`<text x="${x(a)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="var(--muted)">${a} 歲</text>`);
+  // Every 10 years, or every 20 when the chart is narrow; the last label ends at the edge instead of running past it.
+  const every = W < 560 ? 20 : 10;
+  for (let a = 0; a <= maxAge; a += every) ticks.push(`<text x="${x(a)}" y="${H - 8}" text-anchor="${x(a) > W - R - 24 ? "end" : "middle"}" font-size="10" fill="var(--muted)">${a} 歲</text>`);
   const candles = life.kline.map(k => {
     const up = k.close >= k.open, cx = x(k.age), top = y(Math.max(k.open, k.close)), h = Math.max(1.5, Math.abs(y(k.open) - y(k.close)));
     const color = up ? "var(--up)" : "var(--down)";

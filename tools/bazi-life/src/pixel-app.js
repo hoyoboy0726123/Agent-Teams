@@ -104,7 +104,7 @@ function drawSlide() {
   const s = story.slides[story.k], box = $("#story");
   let h = `<button type="button" class="skip" data-story-close>略過</button>`;
   if (s.type === "moment") {
-    h += `<div class="slide"><canvas width="${W}" height="${H}"></canvas><p class="ag">${s.age} 歲・${s.year}</p><p class="tx">${esc(shorten(s.text))}</p><div class="dots">${Array.from({ length: s.n }, (_, j) => `<i class="${j <= s.i ? "on" : ""}"></i>`).join("")}</div></div><p class="hint">點一下畫面繼續</p>`;
+    h += `<div class="slide"><canvas width="${W}" height="${H}"></canvas><p class="ag">${s.age} 歲・${s.year}</p><p class="tx" data-no-i18n>${esc(shorten(s.text))}</p><div class="dots">${Array.from({ length: s.n }, (_, j) => `<i class="${j <= s.i ? "on" : ""}"></i>`).join("")}</div></div><p class="hint">點一下畫面繼續</p>`;
   } else {
     h += `<div class="slide"><canvas width="${W}" height="${H}"></canvas><h2>${s.year} 年</h2><p class="tx">你走完了 ${s.age} 歲的一生。</p><p class="soft">同一張命盤再過 100 次，會走出哪些不同的路？</p><button type="button" class="go" data-story-close>看這一生的結局</button></div>`;
   }
