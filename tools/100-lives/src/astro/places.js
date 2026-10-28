@@ -91,10 +91,12 @@ export const ALL_PLACES = PLACES.flatMap(g => g.places);
 
 const norm = s => String(s || "").trim().toLowerCase().replace(/\./g, "").replace(/^saint /, "st ").replace(/\s+/g, " ");
 
-// findPlace("Austin", "TX") → the place, or null. Case and "St."/"Saint" do not matter. Without a state, the most
-// populous city of that name (the first in the list) is returned.
+// Without a state, a name shared by several places means the most populous of them.
+const LARGEST = { portland: "OR", "kansas city": "MO", springfield: "MO", charleston: "SC", columbus: "OH" };
+
+// findPlace("Austin", "TX") → the place, or null. Case and "St."/"Saint" do not matter.
 export function findPlace(name, state = null) {
-  const n = norm(name), st = state ? String(state).trim().toUpperCase() : null;
+  const n = norm(name), st = state ? String(state).trim().toUpperCase() : LARGEST[n] || null;
   return ALL_PLACES.find(p => norm(p.name) === n && (!st || p.state === st)) || null;
 }
 

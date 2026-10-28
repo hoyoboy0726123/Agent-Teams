@@ -5,7 +5,7 @@
   "type": "module",
   "description": "100 Lives: live a whole American life year by year, steered by your Western birth chart, then live it 99 more times.",
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test \"test/**/*.test.js\""
   },
   "dependencies": {
     "astronomy-engine": "^2.1.19"
