@@ -351,8 +351,8 @@ export const CHILD = [
       return {
         prompt: sc.prompt,
         options: [
-          { id: "c_talent.piano", label: "鋼琴", hint: hint("piano", "每週去老師家上課"), act: "hobby", style: "learn", weight: 0.2, when: () => y >= 1970, apply: learn("piano", piano) },
-          { id: "c_talent.art", label: "畫畫", hint: hint("art", "蠟筆、水彩、素描"), act: "hobby", style: "learn", weight: 0.2, apply: learn("art", [
+          { id: "c_talent.piano", label: ctx.f("鋼琴"), hint: hint("piano", "每週去老師家上課"), act: "hobby", style: "learn", weight: 0.2, when: () => y >= 1970, apply: learn("piano", piano) },
+          { id: "c_talent.art", label: ctx.f("畫畫"), hint: hint("art", "蠟筆、水彩、素描"), act: "hobby", style: "learn", weight: 0.2, apply: learn("art", [
             "去學畫畫，{蠟筆換成了水彩，|每週都畫滿一整本圖畫紙，}{你畫的{家裡的貓|阿嬤的菜園|校門口的大榕樹}被貼在教室後面。|寫生比賽還拿了佳作。}",
             "{pre}去學畫畫，{蠟筆換成了水彩，|每週都畫滿一整本圖畫紙，}{你畫的{家裡的貓|阿嬤的菜園|校門口的大榕樹}被貼在教室後面。|寫生比賽還拿了佳作。}",
             "{{pre0}|{pre1}}去學畫畫，{蠟筆換成了水彩，|每週都畫滿一整本圖畫紙，}{你畫的{家裡的貓|阿嬤的菜園|校門口的大榕樹}被貼在教室後面。|寫生比賽還拿了佳作。}"]) },
@@ -364,15 +364,15 @@ export const CHILD = [
             "去上程式積木課，{用積木讓小車子轉彎，|做了一個會跑的小遊戲，}{得意地表演給全家看。|回家一直問電腦為什麼聽得懂。}",
             "{pre}去上程式積木課，{用積木讓小車子轉彎，|做了一個會跑的小遊戲，}{得意地表演給全家看。|回家一直問電腦為什麼聽得懂。}",
             "{{pre0}|{pre1}}去上程式積木課，{用積木讓小車子轉彎，|做了一個會跑的小遊戲，}{得意地表演給全家看。|回家一直問電腦為什麼聽得懂。}"]) },
-          { id: "c_talent.callig", label: "書法", hint: hint("callig", "磨墨、寫大字"), act: "hobby", style: "safe", weight: 0.15, when: () => y < 1985, apply: learn("calligraphy", [
+          { id: "c_talent.callig", label: ctx.f("書法"), hint: hint("callig", "磨墨、寫大字"), act: "hobby", style: "safe", weight: 0.15, when: () => y < 1985, apply: learn("calligraphy", [
             "去學書法，{每天磨墨寫大字，|手上永遠沾著墨，}{過年時寫了一張春聯貼在門口。|老師說你的字很端正。}",
             "{pre}去學書法，{每天磨墨寫大字，|手上永遠沾著墨，}{過年時寫了一張春聯貼在門口。|老師說你的字很端正。}",
             "{{pre0}|{pre1}}去學書法，{每天磨墨寫大字，|手上永遠沾著墨，}{過年時寫了一張春聯貼在門口。|老師說你的字很端正。}"]) },
-          { id: "c_talent.kick", label: "跆拳道", hint: hint("kick", "從白帶開始練"), act: "exercise", style: "health", weight: 0.12, when: () => y >= 1985, apply: learn("taekwondo", [
+          { id: "c_talent.kick", label: ctx.f("跆拳道"), hint: hint("kick", "從白帶開始練"), act: "exercise", style: "health", weight: 0.12, when: () => y >= 1985, apply: learn("taekwondo", [
             "去學跆拳道，{從白帶練到了綠帶，|每次喊「嘿！」都特別大聲，}{整個人變得很有精神。|踢破木板那天，你回家講了一整晚。}",
             "{pre}去學跆拳道，{從白帶練到了綠帶，|每次喊「嘿！」都特別大聲，}{整個人變得很有精神。|踢破木板那天，你回家講了一整晚。}",
             "{{pre0}|{pre1}}去學跆拳道，{從白帶練到了綠帶，|每次喊「嘿！」都特別大聲，}{整個人變得很有精神。|踢破木板那天，你回家講了一整晚。}"]) },
-          { id: "c_talent.swim", label: "游泳", hint: hint("swim", "學會換氣"), act: "exercise", style: "health", weight: 0.12, when: () => y >= 1995, apply: learn("swim", [
+          { id: "c_talent.swim", label: ctx.f("游泳"), hint: hint("swim", "學會換氣"), act: "exercise", style: "health", weight: 0.12, when: () => y >= 1995, apply: learn("swim", [
             "去學游泳，{第一堂課抱著浮板不敢放手，|嗆了好幾口水，}{後來可以一口氣游二十五公尺。|學會換氣那天，你在水裡笑得好開心。}",
             "{pre}去學游泳，{第一堂課抱著浮板不敢放手，|嗆了好幾口水，}{後來可以一口氣游二十五公尺。|學會換氣那天，你在水裡笑得好開心。}",
             "{{pre0}|{pre1}}去學游泳，{第一堂課抱著浮板不敢放手，|嗆了好幾口水，}{後來可以一口氣游二十五公尺。|學會換氣那天，你在水裡笑得好開心。}"]) },
@@ -606,6 +606,8 @@ export const CHILD = [
     id: "c_summerHw", domain: "study", channel: "change", max: 1, ages: [7, 12], when: s => s.studying && !s.abroad, p: () => 0.06,
     choice: (s, ctx) => {
       const y = s.year, old = olderSibs(s), helper = old.length ? siblingCall(ctx.rng.pick(old)) : grownUp(s, ctx), who = grownUp(s, ctx);
+      // an older sibling is "your {sib}" in English, a grown-up is called by name: the same Chinese, two templates
+      const sibHelp = old.length > 0;
       const mate = (bestFriend(s) || ctx.person({ role: "friend", sex: s.sex, birthYear: s.birthYear })).call;
       const withMate = t => ctx.f(t, { mate }), clay = y >= 1985 ? "紙黏土" : "黏土";
       const sc = pickScene(ctx, [
@@ -617,7 +619,7 @@ export const CHILD = [
             daily: ["每天寫一點", "照進度慢慢來", "{lead}。你每天寫兩頁，{開學那天交出整整齊齊的一本，|日記裡還畫了插圖，}{老師在上面蓋了一個「優」。|被老師拿去給全班看。}"],
             last: ["最後幾天再趕", "先玩再說", "{lead}。你玩了一整個暑假，最後三天才開始趕，{日記裡的天氣全部寫「晴」，|二十篇日記一個晚上補完，}{開學前一晚寫到半夜。|寫到手都抽筋了。}"],
             together: [withMate("跟{mate}一起寫"), "互相幫忙", "{lead}。你和{mate}每天下午{在{mate}家|在圖書館}一起寫，{寫一寫就聊起天來，|互相對答案，}{最後兩個人連錯字都一樣。|那是最好玩的一個暑假。}"],
-            help: [ctx.f("拜託{helper}教你", { helper }), "數學有好幾題不會", "{lead}。數學有好幾題你怎麼都不會，{helper}{坐在你旁邊一題一題講，|拿出鉛筆畫圖給你看，}{你終於弄懂了。|講到後來，{helper}自己也算錯了一題，兩個人笑成一團。}"],
+            help: [ctx.f((sibHelp ? "拜託{sib}教你" : "拜託{helper}教你"), { helper, sib: helper }), "數學有好幾題不會", (sibHelp ? "{lead}。數學有好幾題你怎麼都不會，{sib}{坐在你旁邊一題一題講，|拿出鉛筆畫圖給你看，}{你終於弄懂了。|講到後來，{sib}自己也算錯了一題，兩個人笑成一團。}" : "{lead}。數學有好幾題你怎麼都不會，{helper}{坐在你旁邊一題一題講，|拿出鉛筆畫圖給你看，}{你終於弄懂了。|講到後來，{helper}自己也算錯了一題，兩個人笑成一團。}")],
           };
         } },
         s.age >= 8 && y >= 1960 && { make: () => {
@@ -628,7 +630,7 @@ export const CHILD = [
             daily: ["每天讀一章", "讀完一本就寫一篇", "{lead}。你每天讀一章，讀完一本就寫一篇，{心得寫得滿滿兩頁，|還在心得旁邊畫了書裡的場景，}{老師在上面寫了一句「寫得真好」。|被老師貼在教室後面的布告欄。}"],
             last: ["開學前再翻翻看", "看封底也能寫", "{lead}。你一直拖到開學前兩天，{只好照著封底的介紹寫心得，|一個晚上把三本書翻完，}{老師的評語是「請再讀一次」。|寫到眼皮都睜不開。}"],
             together: [withMate("跟{mate}交換書看"), "看完再互相講", "{lead}。你和{mate}交換書看，{每天{talk}講書裡的故事，|看完一本就換下一本，}{最後兩個人的心得開頭一模一樣。|你們還自己編了續集。}"],
-            help: [ctx.f("請{helper}帶你去挑書", { helper }), "不知道要讀什麼", y < 1970 ? "{lead}。你不知道要讀什麼，{helper}帶你去書局挑了三本，{還陪你讀完了第一本。|回家的路上還幫你想好了心得的開頭。}" : "{lead}。你不知道要讀什麼，{helper}帶你去{圖書館|書局}挑了三本，{還陪你讀完了第一本。|回家的路上還幫你想好了心得的開頭。}"],
+            help: [ctx.f((sibHelp ? "請{sib}帶你去挑書" : "請{helper}帶你去挑書"), { helper, sib: helper }), "不知道要讀什麼", y < 1970 ? (sibHelp ? "{lead}。你不知道要讀什麼，{sib}帶你去書局挑了三本，{還陪你讀完了第一本。|回家的路上還幫你想好了心得的開頭。}" : "{lead}。你不知道要讀什麼，{helper}帶你去書局挑了三本，{還陪你讀完了第一本。|回家的路上還幫你想好了心得的開頭。}") : (sibHelp ? "{lead}。你不知道要讀什麼，{sib}帶你去{圖書館|書局}挑了三本，{還陪你讀完了第一本。|回家的路上還幫你想好了心得的開頭。}" : "{lead}。你不知道要讀什麼，{helper}帶你去{圖書館|書局}挑了三本，{還陪你讀完了第一本。|回家的路上還幫你想好了心得的開頭。}")],
           };
         } },
         { make: () => {
@@ -639,7 +641,7 @@ export const CHILD = [
             daily: ["每天做一點，慢慢修", "做到滿意為止", "{lead}。你每天做一點，{做出一座窗戶會開關的房子，|做出一台輪子會轉的車子，}{開學後被老師選去全校展覽。|同學一直圍過來問你是怎麼做的。}"],
             last: ["開學前一天再做", "隨便黏一黏就好", "{lead}。你拖到開學前一天才動手，{半夜還在家裡翻箱倒櫃找膠水，|最後交出一個歪歪的盒子，}{老師問這是什麼，你說是「抽象藝術」。|{who}被你拉起來陪你做到半夜。}"],
             together: [withMate("跟{mate}合做一個大的"), "兩個人點子比較多", "{lead}。你和{mate}合做了一個{紙箱機器人|有山有河的小模型}，{在{mate}家攤了一整個暑假，|兩個人為了顏色吵了好幾次，}{開學時兩個人一起抬到學校。|老師說這是全班最大的一件。}"],
-            help: [ctx.f("拜託{helper}幫忙", { helper }), "勞作太難了", "{lead}。勞作太難了，{helper}幫你{{house}，|用{clay}捏了一隻恐龍，}{開學時老師問：「這是誰做的？」|你在旁邊負責塗顏色。}"],
+            help: [ctx.f((sibHelp ? "拜託{sib}幫忙" : "拜託{helper}幫忙"), { helper, sib: helper }), "勞作太難了", (sibHelp ? "{lead}。勞作太難了，{sib}幫你{{house}，|用{clay}捏了一隻恐龍，}{開學時老師問：「這是誰做的？」|你在旁邊負責塗顏色。}" : "{lead}。勞作太難了，{helper}幫你{{house}，|用{clay}捏了一隻恐龍，}{開學時老師問：「這是誰做的？」|你在旁邊負責塗顏色。}")],
           };
         } },
         s.age <= 10 && { make: () => {
@@ -652,7 +654,7 @@ export const CHILD = [
             daily: ["每天量、每天畫", "記下每一天的變化", "{lead}。你每天用尺量綠豆芽，畫在日記上，{發現它晚上長得比白天快，|還記下哪天下雨、哪天出大太陽，}{老師把你的日記拿去給全班看。|老師在上面寫了一句「你是小科學家」。}"],
             last: ["開學前再補", "憑印象畫就好", "{lead}。你玩了一整個暑假，綠豆早就乾掉了，最後三天{憑想像把三十天的日記一次補完，|畫了一株越長越高的豆芽，}{老師看了說：「你的綠豆長得好整齊。」|日記裡的天氣全部寫「晴」。}"],
             together: [withMate("跟{mate}比誰的長得高"), "互相看對方的", "{lead}。你和{mate}各種一盆，{每天跑去對方家比高度，|約好誰的長得比較高，另一個人就要請吃冰，}{最後你的多了一公分，{mate}請你吃了一支冰棒。|最後{mate}的贏了，你請了一支冰棒。}"],
-            help: [ctx.f("拜託{helper}幫忙澆水", { helper }), awayHint, "{lead}。{{aw0}|{aw1}}，拜託{helper}幫忙澆水，{helper}{{water}，|一天都沒忘記，}{回來時豆芽長得比你走的時候高了一大截。|你在日記裡寫了一段謝謝{helper}的話。}"],
+            help: [ctx.f((sibHelp ? "拜託{sib}幫忙澆水" : "拜託{helper}幫忙澆水"), { helper, sib: helper }), awayHint, (sibHelp ? "{lead}。{{aw0}|{aw1}}，拜託{sib}幫忙澆水，{sib}{{water}，|一天都沒忘記，}{回來時豆芽長得比你走的時候高了一大截。|你在日記裡寫了一段謝謝{sib}的話。}" : "{lead}。{{aw0}|{aw1}}，拜託{helper}幫忙澆水，{helper}{{water}，|一天都沒忘記，}{回來時豆芽長得比你走的時候高了一大截。|你在日記裡寫了一段謝謝{helper}的話。}")],
           };
         } },
         y >= 1990 && (s.father.alive || s.mother.alive) && { w: 0.8, make: () => {
@@ -663,7 +665,7 @@ export const CHILD = [
             daily: ["每天晚飯後問一題", "慢慢聽", "{lead}。你每天晚飯後問{elder}一個問題，{{elder}拿出一本舊相簿，一張一張講給你聽，|聽到了好多你從沒聽過的事，}{學習單寫到要另外黏一張紙。|老師在學習單上寫：「請替我謝謝{elder}。」}"],
             last: ["開學前一天再問", "問兩三題就好", y >= 2012 ? "{lead}。你拖到開學前一天晚上才想起來，{趕快打視訊給{elder}問了三個問題，|{elder}已經準備睡了，只回答了兩題，}{學習單寫得短短的。|{elder}說：「早點問，我可以講更多。」}" : "{lead}。你拖到開學前一天晚上才想起來，{趕快打電話給{elder}問了三個問題，|{elder}已經準備睡了，只回答了兩題，}{學習單寫得短短的。|{elder}說：「早點問，我可以講更多。」}"],
             together: [withMate("跟{mate}互相訪問"), "去對方家聽故事", "{lead}。你和{mate}{一起去訪問兩家的長輩，|輪流去對方家問問題，}{聽到兩家的長輩小時候竟然住在同一個村子，|{mate}家的長輩還唱了一首以前的歌給你們聽，}{兩張學習單都寫得好精彩。|那是最好玩的一份作業。}"],
-            help: [ctx.f("請{helper}幫你想問題", { helper }), "不知道要問什麼", "{lead}。你不知道要問什麼，{helper}幫你想了十個問題，{還坐在旁邊幫你把台語翻成國語寫下來，|一起聽{elder}講以前的事，}{學習單寫得好完整。|那天{helper}也聽得好入迷。}"],
+            help: [ctx.f((sibHelp ? "請{sib}幫你想問題" : "請{helper}幫你想問題"), { helper, sib: helper }), "不知道要問什麼", (sibHelp ? "{lead}。你不知道要問什麼，{sib}幫你想了十個問題，{還坐在旁邊幫你把台語翻成國語寫下來，|一起聽{elder}講以前的事，}{學習單寫得好完整。|那天{sib}也聽得好入迷。}" : "{lead}。你不知道要問什麼，{helper}幫你想了十個問題，{還坐在旁邊幫你把台語翻成國語寫下來，|一起聽{elder}講以前的事，}{學習單寫得好完整。|那天{helper}也聽得好入迷。}")],
           };
         } },
         y >= 2013 && { w: 1.2, make: () => {
@@ -674,12 +676,12 @@ export const CHILD = [
             daily: ["每天做一點", "一天做幾題", "{lead}。你每天吃完早餐就做幾題，{不會的就看教學影片，|做完還多看了幾支科學影片，}{開學時老師說你是全班最穩定的。|分數慢慢從六十幾分爬到九十幾分。}"],
             last: ["最後幾天一次刷完", "反正有影片可以看", "{lead}。你拖到開學前幾天才登入，{一個晚上看完二十幾支教學影片，|題目不會就一直猜，}{老師在後台看到你半夜還在線上。|做到眼睛都酸了。}"],
             together: [withMate("跟{mate}開視訊一起做"), "邊做邊聊", "{lead}。你和{mate}{開著視訊一起做，|約好每天下午比賽誰先做完，}{結果聊天的時間比寫作業還長。|兩個人的分數一模一樣。}"],
-            help: [ctx.f("拜託{helper}教你", { helper }), "有幾題看不懂", "{lead}。有幾題你怎麼都看不懂，{helper}{坐在你旁邊一題一題講，|畫圖解釋給你看，}{你終於弄懂了{topic}。|講到後來，{helper}自己也算錯了一題，兩個人笑成一團。}"],
+            help: [ctx.f((sibHelp ? "拜託{sib}教你" : "拜託{helper}教你"), { helper, sib: helper }), "有幾題看不懂", (sibHelp ? "{lead}。有幾題你怎麼都看不懂，{sib}{坐在你旁邊一題一題講，|畫圖解釋給你看，}{你終於弄懂了{topic}。|講到後來，{sib}自己也算錯了一題，兩個人笑成一團。}" : "{lead}。有幾題你怎麼都看不懂，{helper}{坐在你旁邊一題一題講，|畫圖解釋給你看，}{你終於弄懂了{topic}。|講到後來，{helper}自己也算錯了一題，兩個人笑成一團。}")],
           };
         } },
       ]).make();
       const v = {
-        lead: sc.lead, mate, helper, who, clay, elder: sc.elder, aw0: sc.aw0, aw1: sc.aw1, talk: y >= 1985 ? "在電話裡" : "在巷口",
+        lead: sc.lead, mate, helper, sib: helper, who, clay, elder: sc.elder, aw0: sc.aw0, aw1: sc.aw1, talk: y >= 1985 ? "在電話裡" : "在巷口",
         house: y < 1985 ? "用竹筷子搭了一棟房子" : "用冰棒棍搭了一棟房子", water: y >= 2012 ? "每天傳照片給你看" : y >= 1985 ? "每天打電話告訴你長多高了" : "每天幫你把高度記在紙上",
         topic: s.age >= 10 ? "分數的除法" : "乘法的直式",
       };
@@ -1080,7 +1082,7 @@ export const CHILD = [
               ? { text: c.w("{lead}。你{forgeDo}，{老師一眼就看出不對，|可是{crooked}，老師一看就知道，}{{summon}，你被罵得更慘。|{who}知道以後，比看到分數還生氣。}", v), mood: -4 }
               : { text: c.w("{lead}。你{forgeDo}，老師沒有發現，{可是你心虛了好幾天，|每次{who}問起學校的事，你都不敢看{who}的眼睛，}{下一次考試你讀得特別用功。|後來你還是自己跟{who}說了。}", v), mood: -1 }),
           },
-          { id: "c_testSign.ally", label: ctx.f("先拿給{ally}看", { ally: String(ally) }), hint: "請人幫你說好話", act: "seekHelp", style: "family", weight: 0.2, when: () => !!ally, apply: (s2, c) => ({ text: c.w("{lead}。你先拿給{ally}看，{ally}{陪你一起拿給{who}，|幫你在{who}面前說了好多好話，}{{who}只說了一句「下次加油」就{done}。|{who}嘆了一口氣，還是{done}。}", v), mood: 0 }) },
+          { id: "c_testSign.ally", label: old.length ? ctx.f("先拿給{sib}看", { sib: ally }) : ctx.f("先拿給{ally}看", { ally: String(ally) }), hint: "請人幫你說好話", act: "seekHelp", style: "family", weight: 0.2, when: () => !!ally, apply: (s2, c) => ({ text: c.w(old.length ? "{lead}。你先拿給{sib}看，{sib}{陪你一起拿給{who}，|幫你在{who}面前說了好多好話，}{{who}只說了一句「下次加油」就{done}。|{who}嘆了一口氣，還是{done}。}" : "{lead}。你先拿給{ally}看，{ally}{陪你一起拿給{who}，|幫你在{who}面前說了好多好話，}{{who}只說了一句「下次加油」就{done}。|{who}嘆了一口氣，還是{done}。}", { ...v, sib: ally }), mood: 0 }) },
           {
             id: "c_testSign.fix", label: sc.card ? "先寫好下學期的讀書計畫" : "先訂正好再拿", hint: "讓家人看到你有在努力", act: "study", style: "learn", weight: 0.2,
             apply: (s2, c) => ({ text: c.w(sc.card

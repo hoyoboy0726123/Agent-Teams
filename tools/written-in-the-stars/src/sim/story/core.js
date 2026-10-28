@@ -197,7 +197,7 @@ export const CORE = [
     // Dropping out at 16 or 17. The event comes at half the status dropout rate each of those years, divided by the
     // share of its options that leave (0.6), so the weights reproduce the rate.
     id: "hsDropout", calibrated: true, ages: [16, 17], max: 1, when: s => inHigh(s),
-    p: (s, ctx) => Math.min(1, rate(ctx, "hsDropout", s.year) / 0.6),
+    p: (s, ctx) => Math.min(1, rate(ctx, "hsDropout", s.year, s.birthYear) / 0.6),
     choice: (s, ctx) => {
       const money = s.flags.homeMoney === "tight";
       // Each scene: the question (now) and how the result line starts (then).
@@ -323,7 +323,7 @@ export const CORE = [
     // community college). rate collegeDropout is the yearly share who leave.
     id: "uniDropout", calibrated: true, once: true, ages: [18, 30],
     when: s => s.studying && !s.abroad && ((s.track === "college" && s.age > (s.flags.uniAt ?? 18) && s.age < (s.flags.uniAt ?? 18) + 4) || (s.track === "community" && s.age >= (s.flags.ccAt ?? 18) && s.age < (s.flags.ccAt ?? 18) + 2)),
-    p: (s, ctx) => rate(ctx, "collegeDropout", s.year, s.track),
+    p: (s, ctx) => rate(ctx, "collegeDropout", s.year, s.track, s.sex, s.birthYear),
     apply: (s, ctx) => {
       const where = s.track === "community" ? "community college" : "college";
       leaveSchool(s); s.flags.dropout = s.age;
@@ -335,7 +335,7 @@ export const CORE = [
     id: "graduateUni", calibrated: true, once: true, ages: [21, 34], when: s => s.studying && s.track === "college" && s.age >= (s.flags.uniAt ?? 18) + 4, p: () => 1,
     choice: (s, ctx) => {
       s.edu = "bachelor";
-      const p = Math.min(0.6, rate(ctx, "master", s.year));
+      const p = Math.min(0.6, rate(ctx, "master", s.year, s.sex, s.birthYear));
       const med = /bio|chem|nurs|pre-?med|neuro/i.test(s.flags.collegeMajor || "") || ctx.rng() < 0.35;
       const gap = s.year >= 1961 ? ctx.rng.pick([...(s.year >= 1961 ? ["Join the Peace Corps"] : []), ...(s.year >= 1994 ? ["Do a year of AmeriCorps"] : []), ...(s.year >= 1990 ? ["Teach for two years in a rural school"] : []), "Backpack through Europe"]) : "Backpack through Europe";
       const lead = scene(ctx, [
@@ -570,7 +570,7 @@ export const CORE = [
         prompt: `${lead} ${ctx.rng.pick(["Are you ready to retire?", "Is it time?", "What do you do?"])}`,
         options: [
           { id: "retire.now", label: early ? "Take the package and retire" : "Retire and start Social Security", hint: reduced ? "a smaller check, starting now" : "you've earned it", act: "retire", style: "self", weight: 0.4, apply: (s2, c) => go(s2, c.w(`You retired at ${s2.age}. ${party} {The first Monday, you still woke up at six.|You cleaned out your desk and found your first business card.|You stood in the parking lot a long minute before driving home.}`)) },
-          { id: "retire.delay", label: "Retire, but wait to claim until 70", hint: "live on savings, bigger checks later", act: "save", style: "safe", weight: 0.15, when: s2 => s2.age < 70, apply: (s2, c) => { s2.flags.ssDelay = true; return go(s2, c.w(`You retired at ${s2.age} and decided to wait until 70 to claim Social Security, living on savings for now. ${party}`)); } },
+          { id: "retire.delay", label: "Retire, but wait to claim until 70", hint: "live on savings, bigger checks later", act: "save", style: "safe", weight: rate(ctx, "claimDelay", s.year), when: s2 => s2.age < 70, apply: (s2, c) => { s2.flags.ssDelay = true; return go(s2, c.w(`You retired at ${s2.age} and decided to wait until 70 to claim Social Security, living on savings for now. ${party}`)); } },
           { id: "retire.phase", label: "Retire, then work part-time", hint: "ease out of it", act: "sideJob", style: "safe", weight: 0.2, apply: (s2, c) => { s2.flags.partTimeRetired = true; return go(s2, c.w(`You retired at ${s2.age} and {picked up a few shifts a week at the hardware store.|took on a little consulting from home.|became a part-time greeter and knew everyone in town.}`)); } },
           { id: "retire.travel", label: s.year >= 1970 ? "Retire and buy the RV" : "Retire and see the country", hint: "the open road", act: "travel", style: "risk", weight: 0.15, apply: (s2, c) => { s2.savings = Math.max(0, s2.savings - 0.3); return go(s2, c.w(`You retired at ${s2.age} and hit the road{ in a used RV|}, {seeing the Grand Canyon, Yellowstone and every diner in between.|with a map of the national parks you checked off one by one.}`), 6); } },
           { id: "retire.notYet", label: "Not yet. Keep working", hint: "you like it, or you need it", act: "pushThrough", style: "risk", weight: 0.1, apply: () => ({ text: "You thought about retiring, then decided you were not done yet.", mood: 0 }) },

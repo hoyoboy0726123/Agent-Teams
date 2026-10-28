@@ -14,7 +14,8 @@
 // rather than a `…${x}…` literal, so its English can be found by the Chinese as written. An answer that goes on from
 // the situation is one template that starts with {lead}, the situation as already told; a piece that differs from
 // scene to scene and has alternatives of its own is a group of vars ({{a}|{b}}), each a plain sentence with its own
-// English. The Chinese, and every draw, are as they were.
+// English. A value whose English here is not the shared word's (補習班 as a kind of business, 滑手機 for someone else)
+// goes through ctx.f, so it takes this file's English. The Chinese, and every draw, are as they were.
 import { yearsMarried, bornSiblings, otherJob, startJob, exam15Name, exam18Name } from "../world.js";
 import { pronoun, partnerMember, sameSexCouple } from "../people.js";
 import { callName } from "../words.js";
@@ -51,6 +52,7 @@ const siblingOf = (ctx, x) => (x.name ? ctx.f("{rel}{name}", { rel: x.label, nam
 // A string shown as a button or hint that the story also writes inside a sentence: the same Chinese, and in English
 // the sentence's words with a capital letter.
 const asLabel = (ctx, x) => ctx.f("{asLabel}", { asLabel: x });
+
 // ctx.w over a list of templates that were `…${x}…` literals before the English edition. ctx.w passes over the
 // templates this life has already told (s.used); a literal was a different string for each x, so whether a template
 // was told is asked of what its literal read, fill(t, vars), and the Chinese reads as it did. `more`: the story's own
@@ -188,7 +190,7 @@ function choresScenes(s, ctx, p, ta) {
     lighter: s.kids.length ? "省下來的時間拿來陪孩子。" : "省下來的時間拿來陪彼此。",
     back: s.employed ? "下班回家" : "忙了一整天",
     kidsChore: s.kids.length ? "孩子也分到擦桌子和摺衣服。" : "誰忘了就請對方喝飲料。",
-    recycle: s.year >= 1998 ? "和回收" : "", screen: s.year >= 2010 ? "滑手機" : "看電視",
+    recycle: s.year >= 1998 ? "和回收" : "", screen: ctx.f(s.year >= 2010 ? "滑手機" : "看電視"),
     trashRule: s.year >= 1998 ? "回收另外排，誰把瓶瓶罐罐洗好，誰就少倒一天。" : "誰忘了就請對方吃宵夜。",
     putDown: s.year >= 2010 ? "放下手機" : "看完電視",
     desk: s.kids.length ? "孩子分到擦自己的書桌。" : "誰先做完，誰決定年夜飯吃什麼。",
@@ -680,7 +682,7 @@ export const ADULT = [
     when: (s, ctx) => (s.rel === "dating" || s.rel === "married") && s.age > s.datingSince && rhythmClash(s, ctx), p: () => 0.08,
     choice: (s, ctx) => {
       const ta = pronoun(s.partner), home = s.rel === "married" || s.flags.y_cohabit === s.partner.id;
-      const night = ctx.rng.pick([s.year >= 2015 ? "追劇" : "看電視", s.year >= 2010 ? "滑手機" : "聽廣播", s.year >= 1995 ? "打電動" : "看小說"]);
+      const night = ctx.f(ctx.rng.pick([s.year >= 2015 ? "追劇" : "看電視", s.year >= 2010 ? "滑手機" : "聽廣播", s.year >= 1995 ? "打電動" : "看小說"]));
       // A situation this life has not had yet, if there is one: ctx.w remembers the template, and the lead as it reads
       // with its values is what counts (wordsAs).
       const scenes = rhythmScenes(s, home, night), told = x => fill(x.lead, x.v), fresh = scenes.filter(x => !s.used.has(told(x)));
@@ -816,8 +818,10 @@ export const ADULT = [
       const k = ctx.rng.pick(kidsAged(s, 5, 12)), kn = k.call, kta = pronoun(k);
       const [a, b] = pick2(ctx, byEra(s, [["珠心算", "鋼琴", "書法", "美術"], ["美語", "鋼琴", "珠心算", "電腦"], ["美語", "作文", "鋼琴", "跆拳道"], ["美語", "程式", "游泳", "畫畫"], ["程式", "美語", "游泳", "機器人"]]));
       const wish = ctx.rng.pick(["畫畫", "打鼓", "游泳", "下圍棋", "跳舞", "籃球", "做實驗"]);
-      const lead = ctx.f("{kn} {kage} 歲，班上同學放學後都在學{a}和{b}", { kn, kage: k.age, a, b });
-      const v = { lead, kn, kta, a, b, wish };
+      // The lessons as the story writes them (ctx.f: class names, this file's English); k.a_hobby keeps the word itself.
+      const lesson = { a: ctx.f(a), b: ctx.f(b), wish: ctx.f(wish) };
+      const lead = ctx.f("{kn} {kage} 歲，班上同學放學後都在學{a}和{b}", { kn, kage: k.age, a: lesson.a, b: lesson.b });
+      const v = { lead, kn, kta, ...lesson };
       return {
         prompt: ctx.f("{lead}。要讓{kn}去補習或學才藝嗎？", { lead, kn }),
         options: [
@@ -1147,14 +1151,14 @@ export const ADULT = [
         "同事都在討論定期定額買 ETF，定存利率只剩一趴多",
         "身邊的人都在買 ETF，還有人在聊美股和虛擬貨幣",
       ]);
-      const fund = era(s) >= 3 ? "定期定額買 ETF" : "買基金";
+      const etf = era(s) >= 3, fund = etf ? "定期定額買 ETF" : "買基金";
       const crash = [1990, 2000, 2001, 2008, 2022].includes(s.year);
-      const v = { lead, fund };
+      const v = { lead };
       return {
         prompt: ctx.f("{lead}。手上這筆存款要怎麼處理？", { lead }),
         options: [
           { id: "a_investing.deposit", label: "放定存就好", hint: "穩穩的", act: "save", style: "safe", weight: 0.3, apply: (s2, c) => { s2.savings += era(s2) < 2 ? 0.06 : 0.01; return { text: c.w("{lead}。你還是把錢放定存，{每年領一點利息，|雖然賺得不多，}{晚上睡得很安穩。|至少不用每天看盤。}", v), mood: 0 }; } },
-          { id: "a_investing.fund", label: asLabel(ctx, fund), hint: "每個月扣一點，慢慢來", act: "invest", style: "safe", weight: 0.3, apply: (s2, c) => { if (crash) { s2.savings = Math.max(0, s2.savings - c.rng.between(0.05, 0.15)); return { text: c.w("{lead}。你開始{fund}，{才扣了幾個月就遇上大跌，|帳面上一下子少了一截，}{你咬著牙沒有停扣。|你告訴自己這是長期的事。}", v), mood: -2 }; } s2.savings += c.rng.between(0, 0.12); return { text: c.w("{lead}。你開始{fund}，{一年下來帳面上多了一些。|每個月扣一點，幾乎感覺不到。}{你把對帳單收進資料夾。|你發現存錢沒有想像中難。}", v), mood: 1 }; } },
+          { id: "a_investing.fund", label: asLabel(ctx, fund), hint: "每個月扣一點，慢慢來", act: "invest", style: "safe", weight: 0.3, apply: (s2, c) => { if (crash) { s2.savings = Math.max(0, s2.savings - c.rng.between(0.05, 0.15)); return { text: c.w(etf ? "{lead}。你開始定期定額買 ETF，{才扣了幾個月就遇上大跌，|帳面上一下子少了一截，}{你咬著牙沒有停扣。|你告訴自己這是長期的事。}" : "{lead}。你開始買基金，{才扣了幾個月就遇上大跌，|帳面上一下子少了一截，}{你咬著牙沒有停扣。|你告訴自己這是長期的事。}", v), mood: -2 }; } s2.savings += c.rng.between(0, 0.12); return { text: c.w(etf ? "{lead}。你開始定期定額買 ETF，{一年下來帳面上多了一些。|每個月扣一點，幾乎感覺不到。}{你把對帳單收進資料夾。|你發現存錢沒有想像中難。}" : "{lead}。你開始買基金，{一年下來帳面上多了一些。|每個月扣一點，幾乎感覺不到。}{你把對帳單收進資料夾。|你發現存錢沒有想像中難。}", v), mood: 1 }; } },
           { id: "a_investing.stock", label: "自己研究買股票", hint: "可能賺，也可能賠", act: "invest", style: "risk", weight: 0.2, apply: (s2, c) => { const x = c.rng.between(0.1, 0.4), w = { ...v, when: s2.employed ? "下班後" : "每天" }; if (c.roll("wealth", "good", crash ? 0.3 : 0.5)) { s2.savings += x; return { text: c.w("{lead}。你{when}開始研究財報，挑了幾支股票，{運氣不錯，一年下來賺了一些。|抱了一年，漲了不少。}{你請家人吃了一頓好的。|你提醒自己別得意忘形。}", w), mood: 3 }; } s2.savings = Math.max(0, s2.savings - x); return { text: c.w("{lead}。你{when}開始研究財報，挑了幾支股票，{結果遇上一波大跌，|買在高點，}{賠了一筆，你把看盤軟體刪了。|帳面一片綠油油，你學到了一課。}", w), mood: -4 }; } },
           { id: "a_investing.hui", label: "跟會", hint: "親戚朋友起的會", act: "invest", style: "social", weight: 0.15, when: s2 => s2.year < 2005, apply: (s2, c) => { if (c.roll("wealth", "bad", 0.12)) { s2.savings = Math.max(0, s2.savings - 0.3); return { text: c.w("{lead}。你跟了{鄰居|同事|親戚}起的會，{沒想到會頭捲款跑了，|半年後就倒會了，}{你繳的錢全拿不回來。|一群會腳在會頭家門口等了一整晚。}", v), mood: -6 }; } s2.savings += 0.05; return { text: c.w("{lead}。你跟了{鄰居|同事|親戚}起的會，{每個月繳一點，|標會那天大家擠在客廳，}{最後標到一筆不錯的利息。|一年下來多了一筆錢。}", v), mood: 2 }; } },
           { id: "a_investing.learn", label: "先去上理財課", hint: "搞懂了再說", act: "study", style: "learn", weight: 0.1, apply: (s2, c) => { spend(s2, 0.01); return { text: c.w("{lead}。你先去上了{幾堂理財課，|社區大學的投資課，}{開始每個月記帳，|學會看懂基金的對帳單，}{錢還沒賺到，但心裡有底了。|才知道自己以前花錢有多隨便。}", v), mood: 1 }; } },
@@ -1292,7 +1296,7 @@ export const ADULT = [
     when: s => !s.arcs.startup && !s.arcs.a_stake && !s.abroad, p: () => 0.025,
     choice: (s, ctx) => {
       const { f, fresh } = friendOf(s, ctx), n = f.call, fta = pronoun(f), who = fresh ? ctx.f("老朋友{n}", { n }) : n;
-      const kind = ctx.rng.pick(byEra(s, [["貿易公司", "電子零件行", "補習班", "小吃店"], ["貿易公司", "電腦公司", "補習班", "咖啡店"], ["網路公司", "咖啡店", "設計工作室", "早午餐店"], ["App 新創", "手搖飲店", "網路商店", "選物店"], ["新創公司", "手搖飲店", "網路商店", "寵物用品店"]]));
+      const kind = ctx.f(ctx.rng.pick(byEra(s, [["貿易公司", "電子零件行", "補習班", "小吃店"], ["貿易公司", "電腦公司", "補習班", "咖啡店"], ["網路公司", "咖啡店", "設計工作室", "早午餐店"], ["App 新創", "手搖飲店", "網路商店", "選物店"], ["新創公司", "手搖飲店", "網路商店", "寵物用品店"]])));
       const lead = ctx.f("{who}辭職開了一間{kind}，找你一起幫忙", { who, kind });
       const stake = (s2, c, data) => c.arc.start("a_stake", { who: n, kind, ...data }, 3);
       const v = { lead, n, kind };

@@ -751,7 +751,7 @@ export const TEEN = [
       const V = {
         lead, name, ta, drink, seen,
         how: k === "exam" ? "你把考卷往旁邊挪了一點" : k === "night" ? "你答應了，隔天考試時把考卷往旁邊挪了一點" : ctx.f("你心一軟，考試時把考卷往{name}那邊挪了一點", { name }),
-        call: y >= 2005 ? "開著視訊" : y >= 1990 ? "抱著電話" : "在巷口的路燈下", hang: y >= 1985 ? "速食店" : "圖書館", said: y >= 2011 ? "群組裡打了一句" : "教室後面說了一句",
+        call: y >= 2005 ? "開著視訊" : y >= 1990 ? "抱著電話" : "在巷口的路燈下", said: y >= 2011 ? "群組裡打了一句" : "教室後面說了一句",
       };
       const opt = (id, act, style, weight, labels, hints, run) => ({ id: `t_cheat.${id}`, label: labels[k], hint: hints[k] || hints.exam, act, style, weight, apply: (s2, c) => { const [text, mood] = run(c); return { text: c.w(text, V), mood }; } });
       return {
@@ -784,7 +784,7 @@ export const TEEN = [
               night: "{lead}。你回{ta}：「我現在教你，比明天偷看有用。」{你們{call}把重點講了一遍，|你把自己的筆記借給了{name}，}{隔天{name}自己寫完了整張考卷。|{name}說原來沒那麼難。}",
               homework: "{lead}。你說抄了也學不會，下課陪{name}把那幾題重寫一遍，{{name}寫到一半突然說「原來是這樣」。|第一節{name}遲交了，但每一題都是自己寫的。}{後來{name}常常拿題目來問你。|你發現教別人，自己也記得更牢。}",
               bff: "{lead}。你說：「答案不能給你，但今晚我陪你讀。」{你們在{name}家的書桌前讀到十一點，|你把考試範圍畫成一張重點表給{name}，}{成績發下來，{name}剛好及格，抱著你大叫。|{name}還是差了一點點，但說這是{ta}讀得最認真的一次。}",
-              leak: "{lead}。你{seen}，放學約了幾個同學在{hang}把範圍讀完，{隔天發現那份答案根本是假的，看了的人都傻眼。|你們互相出題出到天黑。}",
+              leak: y >= 1985 ? "{lead}。你{seen}，放學約了幾個同學在速食店把範圍讀完，{隔天發現那份答案根本是假的，看了的人都傻眼。|你們互相出題出到天黑。}" : "{lead}。你{seen}，放學約了幾個同學在圖書館把範圍讀完，{隔天發現那份答案根本是假的，看了的人都傻眼。|你們互相出題出到天黑。}",
             }[k], 2]),
           opt("refuse", "insist", "self", 0.18,
             { exam: "小聲說「不行」", night: "直接回絕", homework: ctx.f("叫{ta}自己寫", { ta }), bff: ctx.f("跟{name}說不行", { name }), leak: "叫大家不要再傳" },
@@ -1294,7 +1294,7 @@ export const TEEN = [
     when: s => !s.studying && !s.abroad && s.employed && !!s.job && s.job.field !== "自營" && s.age > (s.job.since ?? s.age), p: () => 0.5,
     choice: (s, ctx) => {
       const y = s.year, who = grownUp(s, ctx), title = s.job.title, family = s.job.field === "家業";
-      const boss = family ? who : /工廠/.test(title) ? "領班" : /清潔/.test(title) ? "組長" : "師傅";
+      const boss = family ? who : ctx.f("{bossTitle}", { bossTitle: /工廠/.test(title) ? "領班" : /清潔/.test(title) ? "組長" : "師傅" });
       const skill = /廚房/.test(title) ? "掌杓" : /工廠/.test(title) ? "操作機台" : /清潔/.test(title) ? "排班和帶新人" : /田/.test(title) ? "開耕耘機" : "進貨和算帳";
       const course = ctx.rng.pick(y < 1980 ? ["鎮上裁縫補習班的夜間班", "夜間的電工訓練班"] : y < 2000 ? ["補習班的夜間電腦班", "夜間的英文會話班", "職訓中心的夜間美髮班"] : ["職訓中心的夜間電腦繪圖班", "夜間的英文會話班", "社區大學的烘焙課"]);
       const exam = s.edu === "國小" ? exam15Name(y + 1) : exam18Name(y + 1);

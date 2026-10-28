@@ -534,10 +534,11 @@ export const LATER = [
         apply: (s2, c) => {
           const kind = c.rng.pick(SHOPS);
           plan(s2, "shop", kind); spend(s2, 0.8); c.arc.start("l_shop", { kind }, 2);
-          // big: the first clause is what memoryLane quotes years later, so it stays 退休後你在巷口開了一間…
+          // big: the first clause is what memoryLane quotes years later, so it stays 退休後你在巷口開了一間… (the English
+          // quotes the gist)
           return { text: c.w(sc.key === "pension"
             ? "退休後你在巷口開了一間{kind}，用的是退休金和存了半輩子的錢。{每天一早就去開門，|店裡的擺設都是自己一樣一樣挑的，}{開幕那天，老同事都來捧場。|第一個月，熟客就記住了你的名字。}"
-            : "退休後你在巷口開了一間{kind}，用的是存了半輩子的錢。{每天一早就去開門，|店裡的擺設都是自己一樣一樣挑的，}{開幕那天，老同事都來捧場。|第一個月，熟客就記住了你的名字。}", { kind }), mood: 4, big: true };
+            : "退休後你在巷口開了一間{kind}，用的是存了半輩子的錢。{每天一早就去開門，|店裡的擺設都是自己一樣一樣挑的，}{開幕那天，老同事都來捧場。|第一個月，熟客就記住了你的名字。}", { kind }), mood: 4, big: true, gist: c.f("退休後在巷口開了一間{kind}", { kind }) };
         },
       };
       const consult = s.job && s.job.field !== "家業" && {

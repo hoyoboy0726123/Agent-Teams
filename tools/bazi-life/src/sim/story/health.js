@@ -378,7 +378,11 @@ export const HEALTH = [
       const prompt = teen
         ? ctx.w("{下課時間|畢業旅行的晚上|補習班下課後}，{who}在{廁所後面|頂樓|機車棚旁邊}偷抽菸，遞了一根給你：「試試看啦。」要接嗎？", { who })
         : work
-          ? ctx.w([...(s.year < 1997 ? ["那個年代辦公室裡大家都抽菸，{who}順手遞了一根給你：「來一根？」要接嗎？"] : []), "{工地休息的時候|等客戶的空檔|加班到半夜，在樓梯間}，{who}遞了一根菸給你。要接嗎？"], { who })
+          // at work, who offered it as a whole phrase ({handed}, {passed}): the English is "a co-worker" but "your manager"
+          ? ctx.w([...(s.year < 1997 ? ["那個年代辦公室裡大家都抽菸，{handed}：「來一根？」要接嗎？"] : []), "{工地休息的時候|等客戶的空檔|加班到半夜，在樓梯間}，{passed}。要接嗎？"], {
+            handed: { 同事: "同事順手遞了一根給你", 客戶: "客戶順手遞了一根給你", 主管: "主管順手遞了一根給你" }[who],
+            passed: { 同事: "同事遞了一根菸給你", 客戶: "客戶遞了一根菸給你", 主管: "主管遞了一根菸給你" }[who],
+          })
           : ctx.w(["{喜宴上|廟口看戲的時候|朋友聚會時}，{who}遞了一根菸給你：「來，抽一根。」要接嗎？", "{過年打牌的時候|喝喜酒散場後|朋友家烤肉時}，{who}掏出一包菸，抽出一根遞給你。要接嗎？"], { who });
       // Who offered it, as a whole phrase for the answers (the English says "a classmate" but "your manager").
       const offer = { 同學: "同學遞菸給你，", 學長: "學長遞菸給你，", 同事: "同事遞菸給你，", 客戶: "客戶遞菸給你，", 主管: "主管遞菸給你，", 朋友: "朋友遞菸給你，", 親戚: "親戚遞菸給你，" }[who];
@@ -1108,11 +1112,11 @@ export const HEALTH = [
             apply: () => { s.savings += stake * depositRate(y); return { text: ctx.w(rate >= 5 ? "想了想，你把存款放進定存，{那時候利率有 {rate}%，|每年領一次利息，}{利息拿得很開心。|心裡很踏實。}" : "想了想，你把存款放進定存，{利息雖然不多，|一年只多了一點點，}{但睡得很安穩。|至少不會少。}", { rate }), mood: 1 }; },
           },
           {
-            id: "m_invest.etf", label: "定期定額買 ETF", hint: "跟著大盤，慢慢存", act: "invest", style: "safe", weight: 0.2, when: () => y >= 2003,
+            id: "m_invest.etf", label: ctx.f("{label}", { label: "定期定額買 ETF" }), hint: "跟著大盤，慢慢存", act: "invest", style: "safe", weight: 0.2, when: () => y >= 2003,
             apply: () => { start("etf", stake); return { text: ctx.w(y >= 2020 ? "你把一部分存款拿去定期定額買{0050|高股息 ETF}，{每個月自動扣款，|設定好就不再管它，}{你說這是給未來的自己的禮物。|漲跌都不太去看。}" : "你把一部分存款拿去定期定額買0050，{每個月自動扣款，|設定好就不再管它，}{你說這是給未來的自己的禮物。|漲跌都不太去看。}"), mood: 1 }; },
           },
           {
-            id: "m_invest.fund", label: "買基金", hint: "交給專業經理人", act: "invest", style: "learn", weight: 0.15, when: () => y >= 1986 && y < 2017,
+            id: "m_invest.fund", label: ctx.f("{label}", { label: "買基金" }), hint: "交給專業經理人", act: "invest", style: "learn", weight: 0.15, when: () => y >= 1986 && y < 2017,
             apply: () => { start("fund", stake); return { text: ctx.w(y < 2000 ? "聽了{理專|朋友}的建議，你買了一檔共同基金，{每個月收到對帳單，|偶爾看看淨值，}{有點期待，也有點緊張。|開始留意國際新聞。}" : "聽了{理專|朋友}的建議，你買了{一檔科技基金|一檔全球股票基金|幾檔基金}，{每個月收到對帳單，|偶爾看看淨值，}{有點期待，也有點緊張。|開始留意國際新聞。}"), mood: 1 }; },
           },
           {

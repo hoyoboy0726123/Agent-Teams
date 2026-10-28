@@ -60,6 +60,8 @@ const cool = s => { s.crisis = Math.max(s.crisis, 1); };
 const marketYear = y => (y === 1990 ? -0.45 : y === 2000 || y === 2001 ? -0.25 : y === 2008 ? -0.3 : y === 2020 || y === 2021 ? 0.3 : y === 2022 ? -0.15 : 0.05);
 
 // ---------- wording ----------
+// A few buttons are worded exactly like what you then did (再累也硬撐著去上課). English needs two forms of these, a
+// button and a past tense, so what you did is written with an empty {done} at the end, which gives it a key of its own.
 // ctx.w for an event that comes back, with a list of templates whose {vars} change from one time to the next: a
 // template counts as already told only when it was told with these same values (as when the values were written into
 // it), so a later time picks among the same templates as before the values became {vars}.
@@ -102,8 +104,8 @@ const smallShop = s => employee(s) && (BASIC.has(s.job.title) || SHOP.includes(s
 // ---------- friends ----------
 const FRIEND_HOW = /同學|同事|室友|隊友|同梯|鄰居|社友|同好|朋友/;
 // How the story first names a friend: 大學室友阿傑, or 好友阿傑 when we do not know how you met. A few ways of meeting
-// have their own template, since their English word comes with "a" ("a classmate").
-const INTRO = { 同學: "同學{name}", 同事: "同事{name}", 鄰居: "鄰居{name}", 老同學: "老同學{name}", 老朋友: "老朋友{name}" };
+// have their own template: their English words are also used on their own ("a classmate").
+const INTRO = { 同學: "同學{name}", 同事: "同事{name}", 鄰居: "鄰居{name}", 朋友: "朋友{name}", 室友: "室友{name}", 老同學: "老同學{name}", 老朋友: "老朋友{name}" };
 const friendIntro = (f, ctx) => (typeof f.how === "string" && f.how.length <= 6 && FRIEND_HOW.test(f.how) && !/[{}|]/.test(f.how)
   ? ctx.f(INTRO[f.how] || "{how}{name}", { how: f.how, name: f.call }) : ctx.f("好友{name}", { name: f.call }));
 const defaultHow = s => (inCollege(s) || ["大學", "科大", "碩士", "博士"].includes(s.edu) ? "大學同學" : s.employed && s.age >= 20 ? "同事" : s.edu === "none" ? "朋友" : s.edu + "同學");
@@ -243,13 +245,12 @@ export const YOUNG = [
       const y = s.year, they = s.sex === "female" ? "她們" : "他們";
       const late = y < 1990 ? "在寢室打牌打到半夜" : y < 2005 ? "上網打電動打到半夜三點" : "打線上遊戲打到半夜三點";
       const fuss = y >= 1995 ? "冷氣要開幾度" : "誰該掃地倒垃圾";
-      const music = y < 1980 ? "收音機" : "音響";
       return {
         prompt: ctx.w([
           "住宿舍{的第一年|以後}，室友{每天{late}|的鬧鐘一早響個不停，自己卻不起床|常常帶朋友回寢室聊到半夜}，你已經好幾個晚上沒睡好。要怎麼辦？",
-          "宿舍{四人|六人}一間，你和室友的作息完全相反：{你早睡早起，{they}是夜貓子。|你習慣安靜讀書，{they}喜歡開著{music}。}要怎麼辦？",
+          y < 1980 ? "宿舍{四人|六人}一間，你和室友的作息完全相反：{你早睡早起，{they}是夜貓子。|你習慣安靜讀書，{they}喜歡開著收音機。}要怎麼辦？" : "宿舍{四人|六人}一間，你和室友的作息完全相反：{你早睡早起，{they}是夜貓子。|你習慣安靜讀書，{they}喜歡開著音響。}要怎麼辦？",
           "寢室裡{泡麵的味道散不掉|垃圾一個禮拜沒人倒|天天為了{fuss}鬥嘴}，室友之間的氣氛越來越僵。要怎麼辦？",
-        ], { late, they, music, fuss }),
+        ], { late, they, fuss }),
         options: [
           {
             id: "y_dorm.talk", label: "直接跟室友談", hint: "把話講開", act: "talk", style: "self", weight: 0.3,
@@ -397,7 +398,7 @@ export const YOUNG = [
     choice: (s, ctx) => {
       const y = s.year, dept = deptOf(s, ctx), phone = y >= 2003, notes = y >= 1985 ? "共筆" : "筆記";
       const course = ctx.rng.pick(["大一英文", "通識課", ...(/電|機|化|土木|物理|數學|資|材料|工程|生科/.test(dept) ? ["微積分", "普通物理"] : ["大一國文"])]);
-      const treat = ctx.rng.pick(y >= 1990 ? ["雞排", "早餐", "飲料"] : ["陽春麵", "早餐"]);
+      const treat = ctx.rng.pick(y >= 1990 ? ["雞排", "早餐", "飲料"] : ["陽春麵", "早餐"]), drink = treat === "飲料";   // 飲料 has sentences of its own: its English word is "drink"
       // Staying up late, by era: cards in the dorm, BBS, the 網咖 years, MSN, phones. [what, button, what you did]
       const [late, unplugLabel, unplug] = ctx.rng.pick(y < 1995 ? [["在寢室打牌打到半夜", "平日不再打牌", "跟室友說好平日不打牌"]]
         : y < 2000 ? [["上 BBS 上到半夜", "十二點以後不開電腦", "說好十二點以後就不開電腦"], ...(y >= 1998 ? [["在網咖打星海爭霸打到天亮", "不再去網咖", "把網咖的會員卡剪了"]] : [])]
@@ -409,7 +410,7 @@ export const YOUNG = [
       const base = {
         go: ["設三個鬧鐘，乖乖去上課", "把出席救回來", phone ? "設了三個鬧鐘，還把手機放在房間的另一頭" : "設了三個鬧鐘，還把鬧鐘放在房間的另一頭"],
         notes: [y >= 1985 ? "借共筆，考前再拚" : "借筆記，考前再拚", "省下來的時間拿去做別的", null],
-        sign: ["請同學幫忙代點名", "被抓到就慘了", "請{f}幫忙點名，說好請吃{treat}"],
+        sign: ["請同學幫忙代點名", "被抓到就慘了", drink ? "請{f}幫忙點名，說好請吃飲料" : "請{f}幫忙點名，說好請吃{treat}"],
         habit: ["調整作息，早點睡", "把生活拉回正軌", null],
         prof: ["去找老師說明狀況", "說不定有轉機", "下課後去找老師，說明了自己的狀況"],
         drop: ["退選，下學期再修", "不想被當", "趁還來得及，把這門課退選了"],
@@ -420,7 +421,7 @@ export const YOUNG = [
         { key: "late", prompt: late.includes("{")
           ? "你常常在網咖打{天堂|CS}打到天亮，白天的課一堂接一堂睡掉，{course}{已經缺了好幾次。|上次小考只寫了名字。}要怎麼辦？"
           : "你常常{late}，白天的課一堂接一堂睡掉，{course}{已經缺了好幾次。|上次小考只寫了名字。}要怎麼辦？", lead: "晚上玩到太晚，白天的課一直缺，",
-          o: { go: ["再累也硬撐著去上課", "把出席救回來", "再累也硬撐著去上課"], habit: [unplugLabel, "把生活拉回正軌", unplug] } },
+          o: { go: ["再累也硬撐著去上課", "把出席救回來", ctx.f("再累也硬撐著去上課{done}", { done: "" })], habit: [unplugLabel, "把生活拉回正軌", unplug] } },
         y >= 1980 && { key: "job", prompt: s.flags.dorm
           ? "打工的班排得太多，{晚班|大夜班}下班回到宿舍都快{兩點|天亮}了，早上的{course}{常常爬不起來。|已經缺了好幾次。}要怎麼辦？"
           : "打工的班排得太多，{晚班|大夜班}下班回到住的地方都快{兩點|天亮}了，早上的{course}{常常爬不起來。|已經缺了好幾次。}要怎麼辦？", lead: "打工排得太多，課一直缺，",
@@ -429,8 +430,8 @@ export const YOUNG = [
           ? "{course}的老師{照著課本念|對著投影片念稿}，全班有一半的人在睡覺，{你已經好幾週沒去了。|你開始覺得去不去都一樣。}要怎麼辦？"
           : "{course}的老師照著課本念，全班有一半的人在睡覺，{你已經好幾週沒去了。|你開始覺得去不去都一樣。}要怎麼辦？", lead: ctx.f("覺得{course}去不去都一樣，", { course }),
           o: { go: ["坐第一排，逼自己聽", "把出席救回來", "坐到第一排，逼自己聽下去"], notes: [y >= 1985 ? "不去上，靠共筆自己讀" : "不去上，靠筆記自己讀", "省下來的時間拿去做別的", y >= 1985 ? "不去上了，靠共筆自己讀" : "不去上了，靠筆記自己讀"], habit: ["早點睡，上課才不會打瞌睡", "把生活拉回正軌", "開始早點睡，上課至少不再打瞌睡"] } },
-        { key: "roll", prompt: "{course}每堂課都點名，同學說可以幫你答「有」，只要請一頓{treat}就好。要怎麼辦？", lead: "同學說可以幫你代點名，",
-          o: { sign: ["請同學幫忙答「有」", "被抓到就慘了", "請{f}幫忙答「有」，說好請吃{treat}"], go: ["還是自己去上", "把出席救回來", "謝謝同學的好意，還是每堂自己去上"] } },
+        { key: "roll", prompt: drink ? "{course}每堂課都點名，同學說可以幫你答「有」，只要請一頓飲料就好。要怎麼辦？" : "{course}每堂課都點名，同學說可以幫你答「有」，只要請一頓{treat}就好。要怎麼辦？", lead: "同學說可以幫你代點名，",
+          o: { sign: ["請同學幫忙答「有」", "被抓到就慘了", drink ? "請{f}幫忙答「有」，說好請吃飲料" : "請{f}幫忙答「有」，說好請吃{treat}"], go: ["還是自己去上", "把出席救回來", "謝謝同學的好意，還是每堂自己去上"] } },
         dating(s) && { key: "date", prompt: "你和{partner}常常{約會|講電話}到很晚，{course}{已經連續缺了好幾堂。|上次小考只寫了名字。}要怎麼辦？", lead: "約會約到很晚，課一直缺，",
           o: { habit: [ctx.f("跟{name}約好平日早點回家", { name: s.partner.call }), "把生活拉回正軌", ctx.f("跟{partner}約好平日早點各自回家", { partner: s.partner.call })] } },
       ]);
@@ -1025,7 +1026,7 @@ export const YOUNG = [
             leave: ["做不完的留到明天", "可能被說不合群", "做不完的就留到明天，照樣準時下班"],
             smart: ["把交接的事整理成流程", "用方法換時間", "把交接下來的工作整理成一套流程"],
             negotiate: [ctx.f("請{boss}趕快補人", { boss }), "把手上的事攤開來談", ctx.f("把兩個人的工作清單拿給{boss}看，請{boss}補人", { boss })],
-            hop: ["也開始找下一份工作", "此處不留人", "也開始找下一份工作"],
+            hop: ["也開始找下一份工作", "此處不留人", ctx.f("也開始找下一份工作{done}", { done: "" })],
           } },
         office && ["設計", "行銷", "業務", "科技", "媒體", "法律"].includes(s.job.field) && { key: "client", lead: "客戶一直臨時改需求，",
           prompt: "客戶{星期五下午才丟來新的需求，星期一一早就要|改了第七版，又說想回到第一版}，整個團隊{又要熬夜了。|連週末都在公司。}要怎麼辦？",
@@ -1459,7 +1460,7 @@ export const YOUNG = [
           o: { yes: ["開一個賣場，下班後經營", "多一份收入，也多一份累", "開了一個網拍賣場，下班後拍照、上架、回訊息"], weekend: ["只在週末出貨", "量力而為", "開了一個小賣場，只在週末出貨"], partner: ["跟朋友合開一個賣場", "有伴比較好玩", "跟{f}合開了一個賣場，一個進貨、一個出貨"] } },
         y >= 2016 && { key: "delivery", lead: "同事找你一起跑外送，",
           prompt: "同事下班後跑外送，說一個晚上能多賺{好幾百|一千多}，問你要不要也試試看。要怎麼辦？",
-          o: { yes: ["申請帳號，下班就跑", "多一份收入，也多一份累", "申請了外送的帳號，下班就騎車上線"], weekend: ["只在週末跑幾單", "量力而為", "只在週末跑幾單"], partner: ["跟同事一起跑，互相照應", "有伴比較好玩", "跟{f}一起跑，約好在同一家便利商店休息"] } },
+          o: { yes: ["申請帳號，下班就跑", "多一份收入，也多一份累", "申請了外送的帳號，下班就騎車上線"], weekend: ["只在週末跑幾單", "量力而為", ctx.f("只在週末跑幾單{done}", { done: "" })], partner: ["跟同事一起跑，互相照應", "有伴比較好玩", "跟{f}一起跑，約好在同一家便利商店休息"] } },
         y >= 2008 && officeJob(s) && { key: "gig", lead: ctx.f("有人找你私下接{gig}的案子，", { gig }),
           prompt: "{以前的同學|朋友的公司}問你能不能私下接一個{gig}的案子，酬勞差不多是半個月的薪水。要怎麼辦？",
           o: { yes: ["接下來，熬夜趕完", "多一份收入，也多一份累", "接了下來，連續熬了好幾個晚上"], weekend: ["接，但只用週末做", "量力而為", "接了下來，但只用週末做"], partner: ["找朋友分工一起接", "有伴比較好玩", "找了{f}分工一起接"] } },
@@ -1673,7 +1674,7 @@ export const YOUNG = [
       const broken = ctx.rng.pick([...(y >= 1990 ? ["冷氣壞了"] : []), ...(y >= 1975 ? ["熱水器壞了"] : []), "天花板在漏水"]);
       const helper = parentsAlive(s) ? parentsWord(s) : "懂法律的朋友";
       const base = {
-        talk: ["好好跟房東溝通", "說不定講開就好", "好好跟房東溝通"],
+        talk: ["好好跟房東溝通", "說不定講開就好", ctx.f("好好跟房東溝通{done}", { done: "" })],
         yield: ["算了，自己處理", "不想吵", "決定自己處理"],
         evidence: ["照合約來，寄存證信函", "照規矩來", "拿出合約，寄了一封存證信函給房東"],
         move: ["乾脆搬家", "換個房東", "決定不續租，另外找房子"],
@@ -1691,7 +1692,7 @@ export const YOUNG = [
             : "租約快到期了，房東先放話說{牆上的釘孔|地板的刮痕}都要從押金扣，兩個月的押金可能拿不回來。要怎麼辦？",
           good: "{lead}你{did}，{房東最後只扣了一點清潔費。|房東看了看，說那就算了，押金全退。}", bad: "{lead}你{did}，{房東還是扣了一個月的押金。|押金只拿回一半。}",
           o: {
-            yield: ["認了，讓房東扣", "不想吵", "認了，讓房東扣"],
+            yield: ["認了，讓房東扣", "不想吵", ctx.f("認了，讓房東扣{done}", { done: "" })],
             evidence: [y >= 1980 ? "拿出入住時拍的照片對質" : "拿出合約一條一條對", "照規矩來", y >= 2005 ? "拿出入住時用手機拍的照片對質" : y >= 1980 ? "拿出入住時拍的照片對質" : "拿出合約一條一條跟房東對"],
             move: ["不耗了，另外找房子", "換個房東", "決定不跟房東耗了，另外找房子"],
           } },
@@ -1774,12 +1775,21 @@ export const YOUNG = [
         meal: [ctx.f("約{name}吃頓飯，好好聊", { name }), "熟了比較好說話", "{lead}你約{name}去吃了一頓{火鍋|熱炒}，{聊開之後，很多事都好說了。|你發現對方其實人很好。}"],
       };
       const sc = sceneOf(s, ctx, "y_flatmate", [
-        y >= 1985 && { key: "pet", lead: ctx.f("{name}想養{pet}，", { name, pet }),
-          prompt: pet === "貓" ? "{mate}說想養一隻貓，可是租約寫著不能養寵物，你也對貓毛有點過敏。要怎麼辦？" : "{mate}說想領養一隻流浪狗，可是租約寫著不能養寵物，你也怕狗叫吵到鄰居。要怎麼辦？",
+        y >= 1985 && pet === "貓" && { key: "pet", lead: ctx.f("{name}想養貓，", { name }),
+          prompt: "{mate}說想養一隻貓，可是租約寫著不能養寵物，你也對貓毛有點過敏。要怎麼辦？",
           o: {
             talk: ["一起去問房東", "先把規矩問清楚", "{lead}你陪{name}去問房東，房東說只要不弄壞東西就可以，你們多付了一點清潔費。", "{lead}你陪{name}去問房東，房東一口回絕，{name}只好打消了念頭。"],
-            deal: [ctx.f("講好{pet}不進你的房間", { pet }), "各退一步", "{lead}你跟{name}講好，{pet}不能進你的房間，費用{fta}自己出，{一開始有點彆扭，後來也就習慣了。|這樣的安排，兩個人都能接受。}"],
-            yield: ["答應，自己多吸地板", "室友開心就好", "{lead}你答應了，還買了一台吸塵器，{後來那隻{pet}最愛睡在你的床上。|每天下班回家，{pet}都在門口等你。}"],
+            deal: ["講好貓不進你的房間", "各退一步", "{lead}你跟{name}講好，貓不能進你的房間，費用{fta}自己出，{一開始有點彆扭，後來也就習慣了。|這樣的安排，兩個人都能接受。}"],
+            yield: ["答應，自己多吸地板", "室友開心就好", "{lead}你答應了，還買了一台吸塵器，{後來那隻貓最愛睡在你的床上。|每天下班回家，貓都在門口等你。}"],
+            avoid: ["不表態，各過各的", "不想起衝突", "{lead}你沒有正面回應，{{name}後來還是帶了一隻回來，你只好把房門關緊。|兩個人之間多了一點尷尬。}"],
+            meal: [ctx.f("約{name}吃頓飯，好好聊", { name }), "熟了比較好說話", "{lead}你約{name}去吃了一頓{火鍋|熱炒}，{聊開之後，你們約好輪流餵食、輪流打掃。|{name}說等租約到期再養，你們還一起去看了收容所。}"],
+          } },
+        y >= 1985 && pet === "狗" && { key: "pet", lead: ctx.f("{name}想養狗，", { name }),
+          prompt: "{mate}說想領養一隻流浪狗，可是租約寫著不能養寵物，你也怕狗叫吵到鄰居。要怎麼辦？",
+          o: {
+            talk: ["一起去問房東", "先把規矩問清楚", "{lead}你陪{name}去問房東，房東說只要不弄壞東西就可以，你們多付了一點清潔費。", "{lead}你陪{name}去問房東，房東一口回絕，{name}只好打消了念頭。"],
+            deal: ["講好狗不進你的房間", "各退一步", "{lead}你跟{name}講好，狗不能進你的房間，費用{fta}自己出，{一開始有點彆扭，後來也就習慣了。|這樣的安排，兩個人都能接受。}"],
+            yield: ["答應，自己多吸地板", "室友開心就好", "{lead}你答應了，還買了一台吸塵器，{後來那隻狗最愛睡在你的床上。|每天下班回家，狗都在門口等你。}"],
             avoid: ["不表態，各過各的", "不想起衝突", "{lead}你沒有正面回應，{{name}後來還是帶了一隻回來，你只好把房門關緊。|兩個人之間多了一點尷尬。}"],
             meal: [ctx.f("約{name}吃頓飯，好好聊", { name }), "熟了比較好說話", "{lead}你約{name}去吃了一頓{火鍋|熱炒}，{聊開之後，你們約好輪流餵食、輪流打掃。|{name}說等租約到期再養，你們還一起去看了收容所。}"],
           } },
@@ -1817,7 +1827,7 @@ export const YOUNG = [
             meal: [ctx.f("約{name}吃頓飯，順便聊聊", { name }), "熟了比較好說話", "{lead}你約{name}去吃了一頓{火鍋|熱炒}，{聊開之後，{name}主動說平日會早點收工。|你們講好了平日晚上的安靜時間。}"],
           } },
       ]);
-      const B = buttonsOf(base, sc), v = { lead: sc.lead, name, fta: ta, pet, other };
+      const B = buttonsOf(base, sc), v = { lead: sc.lead, name, fta: ta, other };
       const share = s2 => { if (s2.flags.y_rentKind !== "studio") s2.flags.y_rentKind = "share"; };
       return {
         prompt: ctx.w(sc.prompt, { mate, other, name, noise }),
@@ -2023,9 +2033,10 @@ export const YOUNG = [
       const k = sceneOf(s, ctx, "y_mlm", [{ key: "coffee" }, { key: "seminar" }, y >= 2014 && { key: "online" }, inCollege(s) && { key: "campus" }, { key: "relative" }]).key;
       const item = ctx.rng.pick(y >= 2014 ? ["面膜", "保健食品", "咖啡"] : ["保健食品", "清潔用品", "保養品", ...(y >= 1995 ? ["淨水器"] : [])]);
       const f = k === "coffee" || k === "online" ? friendOf(s, ctx, { prefer: /國小|國中|高中|高職/, how: ctx.rng.pick(["國中同學", "高中同學"]) }) : null;
-      // Someone the story names by who they are to you (同事, 阿姨) is "your co-worker" in English: {yourRole}.
+      // Someone the story names by who they are to you (同事, 阿姨) is "your co-worker" in English: {yourRole}. (學長 is
+      // "an older schoolmate" on its own.)
       const role = k === "seminar" ? (work ? "同事" : "學長") : k === "relative" ? ctx.rng.pick(["阿姨", "表姊", "舅媽"]) : null;
-      const host = f ? f.call : role ? ctx.f("{yourRole}", { yourRole: role }) : "對方", campus = k === "campus";
+      const host = f ? f.call : role === "學長" ? role : role ? ctx.f("{yourRole}", { yourRole: role }) : "對方", campus = k === "campus";
       const event = y >= 2012 ? "財富自由講座" : "成功人士分享會";
       const intro = f && friendIntro(f, ctx), fta = f && pronoun(f);
       const S = {
@@ -2033,7 +2044,7 @@ export const YOUNG = [
           ? "好久沒聯絡的{intro}突然打電話約你喝咖啡，到了才發現{fta}帶了一位「{學長|老師}」，桌上攤著一本{產品型錄|事業計畫書}。要怎麼辦？"
           : y < 2011
             ? "好久沒聯絡的{intro}突然傳簡訊約你喝咖啡，到了才發現{fta}帶了一位「{學長|老師}」，桌上攤著一本{產品型錄|事業計畫書}。要怎麼辦？"
-            : "好久沒聯絡的{intro}突然傳 LINE 約你喝咖啡，到了才發現{fta}帶了一位「{學長|老師}」，桌上攤著一本{產品型錄|事業計畫書}。要怎麼辦？" },
+            : "好久沒聯絡的{intro}突然傳 LINE約你喝咖啡，到了才發現{fta}帶了一位「{學長|老師}」，桌上攤著一本{產品型錄|事業計畫書}。要怎麼辦？" },
         seminar: { lead: ctx.f("被{host}拉去聽了一場{event}，", { host, event }), prompt: "{host}邀你去{飯店的宴會廳|一間很氣派的辦公室}聽一場「{event}」，台上的講師說自己{兼差一年就買了雙B|下班兼職月入十萬}，台下的人一直拍手。要怎麼辦？" },
         online: { lead: ctx.f("{host}拉你當{item}的代理，", { host, item }), prompt: y >= 2016
           ? "{intro}在IG上天天分享{item}的「微創業」，私訊問你要不要一起當代理，說入門只要{兩萬|三萬}，{之後躺著也能賺。|業績好還能出國旅遊。}要怎麼辦？"
@@ -2151,7 +2162,7 @@ export const YOUNG = [
             budget: ["薪水一進來先存一半", "看清楚錢花去哪", "薪水一進來先轉一半到另一個帳戶，剩下的每一筆都記下來"],
           } },
       ]);
-      const B = buttonsOf(base, sc), lead = sc.lead, did = k => ({ lead, did: B[k][2], noodle, who, bill: card ? "卡費" : "分期款", spent: y >= 1990 ? "飲料" : "宵夜" });
+      const B = buttonsOf(base, sc), lead = sc.lead, did = k => ({ lead, did: B[k][2], noodle, who, bill: card ? "卡費" : "分期款" });
       return {
         prompt: ctx.w(sc.prompt, { appliance, goods, gadget, noodle }),
         options: [
@@ -2169,7 +2180,7 @@ export const YOUNG = [
           },
           {
             id: "y_spree.budget", label: B.budget[0], hint: B.budget[1], act: "save", style: "learn", weight: 0.2,
-            apply: (s2, c) => { frugal(s2, 1); return { text: c.w("{lead}你{did}，{三個月後，存款第一次比上個月多。|才發現每個月光是{spent}就花了不少錢。}", did("budget")), mood: 1 }; },
+            apply: (s2, c) => { frugal(s2, 1); return { text: c.w(y >= 1990 ? "{lead}你{did}，{三個月後，存款第一次比上個月多。|才發現每個月光是飲料就花了不少錢。}" : "{lead}你{did}，{三個月後，存款第一次比上個月多。|才發現每個月光是宵夜就花了不少錢。}", did("budget")), mood: 1 }; },
           },
           {
             id: "y_spree.family", label: B.family[0], hint: B.family[1], act: "care", style: "family", weight: 0.1, when: s2 => parentsAlive(s2),

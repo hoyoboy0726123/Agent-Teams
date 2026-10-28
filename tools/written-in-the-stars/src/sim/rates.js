@@ -111,13 +111,18 @@ export const deathRaw = (age, sex, year) => lifeTable(sex, year)[Math.min(MAX, M
 // does, within five years (FATALITY, from typical survival: 15–20 % of stroke and heart patients die in the first
 // year); so the diagnoses at an age are the deaths a year older divided by the five-year case fatality.
 // Cancer's fatality is FATALITY.cancer × e^(α + β·(age at diagnosis − 65)/10) for each sex (CANCER_FATALITY): younger
-// patients survive far more often, and a regular health check lowers the fatality by a quarter (design). α and β are
-// to be solved so the simulated diagnoses reproduce the US cancer registry (us-rates.js CANCER_FATALITY when it has
-// them); until then they are bazi-life's values for Taiwan, which give a five-year survival a little below the US one.
+// patients survive more often, and a regular health check lowers the fatality by a quarter (design). α and β are
+// solved so that the simulated diagnoses of 2019 (among people not already ill) reproduce the US registry
+// (us-rates.js CANCER_INCIDENCE, U.S. Cancer Statistics 2019–23, on the 2000 US standard population, US_STANDARD_2000):
+// the age-standardised rate of each sex exactly (men 490.4, women 428.9 per 100,000), β (shared) as the best fit to
+// the rates by age group (0–14 21 vs 16, 15–39 66 vs 77, 40–64 698 vs 549, 65–74 1,726 vs 1,795, 75+ 2,177 vs 2,277;
+// no single slope fits the middle ages better) and a median age at diagnosis of 66.8 (SEER: 67). That gives a
+// five-year survival of about 81 % after a diagnosis at 50, 73 % at 65 and 63 % at 80 (SEER's relative survival:
+// about 69 % overall). test/calibration.test.js checks the fit (us-rates.js CANCER_FATALITY would override it).
 export const WHO_STANDARD = [[0, 8.86], [5, 8.69], [10, 8.60], [15, 8.47], [20, 8.22], [25, 7.93], [30, 7.61], [35, 7.15], [40, 6.59], [45, 6.04], [50, 5.37], [55, 4.55], [60, 3.72], [65, 2.96], [70, 2.21], [75, 1.52], [80, 0.91], [85, 0.63]];
 export const CANCER_REFERENCE = D.CANCER_REFERENCE || null;
 const FATALITY = { cancer: [0.15, 0.1, 0.07, 0.05, 0.04], stroke: [0.17, 0.06, 0.05, 0.04, 0.04], "heart disease": [0.14, 0.05, 0.04, 0.04, 0.03] };
-export const CANCER_FATALITY = D.CANCER_FATALITY || { male: [0.5374, 0.2696], female: [0.1, 0.4262] };   // [α, β]
+export const CANCER_FATALITY = D.CANCER_FATALITY || { male: [-0.1694, 0.25], female: [-0.2011, 0.25] };   // [α, β]
 const CAUSE = { cancer: "cancer", stroke: "stroke", "heart disease": "heart" };
 export const SERIOUS_TYPES = Object.keys(CAUSE);
 const CHECKUP_SHARE = 0.55;   // the share of people who keep up regular checkups from 40 (story/core.js `checkups`)
@@ -443,53 +448,105 @@ export const SAME_SEX_MARRIAGE = 2015;
 export const kindergarten = year => interp([[1955, 0.55], [1965, 0.62], [1975, 0.85], [1985, 0.93], [2000, 0.95]], yr(year));
 // Middle school / junior high: everyone of school age (compulsory schooling).
 export const juniorHigh = () => 1;
-// Finishing high school, a diploma or a GED, by the year you turn 18 (NCES Digest table 104.20, people aged 25–29 who
-// completed high school, read back to their graduation year: about 61 % in 1960, 75 % in 1970, 85 % in 1980, 88 % in
-// 2000, 89 % in 2010, 95 % in 2020). About 4 points of that is a GED taken later.
-export const HIGH_SCHOOL = D.HIGH_SCHOOL || [[1950, 0.6], [1962, 0.75], [1972, 0.85], [1982, 0.86], [1992, 0.87], [2002, 0.89], [2012, 0.92], [2020, 0.95]];
-export const highSchoolGrad = year => interp(HIGH_SCHOOL, yr(year));
-// The chance of dropping out in each of the years at 16 and 17 (legal from 16 in most states), so that the diploma
-// share on time is the completion share less the GEDs; a dropout earns a GED with GED_RATE a year from 17 to 30 (design).
-export const hsDropout = year => 1 - Math.sqrt(Math.max(0.3, highSchoolGrad(year) - 0.04));
+// Schooling is fitted to each birth cohort's highest level (us-rates.js EDUCATION_BY_COHORT: high school or more and
+// a bachelor's or more from Census CPS at 25–29; the split into some college, associate and graduate degrees is the
+// data track's approximation): the shares by sex, for cohorts 1950, 1955, …, 2005, straight between them.
+const EDU_COHORTS = D.EDUCATION_BY_COHORT || [[1950, { male: { highSchool: 0.85, someCollege: 0.27, associate: 0.04, bachelor: 0.17, graduate: 0.1 }, female: { highSchool: 0.85, someCollege: 0.3, associate: 0.04, bachelor: 0.13, graduate: 0.08 } }], [2000, { male: { highSchool: 0.95, someCollege: 0.27, associate: 0.1, bachelor: 0.22, graduate: 0.14 }, female: { highSchool: 0.95, someCollege: 0.21, associate: 0.1, bachelor: 0.29, graduate: 0.18 } }]];
+const EDU_KEYS = ["highSchool", "someCollege", "associate", "bachelor", "graduate"];
+export function educationTarget(birthYear, sex = null) {
+  const at = sx => Object.fromEntries(EDU_KEYS.map(k => [k, interp(EDU_COHORTS.map(([c, r]) => [c, r[sx][k]]), birthYear)]));
+  if (sex === "male" || sex === "female") return at(sex);
+  const m = at("male"), f = at("female");
+  return Object.fromEntries(EDU_KEYS.map(k => [k, (m[k] + f[k]) / 2]));
+}
+// Finishing high school, a diploma or a GED (the cohort's high school or more). The story's dropouts leave at 16 or 17
+// (legal from 16 in most states) and may pass the GED from 17 to 30 (GED_RATE a year, design; 2.5 times that for those
+// who planned it, three in ten of the dropouts in story/core.js): about half of them by 30. So the diploma share is
+// solved from the target, and the yearly dropout chance in each of the two years from it.
 export const GED_RATE = 0.035;
 export const ged = age => (age >= 17 && age <= 30 ? GED_RATE : 0);
-// College right after high school: the share of new graduates enrolled that fall (NCES Digest table 302.10: 45 % in
-// 1960, 52 % in 1970, 49 % in 1980, 60 % in 1990, 63 % in 2000, 70 % in 2009, 66 % in 2019, 62 % in 2022), about a
-// third of them in a two-year community college from the 1970s (fewer before). Trade school and enlisting are the
-// usual other paths; the rest go to work.
-export const ENROLLMENT = D.ENROLLMENT || [[1955, 0.42], [1960, 0.45], [1965, 0.51], [1970, 0.52], [1980, 0.49], [1985, 0.58], [1990, 0.6], [1995, 0.62], [2000, 0.63], [2005, 0.69], [2009, 0.7], [2015, 0.69], [2019, 0.66], [2020, 0.63], [2022, 0.62]];
+const GED_BY_30 = 0.7 * (1 - Math.pow(1 - GED_RATE, 14)) + 0.3 * (1 - Math.pow(1 - 2.5 * GED_RATE, 14));
+export const highSchoolGrad = (year, birthYear = year - 17) => educationTarget(birthYear).highSchool;
+export const HIGH_SCHOOL = EDU_COHORTS.map(([c, r]) => [c + 18, (r.male.highSchool + r.female.highSchool) / 2]);
+const diplomaShare = birthYear => Math.max(0.3, (educationTarget(birthYear).highSchool - GED_BY_30) / (1 - GED_BY_30));
+export const hsDropout = (year, birthYear = year - 17) => 1 - Math.sqrt(diplomaShare(birthYear));
+// College right after high school: the share of new graduates enrolled that fall (us-rates.js COLLEGE_ENROLLMENT,
+// NCES Digest table 302.10: 45 % in 1960, 52 % in 1970, 49 % in 1980, 60 % in 1990, 63 % in 2000, 70 % in 2009, 62 %
+// in 2022), about a third of them in a two-year community college from the 1970s (fewer before).
+export const ENROLLMENT = D.COLLEGE_ENROLLMENT ? D.COLLEGE_ENROLLMENT.map(([y, v]) => [y, v / 100]) : [[1955, 0.42], [1960, 0.45], [1965, 0.51], [1970, 0.52], [1980, 0.49], [1985, 0.58], [1990, 0.6], [1995, 0.62], [2000, 0.63], [2005, 0.69], [2009, 0.7], [2015, 0.69], [2019, 0.66], [2020, 0.63], [2022, 0.62]];
 export const college = year => interp(ENROLLMENT, yr(year));
 export const communityShare = year => interp([[1960, 0.2], [1972, 0.33], [2022, 0.33]], yr(year));
+// In the story everyone goes to college at the graduation choice or not at all (bar the GI Bill and night school), so
+// that choice takes everyone who ever starts college by 30: the cohort's some college or more over its high school or
+// more (about 69 % of the 1955 cohort's graduates, 80 % of the 1990 one's), more than the NCES share who start that
+// fall (ENROLLMENT, 47 % and 69 %). A third of them start at a community college; a third of those who finish an
+// associate degree transfer (design, from National Student Clearinghouse figures). The yearly dropout rates are then
+// solved so the cohort ends with its shares of associate degrees and of bachelor's degrees or more.
+export const transfer = () => 0.33;
+const FOUR_YEAR_CHECKS = 3, COMMUNITY_CHECKS = 2;   // the years story/core.js uniDropout rolls on each track
+const collegePlans = new Map();
+export function collegePlan(birthYear, sex = "male") {
+  const by = Math.round(birthYear), key = `${by}:${sex}`;
+  if (collegePlans.has(key)) return collegePlans.get(key);
+  const t = educationTarget(by, sex === "female" ? "female" : sex === "male" ? "male" : null);
+  // Only diploma holders reach the choice (GED holders come later), so the shares are taken over them.
+  const dip = diplomaShare(by), m = military(by, by + 18, sex), cap = 1 - 0.05 - 0.02 - (m.draft ? DRAFT_ENLIST : Math.min(0.4, m.p / dip));
+  const attend = Math.min(0.9, cap, (t.someCollege + t.associate + t.bachelor + t.graduate) / dip);
+  const ba = (t.bachelor + t.graduate) / dip, assoc = t.associate / dip, f = communityShare(by + 18), tr = transfer();
+  const yearly = (total, n) => 1 - Math.pow(1 - total, 1 / n);
+  // Given the four-year dropout d4, the community-college dropout that gives the associate share, and the bachelor's.
+  const at = d4 => {
+    const y4 = yearly(d4, FOUR_YEAR_CHECKS);
+    const keep = Math.max(0.05, Math.min(1, assoc / (attend * f * ((1 - tr) + tr * y4))));
+    const bach = attend * ((1 - f) * (1 - d4) + f * keep * tr * (1 - y4));
+    return { d4, dc: 1 - keep, bach };
+  };
+  let lo = 0, hi = 0.9;
+  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (at(mid).bach > ba) lo = mid; else hi = mid; }
+  const r = at((lo + hi) / 2);
+  const plan = { attend, diploma: dip, community: f, fourYear: yearly(r.d4, FOUR_YEAR_CHECKS), communityYear: yearly(r.dc, COMMUNITY_CHECKS), graduate: t.graduate / Math.max(0.01, t.bachelor + t.graduate) };
+  collegePlans.set(key, plan);
+  return plan;
+}
 // The weights of the choice after graduation: { college, community, trade, military, work }, summing to 1.
 export function afterHighSchool(year, sex = "male", birthYear = year - 18) {
-  const enroll = college(year), cc = communityShare(year), mil = military(birthYear, year, sex).p * 0.6;
-  const trade = 0.05;
-  return { college: enroll * (1 - cc), community: enroll * cc, trade, military: mil, work: Math.max(0.02, 1 - enroll - trade - mil) };
+  const plan = collegePlan(birthYear, sex), cc = plan.community;
+  const m = military(birthYear, year, sex), mil = m.draft ? DRAFT_ENLIST : Math.min(0.4, m.p / diplomaShare(birthYear));
+  const trade = 0.05, enroll = Math.min(plan.attend, 1 - trade - mil - 0.02);
+  return { college: enroll * (1 - cc), community: enroll * cc, trade, military: mil, work: Math.max(0, 1 - enroll - trade - mil) };
 }
-// Finishing: about 62–64 % of four-year starters finish a bachelor's within six years (NCES), about a third of
-// community-college starters finish an associate degree and a third transfer to a four-year school (design from
-// National Student Clearinghouse figures). Yearly dropout rates that give those shares (design).
-export const collegeDropout = (year, track = "college") => (track === "community" ? 0.2 : 0.11);
-export const transfer = () => 0.33;
-// Graduate school straight after a bachelor's (design, from NCES: about 14 % of adults hold an advanced degree, about
-// 37 % of bachelor's holders, many of them years later): a master's or MBA, law or medicine, or a PhD.
-export const gradSchool = () => ({ master: 0.15, professional: 0.05, phd: 0.02 });
-export const master = () => { const g = gradSchool(); return g.master + g.professional + g.phd; };
+// The yearly chance of leaving college without the degree (story/core.js passes the year and the track; the sex and
+// birth year pick the cohort's plan).
+export const collegeDropout = (year, track = "college", sex = "male", birthYear = year - 19) => {
+  const plan = collegePlan(birthYear, sex);
+  return track === "community" ? plan.communityYear : plan.fourYear;
+};
+// Graduate school straight after a bachelor's: a master's or MBA, law or medicine, or a PhD. The cohorts' graduate
+// degrees are about 38 % of their bachelor's or more (us-rates.js EDUCATION_BY_COHORT, from Census 2024, adults 25+);
+// in the story nearly all of them start right after college (a few more come from night school, story/work.js), so
+// the share who go on is that share (design: 95 % of it).
+export const master = (year, sex = "male", birthYear = year - 22) => 0.95 * collegePlan(birthYear, sex).graduate;
+export const gradSchool = (year = 2024, sex = "male", birthYear = year - 22) => { const g = master(year, sex, birthYear); return { master: g * 0.68, professional: g * 0.23, phd: g * 0.09 }; };
 
 // ---------- military service ----------
 // The Vietnam-era draft (lotteries 1969–1972; the last inductions in 1972, the all-volunteer force from 1973) and
-// enlistment since: about 12 % of young men in the 1970s–80s and about 7 % now, about 1.5 % of young women
+// enlistment since. p is the share of a birth cohort's men who ever serve (us-rates.js MILITARY_SERVICE_SHARE, from
+// veteran counts: about 30 % of men born 1944–52, 15 % of 1955–64, 10 % of 1965–80, 7 % after); about 1.5 % of women
 // (Department of Defense accession figures, approximately). `draft` marks a man of draft age in the lottery years
-// (era.js tells the lottery). p is the chance of serving at 18–22.
+// (era.js tells the lottery and inducts about a tenth of those men, so the graduation choice enlists DRAFT_ENLIST of
+// them); otherwise the graduation choice is where they enlist, so it takes the share over the diploma share.
+const SERVICE_SHARE = D.MILITARY_SERVICE_SHARE || [[1950, 0.3], [1955, 0.15], [1964, 0.15], [1965, 0.1], [1980, 0.1], [1985, 0.07]];
+const DRAFT_ENLIST = 0.18;
+
 export function military(birthYear, year = birthYear + 18, sex = "male") {
   const y = yr(year);
   if (sex === "female") return { p: interp([[1970, 0.005], [1980, 0.012], [2000, 0.015]], y), draft: false, years: 4 };
   const draft = birthYear <= 1953 && y <= 1972;
-  return { p: draft ? 0.3 : interp([[1973, 0.14], [1990, 0.12], [1995, 0.08], [2005, 0.075], [2020, 0.07]], y), draft, years: draft ? 2 : 4 };
+  return { p: interp(SERVICE_SHARE, birthYear), draft, years: draft ? 2 : 4 };
 }
 
 // The chance that someone finishing high school in `year` enlists (the choice after graduation; story/core.js).
-export const enlist = (sex, year) => military(year - 18, year, sex).p;
+export const enlist = (sex, year) => { const m = military(year - 18, year, sex); return m.draft ? DRAFT_ENLIST : Math.min(0.4, m.p / diplomaShare(year - 18)); };
 
 // ---------- work ----------
 // One unit of pay is the median annual earnings of a full-time worker (BLS, usual weekly earnings, 2023: $1,117 a week,
@@ -505,10 +562,26 @@ export const jobChange = age => interp([[22, 0.24], [30, 0.16], [40, 0.09], [55,
 const RECESSIONS = new Set([1953, 1954, 1957, 1958, 1960, 1961, 1970, 1974, 1975, 1980, 1981, 1982, 1990, 1991, 2001, 2008, 2009, 2020]);
 export const isRecession = year => RECESSIONS.has(yr(year));
 export const layoff = year => 0.03 * (isRecession(year) ? 1.8 : 1);
-// Retiring: Social Security from 62 (most claim between 62 and the full retirement age of 66–67); the average
-// retirement age is about 62 (Gallup 2024) and labour-force participation falls from about 65 % at 55–64 to 19 % at 65+
-// (BLS). Yearly chances by age (design, fitted to those).
-export const retire = (age, sex) => (age < 55 ? 0 : age < 62 ? (sex === "female" ? 0.05 : 0.04) : age === 62 ? 0.22 : age < 65 ? 0.12 : age < 67 ? 0.28 : age < 70 ? 0.2 : 0.3);
+// Retiring, told as claiming Social Security (the official age series: us-rates.js RETIREMENT_AWARD_AGE and
+// RETIREMENT_AT_62, SSA Annual Statistical Supplement Table 6.B5): the average retired-worker award came at 64.2 in
+// 2012, 64.7 in 2017 and 65.2 in 2022–23, the share at 62 fell from 37 % to 23 %, and the full retirement age rose from
+// 66 to 67 for the 1955–1960 cohorts (FULL_RETIREMENT_AGE). Yearly chances by age (design, fitted to those for the
+// cohorts born 1950–1960, held after): before 62 an early-retirement chance that falls from 4.5 % to 2 %, 18 % at 62,
+// 22 % a year until the full retirement age, 60 % at it, 45 % a year after it, half at 70 and later. story/core.js's
+// choice also lets about one retiree in fifteen wait to claim until 70 (claimDelay, design: SSA awards at 70 were a
+// few percent until the 2010s).
+const FULL_RETIREMENT = D.FULL_RETIREMENT_AGE || [[1937, 65], [1943, 66], [1954, 66], [1960, 67]];
+export const fullRetirementAge = birthYear => interp(FULL_RETIREMENT, birthYear);
+export function retire(age, sex = "male", year = 2024) {
+  const by = yr(year) - age, fra = Math.round(fullRetirementAge(by));
+  if (age < 55) return 0;
+  if (age < 62) return interp([[1950, 0.045], [1960, 0.02]], by) + (sex === "female" ? 0.005 : 0);
+  if (age === 62) return 0.18;
+  if (age < fra) return 0.22;
+  if (age === fra) return 0.6;
+  return age < 70 ? 0.45 : 0.5;
+}
+export const claimDelay = () => 0.07;
 // Social Security's national average wage index (1951 $2,799, 1960 $4,007, 1970 $6,186, 1980 $12,513, 1990 $21,028,
 // 2000 $32,155, 2010 $41,674, 2020 $55,629, 2023 $66,622), for turning pay units into the dollars of a year; the
 // median full-time earnings were about 0.87 of it in 2023. After 2023, wages grow 3.5 % a year (design).
@@ -529,8 +602,8 @@ export const marketReturn = year => (SP500[yr(year)] ?? 10) / 100;
 // in 2024 and about 30 through the 1980s–2000s (National Association of Realtors). Yearly chances (design, fitted to
 // those); the down payment is in years of median pay (a typical first-time buyer puts down 6–9 % of a home costing
 // about seven years of median pay, plus closing costs: design).
-export const homeBuy = age => interp([[22, 0.03], [25, 0.07], [30, 0.11], [35, 0.11], [45, 0.08], [60, 0.04], [75, 0.01]], age);
-export const DOWN_PAYMENT = 0.8;
+export const homeBuy = age => interp([[22, 0.05], [25, 0.13], [30, 0.2], [34, 0.15], [38, 0.07], [45, 0.05], [60, 0.03], [75, 0.01]], age);
+export const DOWN_PAYMENT = 0.5;
 // Moving to another state (Census Bureau, CPS mobility: about 3 % of people a year through the 1950s–80s, 2.5 % around
 // 2000, 1.5 % from the 2010s; most for young adults): yearly chances by age and era (design, to those figures).
 // Without a year, the era factor is left out (1).
