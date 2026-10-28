@@ -62,6 +62,8 @@ const marketYear = y => (y === 1990 ? -0.45 : y === 2000 || y === 2001 ? -0.25 :
 // ---------- wording ----------
 // A few buttons are worded exactly like what you then did (再累也硬撐著去上課). English needs two forms of these, a
 // button and a past tense, so what you did is written with an empty {done} at the end, which gives it a key of its own.
+// The same goes for words the shared story already uses in another sense (當家教 is "tutoring" there, 對方 "they"):
+// the buttons 當家教 and 跑外送, and 對方 as the recruiter in y_mlm.
 // ctx.w for an event that comes back, with a list of templates whose {vars} change from one time to the next: a
 // template counts as already told only when it was told with these same values (as when the values were written into
 // it), so a later time picks among the same templates as before the values became {vars}.
@@ -337,7 +339,7 @@ export const YOUNG = [
         prompt: ctx.w(["{生活費有點不夠用|想自己賺點零用錢|看到同學都在打工}，你想去打工。要做什麼？", "{下學期的學費|想買的東西}還差一點，你打算找個打工。要做什麼？"]),
         options: [
           {
-            id: "y_parttime.tutor", label: "當家教", hint: "時薪高，要會教", act: "sideJob", style: "learn", weight: 0.2,
+            id: "y_parttime.tutor", label: ctx.f("當家教{done}", { done: "" }), hint: "時薪高，要會教", act: "sideJob", style: "learn", weight: 0.2,
             apply: (s2, c) => { s2.savings += 0.04; return { text: c.w("課餘去當家教，教{國中生數學|高中生英文|小學生寫功課}，{學生月考進步了二十分，家長送你一盒水果。|一個小時的家教費，抵得上在餐廳打工的兩倍。|你發現教會別人，比自己讀懂還難。}"), mood: 2 }; },
           },
           {
@@ -354,7 +356,7 @@ export const YOUNG = [
             apply: (s2, c) => { s2.savings += 0.02; return { text: c.w("在{系辦|圖書館|學校餐廳}當工讀生，{薪水不多，但可以邊顧櫃台邊讀書。|跟系上的助教混得很熟，選課都有人提醒。}"), mood: 1 }; },
           },
           {
-            id: "y_parttime.hustle", label: y >= 2016 ? "跑外送" : "跟同學去夜市擺攤", hint: "賺得多，也比較累", act: "sideJob", style: "risk", weight: 0.15,
+            id: "y_parttime.hustle", label: y >= 2016 ? ctx.f("跑外送{done}", { done: "" }) : "跟同學去夜市擺攤", hint: "賺得多，也比較累", act: "sideJob", style: "risk", weight: 0.15,
             apply: (s2, c) => {
               s2.savings += 0.06; stress(s2, 0.05);
               return { text: c.w(y >= 2016
