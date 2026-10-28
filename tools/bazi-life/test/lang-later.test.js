@@ -27,7 +27,7 @@ function state(o) {
     edu: o.edu, job: o.job ? { title: "工程師", field: o.job, since: 25 } : null, career: o.pro ? 2 : 0, retired: o.retired, employed: !o.retired, studying: false,
     home: o.home, savings: 2, debt: 0, income: 1, health: { chronic: o.chronic, serious: false, hr: 1 },
     flags: { grandkids: o.grands, estranged: true, l_plan: o.plan ? { kind: o.plan, what: o.what, show: o.show, at: age - 4 } : undefined, l_eyesWait: o.eyesWait, l_noSmart: o.noSmart },
-    last: { retire: age - 1, grandchild: o.grands ? age - 1 : undefined, widowed: o.rel === "widowed" ? age - 1 : undefined, h_knee: o.knee },
+    last: { retire: age - 1, grandchild: o.grands ? age - o.newborn : undefined, widowed: o.rel === "widowed" ? age - 1 : undefined, h_knee: o.knee },
     count: { l_directive: o.again ? 2 : 1 }, arcs: o.shop ? { l_shop: { stage: o.shop, next: age, since: age - 2, data: { kind: "咖啡館" } } } : {},
     used: new Set(), memory: [], seq: 0, traits: {},
   };
@@ -43,7 +43,7 @@ for (const sex of ["male", "female"]) for (const year of [1996, 2006, 2016, 2021
       job: ["公部門", "科技", "家業", null, "教育"][n % 5], pro: n % 2 === 0, retired: n % 3 !== 2, home: n % 2 ? "own" : "rent", chronic: n % 2 === 0,
       friend: n % 4 !== 3, away: n % 3 === 0 ? "上海" : null, sibName: n % 2 === 1, nature: ["溫柔", "工作狂", "愛自由"][n % 3], eyesWait: n % 5 === 0, noSmart: n % 7 === 0,
       plan: ["travel", "volunteer", "learn", "grandkids", "farm", "consult"][n % 6], what: ["", "博物館", "陶笛", "宥蓁", "芭樂", n % 2 ? "顧問" : "帶新人"][n % 6], show: n % 2 ? "stage" : "wall",
-      shop: ["start", "keep", null][n % 3], again: n % 4 === 1, knee: n % 2 ? 50 : undefined,
+      shop: ["start", "keep", null][n % 3], again: n % 4 === 1, knee: n % 2 ? 50 : undefined, newborn: n % 3,
     });
   }
 }

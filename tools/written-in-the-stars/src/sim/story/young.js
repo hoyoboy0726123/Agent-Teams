@@ -49,6 +49,11 @@ export const loanOf = year => `$${nice(interp([[1960, 1500], [1975, 2500], [1985
 const placeWords = x => (/,/.test(String(x || "")) ? String(x) : stateName(stateCode(x)) || String(x || "a new city"));
 const here = s => stateName(stateOf(s)) || "your hometown";
 const atHome = s => !s.abroad;
+// The trade from core.js (s.flags.trade: "electrician", "welding", "HVAC"…) as a noun for a sentence, and whether it
+// is a building or mechanical trade (job sites, apprenticeships) rather than a salon or a clinic.
+const TRADE_WORD = { electrician: "electrical work", "auto mechanics": "auto repair", "practical nursing": "practical nursing", "dental assisting": "dental assisting" };
+const tradeWord = t => TRADE_WORD[t] || t || "your trade";
+const BUILD_TRADES = ["electrician", "welding", "HVAC", "plumbing", "auto mechanics"];
 // At a four-year college now, and which year of it: 0 freshman, 1 sophomore, 2 junior, 3 senior.
 const inUni = s => s.studying && !s.abroad && s.track === "college";
 const uniYear = s => s.age - (s.flags.uniAt ?? s.age);
@@ -61,6 +66,8 @@ const grownUp = s => !s.studying && !s.abroad && !inService(s);
 const working = s => s.employed && s.job && s.job.field !== "military" && !s.retired;
 const single = s => s.rel === "single" || s.rel === "divorced" || s.rel === "widowed";
 const dating = s => s.rel === "dating" && !!s.partner;
+// "they", "she" or "he" for a parentWord() answer ("your parents", "Mom", "Dad", "Grandma").
+const pro = who => (who === "your parents" ? "they" : who === "Dad" ? "he" : "she");
 const debt = (s, x) => { s.debt = Math.max(0, (s.debt || 0) + x); };
 const spend = (s, x) => { s.savings = Math.max(0, s.savings - x); };
 const stress = (s, x) => { s.health.stress = Math.max(0, Math.min(1, (s.health.stress ?? 0.3) + x)); };
@@ -203,7 +210,7 @@ export const YOUNG = [
       return {
         prompt: `${lead} Do you go?`,
         options: [
-          { id: "y_studyAbroad.semester", label: `Spend a semester in ${place}`, hint: "a passport stamp and a new life", act: "studyAbroad", style: "risk", weight: 0.35, apply: (s2, c) => { debt(s2, 0.04); return go(s2, c, `You spent a semester in ${place}, {and called home from a phone booth that ate your coins.|and learned to read a train schedule, order a coffee and be homesick in a second language.|and came back with a new way of walking around your own campus.} {You still dream about the bakery on the corner.|Your host family sent Christmas cards for twenty years.|You saved the transit pass in a shoebox.}`); } },
+          { id: "y_studyAbroad.semester", label: `Spend a semester in ${place}`, hint: "a passport stamp and a new life", act: "studyAbroad", style: "risk", weight: 0.35, apply: (s2, c) => { debt(s2, 0.04); return go(s2, c, `You spent a semester in ${place}, {${s2.year < 2005 ? "and called home from a phone booth that ate your coins." : "and video-called home at strange hours from a café with bad Wi-Fi."}|and learned to read a train schedule, order a coffee and be homesick in a second language.|and came back with a new way of walking around your own campus.} {You still dream about the bakery on the corner.|Your host family sent Christmas cards for twenty years.|You saved the transit pass in a shoebox.}`); } },
           { id: "y_studyAbroad.summer", label: "Do a short summer program instead", hint: "six weeks, less money", act: "studyAbroad", style: "safe", weight: 0.2, apply: (s2, c) => go(s2, c, `You did six weeks in ${place} over the summer, {in a dorm with students from nine countries.|taking one class and seeing every museum.} {It was short and it rearranged something in you.|You came home with a sunburn and a new favorite food.}`) },
           { id: "y_studyAbroad.grant", label: "Apply for a scholarship to cover it", hint: "a long essay, a long shot", act: "study", style: "learn", weight: 0.12, apply: (s2, c) => (c.roll("study", "good", 0.45) ? go(s2, c, `You won a scholarship for a semester in ${place}, {and read the letter twice in the mailroom.|and spent it walking everywhere and writing everything down.}`) : { text: `You applied for a study-abroad scholarship to ${place} and didn't get it. You stayed and promised yourself you would go someday.`, mood: -1 }) },
           { id: "y_studyAbroad.stay", label: "Stay and keep your job and your friends", hint: "the campus you know", act: "wait", style: "family", weight: 0.2, apply: (s2, c) => ({ text: c.w(`You skipped the semester in ${place} and stayed on campus, {kept your job at the library, and had the best spring of college.|and your friends who went sent postcards you kept on the fridge.}`), mood: 0 }) },
@@ -358,7 +365,11 @@ export const YOUNG = [
   A("y_freshman15", [18, 20], 0.12, ["The all-you-can-eat dining hall {and its soft-serve machine|and its waffle station} got the better of you, and the “freshman fifteen” was, for you, closer to ten.", "You discovered that college food is mostly beige and that you could eat a lot of it, and by spring your jeans had opinions.", "You gained a few pounds your freshman year, {started walking to every class the long way,|joined an intramural team,} and made your peace with it."], { when: s => inUni(s) && uniYear(s) <= 1, mood: 0 }),
   A("y_paper", [18, 26], 0.15, s => [s.year < 1985 ? "You typed your term paper on a Smith-Corona at 4 a.m., with a bottle of Wite-Out beside you and no room for mistakes." : s.year < 1997 ? "You wrote your term paper in the computer lab at 3 a.m. and waited forty minutes for the dot-matrix printer." : "Your laptop crashed the night before your paper was due, and you learned, permanently, to save your work.", "You wrote a paper you were proud of, and the professor wrote “Yes!” in the margin three times. You kept it.", "You pulled your first all-nighter on a paper about {the French Revolution|Moby-Dick|the Great Depression}, and turned it in with ten minutes to spare."], { when: s => atCollege(s) || inGrad(s), mood: 1 }),
   A("y_ccLife", [18, 30], 0.3, (s, ctx) => ["At the community college {half your classmates had kids and full-time jobs,|the parking lot filled up by seven-thirty,} and {you learned more from them than from the textbook.|you liked being in a room full of people who had chosen to be there.}", `Your ${ctx.rng.pick(["English", "algebra", "biology", "accounting"])} instructor at the community college worked days at {a law office|the hospital|an engineering firm}, and taught at night because she loved it. You could tell.`, "You took classes at the community college {in the morning and worked a lunch shift after,|at night, three evenings a week,} and the routine was hard and steady and yours."], { when: inCC, mood: 2 }),
-  A("y_tradeShop", [18, 26], 0.35, s => [`In the trade school shop, an old instructor with forty years in ${s.flags.trade || "the trade"} watched you work and said, “Again.” You did it again, and better.`, `You learned ${s.flags.trade || "your trade"} with your hands: {burned fingertips, a scar on your thumb,|steel-toed boots and a lunch pail,} and a pride you hadn't felt in a classroom before.`, "On your first real job site you made every rookie mistake once, {and the journeyman who trained you never let you make the same one twice.|and somebody sent you to look for a left-handed wrench.}"], { when: s => inTrade(s) || (s.edu === "certificate" && s.age <= 24), mood: 3 }),
+  A("y_tradeShop", [18, 26], 0.35, s => {
+    const t = tradeWord(s.flags.trade);
+    if (!BUILD_TRADES.includes(s.flags.trade)) return [`In your ${t} program an instructor with thirty years in the field watched you work and said, “Again.” You did it again, and better.`, `You learned ${t} hands-on, {on practice mannequins and then on real, nervous people,|in a classroom that smelled of disinfectant,} and found a pride you hadn't felt in high school.`, `Your first real client in ${t} {tipped you in quarters and came back every month for years.|told you that you had a gentle touch, and you thought about it all week.}`];
+    return [`In the trade school shop, an old instructor with forty years in ${t} watched you work and said, “Again.” You did it again, and better.`, `You learned ${t} with your hands: {burned fingertips, a scar on your thumb,|steel-toed boots and a lunch pail,} and a pride you hadn't felt in a classroom before.`, "On your first real job site you made every rookie mistake once, {and the journeyman who trained you never let you make the same one twice.|and somebody sent you to look for a left-handed wrench.}"];
+  }, { when: s => inTrade(s) || (s.edu === "certificate" && s.age <= 24), mood: 3 }),
   A("y_gradLife", [21, 32], 0.3, s => {
     const t = s.track;
     if (t === "law") return ["In law school a professor cold-called you on the first day, and you answered something about contracts that may have been in English.", "You spent your 1L year in the law library with a mountain of casebooks and a study group that ran on spite and coffee.", "Your law school study group met every Sunday night, and one of them became a lifelong friend."];
@@ -377,18 +388,18 @@ export const YOUNG = [
       const where = br === "Coast Guard" ? ctx.rng.pick(["a cutter in the Bering Sea", "hurricane duty on the Gulf Coast", "drug patrols in the Caribbean"])
         : y <= 1953 ? "Korea" : y <= 1964 ? ctx.rng.pick(["West Germany", "Okinawa", sea ? "a destroyer in the Mediterranean" : "South Korea"])
         : y <= 1972 ? (sea ? "a carrier off the coast of Vietnam" : "Vietnam") : y <= 1989 ? ctx.rng.pick(["West Germany", "South Korea", sea ? "an aircraft carrier in the Mediterranean" : "a base in Italy"])
-        : y <= 1991 ? "Saudi Arabia, for Desert Storm" : y <= 2000 ? ctx.rng.pick(["Bosnia", "South Korea", sea ? "a ship in the Persian Gulf" : "Kosovo"])
+        : y <= 1991 ? "Saudi Arabia for Desert Storm" : y <= 2000 ? ctx.rng.pick(["Bosnia", "South Korea", sea ? "a ship in the Persian Gulf" : "Kosovo"])
         : y <= 2002 ? "Afghanistan" : y <= 2011 ? ctx.rng.pick(["Iraq", "Afghanistan"]) : y <= 2014 ? "Afghanistan" : ctx.rng.pick(["Kuwait", "Poland", sea ? "a destroyer in the Pacific" : "South Korea", "Djibouti"]);
-      const months = ctx.rng.pick(["nine months", "a year", "seven months", "fifteen months"]);
+      const months = ctx.rng.pick(["nine months", "year", "seven months", "fifteen months"]), span = months === "year" ? "a year" : months;
       const mail = y < 1995 ? "letters" : y < 2007 ? "emails from a tent with a satellite connection" : "video calls that froze every few seconds";
       const back = "{You came home thinner and quieter, to a sign taped to the garage door.|You came home in the middle of the night, and your family was at the gate anyway.|You came home and stood in the kitchen a long time, just looking at it.}";
       const go = (s2, c, text, mood = 0) => { s2.flags.deployed = { where, age: s2.age }; return { text: c.w(`${text} ${back}`), mood, big: true }; };
       return {
-        prompt: `Your ${sea && br !== "Coast Guard" ? "ship" : "unit"} got orders: ${months} in ${where}. You leave in three weeks. How do you spend the time before you go?`,
+        prompt: `Your ${sea && br !== "Coast Guard" ? "ship" : "unit"} got orders: ${span} in ${where}. You leave in three weeks. How do you spend the time before you go?`,
         options: [
           { id: "y_deployment.home", label: "Spend your leave at home", hint: "your mother's kitchen", act: "care", style: "family", weight: 0.3, apply: (s2, c) => go(s2, c, `Before your ${months} in ${where}, you spent your leave at home, {fixing things around the house that didn't need fixing|eating everything ${parentWord(s2, c)} cooked}. Then you shipped out, and the months were long and mostly the same day over and over.`, 1) },
           { id: "y_deployment.letters", label: "Promise to write every week", hint: mail, act: "talk", style: "social", weight: 0.2, apply: (s2, c) => go(s2, c, `Before your ${months} in ${where}, you promised everyone you would write, and you did: ${mail}, every week, about the food and the heat and nothing that would worry them.`, 1) },
-          { id: "y_deployment.buddies", label: "Road trip with your buddies", hint: "one more good week", act: "travel", style: "risk", weight: 0.15, apply: (s2, c) => go(s2, c, `Before your ${months} in ${where}, you and three guys from your unit took a road trip {to the beach|to Vegas|to a lake cabin someone's uncle owned}, and it held you together for the months after.`, 2) },
+          { id: "y_deployment.buddies", label: "Road trip with your unit friends", hint: "one more good week", act: "travel", style: "risk", weight: 0.15, apply: (s2, c) => go(s2, c, `Before your ${months} in ${where}, you and three friends from your unit took a road trip {to the beach|to Vegas|to a lake cabin someone's uncle owned}, and it held you together for the months after.`, 2) },
           { id: "y_deployment.course", label: "Sign up for a course while you're there", hint: "come back with a skill", act: "study", style: "learn", weight: 0.15, apply: (s2, c) => { s2.career = Math.min(5, s2.career + 1); return go(s2, c, `You spent your ${months} in ${where} doing your job and taking every course on offer, {and came back with a certification and a promotion.|studying by flashlight between shifts.}`, 1); } },
           { id: "y_deployment.save", label: "Save every dollar of deployment pay", hint: "come home to something", act: "save", style: "safe", weight: 0.2, apply: (s2, c) => { s2.savings += 0.3; return go(s2, c, `You spent your ${months} in ${where} and saved nearly every dollar of the deployment pay, {and came home to more money than you had ever seen in one place.|with a plan for every cent.}`, 1); } },
         ],
@@ -419,8 +430,8 @@ export const YOUNG = [
     },
   },
   {
-    id: "y_gapYear", domain: "move", channel: "change", once: true, ages: [18, 21],
-    when: s => !s.studying && !s.employed && !s.abroad && !inService(s) && s.flags.doneSenior && s.flags.leftSchool !== undefined && s.age - s.flags.leftSchool <= 1, p: () => 0.3,
+    id: "y_gapYear", domain: "move", channel: "change", once: true, ages: [18, 20],
+    when: s => !s.studying && !s.employed && !s.abroad && !inService(s) && s.flags.doneSenior && s.flags.leftSchool !== undefined && s.age - s.flags.leftSchool <= 1 && s.flags.uniAt === undefined && s.flags.ccAt === undefined && s.flags.tradeAt === undefined, p: () => 0.3,
     choice: (s, ctx) => {
       const y = s.year, serve = y >= 1994 ? "Join AmeriCorps for a year" : y >= 1965 ? "Volunteer with VISTA" : "Go on a church mission trip";
       return {
@@ -436,9 +447,9 @@ export const YOUNG = [
     },
   },
   {
-    id: "y_apprentice", domain: "career", channel: "good", once: true, ages: [18, 27], when: s => s.edu === "certificate" && s.employed && s.flags.trade && !s.studying && s.job && s.job.field !== "military", p: () => 0.35,
+    id: "y_apprentice", domain: "career", channel: "good", once: true, ages: [18, 27], when: s => s.edu === "certificate" && s.employed && BUILD_TRADES.includes(s.flags.trade) && !s.studying && s.job && s.job.field !== "military", p: () => 0.35,
     choice: (s, ctx) => {
-      const t = s.flags.trade, local = ctx.rng.pick(["the union hall", "the local", "the apprenticeship office downtown"]);
+      const t = tradeWord(s.flags.trade), local = ctx.rng.pick(["the union hall", "the local", "the apprenticeship office downtown"]);
       return {
         prompt: `${scene(ctx, [`You have your certificate in ${t}, and ${local} is taking applications for a four-year apprenticeship.`, `The shop where you work in ${t} pays fine, and the owner says you could run the place someday.`, `A recruiter is offering big money for ${t} work on the road, six weeks on and two off.`])} What do you do?`,
         options: [
@@ -536,7 +547,7 @@ export const YOUNG = [
           { id: "y_creditCard.paid", label: "Use it, pay it off every month", hint: "build credit, owe nothing", act: "save", style: "safe", weight: 0.3, apply: s2 => { s2.flags.card = "paid"; return { text: `You got ${card} and paid the whole balance every month, and your credit score quietly grew into something the bank would love later.`, mood: 1 }; } },
           { id: "y_creditCard.minimum", label: "Use it and pay the minimum", hint: "future you", act: "borrow", style: "risk", weight: 0.25, apply: (s2, c) => { s2.flags.card = "minimum"; debt(s2, 0.08); return { text: c.w(`You got ${card} and paid the minimum each month, {and the balance grew like a houseplant you never watered and somehow never died.|until a statement showed how much was interest, and you felt a little sick.}`), mood: -2 }; } },
           { id: "y_creditCard.emergency", label: "Keep it for emergencies", hint: "in the glove box", act: "insurance", style: "family", weight: 0.2, apply: s2 => { s2.flags.card = "emergency"; return { text: `You got ${card} and kept it in the glove box for emergencies. It rescued you exactly once, from a tow-truck bill, and went back in the glove box.`, mood: 1 }; } },
-          { id: "y_creditCard.cut", label: "Cut it up", hint: "cash only", act: "avoid", style: "self", weight: 0.1, apply: s2 => { s2.flags.card = "none"; return { text: `You cut ${card} into pieces over the trash can and stuck with cash, which drove every landlord and rental-car counter a little crazy.`, mood: 0 }; } },
+          { id: "y_creditCard.cut", label: "Cut it up", hint: "cash only", act: "avoid", style: "self", weight: 0.1, apply: s2 => { s2.flags.card = "none"; return { text: `You got ${card}, cut it into pieces over the trash can and stuck with cash, which drove every landlord and rental-car counter a little crazy.`, mood: 0 }; } },
           { id: "y_creditCard.spree", label: `Buy ${big} with it right now`, hint: "you deserve it", act: "borrow", style: "risk", weight: 0.15, apply: (s2, c) => { s2.flags.card = "spree"; debt(s2, 0.05); return { text: c.w(`You got ${card} and bought ${big} the same afternoon, {and it was wonderful for about a month.|and spent the next year paying it off, one small check at a time.}`), mood: 0 }; } },
         ],
       };
@@ -545,7 +556,7 @@ export const YOUNG = [
   {
     id: "y_carLoan", domain: "wealth", channel: "change", once: true, ages: [20, 30], when: s => grownUp(s) && s.employed && !s.flags.carLoan, p: () => 0.15,
     choice: (s, ctx) => {
-      const y = s.year, old = s.flags.firstCar ? s.flags.firstCar.name : ctx.rng.pick(carOf(y - 8));
+      const y = s.year, old = s.flags.firstCar ? s.flags.firstCar.name : ctx.rng.pick(carOf(y));
       const fresh = y < 1975 ? "a new Ford Mustang" : y < 1985 ? "a new Honda Accord" : y < 1995 ? "a new Ford Ranger pickup" : y < 2005 ? "a new Toyota Camry" : y < 2015 ? "a new Honda Civic" : "a new Toyota RAV4";
       const price = usd(y, ctx.rng.pick([24000, 28000, 32000]));
       const lead = scene(ctx, [
@@ -560,7 +571,7 @@ export const YOUNG = [
           { id: "y_carLoan.new", label: `Buy ${fresh} on a five-year loan`, hint: `${price}, sixty payments`, act: "borrow", style: "risk", weight: 0.25, apply: (s2, c) => { set("loan", fresh)(s2); debt(s2, 0.3); return { text: c.w(`You bought ${fresh} on a sixty-month loan, {and the new-car smell lasted about a year; the payment lasted five.|and drove it home with the windows down and the radio up, a little terrified.}`), mood: 4, big: true }; } },
           { id: "y_carLoan.used", label: "Buy a reliable used car with cash", hint: "boring and paid for", act: "save", style: "safe", weight: 0.3, apply: (s2, c) => { const car = c.rng.pick(carOf(y)); set("cash", car)(s2); spend(s2, 0.15); return { text: c.w(`You bought ${car} with cash after {a mechanic friend looked it over|reading every review you could find}, and {it ran forever.|it was boring and paid for, which was the whole idea.}`), mood: 2 }; } },
           { id: "y_carLoan.lease", label: y >= 1988 ? "Lease something" : "Buy it on the dealer's payment plan", hint: "a low monthly number", act: "borrow", style: "self", weight: 0.15, apply: (s2, c) => { set("lease", fresh)(s2); debt(s2, 0.1); return { text: c.w(y >= 1988 ? `You leased ${fresh}, {and checked the mileage every month like a stock price.|and turned it in three years later with a coffee stain you hoped they wouldn't see.}` : `You bought ${fresh} on the dealer's payment plan, and made every payment in person at the dealership on the first of the month.`), mood: 2 }; } },
-          { id: "y_carLoan.fix", label: `Keep fixing ${old}`, hint: "one more year", act: "wait", style: "safe", weight: 0.2, apply: (s2, c) => { set("kept", old)(s2); return { text: c.w(`You kept ${old} alive {with duct tape, a used alternator and prayer,|on a first-name basis with the mechanic,} and it outlived everyone's expectations, including the mechanic's.`), mood: 0 }; } },
+          { id: "y_carLoan.fix", label: "Keep the old car running", hint: "one more year", act: "wait", style: "safe", weight: 0.2, apply: (s2, c) => { set("kept", old)(s2); return { text: c.w(`You kept ${old} alive {with duct tape, a used alternator and prayer,|by getting on a first-name basis with the mechanic,} and it outlived everyone's expectations, including the mechanic's.`), mood: 0 }; } },
           { id: "y_carLoan.none", label: "Go without a car", hint: "bike, bus, train", act: "exercise", style: "health", weight: 0.1, apply: (s2, c) => { set("none", "no car")(s2); return { text: c.w(`You sold ${old} for scrap and got around by {bike and bus|train and your own two feet}, and {your legs got strong and your savings got bigger.|you read forty books that year on the bus.}`), mood: 1 }; } },
         ],
       };
@@ -579,7 +590,7 @@ export const YOUNG = [
           { id: "y_401k.max", label: "Put in as much as you can", hint: "future you says thanks", act: "save", style: "learn", weight: 0.1, apply: (s2, c) => { s2.flags.retirementPlan = "max"; return { text: c.w("You signed up for the 401(k) and put in as much as you could stand, {and lived on rice and beans for a while.|and checked the balance like a garden.}"), mood: 1 }; } },
           { id: "y_401k.later", label: "Not yet. You need the money now", hint: "rent first", act: "wait", style: "self", weight: 0.3, apply: s2 => { s2.flags.retirementPlan = "none"; return { text: "You put the 401(k) packet in a drawer. Rent came first, and retirement felt like something that happened to other people.", mood: 0 }; } },
           { id: "y_401k.ira", label: `Open ${ira} on your own`, hint: "your money, your choices", act: "invest", style: "risk", weight: 0.1, apply: (s2, c) => { s2.flags.retirementPlan = "ira"; return { text: c.w(`You opened ${ira} on your own and {read three books about index funds.|put in fifty dollars a month and never stopped.}`), mood: 1 }; } },
-          { id: "y_401k.ask", label: "Ask someone who knows", hint: "a parent, an uncle, a mentor", act: "seekHelp", style: "family", weight: 0.15, apply: (s2, c) => { s2.flags.retirementPlan = "asked"; return { text: c.w(`You called ${parentWord(s2, c)} about the 401(k), {and got a forty-minute lecture on compound interest you were secretly glad of.|and found out they had wished someone had told them at your age.} You signed up for the match.`), mood: 2 }; } },
+          { id: "y_401k.ask", label: "Ask someone who knows", hint: "a parent, an uncle, a mentor", act: "seekHelp", style: "family", weight: 0.15, apply: (s2, c) => { s2.flags.retirementPlan = "asked"; const who = parentWord(s2, c); return { text: c.w(`You called ${who} about the 401(k), {and got a forty-minute lecture on compound interest you were secretly glad of.|and found out ${pro(who)} had wished someone had told ${pro(who) === "they" ? "them" : pro(who) === "he" ? "him" : "her"} at your age.} You signed up for the match.`), mood: 2 }; } },
         ],
       };
     },
@@ -602,7 +613,7 @@ export const YOUNG = [
           { id: "y_insurance.none", label: "Go without and be careful", hint: "young and invincible", act: "avoid", style: "risk", weight: 0.25, apply: (s2, c) => { s2.flags.insurance = "none"; return { text: c.w("You went without health insurance for a while, {and looked both ways twice at every crosswalk.|and treated every cold with soup and stubbornness.|and were lucky, and knew it.}"), mood: -1 }; } },
           { id: "y_insurance.job", label: "Find a job with benefits", hint: "the real reason people take jobs", act: "jobHop", style: "safe", weight: 0.2, apply: (s2, c) => { s2.flags.insurance = "job"; return { text: c.w(`You started looking for work with benefits, and {a hospital, a school district and a grocery chain all called back.|you found one, and the first thing you did was get your teeth cleaned.}`), mood: 1 }; } },
           { id: "y_insurance.clinic", label: "Use the community health clinic", hint: "sliding scale", act: "seeDoctor", style: "health", weight: 0.12, apply: s2 => { s2.flags.insurance = "clinic"; return { text: "You found the community health clinic, which charged on a sliding scale, and a nurse practitioner there became your doctor for years.", mood: 1 }; } },
-          { id: "y_insurance.family", label: "Ask family how they did it", hint: "someone has been here", act: "seekHelp", style: "family", weight: 0.08, apply: (s2, c) => { s2.flags.insurance = "plan"; return { text: c.w(`You asked ${parentWord(s2, c)} what to do about insurance, and they helped you pick a plan at the kitchen table, {reading the fine print out loud.|with a highlighter and a pot of coffee.}`), mood: 2 }; } },
+          { id: "y_insurance.family", label: "Ask family how they did it", hint: "someone has been here", act: "seekHelp", style: "family", weight: 0.08, apply: (s2, c) => { s2.flags.insurance = "plan"; const who = parentWord(s2, c); return { text: c.w(`You asked ${who} what to do about insurance, and ${pro(who)} helped you pick a plan at the kitchen table, {reading the fine print out loud.|with a highlighter and a pot of coffee.}`), mood: 2 }; } },
         ],
       };
     },
@@ -685,15 +696,15 @@ export const YOUNG = [
     id: "y_meetParents", domain: "love", channel: "change", tags: ["spouse"], about: "partner", once: true, ages: [19, 30], when: s => atHome(s) && dating(s) && s.age > (s.datingSince ?? s.age), p: () => 0.25,
     choice: (s, ctx) => {
       const P = s.partner, n = P.call;
-      const [lead, then] = scene(ctx, [
-        [`${n} invited you home for Thanksgiving to meet the whole family, including a grandmother who is "very direct."`, `Meeting ${n}'s family at Thanksgiving,`],
-        [`You're meeting ${n}'s parents for the first time, at a steakhouse ${their(P)} dad picked.`, `Meeting ${n}'s parents at a steakhouse,`],
-        [`${n}'s family reunion is this weekend, and you're the new person everyone will be looking at.`, `At ${n}'s family reunion,`],
+      const [lead, then, gift, gifted] = scene(ctx, [
+        [`${n} invited you home for Thanksgiving to meet the whole family, including a grandmother who is “very direct.”`, `Meeting ${n}'s family at Thanksgiving,`, "Bring something homemade", "{a homemade pie|your grandmother's banana bread|a casserole you had practiced twice}"],
+        [`You're meeting ${n}'s parents for the first time, at a steakhouse ${their(P)} dad picked.`, `Meeting ${n}'s parents at a steakhouse,`, "Bring flowers for the table", "{flowers for the table|a little box of chocolates from a good bakery}"],
+        [`${n}'s family reunion is this weekend, and you're the new person everyone will be looking at.`, `At ${n}'s family reunion,`, "Bring a dish for the potluck", "{a big bowl of potato salad|a pan of brownies|your famous baked beans}"],
       ]);
       return {
         prompt: `${lead} How do you make a good impression?`,
         options: [
-          { id: "y_meetParents.pie", label: "Bring something homemade", hint: "a pie never hurts", act: "care", style: "family", weight: 0.25, apply: (s2, c) => ({ text: c.w(`${then} you brought {a homemade pie|your grandmother's banana bread|a casserole you had practiced twice}, and ${n}'s mother {asked for the recipe.|put it on the good plate.}`), mood: 3 }) },
+          { id: "y_meetParents.pie", label: gift, hint: "it never hurts", act: "care", style: "family", weight: 0.25, apply: (s2, c) => ({ text: c.w(`${then} you brought ${gifted}, and ${n}'s mother {made a fuss over it.|said it was the nicest thing anyone had brought in years.}`), mood: 3 }) },
           { id: "y_meetParents.honest", label: "Answer every question honestly", hint: "the job, the plans, the debt", act: "talk", style: "social", weight: 0.25, apply: (s2, c) => ({ text: c.w(`${then} you answered every question honestly, {even about your student loans,|even the one about your intentions,} and ${n}'s ${c.rng.pick(["father", "mother", "grandmother"])} said later that ${n} had found someone straightforward.`), mood: 3 }) },
           { id: "y_meetParents.common", label: "Find common ground", hint: "football, gardening, old movies", act: "socialize", style: "social", weight: 0.2, apply: (s2, c) => ({ text: c.w(`${then} you {talked football with ${n}'s dad for an hour|helped ${n}'s mom in the garden|watched an old western with ${n}'s grandfather}, and {you were in.|${n} looked at you like you had performed a miracle.}`), mood: 4 }) },
           { id: "y_meetParents.dishes", label: "Offer to do the dishes", hint: "the oldest trick", act: "care", style: "family", weight: 0.15, apply: (s2, c) => ({ text: c.w(`${then} you got up and did the dishes without being asked, {and ${n}'s aunt told everyone.|and ended up having the best conversation of the day at the sink.}`), mood: 3 }) },
@@ -720,7 +731,7 @@ export const YOUNG = [
           { id: "y_movingIn.wait", label: "Not until you're sure", hint: "no rush", act: "wait", style: "safe", weight: 0.25, apply: () => ({ text: `You told ${n} you wanted to wait a little before moving in together. ${cap(they(P))} understood, mostly.`, mood: 0 }) },
           { id: "y_movingIn.separate", label: "Keep your own places", hint: "you like your space", act: "avoid", style: "self", weight: 0.12, apply: () => ({ text: `You and ${n} decided to keep your own places, and to be honest you both liked having somewhere to go home to.`, mood: 0 }) },
           { id: "y_movingIn.pet", label: "Adopt a pet together first", hint: "a trial run", act: "care", style: "social", weight: 0.13, apply: (s2, c) => { const k = c.rng() < 0.6 ? "dog" : "cat", name = c.rng.pick(PET[k].names(s2.year)); if (!s2.flags.pet || s2.age - s2.flags.pet.since >= 10) s2.flags.pet = { kind: k, name, noun: PET[k].noun, since: s2.age }; return { text: `You and ${n} adopted a ${k} named ${name} as a "trial run," and within a month you had moved in together because ${name} needed a stable home.`, mood: 5 }; } },
-          { id: "y_movingIn.ask", label: "Ask your family what they think", hint: "for better or worse", act: "talk", style: "family", weight: 0.1, apply: (s2, c) => ({ text: c.w(old ? `You asked ${parentWord(s2, c)} about moving in with ${n}, and {the silence on the phone was very long.|they said they'd rather you got married first, and you decided to wait a while.}` : `You asked ${parentWord(s2, c)} about moving in with ${n}, and they said, “Finally,” {which settled it.|and offered their old dining table.}`), mood: 1 }) },
+          { id: "y_movingIn.ask", label: "Ask your family what they think", hint: "for better or worse", act: "talk", style: "family", weight: 0.1, apply: (s2, c) => { const who = parentWord(s2, c), p0 = pro(who), poss = p0 === "they" ? "their" : p0 === "he" ? "his" : "her"; return { text: c.w(old ? `You asked ${who} about moving in with ${n}, and {the silence on the phone was very long.|${p0} said ${p0 === "they" ? "they'd" : `${p0}'d`} rather you got married first, and you decided to wait a while.}` : `You asked ${who} about moving in with ${n}, and ${p0} said, “Finally,” {which settled it.|and offered ${poss} old dining table.}`), mood: 1 }; } },
         ],
       };
     },

@@ -1880,3 +1880,10 @@ export const ADULT = [
     ];
   }, { domain: "family", channel: "good", tags: ["children"], cooldown: 6, max: 2, mood: 2, when: s => home(s) && s.year >= 2000 && hasKid(10, 25)(s) }),
 ];
+
+// Pacing: a life holds about forty choices in all, and the years 30–60 already have core.js's big decisions, so the
+// everyday choices here are scaled to ask about seven over those thirty years. Follow-ups and moments that come once
+// at a fixed point (the tuition bill, the empty nest, the estate, the year after a divorce) keep their odds.
+const PACE = 0.62;
+const KEEP = new Set(["a_estate", "a_tuition", "a_collegeApps", "a_emptyNest", "a_afterDivorce", "a_widowed", "a_laidOff50", "a_blended", "a_anniversary", "a_hsReunion", "a_estranged", "a_parents50th", "a_comingOut"]);
+for (const ev of ADULT) if (ev.choice && !KEEP.has(ev.id)) { const p = ev.p; ev.p = (s, ctx) => p(s, ctx) * PACE; }

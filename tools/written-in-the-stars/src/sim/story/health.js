@@ -255,9 +255,9 @@ export const HEALTH = [
   },
   A("h_coffee", [16, 85], 0.015, s => {
     const y = s.year;
-    const cup = y < 1972 ? "percolator coffee from a can of Folgers" : y < 1990 ? "coffee from the Mr. Coffee on the counter" : y < 2008 ? "a latte from the new coffee shop downtown" : y < 2015 ? "coffee from a single-cup pod machine" : y < 2036 ? "cold brew" : "coffee";
+    const cup = y < 1972 ? "percolator coffee from a can of Folgers" : y < 1990 ? "coffee from the Mr. Coffee on the counter" : y < 2008 ? "a latte from the new coffee shop downtown" : y < 2015 ? "coffee from a single-cup pod machine" : y < 2036 ? "cold brew" : "strong black coffee";
     return [
-      `You became a coffee person: ${cup} {every morning, before anyone was allowed to talk to you.|two cups a day, then three.|and a strong opinion about it.}`,
+      `You became a coffee person: ${cup}, {every morning before anyone was allowed to talk to you.|two cups a day, then three.|with strong opinions about how to make it.}`,
       `Your mornings now run on ${cup}, {and your mug says “Don't talk to me.”|and you know the barista's kids' names.|and the day the machine broke was a dark day.}`,
       `You switched to ${cup} {and never looked back.|and the family gave you a fancy mug every Christmas.}`,
     ];
@@ -433,7 +433,7 @@ export const HEALTH = [
     },
   },
   A("h_readers", [40, 52], 0.1, [
-    "You realized your arms had gotten too short to read the menu, {and bought reading glasses at the drugstore.|and the waiter politely held the candle closer.} {Now there's a pair in every room.|You keep losing them on top of your head.}",
+    "You realized your arms had gotten too short to read the menu, {and bought reading glasses at the drugstore. Now there's a pair in every room.|and bought drugstore readers, which you keep losing on top of your head.|and the waiter politely held the candle closer, until you gave in and bought readers.}",
     "At the eye doctor you learned the word “presbyopia,” {and left with reading glasses and a sense of betrayal.|which is a fancy way of saying forty.}",
     "You started needing reading glasses, {and bought a three-pack in leopard print.|and borrowed your mother's until you gave in.}",
   ], { mood: 0, domain: "health", channel: "change" }),
@@ -466,10 +466,10 @@ export const HEALTH = [
     "You had no health insurance for a while, and {a sprained wrist meant a cash bill from urgent care that you paid off over months.|you skipped the dentist for two years.}",
     "No job meant no insurance, and {you were careful in a way you hadn't been before.|a friend in nursing school became your doctor, unofficially.}",
   ], { mood: -1, domain: "wealth", channel: "bad", when: s => s.year >= 1975 && s.year <= 2013 && !s.employed && !s.studying && usHome(s) && s.done.has("firstJob") }),
-  A("h_under26", [22, 26], 0.3, [
-    "Thanks to the new health law, you stayed on your parents' insurance until 26, {and when you aged off, you learned the word “deductible.”|which your mother mentioned every Thanksgiving.}",
+  A("h_under26", [22, 26], 0.3, s => [
+    `${s.year <= 2016 ? "Thanks to the new health law, you" : "You"} stayed on your parents' health insurance until 26, {and when you aged off, you learned the word “deductible.”|which your mother mentioned every Thanksgiving.}`,
     "You were still on your parents' health insurance, {which was lucky the week you broke your toe.|and the card in your wallet still had your dad's name on it.}",
-    "At 26 you aged off your parents' health plan and {signed up for your own, feeling very adult and slightly poorer.|spent a weekend learning what a premium is.}",
+    s.age === 26 ? "At 26 you aged off your parents' health plan and {signed up for your own, feeling very adult and slightly poorer.|spent a weekend learning what a premium is.}" : "You stayed on your parents' health plan for now, {and your mother reminded you it ends at 26.|and kept the card in your wallet just in case.}",
   ], { mood: 0, domain: "wealth", channel: "change", when: s => s.year >= 2010 && s.year <= 2035 && (s.father.alive || s.mother.alive) && usHome(s) }),
   {
     id: "h_aca", once: true, domain: "wealth", channel: "change", ages: [26, 64], when: s => s.year >= 2014 && s.year <= 2035 && !s.employed && !s.retired && !s.studying && usHome(s), p: () => 0.2,
@@ -574,7 +574,7 @@ export const HEALTH = [
   A("h_flushot", [18, 95], 0.015, s => [
     s.year >= 2009 ? "You got your flu shot at the pharmacy {while waiting for a prescription,|on the way home from work,} {and your arm was sore for a day.|and they gave you a coupon, which felt like a prize.}" : "You got the free flu shot at work, {in a line in the break room,|from a nurse with a cart,} {and your arm was sore for a day.|and bragged about it all winter.}",
     "You skipped the flu shot this year and got the flu, {and spent a week in bed hearing everyone say “Did you get your shot?”|and learned your lesson, for a while.}",
-    "Flu season came, and {you got the shot and dodged it, while the whole office went down.|your doctor gave you the high-dose one, which made you feel old and safe.}",
+    "Flu season came, and {you got the shot and dodged it, while everyone around you went down.|your doctor gave you the high-dose one, which made you feel old and safe.}",
   ], { mood: 0, domain: "health", channel: "change", when: s => s.year >= 1985 }),
   // People 65 and older were among the first offered the vaccine (early 2021); era.js e_2021vaccine tells most lives'
   // shot, so this is for those it did not.
