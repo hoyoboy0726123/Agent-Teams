@@ -247,7 +247,8 @@ html[lang="en"] .member { grid-template-columns: 9.5em minmax(0, 1fr) minmax(0, 
 
 /* playing */
 #play { display: grid; gap: 14px; }
-.status { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--paper); padding-block: 8px; display: grid; gap: 8px; border-bottom: 1px solid var(--rule); }
+.status { position: static; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--paper); padding-block: 8px; display: grid; gap: 8px; border-bottom: 1px solid var(--rule); }
+.status.pinned { position: sticky; }
 .status-row { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
 .status .age { font-family: var(--display); font-size: 26px; font-weight: 700; }
 .status .pill { font-size: 13px; color: var(--muted); }
@@ -278,6 +279,7 @@ html[lang="en"] .member { grid-template-columns: 9.5em minmax(0, 1fr) minmax(0, 
 @media (max-width: 600px) { input, select, textarea { font-size: 16px; } }
 .born { font-size: 14px; color: var(--muted); }
 .feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.feed li:focus:not(:focus-visible) { outline: none; }
 .feed li { scroll-margin-top: var(--sticky, 150px); display: grid; grid-template-columns: 4.2em 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--wash); }
 .feed .when { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--muted); }
 .feed .when small { display: block; font-family: var(--mono); font-size: 11px; font-weight: 400; }
@@ -983,6 +985,7 @@ footer a { color: var(--indigo); }
         <button type="button" data-speed="3" aria-pressed="false">快一點</button>
         <button type="button" data-speed="10" aria-pressed="false">很快</button>
         <button type="button" id="c-skip">直接看結局</button>
+        <button type="button" id="c-pin" aria-pressed="false" title="讓畫面和歲數一直留在螢幕上方">固定在上方</button>
       </div>
     </div>
     <p class="ai-auto" id="c-ai-wrap"><label class="major"><input type="checkbox" id="c-ai" checked> 結局自動 AI 解讀</label><span>打勾時，走完一生會自動把出生日期、時間、出生地和性別送給 AI 命理師寫解讀（不含姓名和家人，寫完不保存）。</span></p>

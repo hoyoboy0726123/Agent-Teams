@@ -62,6 +62,7 @@ const aiOff = () => !READING_URL || !/^https?:$/.test(location.protocol);
 // 結局自動 AI 解讀 is offered only while the AI reading is open (ai-mode.js) and on the site.
 const noAutoBox = () => aiSoon() || aiOff() || aiOutToday();
 const AI_AUTO = "bazi-life.aiAuto";
+const PIN_KEY = "bazi-life.pinStatus";
 let remoteOff = !INTERPRET_URL || !/^https?:$/.test(location.protocol);
 
 function setup() {
@@ -86,9 +87,16 @@ function setup() {
   addEventListener("pagehide", () => saveFormSoon.flush());
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveFormSoon.flush(); });
   initPixels();
-  // The sticky status bar (with the pixel scene) is as tall as the screen makes it; scrolling to a choice leaves room for it.
+  // The status bar (with the pixel scene) scrolls with the page; 固定在上方 pins it (remembered in this browser). While
+  // pinned, scrolling to a line or a choice leaves room for it (--sticky).
   const status = $(".status");
-  if (status && typeof ResizeObserver === "function") new ResizeObserver(() => document.documentElement.style.setProperty("--sticky", `${Math.ceil(status.getBoundingClientRect().height) + 8}px`)).observe(status);
+  const sticky = () => document.documentElement.style.setProperty("--sticky", status.classList.contains("pinned") ? `${Math.ceil(status.getBoundingClientRect().height) + 8}px` : "12px");
+  const pin = on => { status.classList.toggle("pinned", on); $("#c-pin").setAttribute("aria-pressed", String(on)); sticky(); };
+  let pinned = false;
+  try { pinned = localStorage.getItem(PIN_KEY) === "1"; } catch {}
+  pin(pinned);
+  $("#c-pin").addEventListener("click", () => { const on = !status.classList.contains("pinned"); pin(on); try { localStorage.setItem(PIN_KEY, on ? "1" : "0"); } catch {} });
+  if (typeof ResizeObserver === "function") new ResizeObserver(sticky).observe(status);
   const partnerSex = $(".member[data-role=partner] .m-sex");
   partnerSex.addEventListener("change", () => { partnerSex.dataset.picked = "1"; });
   for (const r of document.querySelectorAll('input[name="sex"]')) r.addEventListener("change", () => { if (!partnerSex.dataset.picked) partnerSex.value = $("#sex-f").checked ? "male" : "female"; });
@@ -343,7 +351,7 @@ function tick() {
 function choose(i) {
   const entries = run.life.choose(i);
   $("#choice").hidden = true; recap = [];
-  render(entries);
+  render(entries, { focus: true });
   updateStatus();
   showStep(run.life.state, age => luckAt(run.prep, age), entries);
   if (run.life.pending) return showChoice();
@@ -392,7 +400,8 @@ const reasonLine = (r, tag = "span") => (r ? `<${tag} class="why">命理：${esc
 const lineOf = e => `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">${e.free ? "你自己的決定" : e.picked ? "依你的個性" : "你的選擇"}：${esc(e.choice)}</span>` : ""}`
   + (e.reason && e.reasonFrom === "family" ? `<span class="why">合盤：${esc(e.reason)}</span>` : "") + reasonLine(chartReason(e.id, e.age, e.channel));
 
-function render(entries) {
+// `focus`: right after a choice, what it led to is scrolled to the top and takes the focus (the choice box is gone).
+function render(entries, { focus = false } = {}) {
   if (!entries.length) return;
   const feed = $("#feed");
   for (const e of entries) {
@@ -407,7 +416,9 @@ function render(entries) {
     if (recapWorthy(e)) recap.push(e);
   }
   const last = feed.lastElementChild;
-  if (last && !$("#play").hidden) last.scrollIntoView({ block: "nearest", behavior: speed === 10 ? "auto" : "smooth" });
+  if (!last || $("#play").hidden) return;
+  if (focus) { last.tabIndex = -1; last.scrollIntoView({ block: "start", behavior: "smooth" }); last.focus({ preventScroll: true }); }
+  else last.scrollIntoView({ block: "nearest", behavior: speed === 10 ? "auto" : "smooth" });
 }
 
 function updateStatus() {
@@ -441,7 +452,8 @@ function showChoice() {
       <div class="free-out" id="free-out" aria-live="polite"></div>
     </form>` : "");
   box.hidden = false;
-  box.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sticky")) || 12, r = box.getBoundingClientRect();
+  if (r.top < top || r.bottom > innerHeight) box.scrollIntoView({ block: r.height > innerHeight - top ? "start" : "end", behavior: "smooth" });
   box.querySelector("button").focus({ preventScroll: true });
 }
 
