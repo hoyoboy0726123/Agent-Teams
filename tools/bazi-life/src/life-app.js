@@ -31,7 +31,8 @@ import { initBaby } from "./baby-app.js";
 import { initMatch, onMatchTab, openMatch } from "./hehun-app.js";
 import { aiSoon } from "./ai-mode.js";
 import { initI18n, lang, t } from "./i18n.js";
-import { makeLang, loadStoryBundle } from "./sim/lang.js";
+import { ensureEnglish, englishNow } from "./english.js";
+import { setReadingLang } from "./core/tr.js";
 import { initStats, track, trackOnce, sendLife, heartbeat, LIVE_URL } from "./stats.js";
 import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
@@ -299,16 +300,6 @@ function startRandom() {
   begin(input, `你投胎成為 ${y} 年 ${m} 月 ${d} 日 ${pad(input.time.h)}:${pad(input.time.mi)}，在${county}出生的${sex === "female" ? "女孩" : "男孩"}，名叫${name}。`, { name, random: true });
 }
 
-// The story in English (README「英文版（翻譯層）」): the catalog is fetched only once English is on. A life starts in the
-// language that is on when it starts; without the catalog (an opened file, the Artifact preview) it stays Chinese.
-const STORY_URL = "/i18n/story-en.json";
-let english = null, englishLoading = null;
-function ensureEnglish() {
-  if (english || englishLoading) return englishLoading;
-  if (!/^https?:$/.test(location.protocol)) return null;
-  englishLoading = loadStoryBundle(STORY_URL).then(b => (english = makeLang(b))).catch(() => null);
-  return englishLoading;
-}
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 // The opening line in English: who, when and where.
 function bornEnglish(input, L, extra) {
@@ -322,7 +313,7 @@ function bornEnglish(input, L, extra) {
 
 function begin(input, born, extra = {}, waited = false) {
   // English is on but its catalog is still coming: start as soon as it is here (or without it, if it fails).
-  if (lang() === "en" && !english && !waited) { const p = ensureEnglish(); if (p) { p.finally(() => begin(input, born, extra, true)); return; } }
+  if (lang() === "en" && !englishNow() && !waited) { const p = ensureEnglish(); if (p) { p.finally(() => begin(input, born, extra, true)); return; } }
   stop();
   let chart, prep;
   // 夜子時 (input.zi, from the birth form or the 合婚 tab) keeps a 23:00–24:00 birth on that day; otherwise 23 點換日.
@@ -331,7 +322,8 @@ function begin(input, born, extra = {}, waited = false) {
   // A name without Kangxi strokes still appears in the story; it just isn't scored.
   const name = prep.name || (extra.name ? { full: extra.name, effects: null } : null);
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-  const L = lang() === "en" && english ? english : null;
+  // A life starts in the language that is on when it starts (the story and, at the end, the readings).
+  const L = englishNow();
   run = { input, extra, chart, prep, name, seed, born, L, life: createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed, name, family: prep.family, majorOnly: $("#c-major").checked, seen: startSeen(), ...(L ? { lang: "en", english: L } : {}) }), summary: null };
   startScene(seed, run.life.state, age => luckAt(prep, age));
   $("#setup").hidden = true; $("#baby").hidden = true; $("#match").hidden = true; $("#end").hidden = true; $("#play").hidden = false;
@@ -581,6 +573,8 @@ function applyFree(action, summary) {
 // ---------- the end ----------
 function finish() {
   stop();
+  // The readings and the result cards in the life's own language (core/tr.js); Chinese when it started in Chinese.
+  setReadingLang(run.L);
   const { life, chart, prep, input } = run;
   const s = life.state;
   updateStatus();   // after 直接看結局 the bar still showed the year it was pressed in
