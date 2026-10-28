@@ -106,6 +106,10 @@ function start() {
   $("#share-png").addEventListener("click", downloadCard);
   $("#share-native").addEventListener("click", shareCard);
   $("#share-native").hidden = !(navigator.share && navigator.canShare);
+  // With a share sheet (phones), Share… comes first and Download PNG steps back.
+  if (navigator.share && navigator.canShare) $("#share-png").classList.replace("solid", "outline");
+  for (const a of document.querySelectorAll(".social a[data-net]")) a.addEventListener("click", () => track(`share_${a.dataset.net}`));
+  $("#share-copy").addEventListener("click", copyLink);
   $("#ai-btn").addEventListener("click", aiReport);
   addEventListener("resize", () => { if (run && run.life.done && !$("#end").hidden) redrawChart(); });
   initWelcome();
@@ -564,6 +568,41 @@ async function drawShare() {
   const d = cardData();
   img.alt = `Share card: I lived to ${d.age}. ${d.title}. ${d.hundred ? `In ${d.hundred.n} of my 100 lives, I ${d.hundred.text}.` : ""} Sun ${d.big.sun}, Moon ${d.big.moon}, Rising ${d.big.rising || "unknown"}.`;
   $("#share-box").classList.remove("loading");
+  setSocialLinks();
+}
+// The line that goes with a shared link or card: this life, one of the 100, and the question.
+function shareText() {
+  const d = cardData();
+  return `I lived to ${d.age} as ${d.title}.${d.hundred ? ` In ${d.hundred.n} of my 100 lives, I ${d.hundred.text}.` : ""} Is your life written in the stars, or just luck?`;
+}
+const shareUrl = () => `https://${SITE()}/`;
+// Each network's own "post this" page: the text and the link go in, the site's preview image (og.png) comes with the
+// link. None of them takes an image file from a web page; that is what Share… (phones) and Download PNG are for.
+function setSocialLinks() {
+  const enc = encodeURIComponent, text = shareText(), url = shareUrl(), both = `${text} ${url}`;
+  const href = {
+    x: `https://x.com/intent/post?text=${enc(text)}&url=${enc(url)}`,
+    threads: `https://www.threads.net/intent/post?text=${enc(both)}`,
+    facebook: `https://www.facebook.com/sharer/sharer.php?u=${enc(url)}`,
+    reddit: `https://www.reddit.com/submit?url=${enc(url)}&title=${enc(text)}`,
+    whatsapp: `https://wa.me/?text=${enc(both)}`,
+    bluesky: `https://bsky.app/intent/compose?text=${enc(both)}`,
+  };
+  for (const a of document.querySelectorAll(".social a[data-net]")) a.href = href[a.dataset.net];
+}
+async function copyLink() {
+  if (!run) return;
+  const both = `${shareText()} ${shareUrl()}`;
+  let ok = false;
+  try { await navigator.clipboard.writeText(both); ok = true; } catch {
+    const t = document.createElement("textarea");
+    t.value = both; t.setAttribute("readonly", ""); t.style.position = "fixed"; t.style.opacity = "0";
+    document.body.appendChild(t); t.select();
+    try { ok = document.execCommand("copy"); } catch {}
+    t.remove();
+  }
+  $("#share-copied").textContent = ok ? "Copied. Paste it anywhere." : "Couldn't copy here; select the link in your address bar instead.";
+  if (ok) track("share_copy");
 }
 const fileName = () => `written-in-the-stars-${run.life.state.age}.png`;
 async function downloadCard() {
@@ -578,8 +617,8 @@ async function downloadCard() {
 async function shareCard() {
   if (!run || !run.card) return;
   const blob = await cardBlob(run.card), file = new File([blob], fileName(), { type: "image/png" });
-  const text = `I lived to ${run.life.state.age} as ${run.label.title}. Is your life written in the stars, or just luck?`;
-  const data = navigator.canShare && navigator.canShare({ files: [file] }) ? { files: [file], text } : { text, url: `https://${SITE()}` };
+  const text = shareText();
+  const data = navigator.canShare && navigator.canShare({ files: [file] }) ? { files: [file], text: `${text} ${shareUrl()}` } : { text, url: shareUrl() };
   try { await navigator.share(data); track("share_native"); } catch {}
 }
 

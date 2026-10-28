@@ -616,8 +616,8 @@ export const marketReturn = year => (SP500[yr(year)] ?? 10) / 100;
 // itself moves), with 1985's before 1985.
 const OWN_30S = D.HOMEOWNERSHIP_BY_AGE ? D.HOMEOWNERSHIP_BY_AGE.map(([y, r]) => [y, (r[2] + r[3]) / 2]) : [[1985, 57]];
 const OWN_30S_MEAN = OWN_30S.reduce((t, [, v]) => t + v, 0) / OWN_30S.length;
-export const homeBuy = (age, year = null) => interp([[22, 0.06], [25, 0.15], [30, 0.23], [34, 0.16], [38, 0.07], [45, 0.04], [60, 0.025], [75, 0.01]], age)
-  * (year === null ? 1 : Math.max(0.6, Math.min(1.5, Math.pow(interp(OWN_30S, yr(year)) / OWN_30S_MEAN, 2.5))));
+export const homeBuy = (age, year = null) => interp([[22, 0.065], [25, 0.17], [30, 0.26], [34, 0.18], [38, 0.075], [45, 0.04], [60, 0.025], [75, 0.01]], age)
+  * (year === null ? 1 : Math.max(0.7, Math.min(1.4, Math.pow(interp(OWN_30S, yr(year)) / OWN_30S_MEAN, 1.5))));
 export const DOWN_PAYMENT = 0.5;
 // Moving to another state (Census Bureau, CPS mobility: about 3 % of people a year through the 1950s–80s, 2.5 % around
 // 2000, 1.5 % from the 2010s; most for young adults): yearly chances by age and era (design, to those figures).

@@ -171,22 +171,24 @@ if (!isMainThread) {
 
   // ---------- the checks ----------
   test(`lifespan and mortality follow the cohort life tables (${plain.length} lives without a chart)`, () => {
+    const checks = [];
     for (const sex of SEXES) {
-      const g = plain.filter(r => r.sex === sex);
-      const deaths = g.length, tableDeaths = g.reduce((s, r) => s + r.qt, 0);
-      note(`${sex}: deaths / life-table deaths (SMR)`, deaths / tableDeaths, 1);
-      note(`${sex}: the engine's yearly risk / the table's`, g.reduce((s, r) => s + r.q, 0) / tableDeaths, 1);
-      near(deaths / tableDeaths, 1, FULL ? 0.03 : 0.1, `${sex}: deaths over the life table's (SMR)`);
-      near(g.reduce((s, r) => s + r.q, 0) / tableDeaths, 1, 0.04, `${sex}: the engine's risk over the table's, along the same lives`);
+      const g = plain.filter(r => r.sex === sex), tableDeaths = g.reduce((s, r) => s + r.qt, 0), risk = g.reduce((s, r) => s + r.q, 0);
+      note(`${sex}: deaths / life-table deaths along the same lives (SMR)`, g.length / tableDeaths, 1);
+      note(`${sex}: the engine's yearly risk / the table's`, risk / tableDeaths, 1);
+      checks.push([g.length / tableDeaths, 1, FULL ? 0.04 : 0.1, `${sex}: deaths over the life table's (SMR)`]);
+      checks.push([risk / tableDeaths, 1, 0.04, `${sex}: the engine's risk over the table's, along the same lives`]);
       for (const bin of FULL ? BINS : [[1950, 2000]]) {
         const c = g.filter(inBin(bin));
         const sim = mean(c.map(r => r.death + 0.5)), us = mean(c.map(r => cohortE0(sex, r.by)));
         note(`${sex} ${label(bin)}: life expectancy at birth`, sim, us);
-        near(sim, us, FULL ? 1 : 1.5, `${sex} born ${label(bin)}: life expectancy`);
+        checks.push([sim, us, FULL ? 1 : 1.5, `${sex} born ${label(bin)}: life expectancy`]);
       }
     }
     // The deaths follow the engine's own yearly risk (the draw is unbiased).
     const z = (plain.length - plain.reduce((s, r) => s + r.q, 0)) / Math.sqrt(plain.reduce((s, r) => s + r.qv, 0));
+    note("deaths vs the engine's yearly risk (z)", z, 0);
+    for (const c of checks) near(...c);
     assert.ok(Math.abs(z) < 4, `deaths vs the engine's risk: z = ${z.toFixed(2)}`);
   });
 

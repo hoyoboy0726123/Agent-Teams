@@ -203,6 +203,15 @@ async function closeStory(p) {
   const path = await download.path(), png = await readFile(path);
   check("Download PNG saves the card", /^written-in-the-stars-\d+\.png$/.test(download.suggestedFilename()) && png.readUInt32BE(16) === 1080 && png.readUInt32BE(20) === 1920 && png.length > 20000, `${download.suggestedFilename()} ${png.length} bytes`);
   if (SHOTS) { const { writeFile } = await import("node:fs/promises"); await writeFile(join(SHOTS, "share-card.png"), png); }
+  // Or post it: each network's post page carries this life's line and the site link; Copy link copies the same.
+  const nets = await p.$$eval(".social a[data-net]", as => as.map(a => [a.dataset.net, a.href, a.target, a.rel]));
+  const want = { x: /^https:\/\/x\.com\/intent\/post\?text=I%20lived%20to%20\d+.*&url=https%3A%2F%2F/, threads: /^https:\/\/www\.threads\.net\/intent\/post\?text=I%20lived/, facebook: /^https:\/\/www\.facebook\.com\/sharer\/sharer\.php\?u=https%3A%2F%2F/, reddit: /^https:\/\/www\.reddit\.com\/submit\?url=.*&title=I%20lived/, whatsapp: /^https:\/\/wa\.me\/\?text=I%20lived/, bluesky: /^https:\/\/bsky\.app\/intent\/compose\?text=I%20lived/ };
+  check("share links: X, Threads, Facebook, Reddit, WhatsApp and Bluesky open in a new tab with this life's line", nets.length === 6 && nets.every(([n, h, t, r]) => want[n] && want[n].test(h) && t === "_blank" && /noopener/.test(r)), nets.map(n => n[0]).join(","));
+  await p.context().grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => {});
+  await p.click("#share-copy");
+  await p.waitForFunction(() => /Copied|Couldn/.test(document.querySelector("#share-copied").textContent), null, { timeout: 5000 });
+  const copied = await p.evaluate(() => navigator.clipboard.readText().catch(() => ""));
+  check("Copy link copies the line and the link", /^I lived to \d+ as .+ https?:\/\/\S+\/$/.test(copied) || /Copied/.test(await p.textContent("#share-copied")), copied.slice(0, 80));
   check("ending (1280): nothing overflows", !(await overflow(p)).length, (await overflow(p)).join("; "));
   await shot(p, "desktop-4-end", { fullPage: true });
   if (SHOTS) await (await p.$("#share-box")).screenshot({ path: join(SHOTS, "desktop-5-share.png") });

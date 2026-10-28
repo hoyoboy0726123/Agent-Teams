@@ -74,6 +74,10 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
   if (m) { key = decodeURIComponent(m[1]); history.replaceState(null, "", location.pathname); }
   try { if (key) localStorage.setItem(KEY, key); else key = localStorage.getItem(KEY) || ""; } catch {}
   const n = x => (x || 0).toLocaleString("en-US");
+  // Every way of sharing: the card (download, share sheet), the network links and Copy link.
+  const shares = x => Object.keys(x || {}).filter(k => k.indexOf("share_") === 0).reduce((a, k) => a + (x[k] || 0), 0);
+  const NETS = [["x", "X"], ["threads", "Threads"], ["facebook", "Facebook"], ["reddit", "Reddit"], ["whatsapp", "WhatsApp"], ["bluesky", "Bluesky"], ["copy", "Copy link"], ["native", "share sheet"], ["png", "PNG"]];
+  const byNet = x => NETS.filter(e => x["share_" + e[0]]).map(e => e[1] + " " + n(x["share_" + e[0]])).join(" · ") || "none yet";
   const pct = (a, b) => (b ? Math.round(a / b * 1000) / 10 + "%" : "—");
   const dur = s => { if (!isFinite(s) || s <= 0) return "—"; s = Math.round(s); return s < 60 ? s + " s" : Math.floor(s / 60) + " min " + String(s % 60).padStart(2, "0") + " s"; };
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -112,7 +116,7 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
       ["Page views", n(t.view), "visits"], ["Visitors", n(t.visitor), n(t.return) + " returning"],
       ["Avg time", dur((t.seconds || 0) / (t.view || 0)), "per view"], ["Lives started", n(t.start), n(t.random) + " random births"],
       ["Lives finished", n(t.end_u), "visits (" + n(t.end) + " lives)"], ["Finish rate", pct(t.end_u, t.form_u), "of visits that opened the form"],
-      ["Wrote a decision", n(t.written_u), "visits"], ["Share card", n((t.share_png || 0) + (t.share_native || 0)), n(t.share_native) + " via share sheet"],
+      ["Wrote a decision", n(t.written_u), "visits"], ["Shared", n(shares(t)), byNet(t)],
       ["988 shown", n(t.help), "safety message"],
       ["AI report", n(t.ai_report_u), "visits (" + n(t.ai_report) + " clicks)", true],
       ["AI report rate", pct(t.ai_report_u, t.end_u), "of visits that finished a life", true],
@@ -133,7 +137,7 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
     });
     $("#chart").innerHTML = svg + '<text x="0" y="20">' + max + "</text></svg>";
     const head = "<tr><th>Day</th><th>Views</th><th>Visitors</th><th>Avg time</th><th>Started</th><th>Finished</th><th>AI report</th><th>AI rate</th><th>Wrote</th><th>Cards</th></tr>";
-    $("#table").innerHTML = head + (list.length ? list.slice().reverse().map(d => "<tr><td>" + d.day + "</td><td>" + n(d.view) + "</td><td>" + n(d.visitor) + "</td><td>" + dur((d.seconds || 0) / (d.view || 0)) + "</td><td>" + n(d.start) + "</td><td>" + n(d.end_u) + "</td><td>" + n(d.ai_report_u) + "</td><td>" + pct(d.ai_report_u, d.end_u) + "</td><td>" + n(d.written_u) + "</td><td>" + n((d.share_png || 0) + (d.share_native || 0)) + "</td></tr>").join("") : '<tr><td colspan="10">No data for this period yet.</td></tr>');
+    $("#table").innerHTML = head + (list.length ? list.slice().reverse().map(d => "<tr><td>" + d.day + "</td><td>" + n(d.view) + "</td><td>" + n(d.visitor) + "</td><td>" + dur((d.seconds || 0) / (d.view || 0)) + "</td><td>" + n(d.start) + "</td><td>" + n(d.end_u) + "</td><td>" + n(d.ai_report_u) + "</td><td>" + pct(d.ai_report_u, d.end_u) + "</td><td>" + n(d.written_u) + "</td><td>" + n(shares(d)) + "</td></tr>").join("") : '<tr><td colspan="10">No data for this period yet.</td></tr>');
   }
   if (key) load(); else showLogin("");
 })();

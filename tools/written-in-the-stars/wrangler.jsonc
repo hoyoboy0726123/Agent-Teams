@@ -8,7 +8,7 @@
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
   // The built pages are imported as text modules (static HTML, no asset upload).
-  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }],
+  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }, { "type": "Data", "globs": ["**/*.png"], "fallthrough": true }],
   // The anonymous counts (/api/stats): a page sends a few a minute. namespace_id must be unique in the account (bazi-life
   // uses 4721–4723).
   "ratelimits": [

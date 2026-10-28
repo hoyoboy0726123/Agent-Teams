@@ -5,7 +5,15 @@
 <meta property="og:title" content="Written in the Stars">
 <meta property="og:description" content="Is your life written in the stars, or just luck? Live it 100 times.">
 <meta property="og:type" content="website">
-<meta name="twitter:card" content="summary">
+<meta property="og:url" content="https://written-in-the-stars.mingpan.workers.dev/">
+<meta property="og:image" content="https://written-in-the-stars.mingpan.workers.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Written in the Stars: is your life written in the stars, or just luck? Live it 100 times.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Written in the Stars">
+<meta name="twitter:description" content="Is your life written in the stars, or just luck? Live it 100 times.">
+<meta name="twitter:image" content="https://written-in-the-stars.mingpan.workers.dev/og.png">
 <meta name="stats-endpoint" content="__STATS_URL__">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1026'/%3E%3Cpath d='M16 5l2.6 7.4L26 15l-7.4 2.6L16 25l-2.6-7.4L6 15l7.4-2.6z' fill='%23f0cd84'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -314,6 +322,9 @@ th:nth-child(3), td:nth-child(3) { text-align: left; }
 .share-box.loading .share-img { opacity: 0.4; }
 .share-actions { display: grid; gap: 10px; align-content: start; }
 .share-actions .row { display: flex; flex-wrap: wrap; gap: 10px; }
+.share-actions .share-to { margin: 6px 0 -2px; font-weight: 600; }
+.share-actions .social .btn { min-height: 44px; padding: 8px 16px; font-weight: 500; }
+.share-actions .social .btn[aria-disabled="true"] { pointer-events: none; opacity: 0.5; }
 .again { display: flex; flex-wrap: wrap; gap: 12px; }
 
 /* ---------- the natal reading ---------- */
@@ -667,9 +678,21 @@ footer .disc { color: var(--night-ink); }
         <div class="share-actions">
           <p class="lede">Made for stories. Save it, post it, and ask your friends how many of their 100 lives got married.</p>
           <div class="row">
+            <button type="button" class="btn solid" id="share-native" hidden>Share…</button>
             <button type="button" class="btn solid" id="share-png">Download PNG</button>
-            <button type="button" class="btn outline" id="share-native" hidden>Share…</button>
           </div>
+          <p class="share-to" id="share-to-label">Or post it:</p>
+          <div class="row social" role="group" aria-labelledby="share-to-label">
+            <a class="btn outline" data-net="x" target="_blank" rel="noopener" href="#">X</a>
+            <a class="btn outline" data-net="threads" target="_blank" rel="noopener" href="#">Threads</a>
+            <a class="btn outline" data-net="facebook" target="_blank" rel="noopener" href="#">Facebook</a>
+            <a class="btn outline" data-net="reddit" target="_blank" rel="noopener" href="#">Reddit</a>
+            <a class="btn outline" data-net="whatsapp" target="_blank" rel="noopener" href="#">WhatsApp</a>
+            <a class="btn outline" data-net="bluesky" target="_blank" rel="noopener" href="#">Bluesky</a>
+            <button type="button" class="btn outline" id="share-copy">Copy link</button>
+          </div>
+          <p class="fine" id="share-copied" role="status" aria-live="polite"></p>
+          <p class="fine">Instagram and TikTok: save the card (or tap Share… on your phone) and add it to your Story.</p>
           <p class="fine">The card shows your Big Three and this life, never your birth date or name.</p>
         </div>
       </div>

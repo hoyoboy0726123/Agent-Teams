@@ -7,6 +7,8 @@ export const EVENTS = [
   "view", "visitor", "return", "t30", "t60", "t180", "t600",
   "form", "form_u", "start", "random", "skip", "again", "end", "end_u", "written", "written_u", "help",
   "share_png", "share_native",
+  // the "Or post it" links on the ending: which network, and Copy link
+  "share_x", "share_threads", "share_facebook", "share_reddit", "share_whatsapp", "share_bluesky", "share_copy",
   "ai_report", "ai_report_u",   // the "Get my AI report" button on the ending (not open yet): each press, and once per page load
   "beat",   // a page with a life running, once a minute: how many are playing right now (/api/live)
 ];

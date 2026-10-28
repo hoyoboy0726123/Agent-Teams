@@ -129,3 +129,46 @@ in bazi-life (`rel`, `partner`, `kids`, `health`, `traits`, `flags`, `arcs`, `me
 `test/sim-stubs/` (a resolve hook, `load.js`); the engine checks run on the stand-in story so they do not move when the
 real story changes, and one test runs the real story when it exists. The intent test has 61 dev sentences; on 30 fresh
 ones the matcher gets 16 first and 21 in its top three (the page shows the top three; the model path does better).
+
+## Calibration
+
+`test/calibration.test.js` (this replaces the "not ported yet" note above) lives auto-played lives born 1950–2000 with
+no chart (`neutralPrep`) and checks them against `us-rates.js`, each target read for the person's own birth year or the
+event's year; then it lives the first of them again with random charts (five lives per chart, same people and seeds)
+and checks that no aggregate moves.
+
+```
+npm test                                       # quick: 2,000 + 1,000 lives in worker threads, pooled checks
+CAL=full node --test test/calibration.test.js  # 20,000 + 10,000 lives, by sex and birth decade (several minutes)
+CAL=fit  node --test test/calibration.test.js  # also prints a refitted rates.js EXPOSURE table
+```
+
+Checked: life expectancy (cohort, along the period tables) and the deaths over the table's (SMR); ever married by 45
+and the median age at first marriage (MS-2 in the year the cohort marries); children by 45 (the ASFR diagonal) and
+the nonmarital share of births; first marriages divorced within 5/10/20 years (NSFG survival); high school, some
+college or associate, bachelor's or more at 30 and graduate degrees at 45 (EDUCATION_BY_COHORT); owning a home at 35
+and 50 (HVS); cancer, heart disease and stroke shares of deaths at 45–69, 70–84, 85+ (CAUSE_SHARES) and the cancer
+registry (CANCER_INCIDENCE on US_STANDARD_2000); service of men born 1950–55 vs later (MILITARY_SERVICE_SHARE); the
+age at claiming Social Security and the share at 62 (SSA 6.B5).
+
+What was fitted, and where:
+
+- **Seeds** (`life.js`): neighbouring seeds gave mulberry32 streams that were not independent (lives 5000..5799 died
+  1.5 years late although every yearly chance was right); the seed now goes through a hash finaliser first.
+- **Mortality** (`rates.js solve`): the chain behind the healthy baseline follows the story's states exactly (the
+  fifth year after a diagnosis is not diagnosable); chronic disease starts at 30 with the share reached by then;
+  deaths the illnesses do not cause are given a cause (`suddenCause`) so every cause keeps its official share;
+  `CANCER_FATALITY` is refitted to the US registry (age-standardised rates exact, median age 67).
+- **Marriage**: every curve is read at the 2024-equivalent age (age minus the year's MS-2 shift) with an era level.
+- **Births**: the year's ASFR and TFR, the year's nonmarital share spread over ages, over the fitted share of women
+  who are couples able to have a baby (`EXPOSURE`, refit with `CAL=fit` when love or family events change).
+- **School**: the dropout, enrollment and completion rates are solved per birth cohort and sex from
+  EDUCATION_BY_COHORT; the graduation choice takes everyone who ever starts college.
+- **Divorce** duration curve, **homes** (`homeBuy(age, year)`, with the HVS ownership of 30–39-year-olds as era),
+  **military** (the cohort's share over the diploma share), **retirement** (hazards around the full retirement age,
+  one in fifteen waits to 70).
+
+For the story files: keep the net drift of `health.hr` at about 1 (the population's mean is about 1.006 now); never
+marry, divorce, have babies or make anyone seriously ill outside `core.js`; core's love and family choices feed
+`EXPOSURE`, so re-run `CAL=fit` after changing them; a death can now carry `s.health.diedOf` without a diagnosis before
+it (`s.health.sudden`), so the death line should not always say "after a long fight".
