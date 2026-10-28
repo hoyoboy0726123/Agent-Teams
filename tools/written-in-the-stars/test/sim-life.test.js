@@ -72,7 +72,8 @@ test("a choice stops the year; a button, a written action and the player's own w
   assert.equal(r.entries[0].free, true);
   assert.match(r.entries[0].text, /You decide to hitchhike to California\. You did it your own way\./);
   assert.equal(r.entries[0].mood, 0);
-  assert.ok(life.state.age === age + 1 || life.done);
+  // The year goes on: to the next year, or to another of the year's core questions (they always come).
+  assert.ok(life.state.age === age + 1 || life.done || (life.pending && life.state.age === age));
   // Next choice: a button.
   guard = 0;
   while (!life.pending && !life.done && guard++ < 200) life.step();

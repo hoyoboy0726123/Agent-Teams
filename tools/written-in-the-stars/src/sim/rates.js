@@ -609,7 +609,13 @@ export const marketReturn = year => (SP500[yr(year)] ?? 10) / 100;
 // in 2024 and about 30 through the 1980s–2000s (National Association of Realtors). Yearly chances (design, fitted to
 // those); the down payment is in years of median pay (a typical first-time buyer puts down 6–9 % of a home costing
 // about seven years of median pay, plus closing costs: design).
-export const homeBuy = age => interp([[22, 0.06], [25, 0.15], [30, 0.23], [34, 0.16], [38, 0.07], [45, 0.04], [60, 0.025], [75, 0.01]], age);
+// The era moves it with the ownership of 30–39-year-olds that year (us-rates.js HOMEOWNERSHIP_BY_AGE: 57 % in 1990,
+// 62 % at the 2005 peak, 51 % in 2015), amplified (design: the year's buying moves the share far more than the share
+// itself moves), with 1985's before 1985.
+const OWN_30S = D.HOMEOWNERSHIP_BY_AGE ? D.HOMEOWNERSHIP_BY_AGE.map(([y, r]) => [y, (r[2] + r[3]) / 2]) : [[1985, 57]];
+const OWN_30S_MEAN = OWN_30S.reduce((t, [, v]) => t + v, 0) / OWN_30S.length;
+export const homeBuy = (age, year = null) => interp([[22, 0.06], [25, 0.15], [30, 0.23], [34, 0.16], [38, 0.07], [45, 0.04], [60, 0.025], [75, 0.01]], age)
+  * (year === null ? 1 : Math.max(0.6, Math.min(1.5, Math.pow(interp(OWN_30S, yr(year)) / OWN_30S_MEAN, 2.5))));
 export const DOWN_PAYMENT = 0.5;
 // Moving to another state (Census Bureau, CPS mobility: about 3 % of people a year through the 1950s–80s, 2.5 % around
 // 2000, 1.5 % from the 2010s; most for young adults): yearly chances by age and era (design, to those figures).

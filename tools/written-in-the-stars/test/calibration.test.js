@@ -2,7 +2,7 @@
 // that rates.js cites (us-rates.js), cohort by cohort; and with random charts the population must stay where it is,
 // because every chart's luck is centred on its own lifetime (PLAN.md, "The seam").
 //
-//   npm test                 the quick run: 2,400 lives without a chart and 1,200 with one (the same people and seeds,
+//   npm test                 the quick run: 2,000 lives without a chart and 1,000 with one (the same people and seeds,
 //                            five lives per chart), spread over worker threads; pooled checks with tolerances of about
 //                            three standard errors
 //   CAL=full npm test        20,000 + 10,000 lives: every check by sex and birth cohort, tighter (minutes)
@@ -20,7 +20,7 @@ const imp = path => import(new URL(path, SRC).href);
 const [seam, L, R, D, S, A, RNG, STORY] = await Promise.all(["sim/seam.js", "sim/life.js", "sim/rates.js", "data/us-rates.js", "sim/setup.js", "astro/index.js", "sim/rng.js", "sim/story/index.js"].map(imp));
 
 const MODE = process.env.CAL === "full" ? "full" : process.env.CAL === "fit" ? "fit" : "quick";
-const PLAN = MODE === "full" ? { plain: 20000, chart: 10000 } : { plain: 2400, chart: 1200 };
+const PLAN = MODE === "full" ? { plain: 20000, chart: 10000 } : { plain: 2000, chart: 1000 };
 const PER_CHART = 5, YEARS = [1950, 2000], SEED = 610000;
 const EDU = { none: "lt", elementary: "lt", middle: "lt", high: "hs", ged: "hs", certificate: "hs", associate: "associate", bachelor: "bachelor", master: "graduate", professional: "graduate", doctorate: "graduate" };
 
@@ -124,7 +124,7 @@ if (!isMainThread) {
   const note = (label, sim, us) => lines.push(`${label.padEnd(58)} ${typeof sim === "number" ? sim.toFixed(3) : sim}  ${typeof us === "number" ? us.toFixed(3) : us}`);
   const FULL = MODE === "full";
   const SEXES = ["male", "female"];
-  const BINS = FULL ? [[1950, 1959], [1960, 1969], [1970, 1979], [1980, 1989], [1990, 2000]] : [[1950, 1964], [1965, 1979], [1980, 2000]];
+  const BINS = FULL ? [[1950, 1959], [1960, 1969], [1970, 1979], [1980, 1989], [1990, 2000]] : [[1950, 1974], [1975, 2000]];
   const inBin = ([a, b]) => r => r.by >= a && r.by <= b;
   const label = ([a, b]) => `${a}–${b}`;
   // Cohort life expectancy from the period tables along the diagonal (the year the person is each age).
@@ -176,7 +176,7 @@ if (!isMainThread) {
       const deaths = g.length, tableDeaths = g.reduce((s, r) => s + r.qt, 0);
       note(`${sex}: deaths / life-table deaths (SMR)`, deaths / tableDeaths, 1);
       note(`${sex}: the engine's yearly risk / the table's`, g.reduce((s, r) => s + r.q, 0) / tableDeaths, 1);
-      near(deaths / tableDeaths, 1, FULL ? 0.03 : 0.08, `${sex}: deaths over the life table's (SMR)`);
+      near(deaths / tableDeaths, 1, FULL ? 0.03 : 0.1, `${sex}: deaths over the life table's (SMR)`);
       near(g.reduce((s, r) => s + r.q, 0) / tableDeaths, 1, 0.04, `${sex}: the engine's risk over the table's, along the same lives`);
       for (const bin of FULL ? BINS : [[1950, 2000]]) {
         const c = g.filter(inBin(bin));

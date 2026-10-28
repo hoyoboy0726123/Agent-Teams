@@ -905,7 +905,7 @@ export const CORE = [
   // ---------- money and home ----------
   {
     id: "buyHome", calibrated: true, domain: "wealth", channel: "good", tags: ["home"], ages: [22, 70], cooldown: 2, when: (s, ctx) => s.home !== "own" && s.savings >= rate(ctx, "DOWN_PAYMENT") && s.employed,
-    p: (s, ctx) => rate(ctx, "homeBuy", s.age),
+    p: (s, ctx) => rate(ctx, "homeBuy", s.age, s.year),
     choice: (s, ctx) => {
       const buy = (s2, kind) => { const first = !s2.flags.ownedBefore; ownHome(s2); s2.flags.ownedBefore = true; s2.savings -= rate(ctx, "DOWN_PAYMENT"); return { text: ctx.w(`You bought ${first ? "your first home" : "a new place"} in ${here(s2)}: ${kind}. {The night you got the keys, you sat on the bare floor and ate pizza out of the box.|Thirty years of mortgage, and you had never felt steadier.|You carried each other over the threshold as a joke, and it was not a joke.}`), mood: 8, big: true }; };
       const starter = ctx.rng.pick([["Buy a starter home", ctx.rng.pick(["a little starter home with a chain-link fence", "a brick bungalow with a big maple out front"])], ["Buy a little ranch house", "a three-bedroom ranch with a carport"]]);
