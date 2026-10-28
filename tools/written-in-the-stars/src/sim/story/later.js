@@ -33,7 +33,7 @@
 //   s.flags.downsized   the age you sold the big house               s.flags.community  "55plus" | "independent" | "ccrc"
 //   s.flags.will, memoir, volunteerAs, pickleball, hearingAids, carKeys (the age you gave them up), widowDating,
 //   s.flags.partTimeDone (the age the part-time gig ended), s.flags.livesWithKid (that child's name)
-import { scene, cap, they, them, their, kidWord, grandWord, bestFriend, makeFriend, fullRetirementAge, snowy, kidsCulture, stateCode, stateName } from "./common.js";
+import { scene, cap, they, them, their, kidWord, grandWord, bestFriend, makeFriend, fullRetirementAge, snowy, kidsCulture, stateCode, stateName, yearsWord } from "./common.js";
 import { faithOf } from "./child.js";
 import { moveTo } from "../world.js";
 
@@ -161,7 +161,7 @@ export const LATER = [
       const share = ssShare(s, s.age), full = s.age >= fra(s) - 0.01, day = ctx.rng.pick(["second", "third", "fourth"]);
       const lead = scene(ctx, [
         full ? `You have reached full retirement age, ${fraWords(s)}, and Social Security will pay you all of it.` : `You are ${s.age}. You could start Social Security now, at about ${share} percent of the full amount, or wait.`,
-        `The Social Security statement says ${share} percent of your full benefit if you start now, and a lot more if you wait until 70.`,
+        `The Social Security statement says ${share} percent of your full benefit if you start now, and more if you wait until 70.`,
         married(s) ? `You and ${pName(s)} spread the Social Security statements across the kitchen table and argued about when to claim.` : null,
         "Your brother-in-law has a strong opinion about when to claim Social Security, and so does everyone at church.",
       ]);
@@ -191,7 +191,7 @@ export const LATER = [
   A("l_ssFirstCheck", [62, 81], 0.6, [
     "Your first Social Security deposit arrived {on the second Wednesday of the month,|right on schedule,} {and you looked at it the way you once looked at your first paycheck.|and you realized you had been paying into it since your first summer job.}",
     "The first Social Security deposit hit your account, {and you set aside a little of it for the grandkids.|and you did the math on how many years of paychecks it took to earn it.|and you finally believed you were retired.}",
-    "Social Security started paying {on a Wednesday, which felt like a strange day for a payday.|and for the first time in decades, money came in without you going anywhere.}",
+    "Social Security started paying{ on a Wednesday, which felt like a strange day for a payday.|, and for the first time in decades, money came in without you going anywhere.}",
   ], { mood: 2, domain: "wealth", channel: "good", when: s => s.flags.ssClaimed === undefined && ssClaimedAt(s) !== undefined && s.age - ssClaimedAt(s) <= 1, fx: s => { s.flags.ssClaimed = ssClaimedAt(s); } }),
   {
     id: "l_cola", domain: "wealth", channel: "change", ages: [63, 105], cooldown: 5, max: 3, when: s => ssClaimedAt(s) !== undefined && usHome(s), p: () => 0.026,
@@ -479,10 +479,10 @@ export const LATER = [
         options: [
           { id: "l_grandTeach.fish", label: "How to fish", hint: "patience and worms", act: "hobby", style: "health", weight: 0.2, apply: (s2, c) => ({ text: c.w(`You taught ${g.call} to fish {off the dock at the lake|at the pond behind the church|on a creek you had fished as a kid}, and ${they(g)} {caught a sunfish the size of a cracker and wanted it mounted.|untangled ${their(g)} own line by the end of the summer.}`), mood: 4 }) },
           { id: "l_grandTeach.bake", label: "The family recipe", hint: "the one nobody writes down", act: "hobby", style: "family", weight: 0.2, apply: (s2, c) => ({ text: c.w(`You taught ${g.call} the family recipe for {the Christmas cookies|Sunday biscuits|the pie everyone fights over}, with a pinch of this and a handful of that, {and ${they(g)} wrote it all down on a card in crayon.|and flour ended up on the ceiling.}`), mood: 4 }) },
-          { id: "l_grandTeach.cards", label: "Poker, or gin rummy", hint: "a lifelong skill", act: "socialize", style: "social", weight: 0.15, apply: (s2, c) => ({ text: c.w(`You taught ${g.call} {poker, for pennies,|gin rummy at the kitchen table|how to shuffle like a Vegas dealer}, and within a year ${they(g)} {was taking your pennies.|had a better poker face than you.}`), mood: 4 }) },
-          { id: "l_grandTeach.fix", label: "How to fix things", hint: "a toolbox of their own", act: "study", style: "learn", weight: 0.15, apply: (s2, c) => ({ text: c.w(`You gave ${g.call} a little toolbox and taught ${them(g)} {to change a tire|to patch a bike tube|to sew on a button and hem a pair of pants|to fix a leaky faucet}, {and ${they(g)} went home and fixed something nobody asked ${them(g)} to.|and ${they(g)} were very proud.}`), mood: 4 }) },
+          { id: "l_grandTeach.cards", label: "Poker, or gin rummy", hint: "a lifelong skill", act: "socialize", style: "social", weight: 0.15, apply: (s2, c) => ({ text: c.w(`You taught ${g.call} {poker for pennies|gin rummy at the kitchen table|how to shuffle like a Vegas dealer}, and within a year ${they(g)} {was taking your pennies.|had a better poker face than you.}`), mood: 4 }) },
+          { id: "l_grandTeach.fix", label: "How to fix things", hint: "a toolbox of their own", act: "study", style: "learn", weight: 0.15, apply: (s2, c) => ({ text: c.w(`You gave ${g.call} a little toolbox and taught ${them(g)} {to change a tire|to patch a bike tube|to sew on a button and hem a pair of pants|to fix a leaky faucet}, {and ${they(g)} went home and fixed something nobody asked ${them(g)} to.|and ${they(g)} was very proud.}`), mood: 4 }) },
           { id: "l_grandTeach.talent", label: `How to ${teach}`, hint: "the thing you were good at as a kid", act: "study", style: "learn", weight: 0.1, apply: (s2, c) => ({ text: c.w(`You taught ${g.call} how to ${teach}, the way someone once taught you, {and the first time ${they(g)} got it right you both cheered.|and it turned out ${they(g)} had your knack for it.}`), mood: 5 }) },
-          { id: "l_grandTeach.learn", label: `Let ${g.call} teach you something`, hint: "a video game, a dance", act: "socialize", style: "social", weight: 0.2, apply: (s2, c) => ({ text: c.w(`You let ${g.call} teach you {${future(s2) ? "a new game" : s2.year >= 2012 ? "Minecraft" : "a video game"}|a dance everyone at school was doing|a card trick}, and you were terrible at it, {which ${they(g)} found hilarious.|and ${they(g)} were a very patient teacher.}`), mood: 4 }) },
+          { id: "l_grandTeach.learn", label: `Let ${g.call} teach you something`, hint: "a video game, a dance", act: "socialize", style: "social", weight: 0.2, apply: (s2, c) => ({ text: c.w(`You let ${g.call} teach you {${future(s2) ? "a new game" : s2.year >= 2012 ? "Minecraft" : "a video game"}|a dance everyone at school was doing|a card trick}, and you were terrible at it, {which ${they(g)} found hilarious.|and ${they(g)} was a very patient teacher.}`), mood: 4 }) },
         ],
       };
     },
@@ -491,7 +491,7 @@ export const LATER = [
     id: "l_grandGame", domain: "family", channel: "good", tags: ["children"], ages: [48, 100], cooldown: 3, max: 2, when: s => grandsIn(s, 5, 17).length > 0, p: () => 0.039,
     apply: (s, ctx) => {
       const g = ctx.rng.pick(grandsIn(s, 5, 17));
-      return { text: ctx.w([`You sat on cold bleachers at ${g.call}'s {soccer game|Little League game|swim meet|basketball game} and cheered loud enough to embarrass ${them(g)}, {which was the point.|and ${they(g)} waved at you anyway.}`, `${g.call}'s {spring recital|school play|band concert} was {two hours long and ${they(g)} were on stage for ninety seconds,|in a gym that smelled like floor wax,} and {you clapped like it was Carnegie Hall.|you saved the program in your Bible.}`, `At ${g.call}'s {science fair|spelling bee|art show}, {you told every stranger which one was your ${gWord(g)}.|you took forty photos of the same poster board.}`]), mood: 4 };
+      return { text: ctx.w([`You sat on cold bleachers at ${g.call}'s {soccer game|Little League game|swim meet|basketball game} and cheered loud enough to embarrass ${them(g)}, {which was the point.|and ${they(g)} waved at you anyway.}`, `${g.call}'s {spring recital|school play|band concert} was {two hours long and ${they(g)} was on stage for ninety seconds,|in a gym that smelled like floor wax,} and {you clapped like it was Carnegie Hall.|you saved the program in your Bible.}`, `At ${g.call}'s {science fair|spelling bee|art show}, {you told every stranger which one was your ${gWord(g)}.|you took forty photos of the same poster board.}`]), mood: 4 };
     },
   },
   {
@@ -505,7 +505,7 @@ export const LATER = [
     id: "l_grandGrad", domain: "family", channel: "good", tags: ["children"], ages: [55, 110], cooldown: 2, max: 2, when: s => grandsIn(s, 18, 18).length > 0 || grandsIn(s, 22, 22).length > 0, p: () => 0.35,
     apply: (s, ctx) => {
       const g = ctx.rng.pick([...grandsIn(s, 18, 18), ...grandsIn(s, 22, 22)]), college = gAge(s, g) >= 22;
-      return { text: ctx.w([`${g.call} graduated from ${college ? "college" : "high school"}, and {you cried when they called ${their(g)} name.|you sat in the front row with a sign you made yourself.|you tucked a check into the card with a note in your best handwriting.}`, `At ${g.call}'s ${college ? "college" : "high school"} graduation, {you got a photo with ${them(g)} in the cap and gown and put it on the fridge that night.|you thought about your own graduation and how fast it all goes.}`, `${g.call} walked across the stage at ${college ? "college" : "high school"} graduation, {and you remembered holding ${them(g)} the day ${they(g)} were born.|and threw you a little wave from the stage.}`]), mood: 6, big: true };
+      return { text: ctx.w([`${g.call} graduated from ${college ? "college" : "high school"}, and {you cried when they called ${their(g)} name.|you sat in the front row with a sign you made yourself.|you tucked a check into the card with a note in your best handwriting.}`, `At ${g.call}'s ${college ? "college" : "high school"} graduation, {you got a photo with ${them(g)} in the cap and gown and put it on the fridge that night.|you thought about your own graduation and how fast it all goes.}`, `${g.call} walked across the stage at ${college ? "college" : "high school"} graduation, {and you remembered holding ${them(g)} the day ${they(g)} was born.|and threw you a little wave from the stage.}`]), mood: 6, big: true };
     },
   },
   A("l_grandWedding", [68, 110], 0.052, (s, ctx) => {
@@ -531,7 +531,7 @@ export const LATER = [
           { id: "l_grandCollege.plan", label: plan ? "Open a 529 college plan" : "Open a college savings account", hint: "a little every birthday", act: "invest", style: "safe", weight: 0.3, apply: s2 => { spend(s2, 0.2); return { text: `You opened a ${plan ? "529 college plan" : "college savings account"} for ${g.call} and added to it every birthday instead of buying another toy.`, mood: 3 }; } },
           { id: "l_grandCollege.bonds", label: "Buy savings bonds, like your grandparents did", hint: "old-fashioned and safe", act: "save", style: "family", weight: 0.15, apply: s2 => { spend(s2, 0.1); return { text: `You bought ${g.call} savings bonds every Christmas, just like your own grandparents did for you, and kept them in an envelope in the desk.`, mood: 2 }; } },
           { id: "l_grandCollege.later", label: "Help when the time comes", hint: "keep the money flexible", act: "wait", style: "self", weight: 0.2, apply: () => ({ text: `You decided to help ${g.call} with college when the time comes and to keep your savings flexible for now.`, mood: 0 }) },
-          { id: "l_grandCollege.teach", label: "Teach them to save instead", hint: "a piggy bank and a lesson", act: "study", style: "learn", weight: 0.2, apply: (s2, c) => ({ text: c.w(`You gave ${g.call} a piggy bank and {matched every quarter ${they(g)} saved.|took ${them(g)} to open a first bank account, and ${they(g)} were very serious about it.}`), mood: 3 }) },
+          { id: "l_grandCollege.teach", label: "Teach them to save instead", hint: "a piggy bank and a lesson", act: "study", style: "learn", weight: 0.2, apply: (s2, c) => ({ text: c.w(`You gave ${g.call} a piggy bank and {matched every quarter ${they(g)} saved.|took ${them(g)} to open a first bank account, and ${they(g)} was very serious about it.}`), mood: 3 }) },
           { id: "l_grandCollege.time", label: "Spend time, not money", hint: "memories compound too", act: "socialize", style: "family", weight: 0.15, apply: () => ({ text: `You decided your gift to ${g.call} would be time instead of money: a standing Saturday together, every week you could.`, mood: 3 }) },
         ],
       };
@@ -541,7 +541,7 @@ export const LATER = [
     id: "l_grandSpoil", domain: "family", channel: "good", tags: ["children"], ages: [44, 100], cooldown: 4, max: 2, when: s => grandsIn(s, 2, 12).length > 0, p: () => 0.033,
     apply: (s, ctx) => {
       const g = ctx.rng.pick(grandsIn(s, 2, 12));
-      return { text: ctx.w([`At ${gName(s)}'s house the rules were different: {ice cream before dinner,|bedtime was a suggestion,|soda with breakfast on birthdays,} and ${g.call} {knew it and used it.|told ${their(g)} parents nothing.}`, `You bought ${g.call} {the toy ${they(g)} had been asking for since Easter|a bike with streamers|a pair of light-up sneakers}, and {${g.parent || "the parents"} gave you a look.|you would do it again tomorrow.}`, `${g.call} {has a drawer in your kitchen that is all ${their(g)} snacks.|knows exactly where you hide the good cookies.|calls you before calling anyone else when ${they(g)} have news.}`]), mood: 4 };
+      return { text: ctx.w([`At ${gName(s)}'s house the rules were different: {ice cream before dinner,|bedtime was a suggestion,|soda with breakfast on birthdays,} and ${g.call} {knew it and used it.|told ${their(g)} parents nothing.}`, `You bought ${g.call} {the toy ${they(g)} had been asking for since Easter|a bike with streamers|a pair of light-up sneakers}, and {${g.parent || "the parents"} gave you a look.|you would do it again tomorrow.}`, `${g.call} {has a drawer in your kitchen that is all ${their(g)} snacks.|knows exactly where you hide the good cookies.|calls you before calling anyone else when ${they(g)} has news.}`]), mood: 4 };
     },
   },
   {
@@ -591,14 +591,14 @@ export const LATER = [
     id: "l_homeTogether", once: true, domain: "love", channel: "change", tags: ["spouse"], about: "partner", ages: [58, 88], when: s => married(s) && s.retired, p: () => 0.065,
     choice: (s, ctx) => {
       const n = pName(s), P = s.partner;
-      const lead = scene(ctx, [`You and ${n} are both home all day now, and you have started to step on each other's toes.`, `${n} has opinions about how you load the dishwasher, now that ${they(P)} watch you do it every day.`, `Forty years of marriage, and you and ${n} are learning how to be retired together.`]);
+      const lead = scene(ctx, [`You and ${n} are both home all day now, and you have started to step on each other's toes.`, `${n} has opinions about how you load the dishwasher, now that ${they(P)} watches you do it every day.`, `After all these years of marriage, you and ${n} are learning how to be retired together.`]);
       return {
         prompt: `${lead} What do you do?`,
         options: [
           { id: "l_homeTogether.space", label: "Separate hobbies, separate rooms", hint: "miss each other a little", act: "hobby", style: "self", weight: 0.25, apply: (s2, c) => ({ text: c.w(`Retired together, you and ${n} agreed on separate days out: {you took the golf course and ${they(P)} took the garden club.|you got the garage and ${they(P)} got the sunroom.} Dinners got a lot more interesting.`), mood: 3 }) },
           { id: "l_homeTogether.dance", label: "Take dance lessons together", hint: "ballroom, or line dancing", act: "hobby", style: "social", weight: 0.2, apply: (s2, c) => ({ text: c.w(`Retired together, you and ${n} signed up for {ballroom lessons at the community center|line dancing at the VFW hall|square dancing on Friday nights}, {and stepped on each other's feet for months and laughed every time.|and won a ribbon at the spring social.}`), mood: 5 }) },
           { id: "l_homeTogether.project", label: "Take on a project together", hint: "a boat, a garden, a quilt", act: "hobby", style: "family", weight: 0.2, apply: (s2, c) => ({ text: c.w(`Retired together, you and ${n} took on a project: {restoring an old wooden boat in the garage.|turning the backyard into a vegetable garden.|a quilt with a square for every year you'd been married.} You argued and finished it anyway.`), mood: 4 }) },
-          { id: "l_homeTogether.walk", label: "A walk together every morning", hint: "the same loop, the same talks", act: "exercise", style: "health", weight: 0.2, apply: (s2, c) => { hr(s2, 0.99); return { text: c.w(`Retired together, you and ${n} started walking the same loop every morning, {and talked about things you hadn't talked about in years.|and said good morning to every dog in the neighborhood.}`), mood: 4 }; } },
+          { id: "l_homeTogether.walk", label: "A walk together every morning", hint: "the same loop, the same talks", act: "exercise", style: "health", weight: 0.2, apply: (s2, c) => { hr(s2, 0.995); return { text: c.w(`Retired together, you and ${n} started walking the same loop every morning, {and talked about things you hadn't talked about in years.|and said good morning to every dog in the neighborhood.}`), mood: 4 }; } },
           { id: "l_homeTogether.counsel", label: "See a counselor together", hint: "a tune-up", act: "counsel", style: "social", weight: 0.15, apply: () => ({ text: `Retired together and bickering, you and ${n} saw a counselor for a few months, and learned to say what you needed instead of slamming the cupboards.`, mood: 3 }) },
         ],
       };
@@ -632,7 +632,7 @@ export const LATER = [
     id: "l_partnerSurgery", domain: "love", channel: "bad", tags: ["spouse"], about: "partner", ages: [60, 100], cooldown: 6, max: 2, when: s => married(s) && s.partner.age >= 64, p: () => 0.026,
     apply: (s, ctx) => {
       const n = pName(s), P = s.partner;
-      return { text: ctx.w([`${n} had a {knee|hip} replaced, and you were the nurse for six weeks. ${cap(they(P))} {were a terrible patient,|complained about everything,} and {you were secretly glad to be needed.|you both laughed about it later.}`, `${n} had cataract surgery and {wore the big dark glasses for a week like a movie star.|kept saying how bright your face looked, which you decided to take as a compliment.}`, `${n} had back surgery, and you {learned to do everything ${they(P)} usually did around the house.|drove ${them(P)} to physical therapy three times a week and read magazines in the waiting room.}`]), mood: -1 };
+      return { text: ctx.w([`${n} had a {knee|hip} replaced, and you were the nurse for six weeks. ${cap(they(P))} {was a terrible patient,|complained about everything,} and {you were secretly glad to be needed.|you both laughed about it later.}`, `${n} had cataract surgery and {wore the big dark glasses for a week like a movie star.|kept saying how bright your face looked, which you decided to take as a compliment.}`, `${n} had back surgery, and you {learned to do everything ${they(P)} usually did around the house.|drove ${them(P)} to physical therapy three times a week and read magazines in the waiting room.}`]), mood: -1 };
     },
   },
   {
@@ -664,7 +664,7 @@ export const LATER = [
           { id: "l_griefYear.group", label: "Join a grief support group", hint: "people who understand", act: "counsel", style: "social", weight: 0.2, apply: (s2, c) => ({ text: c.w(`After ${n} died, you joined a grief group {at the church|at the hospice center} on Tuesday nights, {and found people who didn't need you to explain.|and a widow named Dot became your best friend.} It didn't fix anything, and it helped.`), mood: 3 }) },
           { id: "l_griefYear.kids", label: "Lean on the kids", hint: "let them help", act: "talk", style: "family", weight: 0.25, when: s2 => adultKids(s2).length > 0, apply: (s2, c) => ({ text: c.w(`After ${n} died, you let the kids carry you for a while: {Sunday dinners, daily phone calls,|a grandchild sleeping over every Friday,} {and you didn't pretend to be fine.|until one day you noticed you were laughing again.}`), mood: 3 }) },
           { id: "l_griefYear.busy", label: "Stay busy", hint: "volunteer, fix, help", act: "volunteer", style: "learn", weight: 0.2, apply: (s2, c) => ({ text: c.w(`After ${n} died, you kept your hands busy: {the food bank on Mondays, the church on Thursdays,|repainting every room in the house,} and {on the hard days, busy helped.|by spring you could talk about ${lateHim(s2)} without your voice breaking.}`), mood: 2 }) },
-          { id: "l_griefYear.walk", label: "Keep the routine: walk every morning", hint: "one foot in front of the other", act: "exercise", style: "health", weight: 0.15, apply: (s2, c) => { hr(s2, 0.99); return { text: c.w(`After ${n} died, you walked every morning, the same loop you two used to walk, {and the neighbors waved and sometimes walked with you.|and talked to ${lateHim(s2)} a little, out loud, when no one was around.}`), mood: 2 }; } },
+          { id: "l_griefYear.walk", label: "Keep the routine: walk every morning", hint: "one foot in front of the other", act: "exercise", style: "health", weight: 0.15, apply: (s2, c) => { hr(s2, 0.995); return { text: c.w(`After ${n} died, you walked every morning, the same loop you two used to walk, {and the neighbors waved and sometimes walked with you.|and talked to ${lateHim(s2)} a little, out loud, when no one was around.}`), mood: 2 }; } },
           { id: "l_griefYear.alone", label: "Give yourself time alone", hint: "grief takes its time", act: "rest", style: "self", weight: 0.2, apply: (s2, c) => { hr(s2, 1.01); return { text: c.w(`After ${n} died, you kept to yourself for a long while, {with ${his} reading glasses still on the nightstand.|sleeping on your own side of the bed.} Slowly, the days got a little lighter.`), mood: 0 }; } },
         ],
       };
@@ -694,7 +694,7 @@ export const LATER = [
         k && s.year >= 2005 ? `${k.call} set up a dating profile for you without asking and is very pleased about it.` : null,
         "Someone at church has started saving you a seat, and it's been noticed by everyone.",
         "Your friend wants to drag you to the dance at the senior center on Friday.",
-        `It's been ${years} years since ${n} died, and you are surprised to find you're lonely for company.`,
+        `It's been ${yearsWord(years)} since ${n} died, and you are surprised to find you're lonely for company.`,
       ]);
       return {
         prompt: `${lead} Are you ready to date again?`,
@@ -744,8 +744,8 @@ export const LATER = [
   {
     id: "l_newFriend", domain: "family", channel: "good", ages: [62, 98], cooldown: 6, max: 1, p: () => 0.019,
     apply: (s, ctx) => {
-      const where = ctx.rng.pick(["at water aerobics", "at the senior center", "in the church choir", "at the dog park", "when they moved in next door", "in a watercolor class"]);
       const f = makeFriend(s, ctx, "neighbor", 0.75);
+      const where = ctx.rng.pick(["at water aerobics", "at the senior center", "in the church choir", "at the dog park", `when ${they(f)} moved in next door`, "in a watercolor class"]);
       return { text: ctx.w([`You met ${f.call} ${where}, and {you were friends by the end of the week.|it turned out you had grown up two towns apart.|you have been on the phone every day since.}`, `${f.call}, whom you met ${where}, {became the friend you didn't know you needed at this age.|drives you to appointments and you make ${them(f)} soup.}`, `At ${s.age} you made a new friend: ${f.call}, ${where}. {You laughed at the same things.|You traded books and recipes and complaints.}`]), mood: 4 };
     },
   },
@@ -819,7 +819,7 @@ export const LATER = [
   A("l_heirloom", [65, 105], 0.019, (s, ctx) => {
     const g = grands(s).filter(x => gAge(s, x) >= 14), kid = adultKids(s)[0];
     const to = g.length ? ctx.rng.pick(g).call : kid ? kid.call : "your niece";
-    const thing = ctx.rng.pick(["your mother's wedding ring", "your father's pocket watch", "the cast-iron skillet that has cooked four generations of breakfasts", "the quilt your grandmother made", s.flags.served ? "your service medals in their case" : "the family Bible with everyone's birthdays in it", "the recipe box, grease stains and all"]);
+    const thing = ctx.rng.pick(["your mother's wedding ring", "your father's pocket watch", "the cast-iron skillet that has cooked four generations of breakfasts", "the quilt your grandmother made", s.flags.served ? "your service medals in their case" : "the family Bible with everyone's birthdays in it", "the recipe box with its grease stains"]);
     return [
       `You gave ${thing} to ${to}, {and told the whole story behind it.|and asked only that it keep getting passed down.|and watched ${to} hold it like it might break.}`,
       `On ${to}'s birthday you handed over ${thing}, {and you both pretended not to cry.|with a note explaining where it came from.}`,
@@ -961,8 +961,8 @@ export const LATER = [
       return {
         prompt: `${scene(ctx, ["Your neighbor won't stop talking about pickleball.", "The tennis courts at the park have been painted over with pickleball lines, and they're full at seven in the morning.", "The grandkids say pickleball is cool now, which you find hard to believe."])} Do you play?`,
         options: [
-          { id: "l_pickleball.league", label: "Join the morning league", hint: "four mornings a week", act: "exercise", style: "health", weight: 0.3, apply: (s2, c) => { s2.flags.pickleball = true; hr(s2, 0.99); return { text: c.w("You joined the morning pickleball league, {and now you play four mornings a week and talk about your dink shot to anyone.|and made a dozen new friends who all have opinions about paddles.}"), mood: 5 }; } },
-          { id: "l_pickleball.tournament", label: "Go all in, enter a tournament", hint: "glory", act: "exercise", style: "risk", weight: 0.15, apply: (s2, c) => { s2.flags.pickleball = true; hr(s2, 0.99); return { text: c.w(c.rng() < 0.4 ? "You took up pickleball and entered a senior tournament, and you won a medal in your age group, which hangs on the fridge." : "You took up pickleball and entered a senior tournament, {and lost in the first round to a 79-year-old with a vicious serve.|and went home with a sore knee and a lot of new friends.}"), mood: 4 }; } },
+          { id: "l_pickleball.league", label: "Join the morning league", hint: "four mornings a week", act: "exercise", style: "health", weight: 0.3, apply: (s2, c) => { s2.flags.pickleball = true; hr(s2, 0.995); return { text: c.w("You joined the morning pickleball league, {and now you play four mornings a week and talk about your dink shot to anyone.|and made a dozen new friends who all have opinions about paddles.}"), mood: 5 }; } },
+          { id: "l_pickleball.tournament", label: "Go all in, enter a tournament", hint: "glory", act: "exercise", style: "risk", weight: 0.15, apply: (s2, c) => { s2.flags.pickleball = true; hr(s2, 0.995); return { text: c.w(c.rng() < 0.4 ? "You took up pickleball and entered a senior tournament, and you won a medal in your age group, which hangs on the fridge." : "You took up pickleball and entered a senior tournament, {and lost in the first round to a 79-year-old with a vicious serve.|and went home with a sore knee and a lot of new friends.}"), mood: 4 }; } },
           { id: "l_pickleball.grandkids", label: "Play with the grandkids", hint: "they think it's cool", act: "exercise", style: "family", weight: 0.15, apply: (s2, c) => ({ text: c.w("You took up pickleball with the grandkids {in the driveway with a portable net,|at the park on Saturdays,} and {beat them, which they did not see coming.|they let you win, which you noticed.}"), mood: 5 }) },
           { id: "l_pickleball.tennis", label: "Stick with tennis", hint: "the real thing", act: "exercise", style: "self", weight: 0.15, apply: () => ({ text: "You refused to take up pickleball on principle and kept playing tennis, on the two courts the park left for people like you.", mood: 1 }) },
           { id: "l_pickleball.no", label: "Watch from a bench", hint: "your knees vote no", act: "avoid", style: "safe", weight: 0.25, apply: (s2, c) => ({ text: c.w("You passed on pickleball and watched from a bench with a coffee, {heckling your friends lovingly.|keeping score better than the players.|and the pock-pock-pock of the paddles became the sound of your mornings.}"), mood: 1 }) },
@@ -987,7 +987,7 @@ export const LATER = [
       return {
         prompt: `You keep asking people to repeat themselves, and ${who} say the TV is loud enough to hear from the driveway. What do you do?`,
         options: [
-          { id: "l_hearing.aids", label: "See an audiologist", hint: "proper hearing aids", act: "seeDoctor", style: "health", weight: 0.35, apply: (s2, c) => { s2.flags.hearingAids = true; spend(s2, 0.08); hr(s2, 0.99); return { text: c.w("You got fitted for hearing aids and {heard birds in the backyard you hadn't heard in years.|realized the refrigerator hums.|could finally follow the conversation at the dinner table, which was mostly about you.}"), mood: 3 }; } },
+          { id: "l_hearing.aids", label: "See an audiologist", hint: "proper hearing aids", act: "seeDoctor", style: "health", weight: 0.35, apply: (s2, c) => { s2.flags.hearingAids = true; spend(s2, 0.08); hr(s2, 0.995); return { text: c.w("You got fitted for hearing aids and {heard birds in the backyard you hadn't heard in years.|realized the refrigerator hums.|could finally follow the conversation at the dinner table, which was mostly about you.}"), mood: 3 }; } },
           { id: "l_hearing.otc", label: s.year >= 2023 ? "Buy hearing aids at the drugstore" : "Try a cheap amplifier", hint: "quick and affordable", act: "seeDoctor", style: "safe", weight: 0.2, apply: (s2, c) => { s2.flags.hearingAids = true; spend(s2, 0.02); return { text: c.w(s2.year >= 2023 ? "You bought hearing aids off the shelf at the drugstore, {and set them up with the help of an app and a grandkid.|and they worked well enough that you stopped saying “What?”}" : "You tried an inexpensive hearing amplifier, {and it whistled at the worst moments.|and it helped, mostly, in quiet rooms.}"), mood: 2 }; } },
           { id: "l_hearing.captions", label: "Turn on the captions", hint: "problem solved, sort of", act: "wait", style: "self", weight: 0.2, apply: () => ({ text: "You turned the captions on the TV and decided that was enough for now. You read your shows now.", mood: 0 }) },
           { id: "l_hearing.ignore", label: "Everyone just mumbles", hint: "it's them, not you", act: "avoid", style: "risk", weight: 0.25, apply: (s2, c) => { hr(s2, 1.01); return { text: c.w(`You decided the problem was that everyone mumbles, {and ${who} started writing things down for you, a little pointedly.|and you nodded through a lot of conversations.}`), mood: -1 }; } },
@@ -1007,9 +1007,9 @@ export const LATER = [
       return {
         prompt: `Your ${joint} has been complaining for years, and now the stairs are a negotiation. The orthopedist says you have options. What do you do?`,
         options: [
-          { id: "l_knee.replace", label: `Get the ${joint} replaced`, hint: "a rough recovery, then a new one", act: "seeDoctor", style: "health", weight: 0.3, apply: (s2, c) => { hr(s2, 0.99); return { text: c.w(`You had your ${joint} replaced, {did your physical therapy like a religion,|complained through six weeks of physical therapy,} and {were walking the dog farther than before by summer.|set off the airport metal detector for the rest of your life.}`), mood: 3 }; } },
-          { id: "l_knee.pt", label: "Physical therapy first", hint: "strengthen around it", act: "exercise", style: "safe", weight: 0.25, apply: (s2, c) => { hr(s2, 0.99); return { text: c.w(`You tried physical therapy for your ${joint} first, {and the exercises with the rubber bands actually worked.|and it bought you a few more good years.}`), mood: 2 }; } },
-          { id: "l_knee.water", label: "Water aerobics", hint: "the pool takes the weight", act: "exercise", style: "social", weight: 0.15, apply: (s2, c) => { hr(s2, 0.99); return { text: c.w(`For your ${joint}, you joined water aerobics at the Y, {where the class sings along to Motown.|and the pool took the weight off and put some friends on.}`), mood: 3 }; } },
+          { id: "l_knee.replace", label: `Get the ${joint} replaced`, hint: "a rough recovery, then a new one", act: "seeDoctor", style: "health", weight: 0.3, apply: (s2, c) => { hr(s2, 0.995); return { text: c.w(`You had your ${joint} replaced, {did your physical therapy like a religion,|complained through six weeks of physical therapy,} and {were walking the dog farther than before by summer.|set off the airport metal detector for the rest of your life.}`), mood: 3 }; } },
+          { id: "l_knee.pt", label: "Physical therapy first", hint: "strengthen around it", act: "exercise", style: "safe", weight: 0.25, apply: (s2, c) => { hr(s2, 0.995); return { text: c.w(`You tried physical therapy for your ${joint} first, {and the exercises with the rubber bands actually worked.|and it bought you a few more good years.}`), mood: 2 }; } },
+          { id: "l_knee.water", label: "Water aerobics", hint: "the pool takes the weight", act: "exercise", style: "social", weight: 0.15, apply: (s2, c) => { hr(s2, 0.995); return { text: c.w(`For your ${joint}, you joined water aerobics at the Y, {where the class sings along to Motown.|and the pool took the weight off and put some friends on.}`), mood: 3 }; } },
           { id: "l_knee.shots", label: "Shots and a cane", hint: "manage it", act: "seeDoctor", style: "self", weight: 0.15, apply: (s2, c) => ({ text: c.w(`You managed your ${joint} with a shot every few months and {a cane with a carved handle.|a cane the grandkids decorated with stickers.}`), mood: 0 }) },
           { id: "l_knee.push", label: "Push through it", hint: "you've had worse", act: "pushThrough", style: "risk", weight: 0.15, apply: s2 => { hr(s2, 1.01); return { text: `You pushed through the bad ${joint} and kept going, slower on the stairs and stubborn about it.`, mood: -1 }; } },
         ],
@@ -1041,5 +1041,5 @@ export const LATER = [
     s.year < 2015 ? "You joined the mall walkers who do laps before the stores open, {three miles past the dark shop windows every morning.|and stop for coffee at the food court after.}" : "You joined a walking group that meets at the track at seven, {three laps and a lot of talking.|rain or shine, mostly shine.}",
     "You started tai chi in the park with a group of early risers, {and your balance got better than it was at fifty.|and the slow moves made the morning feel long in a good way.}",
     "You took up water aerobics at the Y, {with a class that sings along to the oldies.|and your knees thanked you.|and the instructor, who is twenty-two, calls everybody “my friends.”}",
-  ], { mood: 3, domain: "health", channel: "good", fx: s => hr(s, 0.99) }),
+  ], { mood: 3, domain: "health", channel: "good", fx: s => hr(s, 0.995) }),
 ];

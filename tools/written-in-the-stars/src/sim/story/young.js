@@ -93,7 +93,7 @@ const PET = {
 export const YOUNG = [
   // ---------- college ----------
   {
-    id: "y_roommate", once: true, ages: [17, 24], when: s => inUni(s) && uniYear(s) <= 1, p: () => 0.5,
+    id: "y_roommate", once: true, ages: [17, 24], when: s => inUni(s) && uniYear(s) <= 1, p: () => 0.3,
     choice: (s, ctx) => {
       const y = s.year, album = y < 1968 ? "the same Kingston Trio record" : y < 1976 ? "Led Zeppelin IV" : y < 1985 ? "the same Journey album" : y < 1995 ? "the same Pearl Jam CD" : y < 2005 ? "Dave Matthews Band" : y < 2015 ? "the same Drake mixtape" : "the same three viral songs";
       const from = ctx.rng.pick(["Lagos", "Seoul", "rural Montana", "the Bronx", "a town of four hundred people in Nebraska", "Mumbai", "suburban Phoenix"]);
@@ -117,7 +117,28 @@ export const YOUNG = [
     },
   },
   {
-    id: "y_greek", once: true, ages: [17, 24], when: s => inUni(s) && uniYear(s) <= 1, p: s => (s.year >= 1967 && s.year <= 1976 ? 0.2 : 0.35),
+    id: "y_homesick", domain: "family", channel: "bad", once: true, ages: [17, 23], when: s => inUni(s) && uniYear(s) <= 1, p: s => (s.flags.awayCollege ? 0.4 : 0.25),
+    choice: (s, ctx) => {
+      const phone = s.year < 1990 ? "the pay phone at the end of the hall" : s.year < 2005 ? "the phone on your desk" : "your phone";
+      const [lead, then] = scene(ctx, [
+        ["It's October, and you're more homesick than you expected. You miss your own bed and the dog.", "Homesick that first October,"],
+        [`You called home from ${phone} and couldn't figure out why your voice cracked.`, "Homesick in your first semester,"],
+        ["Everyone on your floor seems to have found their people already, and you eat dinner alone a lot.", "Lonely that first fall,"],
+      ]);
+      return {
+        prompt: `${lead} What do you do?`,
+        options: [
+          { id: "y_homesick.call", label: "Call home every night", hint: "a voice you know", act: "talk", style: "family", weight: 0.25, apply: (s2, c) => ({ text: c.w(`${then} you called home every night from ${phone}, {and by Thanksgiving you called once a week.|and ${parentWord(s2, c)} read you the local news.} It got easier.`), mood: 1 }) },
+          { id: "y_homesick.club", label: "Join something, anything", hint: "a reason to leave your room", act: "socialize", style: "social", weight: 0.3, apply: (s2, c) => { makeFriend(s2, c, "college", 0.7); return { text: c.w(`${then} you joined {the ultimate Frisbee club|the campus choir|a volunteer tutoring group|the film society}, and by November you had somewhere to be and someone to sit with.`), mood: 3 }; } },
+          { id: "y_homesick.weekends", label: "Go home on weekends", hint: "the bus on Friday", act: "care", style: "family", weight: 0.15, apply: (s2, c) => ({ text: c.w(`${then} you went home most weekends, {doing laundry in your parents' basement,|working shifts at your old job,} and campus stayed a weekday place for a while.`), mood: 0 }) },
+          { id: "y_homesick.tough", label: "Tough it out", hint: "it gets better", act: "pushThrough", style: "safe", weight: 0.2, apply: (s2, c) => ({ text: c.w(`${then} you toughed it out, and somewhere around the first snow {you realized campus felt like home.|someone down the hall knocked and asked if you wanted to get pizza.}`), mood: 1 }) },
+          { id: "y_homesick.counsel", label: "Go to the counseling center", hint: "this is what it's for", act: "counsel", style: "health", weight: 0.1, apply: (s2, c) => { stress(s2, -0.05); return { text: c.w(`${then} you went to the campus counseling center, {where a kind woman with a bowl of candy said it was the most normal thing in the world.|and it helped more than you expected.}`), mood: 2 }; } },
+        ],
+      };
+    },
+  },
+  {
+    id: "y_greek", once: true, ages: [17, 24], when: s => inUni(s) && uniYear(s) <= 1, p: s => (s.year >= 1967 && s.year <= 1976 ? 0.15 : 0.25),
     choice: (s, ctx) => {
       const house = s.sex === "female" ? ctx.rng.pick(["Alpha Phi", "Delta Gamma", "Kappa Kappa Gamma", "Chi Omega", "Alpha Kappa Alpha"]) : ctx.rng.pick(["Sigma Chi", "Kappa Sigma", "Pi Kappa Alpha", "Phi Delta Theta", "Alpha Phi Alpha"]);
       const word = s.sex === "female" ? "sorority" : "fraternity";
@@ -141,7 +162,7 @@ export const YOUNG = [
     },
   },
   {
-    id: "y_major", domain: "study", channel: "change", once: true, ages: [18, 26], when: s => inUni(s) && uniYear(s) >= 1 && uniYear(s) <= 2 && !s.flags.collegeMajor, p: () => 0.6,
+    id: "y_major", domain: "study", channel: "change", once: true, ages: [18, 26], when: s => inUni(s) && uniYear(s) >= 1 && uniYear(s) <= 2 && !s.flags.collegeMajor, p: s => (uniYear(s) === 2 ? 0.6 : 0.3),
     choice: (s, ctx) => {
       const y = s.year, parent = parentWord(s, ctx);
       const love = ctx.rng.pick(["English", "history", "art history", "philosophy", "music", "theater", y >= 1972 ? "film studies" : "French", "anthropology"]);
@@ -236,7 +257,7 @@ export const YOUNG = [
     },
   },
   {
-    id: "y_campusJob", domain: "career", channel: "good", once: true, ages: [18, 26], when: s => atCollege(s), p: () => 0.3,
+    id: "y_campusJob", domain: "career", channel: "good", once: true, ages: [18, 26], when: s => atCollege(s), p: () => 0.22,
     choice: (s, ctx) => {
       const y = s.year, money = homeMoney(s, ctx) === "tight";
       const off = ctx.rng.pick(["delivering pizza", "waiting tables at the diner by campus", "bartending at the college bar", y >= 1995 ? "working the campus IT help desk" : "shelving books at the bookstore"]);
@@ -288,27 +309,6 @@ export const YOUNG = [
         { id: "y_cardTable.three", label: "Sign up for three of them", hint: "more shirts", act: "borrow", style: "risk", weight: 0.1, apply: s2 => { s2.flags.card = "spree"; debt(s2, 0.1); return { text: "You signed up for three credit cards in one week and had three free T-shirts and, by spring, three minimum payments.", mood: -2 }; } },
       ],
     }),
-  },
-  {
-    id: "y_homesick", domain: "family", channel: "bad", once: true, ages: [17, 23], when: s => inUni(s) && uniYear(s) <= 1, p: s => (s.flags.awayCollege ? 0.35 : 0.2),
-    choice: (s, ctx) => {
-      const phone = s.year < 1990 ? "the pay phone at the end of the hall" : s.year < 2005 ? "the phone on your desk" : "your phone";
-      const [lead, then] = scene(ctx, [
-        ["It's October, and you're more homesick than you expected. You miss your own bed and the dog.", "Homesick that first October,"],
-        [`You called home from ${phone} and couldn't figure out why your voice cracked.`, "Homesick in your first semester,"],
-        ["Everyone on your floor seems to have found their people already, and you eat dinner alone a lot.", "Lonely that first fall,"],
-      ]);
-      return {
-        prompt: `${lead} What do you do?`,
-        options: [
-          { id: "y_homesick.call", label: "Call home every night", hint: "a voice you know", act: "talk", style: "family", weight: 0.25, apply: (s2, c) => ({ text: c.w(`${then} you called home every night from ${phone}, {and by Thanksgiving you called once a week.|and ${parentWord(s2, c)} read you the local news.} It got easier.`), mood: 1 }) },
-          { id: "y_homesick.club", label: "Join something, anything", hint: "a reason to leave your room", act: "socialize", style: "social", weight: 0.3, apply: (s2, c) => { makeFriend(s2, c, "college", 0.7); return { text: c.w(`${then} you joined {the ultimate Frisbee club|the campus choir|a volunteer tutoring group|the film society}, and by November you had somewhere to be and someone to sit with.`), mood: 3 }; } },
-          { id: "y_homesick.weekends", label: "Go home on weekends", hint: "the bus on Friday", act: "care", style: "family", weight: 0.15, apply: (s2, c) => ({ text: c.w(`${then} you went home most weekends, {doing laundry in your parents' basement,|working shifts at your old job,} and campus stayed a weekday place for a while.`), mood: 0 }) },
-          { id: "y_homesick.tough", label: "Tough it out", hint: "it gets better", act: "pushThrough", style: "safe", weight: 0.2, apply: (s2, c) => ({ text: c.w(`${then} you toughed it out, and somewhere around the first snow {you realized campus felt like home.|someone down the hall knocked and asked if you wanted to get pizza.}`), mood: 1 }) },
-          { id: "y_homesick.counsel", label: "Go to the counseling center", hint: "this is what it's for", act: "counsel", style: "health", weight: 0.1, apply: (s2, c) => { stress(s2, -0.05); return { text: c.w(`${then} you went to the campus counseling center, {where a kind woman with a bowl of candy said it was the most normal thing in the world.|and it helped more than you expected.}`), mood: 2 }; } },
-        ],
-      };
-    },
   },
   {
     id: "y_internship", domain: "career", channel: "good", once: true, ages: [19, 26], when: s => inUni(s) && uniYear(s) >= 2, p: () => 0.3,

@@ -106,7 +106,7 @@ export const ADULT = [
   // ---------- money ----------
   {
     // 401(k) plans spread after the IRS rules of 1981; automatic enrollment after the Pension Protection Act of 2006.
-    id: "a_401k", domain: "wealth", channel: "good", once: true, ages: [28, 50], when: s => working(s) && s.year >= 1982 && s.job.field !== "military" && !s.flags.retire401k, p: () => 0.07,
+    id: "a_401k", domain: "wealth", channel: "good", once: true, ages: [28, 50], when: s => working(s) && s.year >= 1982 && s.job.field !== "military" && !s.flags.retire401k, p: () => 0.055,
     choice: (s, ctx) => {
       const [lead, then] = scene(ctx, [
         ["The benefits packet from HR is on your desk, and the 401(k) form is on top.", "When the 401(k) form came in your benefits packet,"],
@@ -175,7 +175,7 @@ export const ADULT = [
   },
   {
     // Bank cards spread through the 1970s; the CARD Act of 2009 put the “minimum payment warning” on statements.
-    id: "a_creditCard", domain: "wealth", channel: "bad", ages: [28, 58], cooldown: 7, max: 2, when: s => home(s) && s.year >= 1972, p: s => (s.unemployedFor ? 0.07 : s.kids.length ? 0.035 : 0.025),
+    id: "a_creditCard", domain: "wealth", channel: "bad", ages: [28, 58], cooldown: 7, max: 2, when: s => home(s) && s.year >= 1972, p: s => (s.unemployedFor ? 0.05 : s.kids.length ? 0.02 : 0.015),
     choice: (s, ctx) => {
       const how = ctx.rng.pick([s.kids.length ? "braces, a broken water heater and Christmas" : "a broken water heater, a wedding and Christmas", "a car repair, then another, then the vet", s.unemployedFor ? "groceries while you were out of work" : "a lot of small things that added up"]);
       const lead = scene(ctx, [
@@ -223,7 +223,7 @@ export const ADULT = [
   },
   {
     // Tax season, by era: the 1040 at the kitchen table, TurboTax from the 1990s, e-filing becoming the norm in the 2000s.
-    id: "a_taxes", domain: "wealth", channel: "change", ages: [28, 60], cooldown: 5, max: 3, when: s => home(s) && (working(s) || s.home === "own"), p: () => 0.035,
+    id: "a_taxes", domain: "wealth", channel: "change", ages: [28, 60], cooldown: 6, max: 2, when: s => home(s) && (working(s) || s.home === "own"), p: () => 0.02,
     choice: (s, ctx) => {
       const lead = scene(ctx, [
         s.year < 1995 ? "It is April 13th, and a shoebox of receipts and a blank 1040 are waiting on the kitchen table." : "It is April 12th, and the tax software keeps asking questions you don't know the answers to.",
@@ -247,7 +247,7 @@ export const ADULT = [
       };
     },
   },
-  A("a_audit", [30, 65], 0.004, (s, ctx) => [
+  A("a_audit", [30, 65], 0.003, (s, ctx) => [
     "A letter came from the IRS, and your stomach dropped. It turned out to be about a math mistake on line 14, and you owed {forty-one dollars|less than dinner out}.",
     "The IRS asked to see your receipts for the home office. You spent a weekend with a shoebox and a highlighter, and they {accepted everything.|let you off with a small adjustment.}",
     "An IRS notice said you had underreported some interest. You called, waited on hold for {two hours|ninety minutes} with the hold music, and {sorted it out in five minutes.|paid it, mostly to make it go away.}",
@@ -300,7 +300,7 @@ export const ADULT = [
     },
   },
   {
-    id: "a_bigRepair", domain: "wealth", channel: "bad", ages: [28, 62], cooldown: 6, max: 2, when: home, p: s => (s.home === "own" ? 0.04 : 0.02),
+    id: "a_bigRepair", domain: "wealth", channel: "bad", ages: [28, 62], cooldown: 6, max: 2, when: home, p: s => (s.home === "own" ? 0.024 : 0.012),
     choice: (s, ctx) => {
       const own = s.home === "own";
       const thing = own ? scene(ctx, [snowy(s) ? "the furnace died in January" : "the air conditioning died in August", "the water heater burst and flooded the basement", "the roof started leaking into the upstairs bedroom", "a tree came down on the garage in a storm"]) : ctx.rng.pick(["the transmission went on the car", "the car failed inspection, badly", "the laptop you work on died"]);
@@ -433,7 +433,7 @@ export const ADULT = [
       };
     },
   },
-  A("a_newborn", [20, 50], 0.4, (s, ctx) => {
+  A("a_newborn", [20, 50], 0.28, (s, ctx) => {
     const k = kidsAged(s, 0, 0)[0], n = k.call;
     return [
       `${n} woke up every two hours. {At 3 a.m. you knew every infomercial by heart.|You fell asleep sitting up at a stoplight, just for a second.|You discovered that you could fold laundry with one hand.}`,
@@ -441,7 +441,7 @@ export const ADULT = [
       `${n} smiled for the first time, {probably gas, and you didn't care.|right at you,} and {you called everyone you knew.|the whole sleepless year made sense for a second.}`,
     ];
   }, { tags: ["children"], once: true, mood: 3, when: s => home(s) && kidsAged(s, 0, 0).length > 0 }),
-  A("a_toddler", [20, 52], 0.25, (s, ctx) => {
+  A("a_toddler", [20, 52], 0.14, (s, ctx) => {
     const k = kidIn(s, ctx, 2, 3), n = k.call, toy = s.year < 1990 ? "the cassette player" : s.year < 2010 ? "the VCR" : "the TV remote";
     return [
       `${n} learned the word “no” and used it {as a complete sentence.|forty times before breakfast.|on the pediatrician.}`,
@@ -449,7 +449,7 @@ export const ADULT = [
       `In the grocery store, ${n} lay down in the cereal aisle and {screamed like it was opera.|refused to move until a stranger laughed.} You stood there and {waited it out.|ate a cracker from the box.}`,
       `${n} asked “why?” {about the sky, the dog, the mailman and death, all in one car ride.|until you said “because” and hated yourself a little.}`,
     ];
-  }, { tags: ["children"], cooldown: 2, max: 2, mood: 2, when: s => home(s) && hasKid(2, 3)(s) }),
+  }, { tags: ["children"], once: true, mood: 2, when: s => home(s) && hasKid(2, 3)(s) }),
   {
     // A sick kid on a workday: chicken pox until the vaccine (1995), ear infections, the stomach bug, a note about lice.
     id: "a_sickDay", domain: "family", channel: "bad", tags: ["children"], ages: [22, 55], cooldown: 4, max: 2, when: s => home(s) && working(s) && hasKid(1, 10)(s), p: () => 0.045,
@@ -473,7 +473,7 @@ export const ADULT = [
       };
     },
   },
-  A("a_birthdayParty", [22, 55], 0.12, (s, ctx) => {
+  A("a_birthdayParty", [22, 55], 0.05, (s, ctx) => {
     const k = kidIn(s, ctx, 3, 10), n = k.call, y = s.year;
     const place = y < 1978 ? "in the backyard, with a sheet cake and pin the tail on the donkey" : y < 1995 ? "at Chuck E. Cheese, with tokens and a giant mouse" : y < 2008 ? "with a rented bounce house on the front lawn" : "at the trampoline park, after you spent a week on the Pinterest invitations";
     return [
@@ -481,8 +481,8 @@ export const ADULT = [
       `For ${n}'s birthday you made a cake shaped like {a castle|a dinosaur|a race car} that looked, everyone agreed, like {a potato.|a hat.} ${n} said it was perfect.`,
       `${n} invited the whole class, and {nineteen kids|twenty-two kids} came to the party ${place}. You {lay on the floor afterward and stared at the ceiling.|swore next year would be small, and lied.}`,
     ];
-  }, { tags: ["children"], cooldown: 3, max: 2, mood: 3, when: s => home(s) && hasKid(3, 10)(s) }),
-  A("a_halloween", [22, 55], 0.1, (s, ctx) => {
+  }, { tags: ["children"], cooldown: 3, max: 1, mood: 3, when: s => home(s) && hasKid(3, 10)(s) }),
+  A("a_halloween", [22, 55], 0.045, (s, ctx) => {
     const k = kidIn(s, ctx, 3, 11), n = k.call, y = s.year;
     const costume = y < 1985 ? ctx.rng.pick(["a ghost made from a bedsheet", "a hobo with a burnt-cork beard", "a store-bought witch with a plastic mask"]) : y < 1995 ? ctx.rng.pick(["a Ninja Turtle", "a Ghostbuster", "a California Raisin"]) : y < 2005 ? ctx.rng.pick(["a Power Ranger", "Harry Potter", "a Pokemon"]) : y < 2015 ? ctx.rng.pick(["a Transformer", "Hannah Montana", "a Minion"]) : ctx.rng.pick(["Elsa", "a Minecraft creeper", "a very determined dinosaur"]);
     return [
@@ -491,7 +491,7 @@ export const ADULT = [
       `${n} changed ${their(k)} mind about the costume three times, and on the night went as ${costume}. {You were proud of the cardboard.|The photo is still on your fridge.}`,
     ];
   }, { tags: ["children"], cooldown: 3, max: 2, mood: 3, when: s => home(s) && hasKid(3, 11)(s) }),
-  A("a_kidTalk", [28, 60], 0.3, (s, ctx) => {
+  A("a_kidTalk", [28, 60], 0.18, (s, ctx) => {
     const k = kidIn(s, ctx, 10, 12), n = k.call, other = together(s) ? (s.partner.sex === "female" ? "Mom" : "Dad") : "a kid on the bus";
     return [
       `You had “the talk” with ${n}, {using a library book with diagrams.|in the car, so nobody had to make eye contact.|and ${they(k)} said, “I know, ${other} told me,” which was a relief.}`,
@@ -659,7 +659,7 @@ export const ADULT = [
       };
     },
   },
-  A("a_recital", [25, 60], 0.08, (s, ctx) => {
+  A("a_recital", [25, 60], 0.035, (s, ctx) => {
     const k = kidIn(s, ctx, 5, 16), n = k.call, cam = camera(s.year);
     return [
       `You went to ${n}'s {school play|band concert|dance recital|spelling bee} and recorded the whole thing on ${cam}. ${n} {forgot one line and improvised a better one.|played the wrong note proudly.|waved at you from the stage.}`,
@@ -698,7 +698,7 @@ export const ADULT = [
       `You said goodbye to ${d} after {twelve|thirteen|eleven} years. The leash still hangs by the back door, {and nobody wants to move it.|and you can't bring yourself to put it away.}`,
     ];
   }, { domain: "family", channel: "bad", once: true, mood: -5, when: s => !!s.flags.familyDog && s.age - s.flags.familyDog.since >= 10, effect: s => { s.flags.familyDog = null; } }),
-  A("a_movieNight", [26, 60], 0.06, (s, ctx) => {
+  A("a_movieNight", [26, 60], 0.03, (s, ctx) => {
     const kids = kidsCall(kidsAged(s, 4, 14)), way = movieWay(s.year);
     return [
       `Friday became family movie night: ${way}, a bowl of popcorn and ${kids} piled on the couch. {Somebody always fell asleep before the end.|You argued every week about who picked.}`,
@@ -706,7 +706,7 @@ export const ADULT = [
       `On a snow day you made a fort out of couch cushions and watched ${way} with ${kids}. {It was the best day of the winter.|Nobody wanted to clean up the fort, so it stayed a week.}`,
     ];
   }, { tags: ["children"], cooldown: 5, max: 2, mood: 3, when: s => home(s) && hasKid(4, 14)(s) }),
-  A("a_proudKid", [28, 70], 0.05, (s, ctx) => {
+  A("a_proudKid", [28, 70], 0.025, (s, ctx) => {
     const k = kidIn(s, ctx, 6, 20), n = k.call;
     return [
       `${n} {stood up for a kid who was being teased|gave ${their(k)} birthday money to a classmate whose house burned down|helped an old man across the parking lot without being asked}, and the school called to tell you. You sat in the car afterward and just smiled.`,
@@ -834,7 +834,7 @@ export const ADULT = [
       };
     },
   },
-  A("a_kidCalls", [36, 70], 0.12, (s, ctx) => {
+  A("a_kidCalls", [36, 70], 0.06, (s, ctx) => {
     const k = kidIn(s, ctx, 18, 22), n = k.call, via = s.year < 1995 ? "collect from the pay phone in the dorm" : s.year < 2008 ? "from a cell phone with terrible reception" : "on FaceTime, from under a pile of laundry";
     return [
       `${n} called ${via} to ask how to {do laundry without turning everything pink.|cook rice.|get a stain out of a borrowed shirt.} You explained, and hung up smiling.`,
@@ -888,7 +888,7 @@ export const ADULT = [
   },
   {
     // A grown child marries (same-sex couples from 2015 nationwide).
-    id: "a_kidWedding", domain: "family", channel: "good", tags: ["children"], ages: [44, 80], cooldown: 4, max: 2, when: s => home(s) && hasKid(23, 38)(s), p: () => 0.05,
+    id: "a_kidWedding", domain: "family", channel: "good", tags: ["children"], ages: [44, 80], cooldown: 4, max: 2, when: s => home(s) && hasKid(23, 38)(s), p: () => 0.035,
     choice: (s, ctx) => {
       const k = kidIn(s, ctx, 23, 38), n = k.call;
       const same = s.year >= 2015 && ctx.rng() < 0.05;
@@ -958,7 +958,7 @@ export const ADULT = [
       };
     },
   },
-  A("a_auntUncle", [28, 60], 0.05, (s, ctx) => {
+  A("a_auntUncle", [28, 60], 0.03, (s, ctx) => {
     const sib = ctx.rng.pick(adultSibs(s)), role = s.sex === "female" ? "aunt" : "uncle";
     return [
       `You are officially the fun ${role}: {you taught ${sibName(sib)}'s kids to play poker.|you gave ${sibName(sib)}'s kids a drum set, and have not been forgiven.|${sibName(sib)}'s kids call you first when they need advice they can't ask their parents.}`,
@@ -1016,7 +1016,7 @@ export const ADULT = [
   },
   {
     // Round-number anniversaries: tin (10), crystal (15), china (20), silver (25), pearl (30).
-    id: "a_anniversary", domain: "love", channel: "good", tags: ["spouse"], about: "partner", ages: [28, 75], cooldown: 4, when: s => home(s) && married(s) && [10, 15, 20, 25, 30].includes(yearsWed(s)), p: () => 0.5,
+    id: "a_anniversary", domain: "love", channel: "good", tags: ["spouse"], about: "partner", ages: [28, 75], cooldown: 4, when: s => home(s) && married(s) && [10, 15, 20, 25, 30].includes(yearsWed(s)), p: () => 0.35,
     choice: (s, ctx) => {
       const name = pn(s), n = yearsWed(s), word = { 10: "tin", 15: "crystal", 20: "china", 25: "silver", 30: "pearl" }[n];
       const nth = { 10: "tenth", 15: "fifteenth", 20: "twentieth", 25: "twenty-fifth", 30: "thirtieth" }[n];
@@ -1127,7 +1127,7 @@ export const ADULT = [
       };
     },
   },
-  A("a_partnerHobby", [28, 65], 0.03, (s, ctx) => {
+  A("a_partnerHobby", [28, 65], 0.016, (s, ctx) => {
     const name = pn(s), P = s.partner, y = s.year;
     const hobby = ctx.rng.pick([y >= 2018 ? "pickleball" : "racquetball", "golf", y >= 2008 ? "CrossFit" : "jogging", "sourdough", "birdwatching", "model trains", y >= 2010 ? "a podcast nobody listens to" : "ham radio", "fantasy football"]);
     return [
@@ -1136,7 +1136,7 @@ export const ADULT = [
       `${name}'s new ${hobby} obsession started as a phase and is now, apparently, a lifestyle. {You've made peace with it.|You bought ${them(P)} a book about it for ${their(P)} birthday, and ${they(P)} cried.}`,
     ];
   }, { tags: ["spouse"], cooldown: 6, max: 2, mood: 2, when: s => home(s) && together(s) }),
-  A("a_longMarried", [35, 75], 0.03, (s, ctx) => {
+  A("a_longMarried", [35, 75], 0.018, (s, ctx) => {
     const name = pn(s), P = s.partner, n = yearsWed(s);
     return [
       `After ${n} years, you and ${name} can have a whole argument with one look across a room, {and make up with another.|and you both know how it ends.}`,
@@ -1253,7 +1253,7 @@ export const ADULT = [
       };
     },
   },
-  A("a_backOut", [32, 62], 0.06, (s, ctx) => {
+  A("a_backOut", [32, 62], 0.05, (s, ctx) => {
     const via = s.year < 1995 ? "a personal ad in the weekly paper" : s.year < 2012 ? "a dating website" : "an app";
     return [
       `You went on your first date in years, through ${via}. {Your date brought their mother.|It was nice and went nowhere, and you were proud of yourself for going.|You talked for four hours and never saw each other again.}`,
@@ -1307,7 +1307,7 @@ export const ADULT = [
       };
     },
   },
-  A("a_parentTech", [30, 65], 0.04, (s, ctx) => {
+  A("a_parentTech", [30, 65], 0.022, (s, ctx) => {
     const who = aParent(s, ctx), y = s.year;
     const thing = y < 1996 ? "the VCR, which had been blinking 12:00 for three years" : y < 2004 ? "email, and the difference between “reply” and “reply all”" : y < 2010 ? "a cell phone, and how to text" : y < 2020 ? "FaceTime, mostly a view of the ceiling fan" : "Zoom, and where the mute button is";
     return [
@@ -1362,7 +1362,7 @@ export const ADULT = [
       };
     },
   },
-  A("a_firstHoliday", [25, 75], 0.5, (s, ctx) => {
+  A("a_firstHoliday", [25, 75], 0.3, (s, ctx) => {
     const dad = (s.last.fatherDeath ?? -9) >= (s.last.motherDeath ?? -9), who = dad ? "Dad" : "Mom", pos = dad ? "his" : "her", hol = ctx.rng.pick(["Thanksgiving", holidayOf(s, ctx)]);
     const task = { Thanksgiving: "carve the turkey", Christmas: "carve the ham", Hanukkah: "light the menorah", Eid: "lead the morning prayer", Diwali: "light the first lamp" }[hol];
     return [
@@ -1371,7 +1371,7 @@ export const ADULT = [
       `The first ${hol} without ${who} was quieter. {You went for a walk after dinner, the route ${who} always took.|${cap(pos)} favorite song came on the radio while you were doing the dishes, and you let it play.}`,
     ];
   }, { domain: "family", channel: "bad", tags: ["father", "mother"], once: true, mood: -3, when: s => home(s) && Math.max(s.last.fatherDeath ?? -9, s.last.motherDeath ?? -9) >= s.age - 1 }),
-  A("a_parentThings", [25, 75], 0.3, (s, ctx) => {
+  A("a_parentThings", [25, 75], 0.16, (s, ctx) => {
     const dad = (s.last.fatherDeath ?? -9) >= (s.last.motherDeath ?? -9), who = dad ? "your father" : "your mother", pos = dad ? "his" : "her";
     return [
       `Going through ${who}'s things, you found {a shoebox of every card you ever made ${dad ? "him" : "her"}|${pos} high school diploma, folded into a book|a savings passbook with your name on it, opened the year you were born}. You sat on the floor with it for an hour.`,
@@ -1383,7 +1383,7 @@ export const ADULT = [
   // ---------- siblings, holidays, the extended family ----------
   {
     // Thanksgiving with the whole family; Friendsgiving from the 2000s.
-    id: "a_thanksgiving", domain: "family", channel: "change", tags: ["siblings"], ages: [28, 62], cooldown: 3, max: 4, when: home, p: () => 0.045,
+    id: "a_thanksgiving", domain: "family", channel: "change", tags: ["siblings"], ages: [28, 62], cooldown: 4, max: 3, when: home, p: () => 0.03,
     choice: (s, ctx) => {
       const sibs = adultSibs(s), y = s.year;
       const uncle = ctx.rng.pick(["Uncle Rick", "Uncle Dale", "Uncle Gary", "Aunt Linda", "your cousin's husband"]);
@@ -1408,7 +1408,7 @@ export const ADULT = [
   },
   {
     // The family reunion: matching T-shirts, a church picnic shelter; DNA kits from about 2012.
-    id: "a_reunion", domain: "family", channel: "good", tags: ["siblings"], ages: [30, 62], cooldown: 6, max: 2, when: home, p: () => 0.025,
+    id: "a_reunion", domain: "family", channel: "good", tags: ["siblings"], ages: [30, 62], cooldown: 8, max: 2, when: home, p: () => 0.018,
     choice: (s, ctx) => {
       const side = ctx.rng.pick(["your mom's side", "your dad's side", "the whole clan"]);
       const lead = scene(ctx, [
@@ -1467,7 +1467,7 @@ export const ADULT = [
       };
     },
   },
-  A("a_sibTime", [28, 65], 0.035, (s, ctx) => {
+  A("a_sibTime", [28, 65], 0.018, (s, ctx) => {
     const sib = ctx.rng.pick(adultSibs(s)), x = sibName(sib);
     return [
       `You and ${x} took a trip together, just the two of you, {to the town where you grew up.|to a ballgame two states away.|to the beach you went to as kids.} You talked about your parents for hours, and about yourselves for the first time in years.`,
@@ -1501,7 +1501,7 @@ export const ADULT = [
   // ---------- home and the neighbors ----------
   {
     // Homeowners' associations: rare before 1970, about a quarter of Americans live under one by the 2020s.
-    id: "a_hoa", domain: "move", channel: "bad", tags: ["home"], ages: [28, 75], cooldown: 6, max: 2, when: s => home(s) && s.home === "own" && s.year >= 1975, p: s => (inStates(s, ["FL", "TX", "AZ", "CA", "NV", "CO", "NC", "GA"]) ? 0.04 : 0.02),
+    id: "a_hoa", domain: "move", channel: "bad", tags: ["home"], ages: [28, 75], cooldown: 8, max: 2, when: s => home(s) && s.home === "own" && s.year >= 1975, p: s => (inStates(s, ["FL", "TX", "AZ", "CA", "NV", "CO", "NC", "GA"]) ? 0.03 : 0.014),
     choice: (s, ctx) => {
       const what = ctx.rng.pick(["your grass is a quarter inch too long", "your mailbox is an unapproved shade of blue", "your holiday lights are still up in February", "the boat in your driveway violates section 4.2(b)", "your garbage cans are visible from the street", "your front door is a color the board did not approve"]);
       const lead = `A letter from the homeowners' association says ${what}. There is a fine.`;
@@ -1519,7 +1519,7 @@ export const ADULT = [
     },
   },
   {
-    id: "a_neighbor", domain: "move", channel: "change", ages: [28, 75], cooldown: 6, max: 2, when: home, p: () => 0.03,
+    id: "a_neighbor", domain: "move", channel: "change", ages: [28, 75], cooldown: 8, max: 2, when: home, p: () => 0.018,
     choice: (s, ctx) => {
       const nb = ctx.person({ role: "friend", sex: ctx.rng() < 0.5 ? "male" : "female", birthYear: s.birthYear + ctx.rng.int(30) - 15 });
       const [lead, then] = scene(ctx, [
@@ -1588,17 +1588,17 @@ export const ADULT = [
       };
     },
   },
-  A("a_lawn", [30, 75], 0.03, (s, ctx) => [
+  A("a_lawn", [30, 75], 0.014, (s, ctx) => [
     "You became a lawn person. {You know the names of the grasses.|You edge the sidewalk with a precision that worries your family.|You have strong feelings about the neighbor's dandelions.}",
     `You spent a whole weekend ${snowy(s) ? "putting up the storm windows and raking leaves" : "fighting the crabgrass"}, {then sat on the porch with a cold drink and surveyed your kingdom.|and the kids jumped in the leaf pile before you could bag it.}`,
     "You bought a riding mower {and drove it like a race car.|and the neighbor's kid asked for a turn.} The grass has never looked better.",
   ], { domain: "move", channel: "good", tags: ["home"], cooldown: 5, max: 2, mood: 2, when: s => home(s) && s.home === "own" }),
-  A("a_blockParty", [28, 75], 0.025, (s, ctx) => [
+  A("a_blockParty", [28, 75], 0.012, (s, ctx) => [
     `Your street had a block party: {sawhorses at both ends, three grills going and kids on bikes everywhere.|a potluck on folding tables and a water balloon fight.} You met neighbors you'd waved at for years.`,
     `For the Fourth of July the whole street {set off fireworks in the cul-de-sac|had a parade of kids on decorated bikes|grilled together}, and you {stayed out until the fireflies came.|ended up in charge of the hot dogs.}`,
     "The neighborhood started a monthly potluck, and {it became the best night of the month.|you met a couple who became your closest friends.}",
   ], { domain: "family", channel: "good", cooldown: 6, max: 2, mood: 3, when: home }),
-  A("a_garageSale", [28, 75], 0.025, (s, ctx) => {
+  A("a_garageSale", [28, 75], 0.012, (s, ctx) => {
     const where = s.year < 2000 ? "a garage sale with hand-lettered signs" : s.year < 2016 ? "Craigslist" : "Facebook Marketplace";
     return [
       `You cleaned out the garage and sold everything through ${where}. {You made two hundred dollars and spent it at someone else's yard sale.|A stranger haggled for twenty minutes over a lamp worth a dollar.}`,
@@ -1659,7 +1659,7 @@ export const ADULT = [
     },
   },
   {
-    id: "a_friendDivorce", domain: "family", channel: "bad", tags: ["friends"], ages: [30, 62], cooldown: 6, max: 2, when: home, p: () => 0.03,
+    id: "a_friendDivorce", domain: "family", channel: "bad", tags: ["friends"], ages: [30, 62], cooldown: 8, max: 2, when: home, p: () => 0.022,
     choice: (s, ctx) => {
       const bf = bestFriend(s), f = bf || ctx.person({ role: "friend", sex: s.sex, birthYear: s.birthYear }), name = f.call;
       const both = together(s);
@@ -1726,17 +1726,17 @@ export const ADULT = [
       };
     },
   },
-  A("a_forty", [40, 40], 0.5, (s, ctx) => [
+  A("a_forty", [40, 40], 0.3, (s, ctx) => [
     `For your fortieth birthday, ${together(s) ? pn(s) : "your friends"} threw a surprise party with black balloons that said “Over the Hill.” {You were genuinely surprised and pretended to be insulted.|You laughed harder than you had in a year.}`,
     `You turned forty and {found your first gray hair, and then nine more.|threw out your back picking up a sock.|realized the music on the oldies station was yours.}`,
     `On your fortieth birthday you {went to bed at nine and woke up delighted.|took the day off and did exactly what you wanted, which was mostly nothing.|wrote a letter to yourself at fifty.}`,
   ], { once: true, mood: 3, when: home }),
-  A("a_fifty", [50, 50], 0.5, (s, ctx) => [
+  A("a_fifty", [50, 50], 0.3, (s, ctx) => [
     `You turned fifty, and ${s.year >= 1958 ? "the AARP membership card arrived in the mail that same week, with your name on it, which felt personal" : "your friends gave you a cane as a joke"}. {You put it on the fridge as a joke and kept it.|You laughed, and then you joined.}`,
     `For your fiftieth, ${hasKid(10, 40)(s) ? "the kids" : together(s) ? pn(s) : "your oldest friends"} made a slideshow of your life, {with far too many photos of your hair from ${s.birthYear + 20}.|and you realized it's been a good one so far.}`,
     "You turned fifty and {decided you no longer cared what anyone thought of your sandals.|went skydiving, or at least looked into it seriously.|found that you liked yourself more than you had at thirty.}",
   ], { once: true, mood: 3, when: home }),
-  A("a_readers", [42, 48], 0.12, (s, ctx) => [
+  A("a_readers", [42, 48], 0.07, (s, ctx) => [
     "You found yourself holding the menu at arm's length, and the optometrist said the word “readers.” {You now own eleven pairs, and can never find one.|You bought a pair at the drugstore and felt about a hundred.}",
     "You needed reading glasses, and {got a chain to wear them around your neck, ironically, then sincerely.|kept pushing them up on your head and then searching for them.}",
     "The print on the medicine bottle got smaller, or so you claimed, until you gave in and bought reading glasses. The world was suddenly very sharp.",
@@ -1787,24 +1787,24 @@ export const ADULT = [
       };
     },
   },
-  A("a_survivor", [32, 64], 0.12, (s, ctx) => [
+  A("a_survivor", [32, 64], 0.1, (s, ctx) => [
     `In the ${s.year} downturn, half your department was let go, and you kept your job. {You felt lucky and guilty in equal parts.|You did the work of three people for a year and didn't complain out loud.}`,
     `The company froze pay${s.year >= 2008 && s.year <= 2010 ? " and gave everyone two unpaid furlough days a month" : ""}. {You cut back on eating out.|You were grateful to be working at all.}`,
     `There were layoffs at work in the ${s.year} recession, and your name wasn't on the list. You helped a friend who was laid off pack ${s.year >= 1995 ? "a box and a laptop bag" : "a box"}, and you took them to lunch the next week.`,
   ], { domain: "career", channel: "change", once: true, mood: -1, when: (s, ctx) => home(s) && working(s) && s.job.field !== "military" && recession(ctx, s.year), effect: s => spend(s, 0.03) }),
-  A("a_youngBoss", [45, 64], 0.03, (s, ctx) => [
+  A("a_youngBoss", [45, 64], 0.018, (s, ctx) => [
     `Your new boss is {twenty-nine|younger than your oldest kid|young enough to be your child}, and called you “a legend” in the first meeting. {You decided to take it as a compliment.|You taught them how things really work there, and they taught you three shortcuts.}`,
     `A new manager half your age asked you, very politely, if you were comfortable with ${s.year >= 2015 ? "Slack" : s.year >= 2000 ? "the new software" : "computers"}. You smiled and said, “I'll manage,” and you did.`,
     "Your new boss is young, sharp and nervous, and by the end of the year you were the one they came to for advice, which was its own kind of promotion.",
   ], { domain: "career", channel: "change", once: true, mood: 0, when: s => home(s) && working(s) && s.job.field !== "military" }),
-  A("a_crew", [30, 65], 0.03, (s, ctx) => {
+  A("a_crew", [30, 65], 0.014, (s, ctx) => {
     const y = s.year, thing = ctx.rng.pick([y < 1995 ? "a bowling league" : y >= 2018 ? "a pickleball group" : "a softball team", y >= 1996 ? "a book club that mostly drank wine" : "a book club", "a monthly poker night", y >= 2002 ? "a fantasy football league" : "a Friday golf foursome", "a trivia team at the bar down the street"]);
     return [
       `You joined ${thing} with a few people from {work|the neighborhood|church}, and {it became the best night of the month.|you have been losing gracefully ever since.|it lasted twenty years.}`,
       `Your friends started ${thing}, and {you were terrible and kept going.|the group text became your favorite place on earth.}`,
       `${thing.replace(/^a /, "The ")} you joined became the place you told the truth about your week. {You laughed more there than anywhere.|When things got hard, they showed up with casseroles.}`,
     ];
-  }, { domain: "family", channel: "good", tags: ["friends"], cooldown: 5, max: 3, mood: 3, when: home }),
+  }, { domain: "family", channel: "good", tags: ["friends"], cooldown: 6, max: 2, mood: 3, when: home }),
 
   // ---------- the times, as a grown-up met them ----------
   A("a_inflation", [28, 60], 0.5, (s, ctx) => [
@@ -1827,7 +1827,7 @@ export const ADULT = [
     `You won an eBay auction for {a lamp exactly like your grandmother's|a box of old baseball cards|a vintage lunchbox} in the last ten seconds, and felt like a spy.`,
     "You typed your credit card number into a website for the first time, nervously, and the package actually arrived. Christmas shopping was never the same.",
   ], { once: true, years: [1998, 2006], mood: 1, when: s => home(s) && s.year >= 1998 && s.year <= 2006 }),
-  A("a_alwaysOn", [28, 60], 0.08, (s, ctx) => [
+  A("a_alwaysOn", [28, 60], 0.06, (s, ctx) => [
     `Work gave you a ${s.year < 2010 ? "BlackBerry" : "smartphone"}, and now {the office follows you to the kids' games.|you check email at red lights, which you know you shouldn't.|you sleep with it on the nightstand like a pager.}`,
     `You answered a work email at 11 p.m. ${hasKid(4, 15)(s) ? "from the bleachers at the school play" : "from bed"}, and decided {you needed rules.|this could not be your whole life.}`,
     "Your boss started emailing at midnight and expecting answers by six, and you {turned off notifications after dinner, and the company survived.|got very good at sounding busy from the beach.}",
@@ -1853,7 +1853,7 @@ export const ADULT = [
       };
     },
   },
-  A("a_videoCall", [30, 65], 0.12, (s, ctx) => {
+  A("a_videoCall", [30, 65], 0.07, (s, ctx) => {
     const g = grandsWord(s), kids = kidsCall(kidsAged(s, 1, 15)), pl = kidsAged(s, 1, 15).length > 1;
     return [
       `${g} learned to video call, and now ${kids} {${pl ? "show" : "shows"} them every drawing, every loose tooth and every new pair of shoes.|${pl ? "read" : "reads"} bedtime stories with them every Sunday night across the country.} Mostly the screen shows their foreheads.`,
@@ -1861,7 +1861,7 @@ export const ADULT = [
       `${kids} ${kidsAged(s, 1, 15).length > 1 ? "blow" : "blows"} kisses at ${g} on the screen every night before bed, and ${g} ${g.includes(" and ") ? "blow" : "blows"} them back.`,
     ];
   }, { domain: "family", channel: "good", tags: ["father", "mother", "children"], once: true, mood: 3, when: s => home(s) && s.year >= 2011 && parentsAlive(s) && hasKid(1, 15)(s) }),
-  A("a_prices", [28, 64], 0.35, (s, ctx) => (s.year === 2008 ? [
+  A("a_prices", [28, 64], 0.22, (s, ctx) => (s.year === 2008 ? [
     "Gas hit four dollars a gallon, and you {started combining errands like a general planning a campaign.|watched the numbers on the pump spin with real fear.|joined a carpool with two coworkers.}",
     "With gas at four dollars, you {left the SUV in the driveway and dusted off the bike.|drove five miles out of your way to save three cents a gallon, which you knew made no sense.}",
     "The price of gas went up every week that summer, and {the family road trip shrank to a day at the lake.|you finally did the math on a smaller car.}",
@@ -1870,7 +1870,7 @@ export const ADULT = [
     "With prices up everywhere, you {canceled three streaming services.|started meal planning on Sundays.|learned to love beans.} Gas was nearly five dollars that summer.",
     "Everything cost more, from rent to coffee, and {your paycheck went a lot less far.|you cut back and talked about money at dinner more than ever.}",
   ]), { domain: "wealth", channel: "bad", once: true, years: [2008, 2023], mood: -2, when: s => home(s) && (s.year === 2008 || s.year === 2022 || s.year === 2023), effect: s => spend(s, 0.02) }),
-  A("a_kidsTech", [35, 65], 0.04, (s, ctx) => {
+  A("a_kidsTech", [35, 65], 0.022, (s, ctx) => {
     const k = kidIn(s, ctx, 10, 25), n = k.call, y = s.year;
     const thing = y < 2007 ? "how to burn a CD" : y < 2012 ? "how to text with the little keyboard" : y < 2018 ? "what an emoji means, which you'd been using wrong" : "how to make your phone's text bigger";
     return [
