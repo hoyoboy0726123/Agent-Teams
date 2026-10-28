@@ -80,9 +80,9 @@
     "{遞出辭呈，|最後一天上班，}{走出公司那一刻，覺得肩膀輕了。|收拾東西時有點捨不得。}": "{You handed in your notice.|On your last day at work,} {the moment you walked out of the office, a weight lifted from your shoulders.|packing up your things, you felt a pang of regret.}",
     "到{where}工作，{一切從頭開始。|住進一間小小的宿舍。|第一個月連超市都逛不習慣。}": "You went to work in {where}. {Everything started again from scratch.|You moved into a tiny dormitory room.|For the first month even the supermarket felt strange.}",
     "{放學後|假日}幫忙家裡{顧店|做事|下田}，{爸媽誇你長大了。|學會了算錢找錢。|累，但很有成就感。}": "{After school|On days off} you helped the family {mind the shop|with the work|in the fields}. {Your parents said how grown-up you were.|You learnt to count money and give change.|It was tiring, but very satisfying.}",
-    "家裡的店": "the family shop",
-    "家裡的田": "the family farm",
-    "家裡的小工廠": "the family’s small factory",
+    "家裡的店": "shopkeeper in the family shop",
+    "家裡的田": "farmer on the family farm",
+    "家裡的小工廠": "worker in the family’s small factory",
     "回到{city}，{每天跟著爸媽|一早就}{顧店|下田|在工廠忙}。{收入少了，但吃得到家裡的飯。|爸媽嘴上不說，其實很開心。}": "You went back to {city}, {and worked alongside your parents every day,|and were up at dawn} {minding the shop|in the fields|busy in the workshop}. {You earned less, but you ate home cooking again.|Your parents never said so, but they were very happy.}",
     "{咬著牙|告訴自己再撐一下，}{繼續撐下去。|日子照過。}{有幾個晚上還是睡不著。|撐過來了，但很累。}": "{You gritted your teeth|You told yourself to hold on a little longer} {and kept going.|and life went on.} {Some nights you still couldn’t sleep.|You got through it, but it wore you out.}",
     "{辦了退休，|交接完最後一份工作，}{開始過自己的日子。|第一個早上睡到自然醒。}": "{You filed your retirement papers|You handed over your last piece of work} {and began living for yourself.|and on the first morning you slept until you woke on your own.}",
@@ -143,7 +143,7 @@
     "騎腳踏車": "cycling",
     "上健身房": "going to the gym",
     "打羽球": "badminton",
-    "{開始每天|每週固定三天去}{sport}，{三個月後|半年後}{體力好了很多。|褲子鬆了一號。}": "You took up {sport}, {every day|three days a week}, and {three months later|six months later} {you were much fitter.|your trousers were a size looser.}",
+    "{開始每天|每週固定三天去}{sport}，{三個月後|半年後}{體力好了很多。|褲子鬆了一號。}": "You made {sport:lower} part of your routine, {every day|three days a week}, and {three months later|six months later} {you were much fitter.|your trousers were a size looser.}",
     "{去醫院掛號，|做了一次完整的檢查，}{醫生說要好好照顧自己。|照著醫囑吃藥、回診。}": "{You booked an appointment at the hospital,|You had a thorough check-up,} {and the doctor told you to look after yourself.|and took your medicine and kept your appointments as the doctor said.}",
     "{下定決心不再熬夜，|把{電動|手機遊戲}的時間減半，|改掉挑食的習慣，}{頭幾天很難熬，|一開始渾身不對勁，}{後來精神好多了。|爸媽都看到你的改變。}": "{You made up your mind to stop staying up late.|You halved the time you spent on {video games|phone games}.|You stopped being a fussy eater.} {The first few days were hard,|At first you felt all wrong,} {but then you had far more energy.|and your parents noticed the change in you.}",
     "{下定決心改掉壞習慣，|把菸酒戒了、作息調正常，}{頭兩個星期很難熬，|一開始渾身不對勁，}{後來越來越有精神。|身體好像年輕了幾歲。}": "{You made up your mind to break your bad habits.|You gave up smoking and drinking and kept regular hours.} {The first two weeks were hard,|At first you felt all wrong,} {but then you had more and more energy.|and your body felt years younger.}",
@@ -154,7 +154,7 @@
     "烘焙": "baking",
     "種花": "gardening",
     "寫作": "writing",
-    "開始{h}，{每週固定上課。|沒想到一學就停不下來。}": "You took up {h}, {with a class every week.|and to your surprise you couldn’t stop.}",
+    "開始{h}，{每週固定上課。|沒想到一學就停不下來。}": "You took up {h:lower}, {with a class every week.|and to your surprise you couldn’t stop.}",
     "{去{醫院|圖書館|社福機構|淨灘活動}當志工，|每週去幫忙一個下午，}{認識了很多新朋友。|覺得自己還能幫上忙。}": "{You volunteered {at a hospital|at the library|at a social-welfare centre|on beach clean-ups},|You went to help out one afternoon a week,} {and made lots of new friends.|and felt you still had something to give.}",
     "{下課主動找同學玩，|參加了社團，}認識了{f}，{很快就變成好朋友。|兩個人常常一起回家。}": "{You made a point of playing with classmates at break,|You joined a club,} and got to know {f}. {You were soon best friends.|The two of you often walked home together.}",
     "聚會": "a get-together",
@@ -227,7 +227,9 @@
     "肺與呼吸道": "the lungs and airways",
     "腎臟與泌尿": "the kidneys and urinary system",
     "爬山": "hiking",
-    "在職專班": "a part-time degree for working adults"
+    "在職專班": "a part-time degree for working adults",
+    "書法": "Calligraphy",
+    "跳舞": "Dance"
   },
   "words": {
     "places": {
@@ -235,9 +237,7 @@
     },
     "hobbies": {
       "攝影": "photography",
-      "書法": "calligraphy",
-      "游泳": "swimming",
-      "跳舞": "dance"
+      "游泳": "swimming"
     }
   }
 }

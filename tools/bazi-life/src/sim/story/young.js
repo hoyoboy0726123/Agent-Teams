@@ -1328,7 +1328,7 @@ export const YOUNG = [
             : "你放在{where}上的{work}，被{好幾千人|一個很有名的帳號}分享出去，一個晚上多了{好幾百|上千}個人追蹤。要怎麼辦？",
           o: {
             hobby: ["照自己的步調慢慢發", "不想被追著跑", null],
-            side: [y >= 2010 ? "開始接業配、賣作品" : "開始在網路上接案", "多一份收入，也多一份累", y >= 2010 ? null : "開始在網路上接案"],
+            side: [y >= 2010 ? "開始接業配、賣作品" : "開始在網路上接案", "多一份收入，也多一份累", y >= 2010 ? null : ctx.f("開始在網路上接案{done}", { done: "" })],
             course: ["去上專業課，認真走這條路", "給自己一個機會", ctx.f("報名了{h}的專業課程", { h })],
             focus: ["帳號先放著，專心工作", "熱度很快就會過", "把帳號先放著，專心在工作上"],
             contest: ["趁熱整理作品去投比賽", "讓更多人看到", "趁熱把作品整理好，拿去參加比賽"],
@@ -1564,7 +1564,7 @@ export const YOUNG = [
       // [label, hint, what you did]. Staying and visiting more often is a choice of its own ({甲|乙}), told below.
       const base = {
         go: ["回老家工作", "離家近，薪水可能少一點", ctx.f("回到{home}，在當地找到一樣是{job}的工作，搬回家住", { home, job })],
-        transfer: [remote ? "跟公司談遠距工作" : "申請調回老家附近", "帶著原本的工作回去", remote ? "跟公司談遠距工作" : ctx.f("向公司申請調回{home}附近", { home })],
+        transfer: [remote ? "跟公司談遠距工作" : "申請調回老家附近", "帶著原本的工作回去", remote ? ctx.f("跟公司談遠距工作{done}", { done: "" }) : ctx.f("向公司申請調回{home}附近", { home })],
         visit: ["留下來，但更常回家", "兩邊都顧", null],
         talk: [ctx.f("跟{who}說明自己的規劃", { who }), "讓家裡放心", ctx.f("把自己的工作和規劃，一五一十地跟{who}說", { who })],
         invite: [ctx.f("接{who}來{here}住幾天", { who, here }), "讓家裡看看你的生活", ctx.f("接{who}來{here}住了幾天，帶著到處走走", { who, here })],
@@ -1693,7 +1693,7 @@ export const YOUNG = [
           good: "{lead}你{did}，{房東最後只扣了一點清潔費。|房東看了看，說那就算了，押金全退。}", bad: "{lead}你{did}，{房東還是扣了一個月的押金。|押金只拿回一半。}",
           o: {
             yield: ["認了，讓房東扣", "不想吵", ctx.f("認了，讓房東扣{done}", { done: "" })],
-            evidence: [y >= 1980 ? "拿出入住時拍的照片對質" : "拿出合約一條一條對", "照規矩來", y >= 2005 ? "拿出入住時用手機拍的照片對質" : y >= 1980 ? "拿出入住時拍的照片對質" : "拿出合約一條一條跟房東對"],
+            evidence: [y >= 1980 ? "拿出入住時拍的照片對質" : "拿出合約一條一條對", "照規矩來", y >= 2005 ? "拿出入住時用手機拍的照片對質" : y >= 1980 ? ctx.f("拿出入住時拍的照片對質{done}", { done: "" }) : "拿出合約一條一條跟房東對"],
             move: ["不耗了，另外找房子", "換個房東", "決定不跟房東耗了，另外找房子"],
           } },
         { key: "takeback", lead: "房東要你提前搬走，",
@@ -1873,7 +1873,7 @@ export const YOUNG = [
       const gain = hui ? "一年下來多了一點利息。" : "股票漲了一些，你很開心。";
       const loss = hui ? "後來會頭跑了，被倒了一筆會錢。" : "後來股票跌了，賠了一點。";
       const bday = s.father.alive && s.mother.alive ? ctx.rng.pick(["媽媽", "爸爸"]) : who;
-      const [i1, i2] = y >= 1990 ? ["醫療險", "意外險"] : ["壽險", "意外險"], subj = y >= 2000 ? "程式" : "會計";
+      const [i1, i2] = y >= 1990 ? ["醫療險", "意外險"] : ["壽險", "意外險"], coding = y >= 2000;
       // [label, hint, what you did]; what you did is null when it is a choice of its own, told in the templates below.
       const base = {
         keep: ["繼續存，放定存", "安心最重要", null],
@@ -1947,7 +1947,7 @@ export const YOUNG = [
           } },
       ]);
       const B = buttonsOf(base, sc), k = sc.key, lead = sc.lead;
-      const v = { lead, did: null, h1, h2, i1, i2, subj, rate: y < 2000 ? "那時候的定存利息很不錯，" : "雖然利息少得可憐，" };
+      const v = { lead, did: null, h1, h2, i1, i2, rate: y < 2000 ? "那時候的定存利息很不錯，" : "雖然利息少得可憐，" };
       const did = k2 => ({ ...v, did: B[k2][2] });
       // What you did when it is a choice of its own, with how it went: {lead}你…，….
       const KEEP = {
@@ -1979,11 +1979,17 @@ export const YOUNG = [
         family: "{lead}你請{當保險業務員的同學|做保險的親戚}幫自己規劃了{{i1}|{i2}}，免得家裡擔心，{每個月多了一筆保費，|雖然有點心疼，}{心裡踏實多了。|你把保單收進了資料夾。}",
         banker: "{lead}你買了理專推薦的{{i1}|{i2}}，{每個月多了一筆保費，|雖然有點心疼，}{心裡踏實多了。|你把保單收進了資料夾。}",
       };
-      const COURSE = {
-        book: "{lead}你報名了{英文|日文|{subj}|證照}課，{下班後去補習班上課。|週末都在教室度過。}",
-        bonus: "{lead}你拿年終報名了{英文|日文|{subj}|證照}課，{下班後去補習班上課。|週末都在教室度過。}",
-        wish: "{lead}你把錢拿去報名了{英文|日文|{subj}|證照}課，{下班後去補習班上課。|週末都在教室度過。}",
-        banker: "{lead}你領了一筆出來，報名了{英文|日文|{subj}|證照}課，{下班後去補習班上課。|週末都在教室度過。}",
+      // Courses: the third of the {甲|乙|丙|丁} is 程式 from 2000, 會計 before (its English word, "accountant", is the job).
+      const COURSE = coding ? {
+        book: "{lead}你報名了{英文|日文|程式|證照}課，{下班後去補習班上課。|週末都在教室度過。}",
+        bonus: "{lead}你拿年終報名了{英文|日文|程式|證照}課，{下班後去補習班上課。|週末都在教室度過。}",
+        wish: "{lead}你把錢拿去報名了{英文|日文|程式|證照}課，{下班後去補習班上課。|週末都在教室度過。}",
+        banker: "{lead}你領了一筆出來，報名了{英文|日文|程式|證照}課，{下班後去補習班上課。|週末都在教室度過。}",
+      } : {
+        book: "{lead}你報名了{英文|日文|會計|證照}課，{下班後去補習班上課。|週末都在教室度過。}",
+        bonus: "{lead}你拿年終報名了{英文|日文|會計|證照}課，{下班後去補習班上課。|週末都在教室度過。}",
+        wish: "{lead}你把錢拿去報名了{英文|日文|會計|證照}課，{下班後去補習班上課。|週末都在教室度過。}",
+        banker: "{lead}你領了一筆出來，報名了{英文|日文|會計|證照}課，{下班後去補習班上課。|週末都在教室度過。}",
       };
       COURSE.lunch = COURSE.book; COURSE.family = COURSE.book;
       return {

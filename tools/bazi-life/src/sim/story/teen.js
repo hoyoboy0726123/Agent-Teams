@@ -140,8 +140,8 @@ export const TEEN = [
       return {
         prompt: ctx.f("{lead}。要選哪一組？", { lead }),
         options: [
-          { id: "t_major.science", label: sci[0], hint: sci[1], act: "study", style: "safe", weight: 0.35, apply: (s2, c) => { set(s2, "自然組", "self"); return { text: c.w("{lead}。你{chose}，{物理和化學課本疊起來比磚頭還厚。|第一次段考，數學難到全班都在哀號。|你開始覺得實驗課是一週最好玩的時間。}", { lead, chose: sci[2] }), mood: 1 }; } },
-          { id: "t_major.social", label: soc[0], hint: soc[1], act: "study", style: "learn", weight: 0.25, apply: (s2, c) => { set(s2, "社會組", "self"); return { text: c.w("{lead}。你{chose}，{開始背歷史年表和地理圖，|國文課變成你最期待的一堂，}{有親戚說社會組以後不好找工作，你笑笑沒回答。|你發現自己很會寫作文。}", { lead, chose: soc[2] }), mood: 1 }; } },
+          { id: "t_major.science", label: ctx.f("{stream}", { stream: sci[0] }), hint: sci[1], act: "study", style: "safe", weight: 0.35, apply: (s2, c) => { set(s2, "自然組", "self"); return { text: c.w("{lead}。你{chose}，{物理和化學課本疊起來比磚頭還厚。|第一次段考，數學難到全班都在哀號。|你開始覺得實驗課是一週最好玩的時間。}", { lead, chose: sci[2] }), mood: 1 }; } },
+          { id: "t_major.social", label: ctx.f("{stream}", { stream: soc[0] }), hint: soc[1], act: "study", style: "learn", weight: 0.25, apply: (s2, c) => { set(s2, "社會組", "self"); return { text: c.w("{lead}。你{chose}，{開始背歷史年表和地理圖，|國文課變成你最期待的一堂，}{有親戚說社會組以後不好找工作，你笑笑沒回答。|你發現自己很會寫作文。}", { lead, chose: soc[2] }), mood: 1 }; } },
           { id: "t_major.heart", label: "跟著興趣走", hint: "選自己喜歡的", act: "insist", style: "self", weight: 0.15, apply: (s2, c) => { const m = set(s2, draw(c, ["art", "piano", "calligraphy"].includes(s2.flags.talent) ? 0.3 : 0.55), "interest"); const t = !sc.sci || sc.sci[0] !== "還是選自然組" ? "{lead}。你想了很久，照著自己的興趣選了{m}，{雖然有人說你選錯了，|就算那不是你分數最好的科目，}{你覺得每天上課都很有意思。|你知道自己為什麼坐在這裡。}" : m === "自然組" ? "{lead}。你想了很久，照著自己的興趣選了{m}，{雖然數學考成這樣，|就算大家都勸你再想想，}{你覺得每天上課都很有意思。|你知道自己為什麼坐在這裡。}" : "{lead}。你想了很久，照著自己的興趣選了{m}，{你早就知道自己喜歡的是文科，|數學考不好反而讓你下定了決心，}{你覺得每天上課都很有意思。|你知道自己為什麼坐在這裡。}"; return { text: c.w(t, { lead, m }), mood: 2 }; } },
           { id: "t_major.parents", label: ctx.f("聽{who}的", { who }), hint: "家人比較有經驗", act: "talk", style: "family", weight: 0.1, apply: (s2, c) => { const m = set(s2, draw(c, 0.8), "parents"); return { text: c.w("{lead}。你聽了{who}的建議，選了{m}。{{who}說{why}。|{who}鬆了一口氣，你也是。}{你心裡還是有點不確定。|你決定先試試看。}", { lead, who, m, why: m === "自然組" ? "這樣以後比較好找工作" : "你的國文一直比數學好" }), mood: 0 }; } },
           { id: "t_major.friend", label: f ? ctx.f("跟{pal}選同一組", { pal: f.call }) : "跟死黨選同一組", hint: "至少有人作伴", act: "socialize", style: "social", weight: 0.08, when: () => !!f, apply: (s2, c) => { const m = set(s2, draw(c, 0.55), "friend"); return { text: c.w("{lead}。你和{pal}說好一起選{m}，{結果被分到同一班，兩個人高興得跳起來。|結果被分到不同班，下課還是黏在一起。}", { lead, pal: f.call, m }), mood: 2 }; } },
@@ -594,7 +594,7 @@ export const TEEN = [
         { key: "once", w: /聯考|聯招/.test(exam) ? 1 : 0, lead: ctx.f("大家都說{exam}一試定終身，考壞了就只能重考", { exam }) },
         { key: "portfolio", w: s.track === "高中" && y >= 2020 ? 1.5 : 0, lead: "準備學測之外，還要整理學習歷程檔案，每天的時間都不夠用" },
       ]);
-      const k = sc.key, lead = sc.lead, listener = f ? f.call : k === "night" ? "輔導老師" : "導師", mates = f ? f.call : "幾個同學";
+      const k = sc.key, lead = sc.lead, listener = f ? f.call : ctx.f("{counsellor}", { counsellor: k === "night" ? "輔導老師" : "導師" }), mates = f ? f.call : "幾個同學";
       const trip = ctx.rng.pick(["墾丁", "花蓮", "日月潭", "澎湖"]), noodle = y < 1972 ? "冷掉的饅頭" : "泡麵";
       // The buttons in each scene: [label, hint].
       const B = {
@@ -1054,7 +1054,7 @@ export const TEEN = [
         { key: "fair", act: "hobby", coach: "自然老師", w: y >= 1965 ? 1 : 0, lead: ctx.rng.pick(["自然老師找你做科展，暑假每天都要到學校的實驗室記錄豆芽長多高", "自然老師找你做科展，暑假每天都要到學校的實驗室觀察螞蟻搬家", "自然老師找你做科展，暑假每天都要到學校的實驗室測河水的水質"]) },
         { key: "robot", act: "hobby", coach: "指導老師", w: y >= 2010 ? 1.2 : 0, lead: "學校的機器人社要參加比賽，社長拉你進隊，週末都要留在學校寫程式" },
       ]);
-      const k = sc.key, lead = sc.lead, coach = sc.coach;
+      const k = sc.key, lead = sc.lead, coach = ctx.f("{coachTitle}", { coachTitle: sc.coach });
       const prep = { speech: kind === "書法" ? "每天放學在教室寫掉一大疊報紙" : kind === "作文" ? "每天寫一篇作文拿去給老師改" : "每天放學對著鏡子練到口乾舌燥", team: "每天練到天黑才回家", choir: role === "伴奏" ? "每天午休都在音樂教室練伴奏" : "每天對著鏡子練指揮的手勢", fair: "每天記錄、拍照、畫圖表", robot: "把程式改了一遍又一遍" }[k];
       // Going all out: [won, lost], each one template opened by the scene ({lead}).
       const all = {
@@ -1169,11 +1169,11 @@ export const TEEN = [
             coat: "{lead}。你和幾個同學發起連署，請學校讓大家冬天可以在制服外加穿外套，{一個禮拜就收到了好幾百個簽名，|學生會也出來幫忙，}{{ruling}|你第一次知道，事情是可以去爭取的。}",
             vote: "{lead}。你自願幫忙整理大家的意見，{做了一張問卷發給全班，|把贊成和反對的理由整理成一張表，}{學生會說那是他們收到最清楚的一份。|最後學校開放每週一天便服日。}",
           }[k], 2),
-          opt("family", "seekHelp", "family", 0.15, k === "vote" ? ctx.f("回家問{who}的看法", { who }) : ctx.f("請{who}寫{note}說明", { who, note }), k === "vote" ? "聽聽大人怎麼想" : "讓大人出面", {
-            hair: "{lead}。你請{who}在{note}上寫幾句話，{{who}寫說你頭髮長得特別快，週末就會帶你去剪，|{who}看了一眼，說「規定就是規定」，週末就帶你去剪了，}{{off}看完{note}，揮揮手讓你過了。|你嘟著嘴，但也沒再說什麼。}",
-            check: "{lead}。你請{who}在{note}上替你說幾句話，{who}{寫了好長一段，|只寫了「下次注意」四個字，}{{off}看完說下不為例。|你還是乖乖改好了。}",
-            patrol: "{lead}。你請{who}在{note}上替你說幾句話，導師看了，{幫你去跟糾察隊說明，|笑著說下次記得就好，}{那次的紀錄被撤掉了。|你鬆了一口氣。}",
-            coat: "{lead}。你請{who}在{note}上寫你怕冷，請學校通融，{{off}看完說下不為例。|隔週{who}乾脆幫你買了一件學校的外套。}",
+          opt("family", "seekHelp", "family", 0.15, k === "vote" ? ctx.f("回家問{who}的看法", { who }) : (note === "聯絡簿" ? ctx.f("請{who}寫聯絡簿說明", { who }) : ctx.f("請{who}寫字條說明", { who })), k === "vote" ? "聽聽大人怎麼想" : "讓大人出面", {
+            hair: note === "聯絡簿" ? "{lead}。你請{who}在聯絡簿上寫幾句話，{{who}寫說你頭髮長得特別快，週末就會帶你去剪，|{who}看了一眼，說「規定就是規定」，週末就帶你去剪了，}{{off}看完聯絡簿，揮揮手讓你過了。|你嘟著嘴，但也沒再說什麼。}" : "{lead}。你請{who}在字條上寫幾句話，{{who}寫說你頭髮長得特別快，週末就會帶你去剪，|{who}看了一眼，說「規定就是規定」，週末就帶你去剪了，}{{off}看完字條，揮揮手讓你過了。|你嘟著嘴，但也沒再說什麼。}",
+            check: note === "聯絡簿" ? "{lead}。你請{who}在聯絡簿上替你說幾句話，{who}{寫了好長一段，|只寫了「下次注意」四個字，}{{off}看完說下不為例。|你還是乖乖改好了。}" : "{lead}。你請{who}在字條上替你說幾句話，{who}{寫了好長一段，|只寫了「下次注意」四個字，}{{off}看完說下不為例。|你還是乖乖改好了。}",
+            patrol: note === "聯絡簿" ? "{lead}。你請{who}在聯絡簿上替你說幾句話，導師看了，{幫你去跟糾察隊說明，|笑著說下次記得就好，}{那次的紀錄被撤掉了。|你鬆了一口氣。}" : "{lead}。你請{who}在字條上替你說幾句話，導師看了，{幫你去跟糾察隊說明，|笑著說下次記得就好，}{那次的紀錄被撤掉了。|你鬆了一口氣。}",
+            coat: note === "聯絡簿" ? "{lead}。你請{who}在聯絡簿上寫你怕冷，請學校通融，{{off}看完說下不為例。|隔週{who}乾脆幫你買了一件學校的外套。}" : "{lead}。你請{who}在字條上寫你怕冷，請學校通融，{{off}看完說下不為例。|隔週{who}乾脆幫你買了一件學校的外套。}",
             vote: "{lead}。你回家問{who}，{who}{說以前連頭髮長度都要管，現在的你們很幸福，|說穿什麼都好，重要的是你們自己決定，}{隔天你在班會上把這段話說給大家聽。|你決定投給自己真心想要的那一邊。}",
           }[k], 1),
         ],

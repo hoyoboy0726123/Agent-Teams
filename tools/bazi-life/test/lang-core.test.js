@@ -54,7 +54,7 @@ for (const a of Object.values(ACTIONS)) ours.add(a.label);
 const chartAt = (rng, y, sex) => computeChart({ date: { y, m: 1 + rng.int(12), d: 1 + rng.int(28) }, time: { h: rng.int(24), mi: rng.int(60) }, place: rng.pick(TAIWAN), sex });
 
 // A ctx as life.js makes it, in English: the same words(), slots and lazy {friend}/{trip}.
-function makeCtx(s, en, rng, { chart, analysis }) {
+function makeCtx(s, en, rng, { chart, analysis, family = null }) {
   let scene = {};
   const slots = () => ({
     city: s.abroad || s.county || chart.input.place.name, job: s.job ? s.job.title : "工作",
@@ -77,7 +77,7 @@ function makeCtx(s, en, rng, { chart, analysis }) {
   }
   const luck = { reasons: [{ domains: ["career"], text: "官殺星透出：事業有壓力，也有機會" }, { domains: ["love"], text: "流年子沖日支午：日支是配偶宮，感情容易變動" }], m: {}, L: 0, score: 50 };
   const ctx = {
-    rng, R, chart, analysis, s, name: null, family: null, w, f: en.f, lang: "en",
+    rng, R, chart, analysis, s, name: null, family, w, f: en.f, lang: "en",
     luckAt: () => luck, tiltOf: () => 0, odds: (d, c, p) => p, roll: (d, c, p) => rng() < p,
     person: opts => newPerson(s, ctx, opts), remember: (kind, text, extra = {}) => s.memory.push({ kind, text, age: s.age, ...extra }), nudge: () => {},
     arc: {
@@ -95,55 +95,81 @@ function makeCtx(s, en, rng, { chart, analysis }) {
 // and unnamed brothers and sisters, a job, the storylines under way, an illness, memories, a home or none.
 function states() {
   const out = [], rng = makeRng(2024);
-  const shops = ["咖啡店", "網路商店", "手搖飲加盟店", "小吃店", "民宿", "KTV", "設計公司", "早餐加盟店"];
+  const shops = ["咖啡店", "網路商店", "手搖飲加盟店", "小吃店", "民宿", "KTV", "設計公司", "早餐加盟店", "補習班", "夾娃娃機店"];
   const courses = ["在職專班", "證照課程", "研究所", "語言課", "創業課程"];
-  for (let i = 0; i < 24; i++) {
+  let k = 0;
+  for (let i = 0; i < 16; i++) {
     const y = 1945 + rng.int(78), sex = rng() < 0.5 ? "male" : "female", chart = chartAt(rng, y, sex), prep = prepare(chart);
-    const life = createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed: 40 + i, auto: true });
-    const ages = [8, 15, 19, 26, 34, 45, 58, 76];
-    for (const age of ages) {
+    const life = createLife({ chart, analysis: prep.analysis, luck: prep.luck, seed: 40 + i, auto: true, lang: "en", english: makeLang(bundle) });
+    for (const age of [8, 13, 15, 19, 23, 26, 34, 40, 45, 58, 80]) {
       while (!life.done && life.state.age < age) life.step();
       if (life.done) break;
-      const s = structuredClone(life.state), k = out.length;
+      k++;
+      const s = structuredClone(life.state);
       const person = (role, sx, by, name) => ({ ...newPerson(s, { rng }, { role, sex: sx, birthYear: by, name }), age: s.year - by });
-      if (!s.partner) { s.partner = person("partner", k % 5 === 0 ? s.sex : s.sex === "male" ? "female" : "male", s.birthYear + 1, k % 3 ? null : "王小明"); s.partner.how = ["同學", "老同學", "同事", "朋友介紹", "交友軟體", "旅行途中"][k % 6]; s.rel = k % 2 ? "married" : "dating"; s.since = s.age - 3; s.datingSince = s.age - 2; }
+      if (!s.partner) { s.partner = person("partner", k % 5 === 0 ? s.sex : s.sex === "male" ? "female" : "male", s.birthYear + 1, k % 3 ? null : "王小明"); s.partner.how = ["同學", "老同學", "同事", "朋友介紹", "交友軟體", "旅行途中", "長輩安排的相親"][k % 7]; s.rel = k % 2 ? "married" : "dating"; s.since = s.age - 3; s.datingSince = s.age - 2; }
       if (!s.partner.nature) s.partner.nature = { word: "溫柔", crisis: 1 };
       if (s.kids.length < 2) s.kids.push({ ...person("kid", "female", s.year - 20), age: 20 }, { ...person("kid", "male", s.year - 6), age: 6 });
       if (s.friends.length < 1) s.friends.push(person("friend", "female", s.birthYear, null));
       s.siblings.list.push({ relation: "olderBrother", label: "哥哥", name: "陳志明", older: true, bornAt: -3, born: true }, { relation: "youngerSister", label: "妹妹", name: "", older: false, bornAt: 2, born: true });
-      if (k % 4 === 0) s.siblings.list.push({ relation: "youngerBrother", label: "弟弟", name: "阿明", older: false, bornAt: s.age, born: false });
+      if (k % 4 === 0) s.siblings.list.push({ relation: "youngerBrother", label: "弟弟", name: "阿明", older: false, bornAt: s.age, born: false }, { relation: "youngerSister", label: "妹妹", name: "小美", older: false, bornAt: s.age, born: false });
       if (!s.job) s.job = { title: ["工程師", "護理師", "美髮師", "藥師", "工廠作業員"][k % 5], factor: 1, field: ["科技", "醫療", "服務", "醫療", "製造"][k % 5], element: "火", since: s.age - 1 };
-      s.employed = true; s.savings = 3; s.edu = ["國中", "高中", "高職", "大學", "科大", "五專"][k % 6]; s.track = ["國中", "高中", "高職", "大學", "科大", "五專"][k % 6];
-      s.arcs.startup = { stage: "start", next: s.age, since: s.age - 1, data: { kind: shops[k % shops.length], side: k % 3 === 0, push: 0.1, pivoted: k % 2 === 0 } };
-      s.arcs.civil = { stage: "start", next: s.age, since: s.age - 1, data: { tries: k % 3, quit: false } };
-      s.arcs.study = { stage: "start", next: s.age, since: s.age - 1, data: { kind: courses[k % courses.length] } };
+      s.employed = true; s.savings = 3; s.edu = ["國中", "高中", "高職", "大學", "科大", "五專"][k % 6]; s.track = s.edu;
+      if (k % 3) {
+        s.arcs.startup = { stage: k % 2 ? "start" : "year2", next: s.age, since: s.age - 1, data: { kind: shops[k % shops.length], side: k % 4 === 1, push: 0.1, pivoted: k % 4 === 2 } };
+        s.arcs.civil = { stage: "start", next: s.age, since: s.age - 1, data: { tries: k % 3, quit: false } };
+        s.arcs.study = { stage: "start", next: s.age, since: s.age - 1, data: { kind: courses[k % courses.length] } };
+      }
       s.flags.stake = { kind: shops[(k + 1) % shops.length], at: s.age - 3, who: k % 2 ? "大學時的好朋友" : "志明", colleague: k % 4 === 1 };
       s.flags.offerAbroad = "日本"; s.flags.militaryAt = k % 2 ? s.age : undefined; s.flags.leftSchool = s.age - (k % 3);
-      s.health.serious = { type: ["癌症", "中風", "心臟病"][k % 3], since: s.age - 5 }; s.health.checkups = k % 2 === 0; s.health.diedOf = k % 3 ? null : "癌症";
+      if (k % 2) { s.health.serious = { type: ["癌症", "中風", "心臟病"][k % 3], since: s.age - 5 }; s.health.diedOf = k % 3 ? null : "癌症"; }
+      s.health.checkups = k % 2 === 0;
+      // memories of this part's big moments (an English life keeps their English gist), and one with no gist
+      s.memory = s.memory.filter(m => MINE.has(m.kind));
       s.memory.push({ kind: "proposal", text: "You married Hsiao-mei!", gist: "you married Hsiao-mei", age: s.age - 25, mood: 5 }, { kind: "fatherDeath", text: "Dad passed away at 80.", age: s.age - 22, mood: -9 });
-      if (k % 3 === 0) { s.county = null; s.birthCounty = null; }
+      // no county (born abroad): the place of birth is what {city} says (core/places.js names are not part of this)
+      let ch = chart;
+      if (k % 3 === 0) { s.county = null; s.birthCounty = null; ch = { ...chart, input: { ...chart.input, place: { ...chart.input.place, name: "臺北市" } } }; }
       if (k % 7 === 0) { s.father.alive = false; s.mother.alive = k % 2 === 0; }
+      if (k % 5 === 4) { s.father.alive = false; s.mother.alive = false; s.last.fatherDeath = s.age; s.siblings.list.forEach(x => { x.bornAt = Math.min(x.bornAt, -20); x.born = true; }); }
       s.used = new Set();
-      out.push({ s, chart, analysis: prep.analysis });
+      // the partner from the family input, met this year (story/core.js realPartnerMeet) and to marry this year
+      const family = k % 2 ? { members: [{ relation: "partner", label: "伴侶", name: "王小明", date: null, sex: s.sex === "male" ? "female" : "male", metYear: s.year, marriedYear: s.year, bond: null }] } : null;
+      out.push({ s, chart: ch, analysis: prep.analysis, family });
+      // and the same person out of work and out of school, single or dating, with no storyline under way
+      const u = structuredClone(s);
+      u.employed = false; u.studying = false; u.retired = false; u.arcs = {}; u.unemployedFor = 1;
+      if (k % 2) { u.done.delete("firstJob"); u.jobsHeld = []; } else u.done.add("firstJob");
+      if (k % 4 === 1) { u.rel = "single"; u.partner = null; } else { u.rel = "dating"; u.datingSince = u.age - 1; delete u.flags.realPartnerMet; if (family) u.partner.real = true; }
+      out.push({ s: u, chart: ch, analysis: prep.analysis, family });
+      // and at school
+      const school = structuredClone(u);
+      school.studying = true; school.edu = school.age < 13 ? "國小" : school.age < 17 ? "國中" : ["高中", "高職", "大學", "科大", "五專", "碩士"][k % 6]; school.track = school.edu;
+      school.flags = { ...school.flags, trackAt: school.age - 5, uniAt: school.age - 5, masterAt: school.age - 3 };
+      out.push({ s: school, chart: ch, analysis: prep.analysis, family });
     }
   }
   return out;
 }
 
 test("every core and work event reads in English, whatever the life (each run on its own in many states)", () => {
-  const shown = new Map(), missing = new Set();
+  const shown = new Map(), missing = new Set(), ran = new Set();
   let lines = 0;
   for (const [j, st] of states().entries()) {
     for (const [k, ev] of EVENTS.entries()) {
-      for (let seed = 0; seed < 3; seed++) {
+      for (let seed = 0; seed < 2; seed++) {
+        if (ev.id === "realPartnerMeet" && !st.family) continue;
         const s = structuredClone(st.s), en = makeLang(bundle), rng = makeRng(j * 1009 + k * 31 + seed);
+        if (ev.id === "realPartnerMeet") delete s.flags.realPartnerMet;
         const ctx = makeCtx(s, en, rng, st);
+        if (ev.when && !ev.when(s, ctx)) continue;
+        ran.add(ev.id);
         const texts = [];
         if (ev.choice) {
           const c = ev.choice(s, ctx);
           if (!c) continue;
           texts.push(en.text(c.prompt));
-          for (const o of c.options) {
+          for (const o of c.options.filter(x => !x.when || x.when(s, ctx))) {
             texts.push(en.text(o.label), en.text(o.hint || ""));
             const s2 = structuredClone(s), c2 = makeCtx(s2, en, makeRng(seed + 7), st);
             const out = o.apply ? o.apply(s2, c2) : act(o.act, s2, c2, { label: o.label });
@@ -174,6 +200,7 @@ test("every core and work event reads in English, whatever the life (each run on
   }
   assert.deepEqual([...shown.keys()].slice(0, 20), []);
   assert.deepEqual([...missing].slice(0, 20), []);
+  assert.deepEqual(EVENTS.map(e => e.id).filter(id => !ran.has(id) && id !== "death"), []);
   assert.ok(lines > 20000, `only ${lines} lines`);
 });
 
@@ -203,8 +230,10 @@ test("whole English lives with written answers show no Chinese from these files"
       seen.add(e.id); if (e.free) freeLines.n++;
       for (const t of [e.text, e.choice]) if (t && BROKEN.test(t)) broken.push(`${e.id}: ${t}`);
     }
-    // Chinese the reader saw that has no English: none of it may be a sentence, label or word of these files.
-    for (const m of en.missing) if (ours.has(m) || /老闆$|加盟店$/.test(m)) missingOurs.add(m);
+    // Chinese the reader saw that has no English: none of it may be a sentence, label or word of these files, nor a
+    // job this life held (a shop of your own is "<shop>老闆").
+    for (const m of en.missing) if (ours.has(m)) missingOurs.add(m);
+    for (const j of life.state.jobsHeld) if (hasCJK(en.word(j.title))) missingOurs.add(j.title);
   }
   assert.deepEqual(broken.slice(0, 10), []);
   assert.deepEqual([...missingOurs], []);
@@ -221,7 +250,8 @@ test("the English keeps the shape of each Chinese template, and every template o
   }
   // the shown templates and strings of these files: those in a ctx.w / ctx.f call or a shown field
   const shownOurs = Object.values(entries).filter(e => e.at.some(a => /src\/sim\/(story\/core|story\/work|act)\.js:/.test(a)) && ["w", "f", "prompt", "label", "hint", "text", "topic"].includes(e.use));
-  const todo = shownOurs.filter(e => !(e.zh in bundle.story) && !(e.zh in bundle.words)).map(e => e.zh);
+  // (strings only compared against, such as L.search[0].startsWith("打給"), are not shown)
+  const todo = shownOurs.filter(e => !(e.zh in bundle.story) && !(e.zh in bundle.words) && !["打給", "去職訓局"].includes(e.zh)).map(e => e.zh);
   assert.deepEqual(todo, []);
   for (const t of Object.values(ACTIONS)) assert.ok(t.label in bundle.story, t.label);
   // keys stay distinct in the shipped bundle
@@ -240,11 +270,12 @@ test("in Chinese, a choice's own topic opens a written answer exactly as its fir
   let n = 0;
   for (const [j, st] of states().entries()) {
     for (const ev of EVENTS.filter(e => e.choice)) {
-      for (let seed = 0; seed < 4; seed++) {
+      for (let seed = 0; seed < 3; seed++) {
         const s = structuredClone(st.s), rng = makeRng(j * 97 + seed);
         const en = { w: (t, v, tr, text) => text, f: (t, v) => fill(t, v) };
         const ctx = makeCtx(s, en, rng, st);
         ctx.f = fill; ctx.lang = "zh";
+        if (ev.when && !ev.when(s, ctx)) continue;
         const c = ev.choice(s, ctx);
         if (!c || !c.prompt) continue;
         n++;
