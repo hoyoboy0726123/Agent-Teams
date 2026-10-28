@@ -12,7 +12,6 @@ import { ALL_EVENTS, deathEvent } from "./story/index.js";
 import { ACTIONS } from "./actions.js";
 import { act, closeSpell } from "./act.js";
 import { expand, fill } from "./grammar.js";
-import { makeLang } from "./lang.js";
 import { initTraits, nudge, styleWeight } from "./traits.js";
 import { newPerson, pronoun } from "./people.js";
 import { chatTool, tripPlace, jobElement } from "./world.js";
@@ -99,11 +98,13 @@ const STYLE_NUDGE = { risk: [["drive", 0.02], ["caution", -0.02]], safe: [["caut
 //   seen       the kinds of question the player was asked in recent lives (the page keeps them for this tab only).
 //              Everyday questions among them come up less often (NOVELTY) and the others a little more (FRESH), so a
 //              replay brings other situations; the big decisions, and questions certain in their year, are as always.
-//   lang       "zh" (the default) or "en" with `catalog`, the English bundle (lang.js). The life is the same in both:
+//   lang       "zh" (the default) or "en" with `english`, the translator lang.js makeLang() makes from the English
+//              bundle (passed in, so the Chinese page carries neither). The life is the same in both languages:
 //              English only changes the words the story shows, never a draw.
-export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed = 1, auto = false, policy = null, county = null, name = null, family = null, majorOnly = false, seen = null, lang = "zh", catalog = null }) {
+export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed = 1, auto = false, policy = null, county = null, name = null, family = null, majorOnly = false, seen = null, lang = "zh", english = null }) {
   if (lang !== "zh" && lang !== "en") throw new Error(`unknown language ${lang}`);
-  const en = lang === "en" ? makeLang(catalog) : null;
+  if (lang === "en" && !(english && english.w)) throw new Error("English needs english: makeLang(bundle) (sim/lang.js)");
+  const en = lang === "en" ? english : null;
   const rng = makeRng(seed);
   const recent = seen && seen.length ? new Set(seen) : null;
   // A separate stream decides whether the calibrated core events happen and who dies when, so adding a story

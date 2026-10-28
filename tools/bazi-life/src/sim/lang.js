@@ -8,13 +8,16 @@
 //   ctx.f(template, vars)   the same for a template without alternatives (what was a `…${x}…` template literal)
 //   text, prompt, label, hint, choice   a plain Chinese string the story shows is looked up as it stands
 // The catalog is the bundle the page fetches only in English (public/i18n/story-en.json, built from src/i18n/en/):
-//   story  { Chinese template or string: English }
+//   story  { key of the Chinese template or string (storyKey): English }
 //   words  { Chinese word: English }   jobs, places, relations, pronouns, the slots' defaults ("另一半" → your partner)
 //   names  { surnames: { 陳: "Chen" }, chars: { 天: "tien" } }   for romanising names (romanise below)
 // A Chinese value with no English is left as it is and listed in `missing`, so a test can say what is still to do.
-import { render, fill } from "./grammar.js";
+// The page imports this file only for English: createLife({ lang: "en", english: makeLang(bundle) }), so neither the
+// bundle nor this code is in the Chinese page.
+import { fill, closing, alternatives } from "./grammar.js";
+import { hashSeed } from "./rng.js";
 
-const CJK = /[㐀-鿿豈-﫿]/;
+const CJK = /[\u3000-\u303f\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]/;   // Han, and CJK and full-width punctuation
 export const hasCJK = t => CJK.test(String(t));
 
 // ---------- English grammar ----------
@@ -83,18 +86,73 @@ export function romanise(zh, names) {
   return given(chars);
 }
 
+// ---------- templates ----------
+// Expands a template with the picks of a trace instead of random draws: the n-th {a|b} group takes the part the
+// n-th group of the traced template took (modulo its own count, and the first part past the end of the trace).
+// {name} and {name:filter…} are written by `value(spec)`; see lang.js for the filters.
+export function render(template, trace, value) {
+  const cursor = { i: 0 };
+  const walk = (t, tr, cur) => {
+    let out = "";
+    for (let i = 0; i < t.length;) {
+      if (t[i] !== "{") { out += t[i++]; continue; }
+      const end = closing(t, i);
+      if (end < 0) { out += t.slice(i); break; }
+      const inner = t.slice(i + 1, end), parts = alternatives(inner);
+      if (parts.length > 1) {
+        const step = tr[cur.i++], k = step ? step.k % parts.length : 0;
+        out += walk(parts[k], step ? step.sub || [] : [], { i: 0 });
+      } else if (/^\w+(:[^{}|]*)?$/.test(inner)) out += value(inner);
+      else out += walk(inner, tr, cur);
+      i = end + 1;
+    }
+    return out;
+  };
+  return walk(template, trace || [], cursor);
+}
+
+// The shape a translation must keep: the {name}s used anywhere (without filters), and the number of parts of each
+// top-level {a|b} group, in order (groups inside a group without alternatives count as top-level, as in expand).
+// byPart: for each top-level group, the names each of its parts uses (lazy slots such as {friend} must match).
+export function shape(template) {
+  const vars = new Set(), alts = [], byPart = [];
+  const names = t => { const out = new Set(); for (const m of t.matchAll(/\{(\w+)(?::[^{}|]*)?\}/g)) out.add(m[1]); return out; };
+  for (const m of template.matchAll(/\{(\w+)(?::[^{}|]*)?\}/g)) vars.add(m[1]);
+  const walk = t => {
+    for (let i = 0; i < t.length;) {
+      if (t[i] !== "{") { i++; continue; }
+      const end = closing(t, i);
+      if (end < 0) break;
+      const inner = t.slice(i + 1, end), parts = alternatives(inner);
+      if (parts.length > 1) { alts.push(parts.length); byPart.push(parts.map(p => [...names(p)].sort())); }
+      else if (!/^\w+(:[^{}|]*)?$/.test(inner)) walk(inner);
+      i = end + 1;
+    }
+  };
+  walk(template);
+  return { vars: [...vars].sort(), alts, byPart };
+}
+
 // ---------- the translator ----------
+// The key of a Chinese string in the shipped bundle: its FNV-1a hash in base 36 (the source files in src/i18n/en/ are
+// keyed by the Chinese itself; scripts/story-bundle.mjs hashes them). A bundle without `keys` is keyed by the Chinese.
+export const storyKey = zh => hashSeed(zh).toString(36);
+
 export function makeLang(bundle) {
   if (!bundle || typeof bundle.story !== "object") throw new Error("English needs its catalog (public/i18n/story-en.json)");
-  const story = bundle.story, words = bundle.words || {}, missing = new Set();
+  const words = bundle.words || {}, missing = new Set();
   const has = (m, k) => Object.hasOwn(m, k);
+  const key = bundle.keys === "fnv36" ? storyKey : zh => zh;
+  // The English of a Chinese template or string, or undefined.
+  const find = zh => { const k = key(zh); return Object.hasOwn(bundle.story, k) ? bundle.story[k] : undefined; };
   // A value in English: a number or English as it is; Chinese from the words, the story, or as a name.
   function word(v) {
     if (v === undefined || v === null) return v;
     const t = String(v);
     if (!hasCJK(t)) return t;
     if (has(words, t)) return words[t];
-    if (has(story, t)) return story[t];
+    const sentence = find(t);
+    if (sentence !== undefined) return sentence;
     const name = romanise(t, bundle.names);
     if (name) return name;
     missing.add(t);
@@ -113,13 +171,15 @@ export function makeLang(bundle) {
     text: t => (t === undefined || t === null ? t : word(t)),
     // ctx.w: `trace` holds the picks of the Chinese expansion, `zh` the Chinese sentence it made.
     w(template, vars, trace, zh) {
-      if (!has(story, template)) { missing.add(template); return zh; }
-      return render(story[template], trace, value(vars));
+      const en = find(template);
+      if (en === undefined) { missing.add(template); return zh; }
+      return render(en, trace, value(vars));
     },
     // ctx.f
     f(template, vars) {
-      if (!has(story, template)) { missing.add(template); return fill(template, vars); }
-      return render(story[template], [], value(vars));
+      const en = find(template);
+      if (en === undefined) { missing.add(template); return fill(template, vars); }
+      return render(en, [], value(vars));
     },
   };
 }

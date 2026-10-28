@@ -380,10 +380,90 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 標題右上角的「EN」按鈕把人生模擬頁切成英文，再按「中文」切回來；選過的語言記在這台瀏覽器（`localStorage` 的 `bazi-life.lang`），下次打開照用。第一次來一律是中文：故事和詳批目前只有中文，所以英文是要自己選的。
 
 - **翻的是網頁本身的字**：分頁、歡迎頁、表單、播放列、結局頁的標題和欄位、AI 卡片、頁尾。中文仍然是原稿，寫在 `src/life.html` 和程式裡；`src/i18n/en.json` 用中文原句對英文。`src/i18n.js` 的 `applyLang` 走過整頁，換掉認得的文字節點和 `placeholder`、`aria-label`、`title`，並記住原本的中文好換回來；英文開著的時候，`MutationObserver` 會把程式後來寫進去的字也一起換（例如新增的兄弟姊妹、狀態列的「30 歲」）。帶數字的幾種句型（「30 歲」「這一次，你活到 88 歲。」「2 個孩子」、十神）用 `PATTERNS` 換。
-- **還是中文的部分**：人生故事、抉擇、八字命理詳批、同盤重跑的卡片、合婚和準爸媽的結果、AI 解讀。這些容器標著 `data-no-i18n`，英文模式下旁邊會出現一行「目前是中文，英文版正在準備中」（`.en-note`）。
+- **還是中文的部分**：人生故事、抉擇、八字命理詳批、同盤重跑的卡片、合婚和準爸媽的結果、AI 解讀。這些容器標著 `data-no-i18n`，英文模式下旁邊會出現一行「目前是中文，英文版正在準備中」（`.en-note`）。故事的英文翻譯層見「英文版（翻譯層）」。
 - 歡迎頁「剛剛走完的人生」和「此刻出生的寶寶」那一句是程式拼的，用 `t()` 取英文，切換語言時（`langchange` 事件）重畫。
 - 排盤引擎頁（`page.html`）還沒有英文。
 - 測試：`test/life.e2e.mjs` 切到英文檢查分頁、標題、即時數據、表單、狀態列和結局，重新整理後還是英文，切回中文全部換回來。
+
+### 英文版（翻譯層）
+
+給新加坡、馬來西亞、菲律賓和海外華人讀者的英文版：故事和詳批也要能變成英文。目前做好的是翻譯層和一個試點檔案（`src/sim/story/era.js`，42 個時代事件全部有英文）；網頁還沒有接上，故事容器仍標著 `data-no-i18n`，等故事都翻完再接。
+
+**原則：引擎裡永遠是中文。** 狀態、抉擇、每一次亂數都和中文版一樣，英文只在「給人看的字」出口換掉，所以同一個 seed 在中英文是同一段人生（`test/lang.test.js` 檢查事件、年齡、心情、選項逐一相同）。中文模式完全不變：50 段固定 seed 的人生，和加上翻譯層之前記下的摘要逐字相同（`test/fixtures/zh-lives.json`）。
+
+- **語言**：`createLife({ …, lang: "en", english: makeLang(bundle) })`（`src/sim/lang.js`）。預設 `lang: "zh"`。翻譯器從外面傳進來，所以中文網頁不帶英文的程式和資料。
+- **`ctx.w(模板, 變數)`**：中文模板照舊展開（同樣的亂數、同樣的「這句講過了」檢查），同時記下每個 `{甲|乙}` 選了第幾個（`grammar.js` `expand` 的 `trace`）；再用**寫在程式裡的中文模板原文**當鍵，查英文模板，照同樣的選擇展開（`lang.js` `render`）。巢狀的選擇跟著外層走，數量不同時取餘數。
+- **`ctx.f(模板, 變數)`**：只有 `{變數}`、不抽亂數的模板，用來取代 `` `…${x}…` `` 樣板字串。中文模式的結果和原本的樣板字串一字不差。
+- **一般字串**：事件直接回傳的 `text`，以及 `prompt`、`label`、`hint` 和紀錄裡的 `choice`，在出口（`life.js` 的 `record` 和 `pending`）用原句查英文。
+- **變數值**：中文的變數值（`{city}`、`{job}`、`{partner}`、`{abroad}`…）依序查詞彙表、故事句子，最後當成人名羅馬拼音；`{friend}`、`{trip}` 這種「用到才抽」的變數，英文直接讀這個場景已經抽好的那一個，不再抽。
+- **找不到英文**：保留中文，記在 `life.untranslated`，測試和翻譯的人可以看還缺什麼。
+
+**英文模板的規則**（`node scripts/extract-strings.mjs --check` 檢查）：
+
+- 和中文用同一組 `{變數}`；最外層的 `{甲|乙}` 數量、順序和每組的選項數都一樣（英文的第 n 組選中文第 n 組選的那一個，所以英文語序要照中文的組別順序安排；組內可以自由改寫）。`{friend}`、`{trip}` 要在同一組的同一個選項裡。
+- 英文可以加篩選：`{ta:cap}`（大寫開頭）、`{job:a}`（an engineer）、`{ta:obj}` `{ta:pos}` `{ta:refl}`（him、his、himself）、`{n:th}`（3rd）、`{n:child:children}`、`{n:s}`。文法函式在 `lang.js`：`pronoun`（he/she/they）、`article`／`withArticle`（a/an）、`plural`、`ordinal`、`capitalize`。
+- 英文裡不能有中文字或全形標點。
+
+**樣板字串要先改寫**（目前只改了 `era.js`）。`${…}` 混進中文的句子，鍵會隨內容變，查不到英文，所以改成 `{變數}` 模板：
+
+```js
+// 改寫前
+prompt: `${ctx.rng.pick(["大家樂風靡全台。", `${s.employed ? "同事" : "鄰居"}說夢到一組數字。`])}${ctx.rng.pick(["你要跟嗎？", "你怎麼做？"])}`,
+text: ctx.w(`疫情那年，你在${s.abroad}{幾乎不出門，|每天看台灣的新聞，}…`),
+// 改寫後
+prompt: ctx.f("{lead}{ask}", {
+  lead: ctx.rng.pick(["大家樂風靡全台。", ctx.f("{who}說夢到一組數字。", { who: s.employed ? "同事" : "鄰居" })]),
+  ask: ctx.rng.pick(["你要跟嗎？", "你怎麼做？"]),
+}),
+text: ctx.w("疫情那年，你在{abroad}{幾乎不出門，|每天看台灣的新聞，}…", { abroad: s.abroad }),
+```
+
+- 每個 `${x}` 變成 `{名字}` 加一個變數；巢狀的樣板字串變成巢狀的 `ctx.f`。
+- 原本不是 `ctx.w` 的句子要用 `ctx.f`，不能改成 `ctx.w`：`ctx.w` 會抽亂數（選模板），整段人生就不一樣了。
+- `${ctx.rng.pick([…])}` 放進變數物件裡，照原本由左到右的順序寫，亂數抽的順序才不變。
+- `${a ? "同事" : "鄰居"}` 這種中文詞，變數值留中文，英文放進詞彙表（`words.json`）。同一個中文詞在不同句子要不同英文時，不要直接傳詞，改成傳整句（`ctx.f`）或換一個變數名。
+- 已經有的常用變數直接用（`${s.job ? s.job.title : "工作"}` 就是 `{job}`）。
+- 改完跑 `npm test`：中文摘要不變才算改對。
+
+**詞彙表和人名**（`src/i18n/en/words.json`、`names.json`）：縣市、出國的地方、旅行地點、聊天方式、工作、個性、認識的方式、學歷、稱呼和代名詞，以及變數的預設值（另一半 → your partner）。人名用台灣護照的威妥瑪拼音（`scripts/romanise.mjs` 從拼音產生字表）：李天賜 → Lee Tien-tzu、志明 → Chih-ming、阿明 → Ah-ming、小美 → Hsiao-mei。字表只有隨機名字用到的字和常見姓氏；玩家自己輸入的罕見字查不到，名字就照原樣（之後可以讓玩家填英文名）。用語和八字術語見 `src/i18n/glossary.md`。
+
+**英文包與建置**：英文寫在 `src/i18n/en/*.json`（一個故事檔一個 JSON，鍵是中文原句），`npm run build` 用 `scripts/story-bundle.mjs` 合成 `public/i18n/story-en.json`（和網頁一起提交），Worker 在 `/i18n/story-en.json` 提供。網頁只在切到英文時才 `fetch`（`lang.js` `loadStoryBundle`），再 `createLife({ …, lang: "en", english: makeLang(bundle) })`。中文網頁不帶英文包；`lang.js` 目前也沒打包進網頁，接上時可以直接打包（壓縮後約 3 KB），或像英文包一樣另外建成英文時才載入的檔案。現在中文網頁只多了翻譯層的掛鉤（`public/life.html` 多約 0.8 KB）。英文包裡故事的鍵是中文原句的雜湊（`storyKey`，FNV-1a，整個英文包比用中文當鍵小約 30%；兩句撞到同一個鍵時建置會停下來，測試也檢查程式裡所有中文句子的鍵都不同）。現在是 24 KB（gzip 11 KB），含 era.js、詞彙和人名；以 era.js 每個中文字約 5 bytes 推估，故事全部翻完約 0.9 MB，加上詳批約 1.1 MB（gzip 約 0.4 MB）。
+
+**工具**：
+
+```bash
+node scripts/extract-strings.mjs                 # 產生 src/i18n/catalog-zh.json，列出每個檔案的字串數、樣板字串數和已翻譯數
+node scripts/extract-strings.mjs --list era.js   # 每一句的 檔案:行、用在哪（w、f、prompt、label、hint、text、other）、要不要改寫
+node scripts/extract-strings.mjs --mixed child.js  # 只列要先改寫的樣板字串
+node scripts/extract-strings.mjs --todo child.js   # 還沒有英文的句子，JSON 格式，可直接貼進 src/i18n/en/child.json
+node scripts/extract-strings.mjs --check         # 英文的變數、選項數、殘留中文；中文原句已經不在程式裡的鍵
+node scripts/romanise.mjs                        # 重新產生人名字表
+```
+
+`catalog-zh.json` 依檔案列出每一句（鍵是「檔案#中文的雜湊」，行數變了也不變）。讀程式用的是一個小型 tokenizer（字串、樣板字串和 `${}`、註解、正規表示式），和 TypeScript 的 parser 對過 52 個檔案，結果一樣。
+
+**還要做的**（中文字數不含註解）：
+
+| 檔案 | 中文字 | 字串 | 要改寫的樣板字串 | 說明 |
+| --- | --- | --- | --- | --- |
+| `story/era.js` | 3.1k | 132 | 0（改好了） | 完成 |
+| `story/child.js`、`teen.js`、`young.js`、`adult.js` | 27k、32k、36k、26k | 1.7k–2.8k | 457、525、620、457 | 樣板字串最多，先改寫再翻 |
+| `story/later.js`、`health.js` | 21k、28k | 1.0k、1.4k | 80、233 | |
+| `story/core.js`、`work.js` | 11k、2.4k | 944、272 | 185、56 | `core.js` 有拆中文句子的程式（見下） |
+| `sim/act.js`、`actions.js`、`life.js`、`rates.js`、`words.js`、`world.js` | 約 7k | | 少 | 一般行動的結果、自己寫選項的開頭、家人稱呼、命盤原因的句子 |
+| `core/reading-*.js`、`detail.js`、`hehun.js`、`partner.js`、`luck.js` | 約 41k | | 約 1,000 | 不經過 `ctx`：要一個模組層級的 `f()`（同一個英文包），以及八字術語表 |
+| `core/name-*.js` | 約 32k | | | 姓名學是中文字的筆畫，英文版另外設計（或不提供） |
+
+以字數看，child.js 約是 era.js 的 9 倍，而且要先改寫 457 個樣板字串；故事全部約是 era.js 的 60 倍、樣板字串約 2,600 個，詳批約 15 倍、樣板字串約 1,000 個。
+
+**已知的坑**：
+
+- 程式切中文句子：`core.js` 的 `memoryLane` 用 `，。！` 切出回憶的第一句，`core.js` 當兵那一句用 `replace(/，.*$/)`，`monte.js` 用 `/到.+工作/` 認出國工作，`life.js` 的 `topicOf` 用 `。` 切出題目的第一句（自己寫選項的開頭）。英文模式下這些拿到的是英文。要翻這些檔案前，先把要用的部分另外存成資料（例如回憶多記一個 `gist`），不要從句子裡切。
+- 句子相加：`lead(sit) + ctx.w(…)`、`m.text + ctx.w(…)` 大約 90 處。英文語序和空格不同，要合成一個模板（`ctx.f("{lead}{rest}", …)`）。
+- 英文模板的組別必須照中文的順序；中文「{原因}{結果}」英文想寫成「結果 because 原因」時，要改寫成不需要倒過來的句子。
+- 同一個中文詞在不同句子要不同英文（「工作」有時是 job、有時是 work），詞彙表一個詞只有一個英文；要另外取變數名或傳整句。
+- 自己寫的選項（`act.js`、`actions.js`）、命盤原因（`luck.js`、`reading-year.js`）、Worker 判讀用的情境（`pending.free`）都還是中文；判讀的 AI 提示詞也要決定讀英文還是中文。
+- 中文摘要的測試在故事改動時也會變：故意改了故事，就 `UPDATE_ZH_LIVES=1 node --test test/lang.test.js`，和那次改動一起提交。
 
 ### 準爸媽模式
 
@@ -508,6 +588,13 @@ CLOUDFLARE_API_TOKEN=proxy-injected CLOUDFLARE_ACCOUNT_ID=a535bb4f35cdac784e0806
 | 路徑 | 說明 |
 | --- | --- |
 | `src/i18n.js`、`src/i18n/en.json` | 中／英切換：網頁本身的字的英文對照（見「中／英切換」） |
+| `src/sim/lang.js` | 英文版的翻譯層：查英文模板、照中文的選擇展開、英文文法、人名羅馬拼音（見「英文版（翻譯層）」） |
+| `src/i18n/en/*.json` | 故事的英文（一個故事檔一個，鍵是中文原句）、詞彙表 `words.json`、人名字表 `names.json`（由 `scripts/romanise.mjs` 產生） |
+| `src/i18n/catalog-zh.json` | 程式裡所有中文字串的清單（由 `scripts/extract-strings.mjs` 產生，不要手改） |
+| `src/i18n/glossary.md` | 英文用語和八字術語 |
+| `scripts/extract-strings.mjs`、`scripts/story-bundle.mjs`、`scripts/romanise.mjs` | 列出中文字串與檢查英文、合成英文包、產生人名字表 |
+| `public/i18n/story-en.json` | 產生出來的英文包，英文模式才下載 |
+| `test/lang.test.js`、`test/helpers/lives.js`、`test/fixtures/zh-lives.json` | 中文不變、中英是同一段人生、era 的英文沒有中文、檢查工具、文法和人名 |
 | `src/core/analysis.js` | 命盤解讀：五行力量、強弱、三派喜忌 |
 | `src/core/tiaohou.js` | 《窮通寶鑑》調候用神表 |
 | `src/core/detail.js` | 命盤細節：神煞、刑沖合害、旺相休囚死、太歲、用神喜忌 |

@@ -11,8 +11,11 @@
 // /api/reading for the AI 命理師解讀; the fragment has no Worker behind it, so it leaves both addresses empty: the page
 // reads the words itself and says the AI reading is on the site. Both pages send anonymous counts to /api/stats
 // (src/stats.js); the fragments send none.
+//   public/i18n/story-en.json   the English of the story (scripts/story-bundle.mjs, from src/i18n/en/), fetched by
+//                               the page only in English, so the Chinese page does not grow (README「英文版（翻譯層）」)
 import { build } from "esbuild";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { storyBundle } from "./story-bundle.mjs";
 import { fileURLToPath } from "node:url";
 
 const TYME4TS_CDN = "https://unpkg.com/tyme4ts@1.5.2/dist/lib/index.mjs";
@@ -52,3 +55,12 @@ await page({
     artifact: { __CHART_URL__: arg("--chart-url") || "https://claude.ai/artifact/3a3ezBHmLKeKBxGaNveAV2", __INTERPRET_URL__: "", __READING_URL__: "", __STATS_URL__: "" },
   },
 });
+
+// The English bundle: checked first (node scripts/extract-strings.mjs --check says what is wrong), then written.
+{
+  const bundle = await storyBundle();
+  await mkdir(at("public/i18n"), { recursive: true });
+  const json = JSON.stringify(bundle);
+  await writeFile(at("public/i18n/story-en.json"), json + "\n");
+  console.log(`public/i18n/story-en.json ${(json.length / 1024).toFixed(0)} KB (${Object.keys(bundle.story).length} story strings, ${Object.keys(bundle.words).length} words)`);
+}
