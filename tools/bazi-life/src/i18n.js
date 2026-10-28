@@ -11,7 +11,8 @@ const LANGS = ["zh", "en"];
 let current = "zh";
 
 const BRANCH = { 子: "Zi", 丑: "Chou", 寅: "Yin", 卯: "Mao", 辰: "Chen", 巳: "Si", 午: "Wu", 未: "Wei", 申: "Shen", 酉: "You", 戌: "Xu", 亥: "Hai" };
-const GOD = { 比肩: "Companion", 劫財: "Rob Wealth", 食神: "Eating God", 傷官: "Hurting Officer", 正財: "Direct Wealth", 偏財: "Indirect Wealth", 正官: "Direct Officer", 七殺: "Seven Killings", 正印: "Direct Resource", 偏印: "Indirect Resource" };
+// The Ten Profiles (十神) by the glossary's names (src/i18n/glossary.md), as the readings use them.
+const GOD = { 比肩: "Peer", 劫財: "Rival", 食神: "Creator", 傷官: "Rebel", 正財: "Steady Wealth", 偏財: "Windfall Wealth", 正官: "Authority", 七殺: "Challenger", 正印: "Nurturer", 偏印: "Maverick" };
 const PATTERNS = [
   [/^(\d+) 歲$/, m => `Age ${m[1]}`],
   [/^(\d{4}) 年$/, m => m[1]],
