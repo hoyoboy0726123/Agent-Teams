@@ -9,6 +9,8 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { ADMIN_HTML } from "../worker/admin.js";
+import { dayOf } from "../worker/stats.js";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT || "playwright");
@@ -20,8 +22,17 @@ const check = (name, ok, extra = "") => { results.push(!!ok); console.log(`${ok 
 const PUBLIC = fileURLToPath(new URL("../public/", import.meta.url));
 const beacons = [];
 const ROUTES = { "/": "index.html", "/index.html": "index.html", "/privacy": "privacy.html", "/terms": "terms.html" };
+// The back office reads GET /api/stats with the admin key: a day of counts with AI report clicks.
+const ADMIN_ROWS = () => [["view", 120], ["visitor", 90], ["form_u", 60], ["start", 50], ["end", 44], ["end_u", 40], ["ai_report", 13], ["ai_report_u", 10]].map(([metric, n]) => ({ day: dayOf(Date.now()), page: "life", metric, n }));
 const server = createServer(async (req, res) => {
   const path = new URL(req.url, "http://x").pathname;
+  if (path === "/admin") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(ADMIN_HTML); return; }
+  if (path === "/api/stats" && req.method === "GET") {
+    if (req.headers.authorization !== "Bearer test-key") { res.writeHead(401); res.end("{}"); return; }
+    const rows = {};
+    for (const x of ADMIN_ROWS()) { const k = `${x.day}|${x.page}`; rows[k] = rows[k] || { day: x.day, page: x.page }; rows[k][x.metric] = x.n; }
+    res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ rows: Object.values(rows) })); return;
+  }
   // The anonymous counts (beacons skip Playwright's routing, so the server keeps them for the check at the end).
   if (path === "/api/stats" && req.method === "POST") {
     let body = "";
@@ -161,6 +172,29 @@ async function closeStory(p) {
   check("100 lives: lifespan, marriage, kids, home and career cards", ["Lifespan", "Marriage", "Kids", "Home", "School and career"].every(c => cards.includes(c)), cards.join(", "));
   check("100 lives: framed as fate vs luck", /Written in the stars/.test(await p.textContent("#fate-head")) && /Just luck/.test(await p.textContent("#fate-head")) && (await p.$$("#cards .verdict")).length >= 4);
   check("the life chart gains the band of the 100 lives", await p.$$eval("#plot svg path", ps => ps.length) >= 1 && await p.$$eval("#plot svg polyline", ps => ps.length) >= 1);
+  // The full natal reading, after the fate-vs-luck cards.
+  const chapters = await p.$$eval("#reading-body details.chapter", ds => ds.map(d => d.querySelector(".ch-t b").textContent));
+  check("reading: seven chapters after the 100 lives, the first open", chapters.join("|") === "Chart overview|The Big Three in depth|Planet by planet|Houses: your twelve life areas|Major aspects|Your timeline|Overall reading" && await p.$eval("#reading-body details.chapter", d => d.open) && await p.evaluate(() => document.querySelector("#hundred").compareDocumentPosition(document.querySelector("#reading")) & Node.DOCUMENT_POSITION_FOLLOWING), chapters.join(", "));
+  check("reading: the chart wheel, with 10 planets, 12 signs, aspect lines, a title and the table alternative", await p.$eval("#reading .wheel", s => s.querySelectorAll(".w-planet").length === 10 && s.querySelectorAll(".w-sglyph").length === 12 && s.querySelectorAll(".w-asp").length > 0 && s.getAttribute("role") === "img" && !!s.querySelector("title") && s.getBoundingClientRect().width > 300) && (await p.$$("#reading .r-table tbody tr")).length === 12 && (await p.$$("#reading .r-bar")).length === 7);
+  for (const d of await p.$$("#reading-body details.chapter")) await d.evaluate(el => { el.open = true; });
+  const reading = await p.textContent("#reading");
+  check("reading: the Big Three in depth (Leo Sun, Scorpio Moon, Scorpio rising), planets, houses, aspects", /Sun in Leo · 10th house/.test(reading) && /Moon in Scorpio/.test(reading) && /Scorpio rising/.test(reading) && /Mercury in Leo/.test(reading) && /Saturn in Pisces/.test(reading) && /10th house · Leo/.test(reading) && /sextile|trine|square/.test(reading) && !/undefined|NaN/.test(reading));
+  check("reading: the timeline ties the cycles to this life, and looks ahead ten years from today", /Saturn return I · age 29/.test(reading) && (await p.$$("#r-timeline .r-life")).length >= 3 && /you're 31 now/.test(reading) && (await p.$$eval("#r-timeline .r-list:last-of-type li", ls => ls.length)) === 10);
+  check("reading (1280): nothing overflows with every chapter open", !(await overflow(p)).length, (await overflow(p)).join("; "));
+  if (SHOTS) { await (await p.$("#reading .r-wheel")).screenshot({ path: join(SHOTS, "desktop-wheel.png") }); }
+  for (const d of (await p.$$("#reading-body details.chapter")).slice(1)) await d.evaluate(el => { el.open = false; });
+  if (SHOTS) await (await p.$("#reading")).screenshot({ path: join(SHOTS, "desktop-reading.png") });
+  // The AI report hook: a real-looking button, a friendly message, and the click counted.
+  const aiLabel = (await p.textContent("#ai-btn")).trim();
+  check("AI card: an “AI Astrology Report” pitch with a “Get my AI report” button (no “soon” on it) and the AI note", aiLabel === "Get my AI report" && !/soon/i.test(await p.textContent("#ai-card h3") + aiLabel) && /An AI astrologer reads your whole chart/.test(await p.textContent("#ai-card")) && /For entertainment and self-reflection\. AI-written\./.test(await p.textContent("#ai-card")) && await p.isHidden("#ai-msg"));
+  const sentBefore = beacons.length;
+  await p.click("#ai-btn");
+  check("AI button: shows “Coming soon!” and points at the reading", /^Coming soon! We're putting the finishing touches on AI reports\. Your full chart reading above is ready now\.$/.test((await p.textContent("#ai-msg")).trim()) && await p.isVisible("#ai-msg"));
+  await p.click("#ai-btn");
+  await p.waitForTimeout(2600);
+  const aiEvents = beacons.slice(sentBefore).flatMap(b => JSON.parse(b).e || []);
+  check("AI button: the beacon carries ai_report for each click and ai_report_u once", aiEvents.filter(e => e === "ai_report").length === 2 && aiEvents.filter(e => e === "ai_report_u").length === 1, aiEvents.join(","));
+  if (SHOTS) await (await p.$("#ai-card")).screenshot({ path: join(SHOTS, "desktop-ai-card.png") });
   check("your sky: the Big Three and this life's key astrology moments", /Leo/.test(await p.textContent("#end-bt")) && (await p.$$("#moments li")).length >= 3 && /house/.test(await p.textContent("#moments")));
   await p.waitForSelector("#share-box:not(.loading)", { timeout: 20000 });
   const imgSize = await p.$eval("#share-img", img => [img.naturalWidth, img.naturalHeight, img.src.slice(0, 22), img.alt]);
@@ -202,6 +236,17 @@ async function closeStory(p) {
   await p.waitForSelector("#share-box:not(.loading)", { timeout: 20000 });
   check("phone 360: the ending fits", !(await overflow(p)).length, (await overflow(p)).join("; "));
   await shot(p, "phone-dark-end", { fullPage: true });
+  for (const d of await p.$$("#reading-body details.chapter")) await d.evaluate(el => { el.open = true; });
+  check("phone 360: the reading has its chapters and wheel, and fits with every chapter open", (await p.$$("#reading-body details.chapter")).length === 7 && await p.$eval("#reading .wheel", s => s.getBoundingClientRect().width >= 290) && !(await overflow(p)).length, (await overflow(p)).join("; "));
+  check("random birth: no outlook from a real age, and it says why", /random birth/.test(await p.textContent("#r-timeline")));
+  await p.click("#ai-btn");
+  check("phone 360: the AI message shows and fits", /Coming soon!/.test(await p.textContent("#ai-msg")) && !(await overflow(p)).length, (await overflow(p)).join("; "));
+  if (SHOTS) {
+    await (await p.$("#reading .r-wheel")).screenshot({ path: join(SHOTS, "phone-wheel.png") });
+    for (const d of (await p.$$("#reading-body details.chapter")).slice(1)) await d.evaluate(el => { el.open = false; });
+    await (await p.$("#reading")).screenshot({ path: join(SHOTS, "phone-reading.png") });
+    await (await p.$("#ai-card")).screenshot({ path: join(SHOTS, "phone-ai-card.png") });
+  }
   await p.context().close();
 }
 
@@ -228,6 +273,9 @@ async function closeStory(p) {
   await p.waitForSelector("#cards .card", { timeout: 60000 });
   await p.waitForSelector("#share-box:not(.loading)", { timeout: 20000 });
   check("unknown birth time: the ending says the Rising sign is unknown", /Unknown/.test(await p.textContent("#end-bt")));
+  for (const d of await p.$$("#reading-body details.chapter")) await d.evaluate(el => { el.open = true; });
+  const rd = await p.textContent("#reading");
+  check("unknown birth time: the reading flags solar houses and the missing Rising, without AC on the wheel", /Rising sign: needs a birth time/.test(rd) && /solar houses/.test(rd) && !(await p.$$eval("#reading .w-alabel", ts => ts.length)) && (await p.$$("#reading-body details.chapter")).length === 7 && !(await overflow(p)).length, (await overflow(p)).join("; "));
   await shot(p, "phone-4-end", { fullPage: true });
   if (SHOTS) await (await p.$("#share-box")).screenshot({ path: join(SHOTS, "phone-5-share.png") });
   await p.context().close();
@@ -264,6 +312,19 @@ for (const width of [430, 768, 1024, 1440]) {
   await p.goto(`${SITE}/terms`);
   const terms = await p.textContent("body");
   check("/terms: entertainment only, 988, the astronomy-engine MIT notice", /entertainment and self-reflection only/.test(terms) && /988/.test(terms) && /Don Cross/.test(terms) && /MIT License/.test(terms));
+  await p.context().close();
+}
+
+// ---------- 6. the back office lists the AI report clicks ----------
+for (const width of [1280, 360]) {
+  const p = await fresh({ width, height: 900 });
+  await p.goto(`${SITE}/admin#key=test-key`);
+  await p.waitForSelector("#app:not([hidden])", { timeout: 5000 }).catch(() => {});
+  const tiles = await p.$$eval("#tiles .tile", ts => ts.map(t => [t.querySelector(".k").textContent, t.querySelector(".v").textContent, t.className]));
+  const ai = tiles.find(t => t[0] === "AI report"), rate = tiles.find(t => t[0] === "AI report rate");
+  check(`/admin (${width}): AI report clicks (10 visits, 13 clicks) and the rate per finished life (25%)`, !!ai && ai[1] === "10" && /hi/.test(ai[2]) && !!rate && rate[1] === "25%" && /13 clicks/.test(await p.textContent("#tiles")) && /Pressed AI report/.test(await p.textContent("#funnel")) && /AI report/.test(await p.textContent("#table")) && /25%/.test(await p.textContent("#table")), JSON.stringify(tiles.slice(-2)));
+  check(`/admin (${width}): nothing overflows`, !(await overflow(p)).length, (await overflow(p)).join("; "));
+  if (SHOTS) await shot(p, `admin-${width}`, { fullPage: true });
   await p.context().close();
 }
 

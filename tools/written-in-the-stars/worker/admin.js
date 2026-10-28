@@ -25,6 +25,7 @@ h1 { margin: 0; font-size: 22px; } h2 { margin: 0 0 8px; font-size: 17px; }
 .tabs button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.tile.hi { border-color: var(--accent); } .tile.hi .v { color: var(--accent); }
 .tile .k { color: var(--muted); font-size: 13px; } .tile .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.3; } .tile .n { color: var(--muted); font-size: 12px; }
 .funnel { display: grid; gap: 8px; }
 .step { display: grid; grid-template-columns: 9em 1fr 5.5em; align-items: center; gap: 10px; font-size: 14px; }
@@ -57,9 +58,9 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
       <button type="button" data-days="90">90 days</button>
     </div>
     <section class="tiles" id="tiles" aria-label="Totals"></section>
-    <section class="card"><h2>From visit to share</h2><div class="funnel" id="funnel"></div><p class="fine">Lives started counts games (one visit can play several); finished, written and shared count visits.</p></section>
+    <section class="card"><h2>From visit to share</h2><div class="funnel" id="funnel"></div><p class="fine">Lives started counts games (one visit can play several); finished, written, AI report and shared count visits (once per page load).</p></section>
     <section class="card"><h2>Time on screen</h2><div class="funnel" id="stay"></div><p class="fine">Only while the page is visible.</p></section>
-    <section class="card"><h2>Views and finished lives per day</h2><div id="chart"></div></section>
+    <section class="card"><h2>Views, finished lives and AI report clicks per day</h2><div id="chart"></div><p class="fine">Bars per day: views, finished lives (visits), AI report (visits).</p></section>
     <section class="card"><h2>Day by day</h2><div class="table-wrap"><table id="table"></table></div></section>
     <p class="fine">Counts only: no IP, no birth data or names, no cookies. A visitor is one browser per day; totals over several days add the days up.</p>
   </div>
@@ -111,25 +112,28 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
       ["Page views", n(t.view), "visits"], ["Visitors", n(t.visitor), n(t.return) + " returning"],
       ["Avg time", dur((t.seconds || 0) / (t.view || 0)), "per view"], ["Lives started", n(t.start), n(t.random) + " random births"],
       ["Lives finished", n(t.end_u), "visits (" + n(t.end) + " lives)"], ["Finish rate", pct(t.end_u, t.form_u), "of visits that opened the form"],
-      ["Wrote a decision", n(t.written_u), "visits"], ["Share card", n(t.share_png + t.share_native), n(t.share_native) + " via share sheet"],
+      ["Wrote a decision", n(t.written_u), "visits"], ["Share card", n((t.share_png || 0) + (t.share_native || 0)), n(t.share_native) + " via share sheet"],
       ["988 shown", n(t.help), "safety message"],
+      ["AI report", n(t.ai_report_u), "visits (" + n(t.ai_report) + " clicks)", true],
+      ["AI report rate", pct(t.ai_report_u, t.end_u), "of visits that finished a life", true],
     ];
-    $("#tiles").innerHTML = tiles.map(([k, v, s]) => '<div class="tile"><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="n">' + esc(s) + "</div></div>").join("");
+    $("#tiles").innerHTML = tiles.map(([k, v, s, hi]) => '<div class="tile' + (hi ? " hi" : "") + '"><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="n">' + esc(s) + "</div></div>").join("");
     const steps = (el, items, base) => { $(el).innerHTML = items.map(([k, v]) => '<div class="step"><span>' + k + '</span><span class="bar"><i style="width:' + (base ? Math.min(100, v / base * 100) : 0) + '%"></i></span><span class="num">' + n(v) + "</span></div>").join(""); };
-    steps("#funnel", [["Viewed", t.view || 0], ["Opened the form", t.form_u || 0], ["Started a life", t.start || 0], ["Finished (visits)", t.end_u || 0], ["Downloaded a card", t.share_png || 0]], t.view || 0);
+    steps("#funnel", [["Viewed", t.view || 0], ["Opened the form", t.form_u || 0], ["Started a life", t.start || 0], ["Finished (visits)", t.end_u || 0], ["Pressed AI report", t.ai_report_u || 0], ["Downloaded a card", t.share_png || 0]], t.view || 0);
     steps("#stay", [["30 s or more", t.t30 || 0], ["1 min or more", t.t60 || 0], ["3 min or more", t.t180 || 0], ["10 min or more", t.t600 || 0]], t.view || 0);
     const span = Math.max(7, Math.min(days, 30)), daysList = Array.from({ length: span }, (_, k) => back(span - 1 - k));
     const W = 900, H = 220, P = 40, bw = (W - P) / span, max = Math.max(1, ...daysList.map(d => (map.get(d) || {}).view || 0));
     let svg = '<svg viewBox="0 0 ' + W + " " + (H + 40) + '" width="100%" role="img" aria-label="Views and finished lives per day">';
     daysList.forEach((d, i) => {
-      const r = map.get(d) || {}, x = P + i * bw, hv = (r.view || 0) / max * H, he = (r.end_u || 0) / max * H;
-      svg += '<rect x="' + (x + bw * 0.1) + '" y="' + (H - hv) + '" width="' + bw * 0.45 + '" height="' + hv + '" rx="2" fill="var(--accent-2)"><title>' + d + ": " + (r.view || 0) + " views</title></rect>";
-      svg += '<rect x="' + (x + bw * 0.55) + '" y="' + (H - he) + '" width="' + bw * 0.35 + '" height="' + he + '" rx="2" fill="var(--accent)"><title>' + d + ": " + (r.end_u || 0) + " finished</title></rect>";
+      const r = map.get(d) || {}, x = P + i * bw, hv = (r.view || 0) / max * H, he = (r.end_u || 0) / max * H, ha = (r.ai_report_u || 0) / max * H;
+      svg += '<rect x="' + (x + bw * 0.08) + '" y="' + (H - hv) + '" width="' + bw * 0.34 + '" height="' + hv + '" rx="2" fill="var(--accent-2)"><title>' + d + ": " + (r.view || 0) + " views</title></rect>";
+      svg += '<rect x="' + (x + bw * 0.45) + '" y="' + (H - he) + '" width="' + bw * 0.22 + '" height="' + he + '" rx="2" fill="var(--accent)"><title>' + d + ": " + (r.end_u || 0) + " finished</title></rect>";
+      svg += '<rect x="' + (x + bw * 0.70) + '" y="' + (H - ha) + '" width="' + bw * 0.22 + '" height="' + ha + '" rx="2" fill="var(--muted)"><title>' + d + ": " + (r.ai_report_u || 0) + " AI report</title></rect>";
       if (span <= 7 || i % Math.ceil(span / 7) === 0 || i === span - 1) svg += '<text x="' + (x + bw / 2) + '" y="' + (H + 30) + '" text-anchor="middle">' + d.slice(5).replace("-", "/") + "</text>";
     });
     $("#chart").innerHTML = svg + '<text x="0" y="20">' + max + "</text></svg>";
-    const head = "<tr><th>Day</th><th>Views</th><th>Visitors</th><th>Avg time</th><th>Started</th><th>Finished</th><th>Wrote</th><th>Cards</th></tr>";
-    $("#table").innerHTML = head + (list.length ? list.slice().reverse().map(d => "<tr><td>" + d.day + "</td><td>" + n(d.view) + "</td><td>" + n(d.visitor) + "</td><td>" + dur((d.seconds || 0) / (d.view || 0)) + "</td><td>" + n(d.start) + "</td><td>" + n(d.end_u) + "</td><td>" + n(d.written_u) + "</td><td>" + n((d.share_png || 0) + (d.share_native || 0)) + "</td></tr>").join("") : '<tr><td colspan="8">No data for this period yet.</td></tr>');
+    const head = "<tr><th>Day</th><th>Views</th><th>Visitors</th><th>Avg time</th><th>Started</th><th>Finished</th><th>AI report</th><th>AI rate</th><th>Wrote</th><th>Cards</th></tr>";
+    $("#table").innerHTML = head + (list.length ? list.slice().reverse().map(d => "<tr><td>" + d.day + "</td><td>" + n(d.view) + "</td><td>" + n(d.visitor) + "</td><td>" + dur((d.seconds || 0) / (d.view || 0)) + "</td><td>" + n(d.start) + "</td><td>" + n(d.end_u) + "</td><td>" + n(d.ai_report_u) + "</td><td>" + pct(d.ai_report_u, d.end_u) + "</td><td>" + n(d.written_u) + "</td><td>" + n((d.share_png || 0) + (d.share_native || 0)) + "</td></tr>").join("") : '<tr><td colspan="10">No data for this period yet.</td></tr>');
   }
   if (key) load(); else showLogin("");
 })();

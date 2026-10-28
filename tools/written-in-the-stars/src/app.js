@@ -14,6 +14,8 @@ import { ACTIONS } from "./sim/actions.js";
 import { initPixels, startScene, showStep, collectStep, openStory, closeStory } from "./ui/pixel-app.js";
 import { drawKline, klineTable } from "./ui/kline.js";
 import { drawShareCard, cardBlob } from "./ui/share.js";
+import { natalReading } from "./astro/reading.js";
+import { readingHTML } from "./ui/reading-view.js";
 import { initStats, track, trackOnce, sendLife, heartbeat, liveUrl } from "./ui/stats.js";
 import {
   GLYPH, ELEMENT, SIGN_WORDS, ROLE_HINT, profectionText, verdictOf, hundredFacts, hundredLine, labelOf,
@@ -99,11 +101,12 @@ function start() {
     if (e.target.closest("[data-free-cancel]")) { $("#free-out").innerHTML = ""; $("#free-text").focus(); }
   });
   $("#choice").addEventListener("submit", e => { e.preventDefault(); const t = $("#free-text"); if (t && t.value.trim()) interpretFree(t.value.trim()); });
-  $("#again-same").addEventListener("click", () => { track("again"); begin(run.input, { name: run.name, born: run.born }); });
+  $("#again-same").addEventListener("click", () => { track("again"); begin(run.input, { name: run.name, born: run.born, random: run.random }); });
   $("#again-new").addEventListener("click", () => { stop(); openSetup(); });
   $("#share-png").addEventListener("click", downloadCard);
   $("#share-native").addEventListener("click", shareCard);
   $("#share-native").hidden = !(navigator.share && navigator.canShare);
+  $("#ai-btn").addEventListener("click", aiReport);
   addEventListener("resize", () => { if (run && run.life.done && !$("#end").hidden) redrawChart(); });
   initWelcome();
 }
@@ -216,16 +219,16 @@ function startRandom() {
   const time = { h: rng.int(24), mi: rng.int(60) };
   const name = randomName(rng, y, sex);
   track("random");
-  begin({ date: { y, m, d }, time, place, sex }, { name, born: `The stars dealt you a random birth: ${name}, born ${dateText({ y, m, d })} at ${timeText(time)} in ${place.name}, ${place.state}.` });
+  begin({ date: { y, m, d }, time, place, sex }, { name, random: true, born: `The stars dealt you a random birth: ${name}, born ${dateText({ y, m, d })} at ${timeText(time)} in ${place.name}, ${place.state}.` });
 }
 
 // ---------- playing ----------
-function begin(input, { name = "", born = "" } = {}) {
+function begin(input, { name = "", born = "", random = false } = {}) {
   stop();
   let prep;
   try { prep = prepare(input, { name }); } catch (e) { console.error(e); showError("We couldn't cast a chart for that birth. Check the date, time and place."); show("setup"); return; }
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-  run = { input, name, born, prep, seed, summary: null, life: createLife({ prep, seed, majorOnly: $("#c-major").checked }) };
+  run = { input, name, born, random, prep, seed, summary: null, life: createLife({ prep, seed, majorOnly: $("#c-major").checked }) };
   run.hundred = askHundred(input, name);   // starts at once, in the worker, while the life is played
   const big = prep.chart.bigThree;
   $("#who").innerHTML = `${name ? `<b>${esc(name)}</b> · ` : ""}${esc(dateText(input.date))}, ${esc(timeText(input.time))} · ${esc(input.place.name)}, ${esc(input.place.state)}`;
@@ -443,6 +446,8 @@ function finish() {
   show("end");
   $("#kline-table").innerHTML = klineTable(life, luckAt, !!input.time);
   drawMoments();
+  drawReading();
+  $("#ai-msg").innerHTML = "";
   $("#hundred").classList.add("loading");
   $("#cards").innerHTML = `<p class="wait" role="status">Living it 99 more times…</p>`;
   $("#fate-head").innerHTML = "";
@@ -522,6 +527,26 @@ function drawMoments() {
   const list = moments.filter(m => !seen.has(m.age) && !titles.has(m.title) && seen.add(m.age) && (m.tone || titles.add(m.title))).slice(0, 8).sort((a, b2) => a.age - b2.age);
   const happened = age => { const e = life.log.find(x => x.age === age && x.big && x.id !== "birth") || life.log.find(x => x.age === age && x.id !== "birth"); return e ? e.text : ""; };
   $("#moments").innerHTML = list.length ? list.map(m => `<li class="${m.tone || "sky"}"><span class="m-age">${m.age}<small>${input.date.y + m.age}</small></span><div><b>${esc(m.title)}</b>${m.text ? `<p>${esc(m.text)}</p>` : ""}${happened(m.age) ? `<p class="m-life"><span class="sr">In this life: </span>${esc(happened(m.age))}</p>` : ""}</div></li>`).join("") : `<li><div><p>This life was short, before the big cycles came round.</p></div></li>`;
+}
+
+// ---------- the natal reading and the AI report ----------
+// The full reading of the real birth chart (src/astro/reading.js), with pointers into the life just lived. The outlook
+// for the next ten years is shown for a birth the player typed in (not a random one), from today's date.
+function drawReading() {
+  const { prep, life, input } = run;
+  try {
+    const moons = input.time ? null : moonSignsOfDay(input.date, input.place.tz);
+    const reading = natalReading(prep.chart, { life: { log: life.log, age: life.state.age }, own: !run.random, today: Date.now(), ...(moons ? { moons } : {}) });
+    $("#reading-lede").textContent = reading.lede;
+    $("#reading-body").innerHTML = readingHTML(reading, prep.chart);
+    $("#reading").hidden = false;
+  } catch (e) { console.error(e); $("#reading").hidden = true; }
+}
+// The AI report is not open yet: the button is real, the click is counted (ai_report each time, ai_report_u once per
+// page load; worker/stats.js), and the player is told it is coming. Nothing about the chart is sent.
+function aiReport() {
+  $("#ai-msg").innerHTML = "<b>Coming soon!</b> We're putting the finishing touches on AI reports. Your full chart reading above is ready now.";
+  trackOnce("ai_report");
 }
 
 // ---------- the share card ----------

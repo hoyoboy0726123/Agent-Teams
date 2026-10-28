@@ -90,7 +90,7 @@ export const POINT = { sun: "Sun", moon: "Moon", asc: "Ascendant", mc: "Midheave
 // ---------- the overall reading ----------
 export const STRENGTH = {
   domicile: p => `${p} at home in its own sign`,
-  exaltation: p => `an exalted ${p}`,
+  exaltation: p => `${p}, exalted`,
 };
 export const EDGE = {
   detriment: p => `${p} in detriment, a part of you that works best when you use it consciously`,

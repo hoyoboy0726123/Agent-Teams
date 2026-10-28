@@ -147,3 +147,18 @@ test("tableOf, sameKey and the US Eastern day", () => {
   // 03:00 UTC on Nov 2 is still Nov 1 in New York.
   assert.equal(dayOf(Date.parse("2026-11-02T03:00:00Z")), "2026-11-01");
 });
+
+test("the AI report button's clicks are counted (ai_report each time, ai_report_u once a visit), and /admin shows them per finished life", async () => {
+  const env = statsEnv(), waits = [];
+  const res = await worker.fetch(post({ p: "life", e: ["end", "end_u", "ai_report", "ai_report_u", "ai_report", "ai_report_x"] }), env, { waitUntil: p => waits.push(p) });
+  assert.equal(res.status, 204);
+  await Promise.all(waits);
+  assert.deepEqual(env.added[0].counts, { end: 1, end_u: 1, ai_report: 2, ai_report_u: 1 });
+  assert.deepEqual(readStats({ p: "life", e: ["ai_report"] }).counts, { ai_report: 1 });
+  assert.equal(readStats({ p: "life", e: ["ai_life"] }), null, "bazi-life's name is not this site's");
+  // The back office: a tile for the clicks, and the click rate over the visits that finished a life.
+  assert.match(ADMIN_HTML, /\["AI report", n\(t\.ai_report_u\)/);
+  assert.match(ADMIN_HTML, /\["AI report rate", pct\(t\.ai_report_u, t\.end_u\), "of visits that finished a life"/);
+  assert.match(ADMIN_HTML, /<th>AI report<\/th><th>AI rate<\/th>/);
+  assert.match(ADMIN_HTML, /\["Pressed AI report", t\.ai_report_u/);
+});

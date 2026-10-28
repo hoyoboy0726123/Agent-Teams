@@ -31,6 +31,30 @@ totals and an anonymous summary of finished lives (decade, Sun sign, age, marrie
 - `worker/`: `index.js` (entry), `app.js` (routes), `stats.js`, `stats-store.js` (the `StatsStore` Durable Object),
   `admin.js`. `wrangler.jsonc` deploys it as the Worker `written-in-the-stars`.
 
+## The natal reading and the AI report hook
+
+The ending page reads the player's real birth chart after the fate-vs-luck cards: **“Your birth chart, read in full”**,
+seven collapsible chapters (chart overview with the wheel, element/modality bars, day or night chart and chart ruler;
+the Big Three in depth; planet by planet; the twelve houses; the tightest major aspects; the timeline of profections,
+Saturn and Jupiter returns and the Uranus opposition, tied to this life's events, plus a ten-year outlook from today for a
+birth the player typed in; an overall reading). It is deterministic and hand-written, no AI, about 4,500 words for a
+typical chart:
+
+- `src/astro/reading.js` builds it: `natalReading(chart, { life, own, today, moons })` → chapters of plain blocks.
+  It combines sign × house × dignity × aspects × timing (`timing.js`, `luck.js` `lordCondition`), with traditional
+  rulers. Without a birth time it uses solar houses (flagged), drops the Rising sign and the Moon's aspects, and reads
+  both Moon signs when the Moon changed sign that day.
+- `src/astro/text/`: the text tables: `signs.js` (Sun, Moon, Rising portraits), `planets.js` (8 planets × 12 signs,
+  dignities, retrogrades), `houses.js` (12 houses, 10 bodies × 12 houses, the chart ruler's house), `aspects.js`
+  (45 pairs × conjunction/harmony/tension), `themes.js` (balance, sect, Sun–Moon blends, timeline, synthesis).
+- `src/ui/reading-view.js` renders the chapters; `src/ui/wheel.js` draws the chart wheel (SVG, `role="img"` with a
+  description, and the planet table as its text alternative).
+
+Below it, the **AI Astrology Report** card has a real “Get my AI report” button. AI reports are not open yet: a press
+shows “Coming soon!” and counts `ai_report` (each press) and `ai_report_u` (once per page load), like bazi-life's
+`ai_life`. Nothing about the chart is sent. `/admin` shows both, with the click rate per finished life
+(`ai_report_u / end_u`).
+
 ## Build, test, deploy
 
 ```bash

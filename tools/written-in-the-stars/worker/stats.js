@@ -7,6 +7,7 @@ export const EVENTS = [
   "view", "visitor", "return", "t30", "t60", "t180", "t600",
   "form", "form_u", "start", "random", "skip", "again", "end", "end_u", "written", "written_u", "help",
   "share_png", "share_native",
+  "ai_report", "ai_report_u",   // the "Get my AI report" button on the ending (not open yet): each press, and once per page load
   "beat",   // a page with a life running, once a minute: how many are playing right now (/api/live)
 ];
 const MAX_EVENTS = 20, MAX_SECONDS = 900;
