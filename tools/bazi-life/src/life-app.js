@@ -9,7 +9,6 @@ import { makeRng } from "./sim/rng.js";
 import { randomName } from "./sim/random-name.js";
 import { describeEffects, LEVEL_NAME } from "./core/name.js";
 import { checkFamily, familyTilts, describeFamilyTilts, isSibling } from "./core/family.js";
-import { describeViews } from "./core/analysis.js";
 import { luckGods } from "./core/detail.js";
 import { natalReading, DAY_MASTER_TEXT } from "./core/reading-natal.js";
 import { yearReading, decadeReading, eventReason } from "./core/reading-year.js";
@@ -32,7 +31,7 @@ import { initMatch, onMatchTab, openMatch } from "./hehun-app.js";
 import { aiSoon } from "./ai-mode.js";
 import { initI18n, lang, t } from "./i18n.js";
 import { ensureEnglish, englishNow } from "./english.js";
-import { setReadingLang } from "./core/tr.js";
+import { setReadingLang, tr, trw, trJoin } from "./core/tr.js";
 import { initStats, track, trackOnce, sendLife, heartbeat, LIVE_URL } from "./stats.js";
 import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
@@ -144,7 +143,7 @@ function setup() {
   // 中／英: the page's own words swap by themselves (i18n.js); the welcome lines built here are drawn again.
   initI18n();
   if (lang() === "en") ensureEnglish();
-  document.addEventListener("langchange", () => { drawNow(); if (lastLive) drawLive(lastLive); if (lang() === "en") ensureEnglish(); });
+  document.addEventListener("langchange", () => { drawNow(); if (lastLive) drawLive(lastLive); if (lang() === "en") ensureEnglish(); if (run && run.summary) endNotes(); });
 }
 
 const TABS = ["welcome", "me", "random", "baby", "match"];
@@ -385,6 +384,7 @@ function skipToEnd() {
 
 // The professional reading of the year the person is `age`, computed once per life and age.
 function readingAt(age) {
+  setReadingLang(run.L);   // the readings in the life's language (another tab may have set its own)
   const cache = (run.readings ||= new Map());
   if (!cache.has(age)) cache.set(age, yearReading(run.chart, run.prep.analysis, age));
   return cache.get(age);
@@ -403,17 +403,28 @@ function chartReason(id, age, channel = null) {
   const d = ev && ev.domain && r.domains[ev.domain];
   if (!d || !d.text || !ch) return null;
   const clear = ch === "good" ? d.level >= 2 : ch === "bad" ? d.level <= -2 : Math.abs(d.level) >= 2;
-  return clear ? { short: `${r.pillar}年：${d.text}`, why: null } : null;
+  return clear ? { short: tr("{reasonPillar}年：{domainText}", { reasonPillar: r.pillar, domainText: d.text }), why: null } : null;
 }
-const reasonLine = (r, tag = "span") => (r ? `<${tag} class="why">命理：${esc(r.short)}</${tag}>${r.why ? `<details class="why-more"><summary>為什麼在這個歲數</summary><p>${esc(r.why)}</p></details>` : ""}` : "");
+// The chart's and the family's reasons are in the life's language (render and showChoice set it: setReadingLang). An
+// English life shows a reason only once its text is English (a Chinese term in brackets is fine): the readings'
+// English (reading-year.js, family.js) arrives sentence by sentence, and a half-Chinese line would be worse than none.
+const readable = text => !run || !run.L || !/[\u3400-\u9fff]/.test(String(text).replace(/\([^()]{1,12}\)/g, ""));
+const reasonLine = (r, tag = "span") => {
+  if (!r) return "";
+  const short = tr("命理：{chartWhy}", { chartWhy: r.short });
+  if (!readable(short)) return "";
+  return `<${tag} class="why">${esc(short)}</${tag}>${r.why && readable(r.why) ? `<details class="why-more"><summary>${esc(tr("為什麼在這個歲數"))}</summary><p>${esc(r.why)}</p></details>` : ""}`;
+};
+const familyLine = (text, tag = "span") => { const line = tr("合盤：{familyWhy}", { familyWhy: trw(text) }); return readable(line) ? `<${tag} class="why">${esc(line)}</${tag}>` : ""; };
 const lineOf = e => (run && run.L
   ? `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">${e.free ? "Your own decision" : e.picked ? "As your nature leads" : "Your choice"}: ${esc(e.choice)}</span>` : ""}`
-  : `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">${e.free ? "你自己的決定" : e.picked ? "依你的個性" : "你的選擇"}：${esc(e.choice)}</span>` : ""}`
-    + (e.reason && e.reasonFrom === "family" ? `<span class="why">合盤：${esc(e.reason)}</span>` : "") + reasonLine(chartReason(e.id, e.age, e.channel)));
+  : `<p class="${e.big ? "big" : ""}">${esc(e.text)}</p>${e.choice ? `<span class="chose">${e.free ? "你自己的決定" : e.picked ? "依你的個性" : "你的選擇"}：${esc(e.choice)}</span>` : ""}`)
+    + (e.reason && e.reasonFrom === "family" ? familyLine(e.reason) : "") + reasonLine(chartReason(e.id, e.age, e.channel));
 
 // `focus`: right after a choice, what it led to is scrolled to the top and takes the focus (the choice box is gone).
 function render(entries, { focus = false } = {}) {
   if (!entries.length) return;
+  setReadingLang(run.L);
   const feed = $("#feed");
   for (const e of entries) {
     let li = feed.lastElementChild;
@@ -465,10 +476,10 @@ function updateStatus() {
 function showChoice() {
   stop();
   const p = run.life.pending, box = $("#choice"), L = run.L;
+  setReadingLang(L);
   markSeen(p.id);
-  // English lives leave out the chart's and the family's reasons (Chinese for now) and the written decision, which is
-  // read by a Chinese matcher.
-  const why = L ? "" : reasonLine(chartReason(p.id, run.life.state.age), "p") + (p.why && p.why.from === "family" ? `<p class="why">合盤：${esc(p.why.text)}</p>` : "");
+  // English lives leave out the written decision, which is read by a Chinese matcher.
+  const why = reasonLine(chartReason(p.id, run.life.state.age), "p") + (p.why && p.why.from === "family" ? familyLine(p.why.text, "p") : "");
   const dm = run.prep.analysis.dayMaster, nature = (trait(run.prep.analysis) || "").split("，").pop();
   const leanNote = p.lean >= 0 && !leanNoted ? (L
     ? `<p class="lean-note">Options marked “your nature” come from your Day Master (${esc(L.word(dm.stem))} ${esc(L.word(dm.element))}) and the choices you have made in this life. Any of them is fine.</p>`
@@ -596,6 +607,7 @@ function finish() {
   // The welcome page's 剛剛走完的人生: the decade, the day stem, the age and three big things; nothing that points back.
   sendLife({ decade: decadeOf(input.date.y), stem: chart.dayMaster.name, age: s.age, married: s.marriages, home: s.home === "own", kids: s.kids.length });
   $("#end").hidden = false;
+  endNotes();
   drawKline();
   drawTable();
   drawCards();
@@ -607,7 +619,16 @@ function finish() {
   openStory(s, age => luckAt(prep, age), () => { $("#end").scrollIntoView({ block: "start" }); $("#end-title").focus({ preventScroll: true }); });
 }
 
+// The ending's en-notes: a life lived in Chinese on the English page has its cards and reading in Chinese; an English
+// life says what of it is still Chinese.
+function endNotes() {
+  const en = lang() === "en";
+  $("#end-en-note").hidden = !(en && run && !run.L);
+  $("#end-en-part").hidden = !(en && run && run.L);
+}
+
 function drawKline() {
+  setReadingLang(run.L);
   const { life, summary, prep } = run;
   const plot = $("#plot"), tip = $("#tip");
   const W = Math.max(320, plot.clientWidth || 600), H = 260, L = 34, R = 10, T = 10, B = 28;
@@ -621,7 +642,7 @@ function drawKline() {
   const ticks = [];
   // Every 10 years, or every 20 when the chart is narrow; the last label ends at the edge instead of running past it.
   const every = W < 560 ? 20 : 10;
-  for (let a = 0; a <= maxAge; a += every) ticks.push(`<text x="${x(a)}" y="${H - 8}" text-anchor="${x(a) > W - R - 24 ? "end" : "middle"}" font-size="10" fill="var(--muted)">${a} 歲</text>`);
+  for (let a = 0; a <= maxAge; a += every) ticks.push(`<text x="${x(a)}" y="${H - 8}" text-anchor="${x(a) > W - R - 24 ? "end" : "middle"}" font-size="10" fill="var(--muted)">${esc(a ? tr("{tickAge} 歲", { tickAge: a }) : tr("{firstTick} 歲", { firstTick: a }))}</text>`);
   const candles = life.kline.map(k => {
     const up = k.close >= k.open, cx = x(k.age), top = y(Math.max(k.open, k.close)), h = Math.max(1.5, Math.abs(y(k.open) - y(k.close)));
     const color = up ? "var(--up)" : "var(--down)";
@@ -630,20 +651,21 @@ function drawKline() {
         : `<rect x="${cx - bodyW / 2 + 0.75}" y="${top + 0.75}" width="${Math.max(0.5, bodyW - 1.5)}" height="${Math.max(0.5, h - 1.5)}" rx="1" fill="var(--sheet)" stroke="${color}" stroke-width="1.5"/>`);
   }).join("");
   plot.querySelector("svg")?.remove();
-  plot.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="人生 K 線：每一年的心情起伏，背景是同盤 100 次人生的範圍">${grid}${ticks.join("")}<path d="${area}" fill="var(--band)"/><polyline points="${median}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${candles}<line id="cross" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/><rect id="hit" x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent"/></svg>`);
+  plot.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(tr("人生 K 線：每一年的心情起伏，背景是同盤 100 次人生的範圍"))}">${grid}${ticks.join("")}<path d="${area}" fill="var(--band)"/><polyline points="${median}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${candles}<line id="cross" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/><rect id="hit" x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent"/></svg>`);
   const svg = plot.querySelector("svg"), cross = svg.querySelector("#cross");
   const byAge = new Map(life.kline.map(k => [k.age, k]));
   const eventsAt = age => life.log.filter(e => e.age === age).slice(0, 3);
   const move = ev => {
+    setReadingLang(run.L);
     const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * (W / r.width);
     const age = Math.max(0, Math.min(maxAge, Math.round((px - L) / step)));
     const k = byAge.get(age), b = band.find(z => z.age === age), l = luckAt(prep, age);
     if (!k && !b) { tip.hidden = true; cross.setAttribute("visibility", "hidden"); return; }
     cross.setAttribute("x1", x(age)); cross.setAttribute("x2", x(age)); cross.setAttribute("visibility", "visible");
-    tip.innerHTML = `<b>${age} 歲</b>${k ? `（${k.year} 年）` : ""}${l ? `・流年 ${esc(l.year)}` : ""}`
-      + (k ? `<br>這一次的心情：${k.close}` : "<br>這一次已經離世")
-      + (b ? `<br>100 次的中位數：${b.p50}` : "")
-      + eventsAt(age).map(e => `<br>・${esc(e.text)}`).join("");
+    tip.innerHTML = `<b>${esc(tr("{tipAge} 歲", { tipAge: age }))}</b>${k ? esc(tr("（{tipYear} 年）", { tipYear: k.year })) : ""}${l ? esc(tr("・流年 {tipPillar}", { tipPillar: l.year })) : ""}`
+      + (k ? `<br>${esc(tr("這一次的心情：{tipMood}", { tipMood: k.close }))}` : `<br>${esc(tr("這一次已經離世"))}`)
+      + (b ? `<br>${esc(tr("100 次的中位數：{tipMedian}", { tipMedian: b.p50 }))}` : "")
+      + eventsAt(age).map(e => `<br>${run.L ? "• " : "・"}${esc(e.text)}`).join("");
     tip.hidden = false;
     const left = Math.min(r.width - 250, Math.max(0, (x(age) / W) * r.width + 12));
     tip.style.left = `${left}px`; tip.style.top = "8px";
@@ -655,12 +677,13 @@ function drawKline() {
 
 function drawTable() {
   const { life, prep } = run;
-  $("#kline-table").innerHTML = `<table><thead><tr><th>年齡</th><th>年份</th><th>流年</th><th>開</th><th>收</th><th>高</th><th>低</th></tr></thead><tbody>${life.kline.map(k => `<tr><td>${k.age} 歲</td><td>${k.year}</td><td>${esc((luckAt(prep, k.age) || {}).year || "")}</td><td>${k.open}</td><td>${k.close}</td><td>${k.high}</td><td>${k.low}</td></tr>`).join("")}</tbody></table>`;
+  $("#kline-table").innerHTML = `<table><thead><tr><th>年齡</th><th>年份</th><th>流年</th><th>開</th><th>收</th><th>高</th><th>低</th></tr></thead><tbody>${life.kline.map(k => `<tr><td>${k.age} 歲</td><td>${k.year}</td><td>${esc(trw((luckAt(prep, k.age) || {}).year || ""))}</td><td>${k.open}</td><td>${k.close}</td><td>${k.high}</td><td>${k.low}</td></tr>`).join("")}</tbody></table>`;
 }
 
+// The year's reason comes from core/luck.js; an English life falls back to the plain line until it has English.
 function hurdleList(h, withBody) {
-  if (!h.years.length) return `<p>這張命盤在這方面沒有特別明顯的關卡年。</p>`;
-  return `<ul>${h.years.map(y => `<li><b>${y.age} 歲</b>（${y.year}）：${esc(y.reason || "流年對這方面不利")}。${withBody && y.body ? `傳統命理上，${y.body.element}對應${esc(y.body.system)}。` : ""}100 次裡有 ${y.hits} 次在這前後出事。</li>`).join("")}</ul>`;
+  if (!h.years.length) return `<p>${esc(tr("這張命盤在這方面沒有特別明顯的關卡年。"))}</p>`;
+  return `<ul>${h.years.map(y => `<li><b>${esc(tr("{hurdleAge} 歲", { hurdleAge: y.age }))}</b>${esc(tr("（{hurdleYear}）：{hurdleReason}。", { hurdleYear: y.year, hurdleReason: y.reason && readable(trw(y.reason)) ? trw(y.reason) : tr("流年對這方面不利") }))}${withBody && y.body ? esc(tr("傳統命理上，{bodyElement}對應{bodySystem}。", { bodyElement: y.body.element, bodySystem: y.body.system })) : ""}${esc(tr("100 次裡有 {hurdleHits} 次在這前後出事。", { hurdleHits: y.hits }))}</li>`).join("")}</ul>`;
 }
 
 function drawCards() {
@@ -668,29 +691,30 @@ function drawCards() {
   const h = Object.fromEntries(r.hurdles.map(x => [x.domain, x]));
   const max = Math.max(...r.lifespan.bins.map(b => b.n), 1);
   const bins = r.lifespan.bins.filter(b => b.from >= 40 || b.n > 0);
-  const hist = `<div class="hist" role="img" aria-label="100 次人生的壽命分布">${bins.map(b => `<i title="${b.from}–${b.to} 歲：${b.n} 次" style="height:${Math.max(2, Math.round(b.n / max * 66))}px"></i>`).join("")}</div><div class="hist-axis"><span>${bins[0].from} 歲</span><span>${bins[bins.length - 1].to} 歲</span></div>`;
+  const hist = `<div class="hist" role="img" aria-label="${esc(tr("100 次人生的壽命分布"))}">${bins.map(b => `<i title="${esc(tr("{binFrom}–{binTo} 歲：{binLives} 次", { binFrom: b.from, binTo: b.to, binLives: b.n }))}" style="height:${Math.max(2, Math.round(b.n / max * 66))}px"></i>`).join("")}</div><div class="hist-axis"><span>${esc(tr("{axisFrom} 歲", { axisFrom: bins[0].from }))}</span><span>${esc(tr("{axisTo} 歲", { axisTo: bins[bins.length - 1].to }))}</span></div>`;
+  // The helplines: Taiwan's 1925 in Chinese; in English also a word for readers elsewhere.
   const cards = [
-    `<div class="card"><h3>壽命</h3>
-      <p class="count">100 次人生裡，一半落在 <em>${r.lifespan.p25}–${r.lifespan.p75} 歲</em>之間</p>
+    `<div class="card"><h3>${esc(tr("壽命"))}</h3>
+      <p class="count">${tr("100 次人生裡，一半落在 <em>{p25}–{p75} 歲</em>之間", { p25: r.lifespan.p25, p75: r.lifespan.p75 })}</p>
       ${hist}
-      <p>中位數 ${r.lifespan.median} 歲。活過 90 歲有 ${r.lifespan.over90} 次，不到 60 歲有 ${r.lifespan.under60} 次。這一次活到 ${s.age} 歲，只是其中一種可能。</p>
-      <p class="help">如果這個結果讓你心裡不舒服，可以打 1925 安心專線（24 小時）。</p>
-      <p class="fine">壽命以內政部生命表為基準，命盤只讓機率傾斜，不是預言。</p></div>`,
-    `<div class="card"><h3>健康</h3>
-      <p class="count">100 次裡，有 <em>${r.seriousBefore60} 次</em>在 60 歲前生過重病</p>
-      <p>重病指癌症、中風或心臟病；一輩子生過重病的有 ${r.seriousEver} 次。命盤上的健康關卡年：</p>
+      <p>${esc(tr("中位數 {median} 歲。活過 90 歲有 {over90} 次，不到 60 歲有 {under60} 次。這一次活到 {thisAge} 歲，只是其中一種可能。", { median: r.lifespan.median, over90: r.lifespan.over90, under60: r.lifespan.under60, thisAge: s.age }))}</p>
+      <p class="help">${esc(tr("如果這個結果讓你心裡不舒服，可以打 1925 安心專線（24 小時）。"))}</p>
+      <p class="fine">${esc(tr("壽命以內政部生命表為基準，命盤只讓機率傾斜，不是預言。"))}</p></div>`,
+    `<div class="card"><h3>${esc(tr("健康"))}</h3>
+      <p class="count">${tr("100 次裡，有 <em>{seriousBefore60} 次</em>在 60 歲前生過重病", { seriousBefore60: r.seriousBefore60 })}</p>
+      <p>${esc(tr("重病指癌症、中風或心臟病；一輩子生過重病的有 {seriousEver} 次。命盤上的健康關卡年：", { seriousEver: r.seriousEver }))}</p>
       ${hurdleList(h.health, true)}
-      <p class="fine">真實的健康風險，要看健康檢查和醫師的建議，不是看命盤。</p></div>`,
-    `<div class="card"><h3>婚姻</h3>
-      <p class="count">100 次裡有 <em>${r.married} 次</em>結婚，其中 ${r.divorced} 次離過婚</p>
-      <p>沒有孩子 ${r.kids[0].runs} 次，一個 ${r.kids[1].runs} 次，兩個 ${r.kids[2].runs} 次，三個以上 ${r.kids[3].runs} 次。命盤上的婚姻關卡年：</p>
+      <p class="fine">${esc(tr("真實的健康風險，要看健康檢查和醫師的建議，不是看命盤。"))}</p></div>`,
+    `<div class="card"><h3>${esc(tr("婚姻"))}</h3>
+      <p class="count">${tr("100 次裡有 <em>{married} 次</em>結婚，其中 {divorced} 次離過婚", { married: r.married, divorced: r.divorced })}</p>
+      <p>${esc(tr("沒有孩子 {kids0} 次，一個 {kids1} 次，兩個 {kids2} 次，三個以上 {kids3} 次。命盤上的婚姻關卡年：", { kids0: r.kids[0].runs, kids1: r.kids[1].runs, kids2: r.kids[2].runs, kids3: r.kids[3].runs }))}</p>
       ${hurdleList(h.love, false)}
-      <p class="fine">感情是兩個人一起經營的。模擬裡的抉擇，也會改變婚姻的結局。</p></div>`,
-    `<div class="card"><h3>事業與財務</h3>
-      <p class="count">100 次裡有 <em>${r.university} 次</em>讀到大學以上，${r.homeOwner} 次買了房子</p>
-      <p>事業關卡年：</p>${hurdleList(h.career, false)}
-      <p>財務關卡年：</p>${hurdleList(h.wealth, false)}
-      <p class="fine">關卡年是命盤上不利的年份，不代表一定會出事。</p></div>`,
+      <p class="fine">${esc(tr("感情是兩個人一起經營的。模擬裡的抉擇，也會改變婚姻的結局。"))}</p></div>`,
+    `<div class="card"><h3>${esc(tr("事業與財務"))}</h3>
+      <p class="count">${tr("100 次裡有 <em>{university} 次</em>讀到大學以上，{homeOwner} 次買了房子", { university: r.university, homeOwner: r.homeOwner })}</p>
+      <p>${esc(tr("事業關卡年："))}</p>${hurdleList(h.career, false)}
+      <p>${esc(tr("財務關卡年："))}</p>${hurdleList(h.wealth, false)}
+      <p class="fine">${esc(tr("關卡年是命盤上不利的年份，不代表一定會出事。"))}</p></div>`,
   ];
   $("#cards").innerHTML = cards.join("");
 }
@@ -699,82 +723,94 @@ function drawCards() {
 const LEVEL_CLASS = { 1: "lv-good", 0: "", "-1": "lv-bad" };
 const SCORED = ["人格", "地格", "外格", "總格"];
 
+// The English name card shows each character with its sound: Yi (怡).
+const charWith = ch => (run.L ? `${trw(ch)} (${ch})` : ch);
+// Words in a list: 火、土 in Chinese, "Fire and Earth" in English.
+const andList = words => { const w = words.map(trw); return run.L && w.length > 1 ? `${w.slice(0, -1).join(", ")} and ${w[w.length - 1]}` : trJoin(w); };
+const isEnLife = () => !!run.L;
 function nameCard() {
   const { prep, extra } = run, n = prep.name;
-  if (!n) return `<div class="card"><h3>姓名：${esc(extra.name)}</h3><p>${esc(prep.nameError || "沒有辦法分析這個名字。")}這次沒有計算姓名學，名字還是會出現在故事裡。</p></div>`;
+  if (!n) return `<div class="card"><h3>${esc(tr("姓名：{cardName}", { cardName: extra.name }))}</h3><p>${esc(tr("{nameError}這次沒有計算姓名學，名字還是會出現在故事裡。", { nameError: trw(prep.nameError || tr("沒有辦法分析這個名字。")) }))}</p></div>`;
   const good = SCORED.filter(k => n.grids[k].level > 0).length;
   const rows = ["天格", ...SCORED].map(k => {
     const g = n.grids[k], scored = k !== "天格";
     const level = scored
-      ? `<span class="${LEVEL_CLASS[g.level]}">${LEVEL_NAME[g.level]}</span>${g.agree ? "" : `<br><small class="muted">兩個數理表：${g.tables.join("、")}</small>`}${g.readings > 1 ? `<br><small class="muted">${g.readings} 種筆畫算法裡 ${g.good} 種是吉</small>` : ""}`
-      : `<span class="muted">不計分</span>`;
-    return `<tr><td>${k}</td><td class="n">${g.value}</td><td>${g.element}</td><td>${level}</td><td class="muted">${esc(g.role)}</td></tr>`;
+      ? `<span class="${LEVEL_CLASS[g.level]}">${esc(LEVEL_NAME[g.level])}</span>${g.agree ? "" : `<br><small class="muted">${esc(tr("兩個數理表：{numberTables}", { numberTables: trJoin(g.tables.map(trw)) }))}</small>`}${g.readings > 1 ? `<br><small class="muted">${esc(tr("{strokeReadings} 種筆畫算法裡 {goodReadings} 種是吉", { strokeReadings: g.readings, goodReadings: g.good }))}</small>` : ""}`
+      : `<span class="muted">${esc(tr("不計分"))}</span>`;
+    return `<tr><td>${esc(trw(k))}</td><td class="n">${g.value}</td><td>${esc(trw(g.element))}</td><td>${level}</td><td class="muted">${esc(trw(g.role))}</td></tr>`;
   }).join("");
-  const strokes = n.chars.map(c => `${c.ch} ${c.strokes.all.join(" 或 ")} 畫`).join("、");
+  const strokes = trJoin(n.chars.map(c => tr("{strokeChar} {strokeCounts} 畫", { strokeChar: charWith(c.ch), strokeCounts: c.strokes.all.join(isEnLife() ? " or " : " 或 ") })));
   const given = n.chars.slice([...n.surname].length), useful = prep.analysis.useful;
   const hit = [...new Set(given.filter(c => useful.includes(c.number)).map(c => c.number))];
   const missed = [...new Set(given.filter(c => prep.analysis.avoid.includes(c.number)).map(c => c.number))];
-  const verdict = hit.length ? `補到了喜用的${hit.join("、")}` : missed.length ? `名字的${missed.join("、")}是你比較忌的五行` : "沒有特別補到喜用";
-  const supplement = `<p>名字補八字：${given.map(c => `${esc(c.ch)} ${c.strokes.primary} 畫屬${c.number}`).join("、")}。你的喜用是${useful.length ? useful.join("、") : "（不明顯）"}，${verdict}。</p>`;
+  const els = andList;
+  const verdict = hit.length ? tr("補到了喜用的{hitElements}", { hitElements: els(hit) }) : missed.length ? tr("名字的{missedElements}是你比較忌的五行", { missedElements: els(missed) }) : tr("沒有特別補到喜用");
+  const supplement = `<p>${esc(tr("名字補八字：{nameChars}。你的喜用是{usefulList}，{nameVerdict}。", { nameChars: trJoin(given.map(c => tr("{givenChar} {givenStrokes} 畫屬{givenElement}", { givenChar: charWith(c.ch), givenStrokes: c.strokes.primary, givenElement: c.number }))), usefulList: useful.length ? els(useful) : tr("（不明顯）"), nameVerdict: verdict }))}</p>`;
   const effects = describeEffects(n.effects);
-  return `<div class="card"><h3>姓名：${esc(n.full)}</h3>
-    <p class="count">計分的四格裡有 <em>${good} 格是吉</em>，三才「${n.sancai.elements}」${n.sancai.name}</p>
-    <p>康熙筆畫：${esc(strokes)}</p>
-    <div class="table-wrap"><table class="grids"><thead><tr><th>格</th><th>數</th><th>五行</th><th>吉凶</th><th>代表</th></tr></thead><tbody>${rows}</tbody></table></div>
+  return `<div class="card"><h3>${esc(tr("姓名：{cardName}", { cardName: n.full }))}</h3>
+    <p class="count">${tr("計分的四格裡有 <em>{goodGrids} 格是吉</em>，三才「{sancaiElements}」{sancaiName}", { goodGrids: good, sancaiElements: run.L ? [...n.sancai.elements].map(trw).join("–") : n.sancai.elements, sancaiName: n.sancai.name })}</p>
+    <p>${esc(tr("康熙筆畫：{kangxiStrokes}", { kangxiStrokes: strokes }))}</p>
+    <div class="table-wrap"><table class="grids"><thead>${tr("<tr><th>格</th><th>數</th><th>五行</th><th>吉凶</th><th>代表</th></tr>")}</thead><tbody>${rows}</tbody></table></div>
     ${supplement}
-    ${effects.length ? `<p>在這次模擬裡，名字讓：</p><ul>${effects.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "<p>這個名字在模擬裡沒有明顯的傾斜。</p>"}
-    <p class="fine">姓名學的流派很多，筆畫算法和 81 數理表都有不同版本。這裡用康熙筆畫，兩個數理表看法不同時算半吉；天格是祖先傳下來的姓，多數流派不論吉凶。名字的影響最多 ±5%，而且不會影響壽命和重病。</p></div>`;
+    ${effects.length ? `<p>${esc(tr("在這次模擬裡，名字讓："))}</p><ul>${effects.map(x => `<li>${esc(trw(x))}</li>`).join("")}</ul>` : `<p>${esc(tr("這個名字在模擬裡沒有明顯的傾斜。"))}</p>`}
+    <p class="fine">${esc(tr("姓名學的流派很多，筆畫算法和 81 數理表都有不同版本。這裡用康熙筆畫，兩個數理表看法不同時算半吉；天格是祖先傳下來的姓，多數流派不論吉凶。名字的影響最多 ±5%，而且不會影響壽命和重病。"))}</p></div>`;
 }
 
 function familyCard() {
   const { prep, summary } = run, family = prep.family;
   const toneClass = t => (t === "互補" ? "tone-good" : t === "需要磨合" ? "tone-bad" : "tone-even");
   const items = family.members.map(m => {
-    const who = `${m.label}${m.name ? `（${esc(m.name)}）` : ""}`;
-    if (!m.bond) return `<li><b>${who}</b><small>沒有填生日，只用名字出現在故事裡</small></li>`;
-    const notes = m.bond.notes.length ? m.bond.notes.map(x => esc(x.text)).join("；") : "沒有明顯的合、沖或生剋";
-    return `<li><b>${who}<span class="tone ${toneClass(m.bond.tone)}">${m.bond.tone}</span></b><small>${notes}</small></li>`;
+    const cap = t => (run.L ? t.charAt(0).toUpperCase() + t.slice(1) : t);
+    const who = esc(cap(m.name ? tr("{memberLabel}（{memberName}）", { memberLabel: m.label, memberName: m.name }) : trw(m.label)));
+    if (!m.bond) return `<li><b>${who}</b><small>${esc(tr("沒有填生日，只用名字出現在故事裡"))}</small></li>`;
+    const notes = m.bond.notes.length ? m.bond.notes.map(x => esc(trw(x.text))).join(isEnLife() ? "; " : "；") : esc(tr("沒有明顯的合、沖或生剋"));
+    return `<li><b>${who}<span class="tone ${toneClass(m.bond.tone)}">${esc(trw(m.bond.tone))}</span></b><small>${notes}</small></li>`;
   });
-  if (family.onlyChild) items.push(`<li><b>獨生子女</b><small>故事裡不會有兄弟姊妹</small></li>`);
+  if (family.onlyChild) items.push(`<li><b>${esc(tr("獨生子女"))}</b><small>${esc(tr("故事裡不會有兄弟姊妹"))}</small></li>`);
   const lines = describeFamilyTilts(familyTilts(family));
   const f = summary.family, has = r => family.members.some(m => m.relation === r), counts = [];
-  if (has("father")) counts.push(`有 ${f.fatherClash} 次和爸爸吵過架`);
-  if (has("mother")) counts.push(`有 ${f.motherClash} 次和媽媽吵過架`);
-  if (family.members.some(m => isSibling(m.relation))) counts.push(`有 ${f.siblingRivalry} 次小時候和兄弟姊妹吵過架`, `有 ${f.siblingHelp} 次得到兄弟姊妹幫忙`);
+  if (has("father")) counts.push(tr("有 {fatherClash} 次和爸爸吵過架", { fatherClash: f.fatherClash }));
+  if (has("mother")) counts.push(tr("有 {motherClash} 次和媽媽吵過架", { motherClash: f.motherClash }));
+  if (family.members.some(m => isSibling(m.relation))) counts.push(tr("有 {siblingRivalry} 次小時候和兄弟姊妹吵過架", { siblingRivalry: f.siblingRivalry }), tr("有 {siblingHelp} 次得到兄弟姊妹幫忙", { siblingHelp: f.siblingHelp }));
   const p = summary.partner;
-  if (p) counts.push(`有 ${p.met} 次和${p.name ? esc(p.name) : "伴侶"}在一起，其中 ${p.married} 次結婚、${p.divorced} 次離婚`);
-  return `<div class="card"><h3>家人合盤</h3>
+  if (p) counts.push(tr("有 {partnerMet} 次和{partnerName}在一起，其中 {partnerMarried} 次結婚、{partnerDivorced} 次離婚", { partnerMet: p.met, partnerName: p.name ? esc(p.name) : run.L ? "your partner" : "伴侶", partnerMarried: p.married, partnerDivorced: p.divorced }));
+  return `<div class="card"><h3>${esc(tr("家人合盤"))}</h3>
     <ul class="bonds">${items.join("")}</ul>
-    ${lines.length ? `<p>在這次模擬裡，家人的命盤讓：</p><ul>${lines.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "<p>沒有填生日的家人，所以沒有合盤的傾斜。</p>"}
-    ${counts.length ? `<p>100 次人生裡，${counts.join("，")}。</p>` : ""}
-    <p class="fine">合盤只看生肖、日柱和五行的關係，讓機率傾斜最多 ±15%，不影響壽命和重病。家人之間怎麼相處，還是要靠彼此。</p></div>`;
+    ${lines.length ? `<p>${esc(tr("在這次模擬裡，家人的命盤讓："))}</p><ul>${lines.map(x => `<li>${esc(trw(x))}</li>`).join("")}</ul>` : `<p>${esc(tr("沒有填生日的家人，所以沒有合盤的傾斜。"))}</p>`}
+    ${counts.length ? `<p>${tr("100 次人生裡，{familyCounts}。", { familyCounts: counts.join(isEnLife() ? "; " : "，") })}</p>` : ""}
+    <p class="fine">${esc(tr("合盤只看生肖、日柱和五行的關係，讓機率傾斜最多 ±15%，不影響壽命和重病。家人之間怎麼相處，還是要靠彼此。"))}</p></div>`;
 }
 
 // How the chart showed in this life: jobs and their elements, the choices that followed the person's nature.
 function chartCard() {
   const { prep, life } = run, a = prep.analysis, s = life.state;
-  const dm = `${a.dayMaster.stem}${a.dayMaster.element}`, nature = (trait(a) || "").split("，").pop();
-  const jobs = s.jobsHeld.map(j => `${esc(j.title)}（${j.element || "？"}${a.useful.includes(j.element) ? "・喜用" : ""}）`);
+  const dm = `${a.dayMaster.stem}${a.dayMaster.element}`, nature = run.L ? trw(trait(a) || "") : (trait(a) || "").split("，").pop();
+  const jobs = s.jobsHeld.map(j => esc(a.useful.includes(j.element) ? tr("{jobTitle}（{jobElement}・喜用）", { jobTitle: j.title, jobElement: j.element }) : tr("{jobTitle}（{jobElement}）", { jobTitle: j.title, jobElement: j.element || (run.L ? "?" : "？") })));
   const fit = s.jobsHeld.filter(j => a.useful.includes(j.element)).length;
   const peak = life.kline.reduce((x, y) => (y.close > x.close ? y : x), life.kline[0]);
   const top = prep.luck.slice(0, s.age + 1).slice().sort((x, y) => y.score - x.score).slice(0, 5).sort((x, y) => x.age - y.age);
   const inTop = top.some(y => Math.abs(y.age - peak.age) <= 1);
-  // With one school voting (a 從格 sets the other two aside) 「1 派中有 1 派」 says nothing.
-  const voting = a.useful[0] ? a.views[a.useful[0]].voting : 0;
-  const view = voting > 1 ? describeViews(a).find(v => v.includes(`喜${a.useful[0]}`)) || "" : "";
-  return `<div class="card"><h3>命盤與這一生</h3>
-    <p class="count">${esc(dm)}日主，<em>${esc(nature)}</em></p>
-    <p>命盤${a.useful.length ? `喜${esc(a.useful.join("、"))}` : "喜忌不明顯"}${a.avoid.length ? `，忌${esc(a.avoid.join("、"))}` : ""}，格局是${esc(a.special ? `${a.special.name}（月令${a.pattern}）` : a.pattern)}。${view ? `${esc(view)}。` : ""}</p>
-    ${jobs.length ? `<p>做過的工作：${jobs.join("、")}。${fit ? `其中 ${fit} 份屬於你的喜用五行。` : "沒有一份屬於你的喜用五行。"}</p>` : ""}
-    ${s.lean.offered ? `<p>${s.lean.offered} 次抉擇裡有明顯的個性傾向，你有 ${s.lean.followed} 次選了它。</p>` : ""}
-    ${s.written ? `<p>你自己寫了 ${s.written} 個決定。</p>` : ""}
-    <p>流年最好的幾年：${top.map(y => `${y.age} 歲（${esc(y.year)}）`).join("、")}。${inTop ? `心情最好的 ${peak.age} 歲，正好落在其中。` : `心情最好的一年是 ${peak.age} 歲。`}</p>
-    <p class="fine">五行行業、格局與職業的對應採用傳統命理的說法；個性傾向從日主出發，也會被這一生的選擇改變。僅供參考。</p></div>`;
+  // With one school voting (a 從格 sets the other two aside) 「1 派中有 1 派」 says nothing. The line for the useful
+  // element is analysis.js describeViews' own, in the reading's language.
+  const u = a.useful[0], uv = u ? a.views[u] : null, voting = uv ? uv.voting : 0;
+  const view = voting > 1 && a.favor[u] > 0 && uv.likes.length ? tr("{schoolsVoting} 派中有 {schoolsLiking} 派認為喜{viewElement}（{viewSchools}）", { schoolsVoting: uv.voting, schoolsLiking: uv.likes.length, viewElement: u, viewSchools: andList(uv.likes) }) : "";
+  const likes = a.useful.length ? tr("喜{likedList}", { likedList: andList(a.useful) }) : tr("喜忌不明顯");
+  const avoids = a.avoid.length ? tr("，忌{avoidedList}", { avoidedList: andList(a.avoid) }) : "";
+  const pattern = a.special ? tr("{specialName}（月令{monthPattern}）", { specialName: a.special.name, monthPattern: a.pattern }) : trw(a.pattern);
+  return `<div class="card"><h3>${esc(tr("命盤與這一生"))}</h3>
+    <p class="count">${tr("{dayMaster}日主，<em>{dayNature}</em>", { dayMaster: esc(trw(dm)), dayNature: esc(nature) })}</p>
+    <p>${esc(tr("命盤{chartLikes}{chartAvoids}，格局是{chartPattern}。", { chartLikes: likes, chartAvoids: avoids, chartPattern: pattern }))}${view ? esc(tr("{chartView}。", { chartView: view })) : ""}</p>
+    ${jobs.length ? `<p>${tr("做過的工作：{jobList}。", { jobList: jobs.join(isEnLife() ? ", " : "、") })}${esc(fit ? tr("其中 {fitJobs} 份屬於你的喜用五行。", { fitJobs: fit }) : tr("沒有一份屬於你的喜用五行。"))}</p>` : ""}
+    ${s.lean.offered ? `<p>${esc(tr("{leanOffered} 次抉擇裡有明顯的個性傾向，你有 {leanFollowed} 次選了它。", { leanOffered: s.lean.offered, leanFollowed: s.lean.followed }))}</p>` : ""}
+    ${s.written ? `<p>${esc(tr("你自己寫了 {writtenCount} 個決定。", { writtenCount: s.written }))}</p>` : ""}
+    <p>${esc(tr("流年最好的幾年：{topYears}。", { topYears: trJoin(top.map(y => tr("{topAge} 歲（{topPillar}）", { topAge: y.age, topPillar: y.year }))) }))}${esc(inTop ? tr("心情最好的 {peakAge} 歲，正好落在其中。", { peakAge: peak.age }) : tr("心情最好的一年是 {peakAge} 歲。", { peakAge: peak.age }))}</p>
+    <p class="fine">${esc(tr("五行行業、格局與職業的對應採用傳統命理的說法；個性傾向從日主出發，也會被這一生的選擇改變。僅供參考。"))}</p></div>`;
 }
 
 // 八字命理詳批: the professional chart and readings for this birth and name, plus how this life's turning points
 // sat in their years.
 function drawReport() {
+  setReadingLang(run.L);
   const { chart, prep, life } = run, a = prep.analysis;
   const natal = natalReading(chart, a, { name: prep.name ? prep.name.full : null });
   const decades = chart.luck.decades.map((_, i) => decadeReading(chart, a, i));
@@ -792,10 +828,12 @@ function drawReport() {
     me: { pillars: prep.natal, analysis: a, sex: chart.input.sex, name: prep.name ? prep.name.full : run.extra.name || "" },
     partner: { pillars: pm.chart.pillars, analysis: pm.chart.analysis, sex: pm.sex, name: pm.name },
   }) : null;
-  const yearsTitle = birth <= now ? `近十年流年（${now}–${now + 9}）` : `成年後十年的流年（${birth + 18}–${birth + 27}）`;
+  const yearsTitle = birth <= now ? tr("近十年流年（{yearsFrom}–{yearsTo}）", { yearsFrom: now, yearsTo: now + 9 }) : tr("成年後十年的流年（{yearsFrom}–{yearsTo}）", { yearsFrom: birth + 18, yearsTo: birth + 27 });
   $("#report-body").innerHTML = reportHTML(chart, { natal, decades, years, events, name, overall, partner, yearsTitle });
-  const born = chart.time.shichen ? `出生日期與${chart.time.shichen}時` : chart.hourKnown ? "出生時刻（真太陽時）" : "出生日期（時辰不詳）";
-  $("#report-lede").textContent = `依${prep.name ? `「${prep.name.full}」的姓名與` : ""}${born}排出的命盤，用傳統子平八字${prep.name ? "與姓名學" : ""}的方法逐項分析。傳統命理的說法，僅供參考。`;
+  const born = chart.time.shichen ? tr("出生日期與{shichen}時", { shichen: chart.time.shichen }) : chart.hourKnown ? tr("出生時刻（真太陽時）") : tr("出生日期（時辰不詳）");
+  $("#report-lede").textContent = prep.name
+    ? tr("依「{fullName}」的姓名與{born}排出的命盤，用傳統子平八字與姓名學的方法逐項分析。傳統命理的說法，僅供參考。", { fullName: prep.name.full, born })
+    : tr("依{born}排出的命盤，用傳統子平八字的方法逐項分析。傳統命理的說法，僅供參考。", { born });
   $("#report").hidden = false;
 }
 
@@ -832,7 +870,7 @@ function setAIStatus(text, bad = false, seconds = null) {
   const el = $("#ai-status");
   if (el.textContent !== text) el.textContent = text;
   el.classList.toggle("bad", bad);
-  $("#ai-secs").textContent = seconds === null ? "" : `（${seconds} 秒）`;
+  $("#ai-secs").textContent = seconds === null ? "" : t("（{seconds} 秒）", { seconds });
 }
 const aiKey = (input, kind, partner) => `${new Date().getUTCFullYear()}|${JSON.stringify(readingRequest(input, kind, { partner }))}`;
 const aiTodo = job => job.all.filter(p => !job.parts[p] && !job.busy.has(p));
@@ -1009,9 +1047,10 @@ function aiStatusOf(job, seconds) {
   // Once the day is out nothing can be written again, so any part not written counts as missing, not as failed.
   const failed = aiOutToday() ? 0 : all.filter(p => job.errors[p] && job.codes[p] !== "quota").length;
   const missing = all.length - done - failed - job.busy.size;
-  if (job.busy.size) setAIStatus(`AI 命理師正在寫…已完成 ${done}/${all.length}`, false, seconds);
-  else if (failed) setAIStatus(`有 ${failed} 段沒寫好，可以按「重寫這一段」。`, true);
-  else if (missing && aiOutToday()) setAIStatus(done ? `今天的 AI 額度用完了，還有 ${missing} 段沒寫到，明天再來看完整的解讀。` : AI_QUOTA, !done);
+  // The status line is the page's own words (i18n.js): t() gives its English when the page is in English.
+  if (job.busy.size) setAIStatus(t("AI 命理師正在寫…已完成 {done}/{all}", { done, all: all.length }), false, seconds);
+  else if (failed) setAIStatus(t("有 {failed} 段沒寫好，可以按「重寫這一段」。", { failed }), true);
+  else if (missing && aiOutToday()) setAIStatus(done ? t("今天的 AI 額度用完了，還有 {missing} 段沒寫到，明天再來看完整的解讀。", { missing }) : AI_QUOTA, !done);
   else setAIStatus(job.kind === "short" ? "這是重點版。想看性格、事業、感情、每一步大運和每一歲的好事與要注意的事，請按「完整解讀」。" : "");
 }
 
@@ -1089,15 +1128,16 @@ function drawPersonal() {
 }
 
 function drawShare(peak) {
+  setReadingLang(run.L);
   const { life, chart, prep } = run;
   const pts = life.kline.map(k => k.close), n = Math.max(1, pts.length - 1);
   const line = pts.map((v, i) => `${(i / n * 300).toFixed(1)},${(56 - v / 100 * 52).toFixed(1)}`).join(" ");
-  $("#share").innerHTML = `<span class="brand">命盤人生</span>
-    <span class="sub">${chart.input.date.y} 年生・屬${esc(chart.zodiac)}・${esc(prep.analysis.dayMaster.stem + prep.analysis.dayMaster.element)}日主</span>
-    <span class="big">這一次，活到 ${life.state.age} 歲</span>
+  $("#share").innerHTML = `<span class="brand">${esc(tr("命盤人生"))}</span>
+    <span class="sub">${esc(tr("{bornYear} 年生・屬{zodiac}・{shareDayMaster}日主", { bornYear: chart.input.date.y, zodiac: chart.zodiac, shareDayMaster: prep.analysis.dayMaster.stem + prep.analysis.dayMaster.element }))}</span>
+    <span class="big">${esc(tr("這一次，活到 {shareAge} 歲", { shareAge: life.state.age }))}</span>
     <svg viewBox="0 0 300 60" preserveAspectRatio="none" aria-hidden="true"><polyline points="${line}" fill="none" stroke="var(--seal)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
-    <span class="sub">人生高峰在 ${peak.age} 歲那年</span>
-    <span class="foot">模擬故事，不是預言・命理推演僅供參考</span>`;
+    <span class="sub">${esc(tr("人生高峰在 {peakAge} 歲那年", { peakAge: peak.age }))}</span>
+    <span class="foot">${esc(tr("模擬故事，不是預言・命理推演僅供參考"))}</span>`;
 }
 
 

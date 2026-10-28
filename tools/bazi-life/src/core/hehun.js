@@ -311,35 +311,38 @@ const LOVE_STYLE = {
 };
 // How Y sees X, from the day masters.
 function seenBy(X, Y, rel) {
-  if (rel === "合") return `${Y.n}覺得和${X.n}特別有緣，很多想法一說就通`;
-  if (rel === "比") return `在${Y.n}眼中，${X.n}像朋友、像夥伴，相處起來很自在`;
-  if (rel === "X生Y") return `在${Y.n}眼中，${X.n}是會照顧人、讓人安心的那一個`;
-  if (rel === "Y生X") return `在${Y.n}眼中，${X.n}是需要被呵護的人，${Y.n}很願意照顧${X.n}`;
-  if (rel === "X剋Y") return `在${Y.n}眼中，${X.n}可靠、有主見，偶爾也有點強勢`;
-  return `在${Y.n}眼中，${X.n}好相處、願意配合；記得也把自己的想法說出來`;
+  const v = { x: X.n, y: Y.n, yOf: Y.of, x2: X.n, y2: Y.n };
+  if (rel === "合") return tr("{y}覺得和{x}特別有緣，很多想法一說就通", v);
+  if (rel === "比") return tr("在{y}眼中，{x}像朋友、像夥伴，相處起來很自在", { ...v, y: isEn() ? Y.of : Y.n });
+  if (rel === "X生Y") return tr("在{y}眼中，{x}是會照顧人、讓人安心的那一個", { ...v, y: isEn() ? Y.of : Y.n });
+  if (rel === "Y生X") return tr("在{y}眼中，{x}是需要被呵護的人，{y2}很願意照顧{x2}", { ...v, y: isEn() ? Y.of : Y.n });
+  if (rel === "X剋Y") return tr("在{y}眼中，{x}可靠、有主見，偶爾也有點強勢", { ...v, y: isEn() ? Y.of : Y.n });
+  return tr("在{y}眼中，{x}好相處、願意配合；記得也把自己的想法說出來", { ...v, y: isEn() ? Y.of : Y.n });
 }
 function loveOf(X, Y, F, neutral) {
-  const lines = [end(LOVE_STYLE[X.stem])];
+  const lines = [end(tr(LOVE_STYLE[X.stem]))];
   const palaceEl = pillarOf(X.names[2]).branchEl, role = X.a.useful.includes(palaceEl) ? "good" : X.a.avoid.includes(palaceEl) ? "care" : "mid";
+  const p = { b: se(X.dayB, palaceEl), xOf: X.of, x: X.n, x2: X.n };
   lines.push({
-    good: `夫妻宮（日支${X.dayB}${palaceEl}）是${X.n}的喜用：傳統上伴侶容易成為${X.n}的助力，在一起之後生活和心情都比較穩。`,
-    care: `夫妻宮（日支${X.dayB}${palaceEl}）是${X.n}比較忌的五行：傳統上感情裡容易有壓力，遇到不舒服先說出來，兩個人一起調整步調就好。`,
-    mid: `夫妻宮（日支${X.dayB}${palaceEl}）對${X.n}的喜忌影響不大，感情的樣子主要看兩人怎麼經營。`,
-  }[role]);
+    good: () => tr("夫妻宮（日支{b}）是{xOf}喜用：傳統上伴侶容易成為{xOf2}助力，在一起之後生活和心情都比較穩。", { ...p, xOf2: X.of }),
+    care: () => tr("夫妻宮（日支{b}）是{x}比較忌的五行：傳統上感情裡容易有壓力，遇到不舒服先說出來，兩個人一起調整步調就好。", { ...p, x: isEn() ? X.of : X.n }),
+    mid: () => tr("夫妻宮（日支{b}）對{xOf}喜忌影響不大，感情的樣子主要看兩人怎麼經營。", p),
+  }[role]());
   const els = spouseElements(X, neutral), sh = els.reduce((t, e) => t + X.share[e], 0), word = neutral ? "伴侶星" : "配偶星";
-  if (sh < 0.005) lines.push(`${word}在${X.n}的命盤裡不明顯：感情上比較含蓄、慢熱，遇到對的人時記得主動一點。`);
-  else if (sh >= STRONG) lines.push(`${word}在${X.n}的命盤裡有力：重視感情，也容易遇到心儀的對象。`);
-  if (X.groups.比劫 >= 2 && X.share[CONTROLS[X.el]] < 0.15) lines.push(`${X.n}命盤裡比劫（代表朋友、同儕）的力量多：重朋友、講義氣，朋友圈和伴侶的時間要記得平衡。`);
-  if (X.visible("傷官") && X.visible("正官")) lines.push(`${X.n}主見強、表達直接：適合能平等溝通的伴侶，相處時多留意語氣和決策的分工。`);
-  if (X.visible("正官") && X.visible("七殺")) lines.push(`${X.n}對伴侶的期待比較多元：先弄清楚自己最重視的特質，選擇時會比較篤定。`);
-  if (X.share[CONTROLS[X.el]] >= 0.35 && /弱/.test(X.a.strength)) lines.push(`伴侶對${X.n}的影響很大，記得維持自己的步調。`);
-  if (X.own.has("桃花") || X.own.has("紅艷煞")) lines.push(`${X.n}命帶桃花：人緣好、有魅力；在穩定的關係裡，把這份魅力用在經營彼此。`);
+  const w = { word, x: isEn() ? X.of : X.n };
+  if (sh < 0.005) lines.push(tr("{word}在{x}的命盤裡不明顯：感情上比較含蓄、慢熱，遇到對的人時記得主動一點。", w));
+  else if (sh >= STRONG) lines.push(tr("{word}在{x}的命盤裡有力：重視感情，也容易遇到心儀的對象。", w));
+  if (X.groups.比劫 >= 2 && X.share[CONTROLS[X.el]] < 0.15) lines.push(tr("{x}命盤裡比劫（代表朋友、同儕）的力量多：重朋友、講義氣，朋友圈和伴侶的時間要記得平衡。", w));
+  if (X.visible("傷官") && X.visible("正官")) lines.push(tr("{x}主見強、表達直接：適合能平等溝通的伴侶，相處時多留意語氣和決策的分工。", p));
+  if (X.visible("正官") && X.visible("七殺")) lines.push(tr("{x}對伴侶的期待比較多元：先弄清楚自己最重視的特質，選擇時會比較篤定。", p));
+  if (X.share[CONTROLS[X.el]] >= 0.35 && /弱/.test(X.a.strength)) lines.push(tr("伴侶對{x}的影響很大，記得維持自己的步調。", p));
+  if (X.own.has("桃花") || X.own.has("紅艷煞")) lines.push(tr("{x}命帶桃花：人緣好、有魅力；在穩定的關係裡，把這份魅力用在經營彼此。", p));
   const lone = ["孤辰", "寡宿"].filter(s => X.own.has(s));
-  if (lone.length) lines.push(`${X.n}命帶${lone.join("、")}：重視獨立和個人空間，主動告訴另一半什麼時候需要陪伴、什麼時候需要獨處。`);
-  else if (X.own.has("華蓋")) lines.push(`${X.n}命帶華蓋：有自己的精神世界，需要一點安靜獨處的時間。`);
-  if (X.dayStars.has("魁罡")) lines.push(`${X.n}的日柱是魁罡：個性剛強、有魄力，在感情裡也習慣作主；留一點空間讓另一半表達，兩個人會更有默契。`);
-  if (X.dayStars.has("陰差陽錯")) lines.push(`${X.n}的日柱是陰差陽錯：傳統上提醒和另一半家人的相處需要多一點時間，先建立兩人的共識，再談和家庭之間的界線。`);
-  if (X.dayStars.has("孤鸞煞")) lines.push(`${X.n}的日柱是孤鸞：傳統上提醒多花一點心思經營感情，把在乎說出口就好。`);
+  if (lone.length) lines.push(tr("{x}命帶{stars}：重視獨立和個人空間，主動告訴另一半什麼時候需要陪伴、什麼時候需要獨處。", { ...p, stars: list(lone.map(trw)) }));
+  else if (X.own.has("華蓋")) lines.push(tr("{x}命帶華蓋：有自己的精神世界，需要一點安靜獨處的時間。", p));
+  if (X.dayStars.has("魁罡")) lines.push(tr("{xOf}日柱是魁罡：個性剛強、有魄力，在感情裡也習慣作主；留一點空間讓另一半表達，兩個人會更有默契。", p));
+  if (X.dayStars.has("陰差陽錯")) lines.push(tr("{xOf}日柱是陰差陽錯：傳統上提醒和另一半家人的相處需要多一點時間，先建立兩人的共識，再談和家庭之間的界線。", p));
+  if (X.dayStars.has("孤鸞煞")) lines.push(tr("{xOf}日柱是孤鸞：傳統上提醒多花一點心思經營感情，把在乎說出口就好。", p));
   const rel = F.stemRel === "合" || F.stemRel === "比" ? F.stemRel : F.stemRel.replace(/A|B/g, m => (m === (X === F.A ? "A" : "B") ? "X" : "Y"));
   return { who: X.n, lines, seen: end(seenBy(X, Y, rel)) };
 }
@@ -363,98 +366,104 @@ const TRY = {
   money: { high: "一起訂一個存錢的目標（旅行、買房基金），每月檢視一次。", mid: "開一個共同帳戶付生活費，其餘各自管理。", low: "約好一個金額，超過的支出先商量再決定。" },
   future: { high: "把兩人都順的年份寫進行事曆，一起規畫大事。", mid: "每年年初一起聊聊各自今年的目標。", low: "壓力大的年份，約好每週固定一段時間關心彼此的近況。" },
 };
+// The six labels (the page and the radar show them).
+const DIM_LABEL = { personality: "個性互補", talk: "溝通默契", romance: "感情甜蜜", family: "家庭長輩", money: "金錢事業", future: "未來同步" };
 function dimsOf(A, B, F, score, years) {
   const P = Object.fromEntries(score.parts.map(x => [x.id, x.got / x.max]));
   const dk = mainKind(F.dayRel), yk = mainKind(F.yearRel), mk = mainKind(F.monthRel);
   const out = [];
-  const dim = (id, label, value, strengths, watches) => {
+  // Each line is a function, so only the one shown is written (tr() of the others would be wasted work).
+  const pick = list => { const f = list.find(Boolean); return f ? f() : null; };
+  const dim = (id, value, strengths, watches) => {
     const v = Math.round(clamp(value, 25, 96));
-    out.push({ id, label, value: v, strength: strengths.find(Boolean) || PLAIN[id], watch: watches.find(Boolean) || "沒有特別要擔心的地方，維持現在的相處方式就好。", try: TRY[id][bandOf(v)] });
+    out.push({ id, label: tr(DIM_LABEL[id]), value: v, strength: pick(strengths) || tr(PLAIN[id]), watch: pick(watches) || tr("沒有特別要擔心的地方，維持現在的相處方式就好。"), try: tr(TRY[id][bandOf(v)]) });
   };
+  const word = F.neutral ? "伴侶星" : "配偶星";
   // 個性互補
-  dim("personality", "個性互補", 100 * (P.stem * 0.35 + P.useful * 0.45 + (F.fill ? 0.2 : 0.1)), [
-    F.ab && F.ba ? "你們各自帶著對方需要的五行，個性上能補彼此的不足。" : null,
-    F.heaven ? "日干相合：個性雖然不同，卻很能互相吸引。" : null,
-    F.stemRel === "A生B" || F.stemRel === "B生A" ? "日干相生：一個人很會照顧另一個人，相處很溫暖。" : null,
-    F.fill ? "一方缺的五行，另一方剛好有，在一起時能帶出彼此少見的一面。" : null,
-    F.ab || F.ba ? "一方的命盤補得到另一方的用神，相處起來能互相加分。" : null,
-    F.stemRel === "比" ? "個性相近，很多想法不用解釋。" : null,
+  dim("personality", 100 * (P.stem * 0.35 + P.useful * 0.45 + (F.fill ? 0.2 : 0.1)), [
+    F.ab && F.ba && (() => tr("你們各自帶著對方需要的五行，個性上能補彼此的不足。")),
+    F.heaven && (() => tr("日干相合：個性雖然不同，卻很能互相吸引。")),
+    (F.stemRel === "A生B" || F.stemRel === "B生A") && (() => tr("日干相生：一個人很會照顧另一個人，相處很溫暖。")),
+    F.fill && (() => tr("一方缺的五行，另一方剛好有，在一起時能帶出彼此少見的一面。")),
+    (F.ab || F.ba) && (() => tr("一方的命盤補得到另一方的用神，相處起來能互相加分。")),
+    F.stemRel === "比" && (() => tr("個性相近，很多想法不用解釋。")),
   ], [
-    F.burdenA && F.burdenB ? "兩人命盤最旺的五行，剛好都是另一方比較忌的，步調不同時容易覺得有壓力。" : null,
-    F.burdenA || F.burdenB ? "一方最旺的五行是另一方比較忌的，步調不同時，另一方容易覺得有壓力。" : null,
-    F.stemRel === "A剋B" || F.stemRel === "B剋A" ? "一方比較有主見，另一方容易把意見收起來。" : null,
-    F.stemRel === "比" ? "兩人太像，遇到都堅持的事，要有人先讓一步。" : null,
+    F.burdenA && F.burdenB && (() => tr("兩人命盤最旺的五行，剛好都是另一方比較忌的，步調不同時容易覺得有壓力。")),
+    (F.burdenA || F.burdenB) && (() => tr("一方最旺的五行是另一方比較忌的，步調不同時，另一方容易覺得有壓力。")),
+    (F.stemRel === "A剋B" || F.stemRel === "B剋A") && (() => tr("一方比較有主見，另一方容易把意見收起來。")),
+    F.stemRel === "比" && (() => tr("兩人太像，遇到都堅持的事，要有人先讓一步。")),
   ]);
   // 溝通默契
   const pair = pairKey(A.main, B.main);
   const clashGroups = pair === "比劫+比劫" || pair === "官殺+官殺" || pair === "比劫+官殺";
   const easyGroups = pair === "財+官殺" || pair === "財+財" || pair === "食傷+財";
-  dim("talk", "溝通默契", 60 + (F.heaven ? 15 : 0) + (dk === "六合" || dk === "三合" ? 10 : 0) + (yk === "六合" || yk === "三合" ? 5 : 0)
+  dim("talk", 60 + (F.heaven ? 15 : 0) + (dk === "六合" || dk === "三合" ? 10 : 0) + (yk === "六合" || yk === "三合" ? 5 : 0)
     - (dk === "相害" || dk === "相刑" ? 10 : 0) - (dk === "相沖" ? 8 : 0) - (yk === "相害" || yk === "相刑" ? 5 : 0) + (easyGroups ? 5 : 0) - (clashGroups ? 5 : 0), [
-    F.heaven ? "日干相合：心意容易相通，很多事一個眼神就懂。" : null,
-    dk === "六合" || dk === "三合" ? "夫妻宮相合：生活上有默契，喜歡一起做的事多。" : null,
-    yk === "六合" || yk === "三合" ? "生肖相合：兩人投緣，說話容易對頻。" : null,
-    easyGroups ? "兩人都講求實際，溝通很有效率。" : null,
-    A.main === "食傷" || B.main === "食傷" ? `${A.main === "食傷" ? A.n : B.n}很會表達、能把話說開，溝通不容易卡住。` : null,
-    A.main === "印" || B.main === "印" ? `${A.main === "印" ? A.n : B.n}很會傾聽、體貼另一半的感受。` : null,
+    F.heaven && (() => tr("日干相合：心意容易相通，很多事一個眼神就懂。")),
+    (dk === "六合" || dk === "三合") && (() => tr("夫妻宮相合：生活上有默契，喜歡一起做的事多。")),
+    (yk === "六合" || yk === "三合") && (() => tr("生肖相合：兩人投緣，說話容易對頻。")),
+    easyGroups && (() => tr("兩人都講求實際，溝通很有效率。")),
+    (A.main === "食傷" || B.main === "食傷") && (() => tr("{x}很會表達、能把話說開，溝通不容易卡住。", { x: A.main === "食傷" ? A.n : B.n })),
+    (A.main === "印" || B.main === "印") && (() => tr("{x}很會傾聽、體貼另一半的感受。", { x: A.main === "印" ? A.n : B.n })),
   ], [
-    dk === "相害" || yk === "相害" ? "小誤會容易悶在心裡、慢慢累積。" : null,
-    dk === "相刑" || yk === "相刑" ? "熟了以後說話容易太直接、互相要求。" : null,
-    dk === "相沖" ? "生活節奏不同，想好好聊的時間點常常對不上。" : null,
-    clashGroups ? "兩人都有主見，討論容易變成辯論。" : null,
+    (dk === "相害" || yk === "相害") && (() => tr("小誤會容易悶在心裡、慢慢累積。")),
+    (dk === "相刑" || yk === "相刑") && (() => tr("熟了以後說話容易太直接、互相要求。")),
+    dk === "相沖" && (() => tr("生活節奏不同，想好好聊的時間點常常對不上。")),
+    clashGroups && (() => tr("兩人都有主見，討論容易變成辯論。")),
   ]);
   // 感情甜蜜
   const seen = [...F.seenAB, ...F.seenBA];
-  dim("romance", "感情甜蜜", 55 + (F.starA && F.starB ? 15 : F.starA || F.starB ? 8 : 0) + (seen.some(x => x.star === "桃花") ? 8 : 0)
+  const wedStar = seen.find(x => x.star === "紅鸞" || x.star === "天喜");
+  dim("romance", 55 + (F.starA && F.starB ? 15 : F.starA || F.starB ? 8 : 0) + (seen.some(x => x.star === "桃花") ? 8 : 0)
     + (seen.some(x => x.star !== "桃花") ? 6 : 0) + (F.heaven ? 8 : 0) + (F.earth ? 8 : 0) - (dk === "相沖" ? 8 : 0) - 3 * (F.lonely[0].length + F.lonely[1].length), [
-    F.starA && F.starB ? `兩人互為${F.neutral ? "伴侶星" : "配偶星"}，傳統上是很有緣分的組合。` : null,
-    seen.find(x => x.star === "紅鸞" || x.star === "天喜") ? `${seen.find(x => x.star === "紅鸞" || x.star === "天喜").star}互見：傳統上主姻緣和喜事。` : null,
-    seen.some(x => x.star === "桃花") ? "桃花互見：彼此身上帶著對方的桃花，吸引力強。" : null,
-    F.heaven ? "日干相合：一見如故。" : null,
-    F.earth ? "夫妻宮相合：越相處越像家人。" : null,
-    F.starA || F.starB ? `一方的日干正是另一方的${F.neutral ? "伴侶星" : "配偶星"}，傳統上視為有緣。` : null,
-    A.own.has("桃花") || B.own.has("桃花") ? `${A.own.has("桃花") ? A.n : B.n}命帶桃花，懂得讓感情保持新鮮。` : null,
-    F.stemRel === "A生B" || F.stemRel === "B生A" ? `${F.stemRel === "A生B" ? A.n : B.n}很會照顧人，相處時常常感到被疼愛。` : null,
+    F.starA && F.starB && (() => tr("兩人互為{word}，傳統上是很有緣分的組合。", { word })),
+    wedStar && (() => tr("{star}互見：傳統上主姻緣和喜事。", { star: wedStar.star })),
+    seen.some(x => x.star === "桃花") && (() => tr("桃花互見：彼此身上帶著對方的桃花，吸引力強。")),
+    F.heaven && (() => tr("日干相合：一見如故。")),
+    F.earth && (() => tr("夫妻宮相合：越相處越像家人。")),
+    (F.starA || F.starB) && (() => tr("一方的日干正是另一方的{word}，傳統上視為有緣。", { word })),
+    (A.own.has("桃花") || B.own.has("桃花")) && (() => tr("{x}命帶桃花，懂得讓感情保持新鮮。", { x: A.own.has("桃花") ? A.n : B.n })),
+    (F.stemRel === "A生B" || F.stemRel === "B生A") && (() => tr("{x}很會照顧人，相處時常常感到被疼愛。", { x: F.stemRel === "A生B" ? A.n : B.n })),
   ], [
-    dk === "相沖" ? "作息和生活習慣不同，兩人的相處時間容易兜不攏。" : null,
-    F.lonely[0].length || F.lonely[1].length ? "有一方比較需要獨處，記得說清楚什麼時候需要陪伴。" : null,
-    "熱情需要經營，別讓日子只剩下例行公事。",
+    dk === "相沖" && (() => tr("作息和生活習慣不同，兩人的相處時間容易兜不攏。")),
+    (F.lonely[0].length || F.lonely[1].length) && (() => tr("有一方比較需要獨處，記得說清楚什麼時候需要陪伴。")),
+    () => tr("熱情需要經營，別讓日子只剩下例行公事。"),
   ]);
   // 家庭長輩
-  dim("family", "家庭長輩", 60 + (yk === "六合" || yk === "三合" ? 12 : 0) - (yk === "相沖" ? 12 : 0) - (yk === "相害" || yk === "相刑" ? 8 : 0)
+  dim("family", 60 + (yk === "六合" || yk === "三合" ? 12 : 0) - (yk === "相沖" ? 12 : 0) - (yk === "相害" || yk === "相刑" ? 8 : 0)
     + (mk === "六合" || mk === "三合" ? 6 : 0) - (mk === "相沖" ? 6 : 0) - 4 * [A, B].filter(X => X.dayStars.has("陰差陽錯")).length + (F.nayin.rel === "生" ? 4 : 0), [
-    yk === "六合" || yk === "三合" ? "生肖相合：傳統上兩家人的往來比較融洽。" : null,
-    mk === "六合" || mk === "三合" ? "月柱（父母宮）相合：和彼此的父母容易處得來。" : null,
-    F.nayin.rel === "生" ? "年命納音相生：傳統上視為兩家的背景能互相扶持。" : null,
+    (yk === "六合" || yk === "三合") && (() => tr("生肖相合：傳統上兩家人的往來比較融洽。")),
+    (mk === "六合" || mk === "三合") && (() => tr("月柱（父母宮）相合：和彼此的父母容易處得來。")),
+    F.nayin.rel === "生" && (() => tr("年命納音相生：傳統上視為兩家的背景能互相扶持。")),
   ], [
-    yk === "相沖" ? "生肖相沖：兩家的生活習慣或觀念可能不太一樣。" : null,
-    yk === "相害" || yk === "相刑" ? "兩家往來時容易因為小事誤會。" : null,
-    mk === "相沖" ? "月柱（父母宮）相沖：和對方父母的相處需要多一點時間。" : null,
-    [A, B].some(X => X.dayStars.has("陰差陽錯")) ? "傳統上提醒和對方家人的相處需要多一點耐心。" : null,
+    yk === "相沖" && (() => tr("生肖相沖：兩家的生活習慣或觀念可能不太一樣。")),
+    (yk === "相害" || yk === "相刑") && (() => tr("兩家往來時容易因為小事誤會。")),
+    mk === "相沖" && (() => tr("月柱（父母宮）相沖：和對方父母的相處需要多一點時間。")),
+    [A, B].some(X => X.dayStars.has("陰差陽錯")) && (() => tr("傳統上提醒和對方家人的相處需要多一點耐心。")),
   ]);
   // 金錢事業
   const robs = [A, B].some(X => X.groups.比劫 >= 2 && X.share[CONTROLS[X.el]] < 0.15);
   const spenders = [A, B].filter(X => SPENDER.has(X.main)).length;
-  dim("money", "金錢事業", 60 + (P.useful - 0.5) * 40 - (robs ? 6 : 0) + (spenders === 1 ? 3 : 0) - (spenders === 2 ? 4 : 0) + (A.main === "財" && B.main === "財" ? 5 : 0), [
-    (F.likeA || F.ab) && (F.likeB || F.ba) ? "兩人的五行對彼此都有幫助，傳統上是能「互旺」的組合。"
-      : F.likeA || F.ab ? `${B.n}的五行對${A.n}有幫助，傳統上說${B.n}能「旺」${A.n}。`
-        : F.likeB || F.ba ? `${A.n}的五行對${B.n}有幫助，傳統上說${A.n}能「旺」${B.n}。` : null,
-    spenders === 1 ? "一個會存、一個會享受，分工得好就是互補。" : null,
-    spenders === 0 ? "兩人都務實、會規畫，存錢不成問題。" : null,
+  dim("money", 60 + (P.useful - 0.5) * 40 - (robs ? 6 : 0) + (spenders === 1 ? 3 : 0) - (spenders === 2 ? 4 : 0) + (A.main === "財" && B.main === "財" ? 5 : 0), [
+    (F.likeA || F.ab) && (F.likeB || F.ba) ? () => tr("兩人的五行對彼此都有幫助，傳統上是能「互旺」的組合。")
+      : F.likeA || F.ab ? () => tr("{bOf}五行對{a}有幫助，傳統上說{b}能「旺」{a2}。", { bOf: B.of, a: A.n, b: B.n, a2: A.n })
+        : F.likeB || F.ba ? () => tr("{aOf}五行對{b}有幫助，傳統上說{a}能「旺」{b2}。", { aOf: A.of, b: B.n, a: A.n, b2: B.n }) : null,
+    spenders === 1 && (() => tr("一個會存、一個會享受，分工得好就是互補。")),
+    spenders === 0 && (() => tr("兩人都務實、會規畫，存錢不成問題。")),
   ], [
-    robs ? "有一方重朋友、花錢大方，借錢和合夥前先和另一半商量。" : null,
-    F.burdenA || F.burdenB ? "事業上的步調不同：一個想衝、一個想穩。" : null,
-    spenders === 2 ? "兩人都比較捨得花，記得先存再花。" : null,
+    robs && (() => tr("有一方重朋友、花錢大方，借錢和合夥前先和另一半商量。")),
+    (F.burdenA || F.burdenB) && (() => tr("事業上的步調不同：一個想衝、一個想穩。")),
+    spenders === 2 && (() => tr("兩人都比較捨得花，記得先存再花。")),
   ]);
   // 未來同步
   const good = years.filter(y => y.state === "good").length, mid = years.filter(y => y.state === "mid").length, n = years.length || 1;
   const both = years.filter(y => y.wed).map(y => y.year), care = years.filter(y => y.state === "care").map(y => y.year);
-  dim("future", "未來同步", 100 * (good + mid * 0.6 + (n - good - mid) * 0.25) / n, [
-    both.length ? `未來十年有兩人都婚緣較旺的年份（${both.slice(0, 3).join("、")} 年）。` : null,
-    good >= 3 ? `未來十年有 ${good} 年，兩人的感情運都順。` : null,
+  dim("future", 100 * (good + mid * 0.6 + (n - good - mid) * 0.25) / n, [
+    both.length && (() => tr("未來十年有兩人都婚緣較旺的年份（{years} 年）。", { years: list(both.slice(0, 3).map(String)) })),
+    good >= 3 && (() => tr("未來十年有 {n} 年，兩人的感情運都順。", { n: good })),
   ], [
-    care.length ? `${care.slice(0, 3).join("、")} 年有一方的運勢比較緊，要多體諒彼此。` : null,
-    !both.length ? "兩人婚緣旺的年份不太同步，規畫大事時多參考彼此的時機。" : null,
+    care.length && (() => tr("{years} 年有一方的運勢比較緊，要多體諒彼此。", { years: list(care.slice(0, 3).map(String)) })),
+    !both.length && (() => tr("兩人婚緣旺的年份不太同步，規畫大事時多參考彼此的時機。")),
   ]);
   return out;
 }
@@ -468,93 +477,111 @@ function checksOf(A, B, F, pr) {
   const dk = mainKind(F.dayRel), yk = mainKind(F.yearRel);
 
   const palace = sec("palace");
-  const full = F.fullClash ? ["兩人的日柱天干相剋、地支相沖，稱為天剋地沖，傳統上視為差異最大的組合：個性和生活節奏很不一樣，差異也能是互補，重點在溝通方式。"] : [];
-  add("palace", "夫妻宮（日支）", LEVEL.main, verdictOf(dk === "六合" || dk === "三合" || (F.heaven && F.earth), isTension(dk)), [...palace.paragraphs, ...full], palace.items);
+  const full = F.fullClash ? [tr("兩人的日柱天干相剋、地支相沖，稱為天剋地沖，傳統上視為差異最大的組合：個性和生活節奏很不一樣，差異也能是互補，重點在溝通方式。")] : [];
+  add("palace", tr("夫妻宮（日支）"), LEVEL.main, verdictOf(dk === "六合" || dk === "三合" || (F.heaven && F.earth), isTension(dk)), [...palace.paragraphs, ...full], palace.items);
   const useful = sec("useful");
-  add("useful", "用神互補", LEVEL.main, verdictOf(F.ab || F.ba, (F.burdenA || F.burdenB) && !F.likeA && !F.likeB), useful.paragraphs, useful.items);
+  add("useful", tr("用神互補"), LEVEL.main, verdictOf(F.ab || F.ba, (F.burdenA || F.burdenB) && !F.likeA && !F.likeB), useful.paragraphs, useful.items);
   const star = sec("star");
-  add("star", F.neutral ? "伴侶星" : "配偶星", LEVEL.main, verdictOf(F.starA || F.starB, false), star.paragraphs, star.items);
+  add("star", trw(F.neutral ? "伴侶星" : "配偶星"), LEVEL.main, verdictOf(F.starA || F.starB, false), star.paragraphs, star.items);
   const day = sec("day");
-  add("day", "日干與天合地合", LEVEL.aux, verdictOf(F.heaven || F.stemRel === "A生B" || F.stemRel === "B生A", false), day.paragraphs, day.items);
+  add("day", tr("日干與天合地合"), LEVEL.aux, verdictOf(F.heaven || F.stemRel === "A生B" || F.stemRel === "B生A", false), day.paragraphs, day.items);
   const elements = sec("elements");
-  add("elements", "五行互補", LEVEL.aux, verdictOf(!!elements, false), elements ? elements.paragraphs : ["兩人沒有明顯「一方缺、另一方剛好很多」的五行，五行互補主要看上面的用神。"]);
+  add("elements", tr("五行互補"), LEVEL.aux, verdictOf(!!elements, false), elements ? elements.paragraphs : [tr("兩人沒有明顯「一方缺、另一方剛好很多」的五行，五行互補主要看上面的用神。")]);
   // 婚姻神煞
   {
     const lines = [];
     const said = (X, Y, list) => {
       if (!list.length) return;
-      const by = uniq(list.map(x => x.star)).map(s => `${s}（${uniq(list.filter(x => x.star === s).map(x => x.role)).join("、")}）`).join("、");
-      lines.push(`${Y.n}的命盤帶著${X.n}的${by}：傳統上${list.some(x => x.star !== "桃花") ? "紅鸞、天喜主姻緣和喜事，" : ""}${list.some(x => x.star === "桃花") ? "桃花主吸引力，" : ""}代表${X.n}容易被${Y.n}吸引。`);
+      const stars = uniq(list.map(x => x.star));
+      const by = isEn() ? join(stars.map(s => tr("{star}（{roles}）", { star: s, roles: join(uniq(list.filter(x => x.star === s).map(x => trw(x.role)))) })))
+        : stars.map(s => `${s}（${uniq(list.filter(x => x.star === s).map(x => x.role)).join("、")}）`).join("、");
+      const why = (list.some(x => x.star !== "桃花") ? tr("紅鸞、天喜主姻緣和喜事，") : "") + (list.some(x => x.star === "桃花") ? tr("桃花主吸引力，") : "");
+      lines.push(tr("{yOf}命盤帶著{xOf}{by}：傳統上{why}代表{x}容易被{y}吸引。", { yOf: Y.of, xOf: X.of, by, why, x: X.n, y: Y.n }));
     };
     said(A, B, F.seenAB); said(B, A, F.seenBA);
-    if (!lines.length) lines.push("兩人的命盤沒有互見桃花、紅鸞、天喜，這很常見；感情的熱度主要看日常怎麼經營。");
+    if (!lines.length) lines.push(tr("兩人的命盤沒有互見桃花、紅鸞、天喜，這很常見；感情的熱度主要看日常怎麼經營。"));
     for (const [X, list] of [[A, F.lonely[0]], [B, F.lonely[1]]]) {
       if (!list.length) continue;
       const lone = list.filter(s => s === "孤辰" || s === "寡宿");
-      if (lone.length) lines.push(`${X.n}命帶${lone.join("、")}：傳統上看作重視獨立和個人空間，主動告訴另一半什麼時候需要陪伴就好。`);
-      if (list.includes("陰差陽錯")) lines.push(`${X.n}的日柱是陰差陽錯：傳統上提醒和另一半家人的相處需要多一點時間。`);
-      if (list.includes("孤鸞煞")) lines.push(`${X.n}的日柱是孤鸞：傳統上提醒多花一點心思經營感情。`);
+      if (lone.length) lines.push(tr("{x}命帶{stars}：傳統上看作重視獨立和個人空間，主動告訴另一半什麼時候需要陪伴就好。", { x: X.n, stars: join(lone.map(trw)) }));
+      if (list.includes("陰差陽錯")) lines.push(tr("{xOf}日柱是陰差陽錯：傳統上提醒和另一半家人的相處需要多一點時間。", { xOf: X.of }));
+      if (list.includes("孤鸞煞")) lines.push(tr("{xOf}日柱是孤鸞：傳統上提醒多花一點心思經營感情。", { xOf: X.of }));
     }
-    lines.push("神煞是輔助的參考，看的是傾向，不是注定。");
-    add("stars", "婚姻神煞", LEVEL.aux, verdictOf(F.seenAB.length || F.seenBA.length, false), [lines.join("")]);
+    lines.push(tr("神煞是輔助的參考，看的是傾向，不是注定。"));
+    add("stars", tr("婚姻神煞"), LEVEL.aux, verdictOf(F.seenAB.length || F.seenBA.length, false), [run(lines)]);
   }
   // 生肖（加上三會）
   const zodiac = sec("zodiac");
-  const season = F.season && !yk ? [`另外，${ZODIAC[A.yearB]}和${ZODIAC[B.yearB]}同屬${F.season[1]}的三會（${F.season[0]}），傳統上視為氣味相近。`] : [];
-  add("zodiac", "生肖", LEVEL.folk, verdictOf(yk === "六合" || yk === "三合" || !!season.length, isTension(yk)), [...zodiac.paragraphs, ...season, "生肖只看出生年，在合婚裡是比較次要的參考。"]);
+  const season = F.season && !yk ? [tr("另外，{za}和{zb}同屬{season}的三會（{branches}），傳統上視為氣味相近。", { za: ZODIAC[A.yearB], zb: ZODIAC[B.yearB], season: F.season[1], branches: duo(F.season[0]) })] : [];
+  add("zodiac", isEn() ? tr("生肖（契合度）") : "生肖", LEVEL.folk, verdictOf(yk === "六合" || yk === "三合" || !!season.length, isTension(yk)), [...zodiac.paragraphs, ...season, tr("生肖只看出生年，在合婚裡是比較次要的參考。")]);
   const nayin = sec("nayin");
-  add("nayin", "年命納音", LEVEL.folk, verdictOf(F.nayin.rel !== "剋", false), nayin.paragraphs);
+  add("nayin", tr("年命納音"), LEVEL.folk, verdictOf(F.nayin.rel !== "剋", false), nayin.paragraphs);
   // 命卦
-  add("gua", "命卦（呂才合婚）", LEVEL.folk, verdictOf(GUA_SCORE[F.gua] === 5, GUA_SCORE[F.gua] === 1), [
-    `依出生年（以立春換年）和性別，${A.n}的命卦是${A.gua.name}卦（${A.gua.group}），${B.n}是${B.gua.name}卦（${B.gua.group}），配起來是「${F.gua}」。${GUA_TEXT[F.gua]}。`
-      + "命卦只看出生年和性別，明代的《神峰通考》就批評過這個方法，現在多半只當參考。",
-  ]);
+  add("gua", tr("命卦（呂才合婚）"), LEVEL.folk, verdictOf(GUA_SCORE[F.gua] === 5, GUA_SCORE[F.gua] === 1), [run([
+    tr("依出生年（以立春換年）和性別，{aOf}命卦是{ga}卦（{gpa}），{b}是{gb}卦（{gpb}），配起來是「{pair}」。{text}。", { aOf: A.of, ga: A.gua.name, gpa: A.gua.group, b: B.n, gb: B.gua.name, gpb: B.gua.group, pair: F.gua, text: GUA_TEXT[F.gua] }),
+    tr("命卦只看出生年和性別，明代的《神峰通考》就批評過這個方法，現在多半只當參考。"),
+  ])]);
   return out;
 }
+const join = items => list(items);
 
 // ---------- 相處說明書 ----------
 function guideOf(A, B, F) {
   const out = [];
-  out.push({ id: "talk", title: "溝通，和吵架後怎麼和好", text: `${A.n}${TALK[A.main]}；${B.n}${TALK[B.main]}。${TALK_TIP[pairKey(A.main, B.main)]}${
-    mainKind(F.dayRel) === "相沖" ? "夫妻宮相沖的兩人作息不同，重要的話挑兩人都有空、都不累的時候說。" : mainKind(F.dayRel) === "相害" ? "夫妻宮相害，最怕悶著不說，不舒服的事當天說開。" : ""}` });
+  const dayK = mainKind(F.dayRel);
+  out.push({ id: "talk", title: tr("溝通，和吵架後怎麼和好"), text: tr("{a}{ta}；{b}{tb}。{tip}{extra}", {
+    a: A.n, ta: TALK[A.main], b: B.n, tb: TALK[B.main], tip: TALK_TIP[pairKey(A.main, B.main)],
+    extra: dayK === "相沖" ? tr("夫妻宮相沖的兩人作息不同，重要的話挑兩人都有空、都不累的時候說。") : dayK === "相害" ? tr("夫妻宮相害，最怕悶著不說，不舒服的事當天說開。") : "",
+  }) });
   const [sa, sb] = [A, B].map(X => SPENDER.has(X.main));
   const saver = !sa ? A : B, spender = sa ? A : B;
-  const moneyTip = sa !== sb ? `一個會存、一個會享受：存款和投資交給${saver.n}，生活的樂趣交給${spender.n}來規畫，大筆支出先商量。`
-    : sa ? "兩人都比較捨得花：先約好每月固定存一筆，剩下的再自由運用。" : "存錢不成問題：記得也留一筆一起享受生活的預算。";
+  const moneyTip = sa !== sb ? tr("一個會存、一個會享受：存款和投資交給{saver}，生活的樂趣交給{spender}來規畫，大筆支出先商量。", { saver: saver.n, spender: spender.n })
+    : sa ? tr("兩人都比較捨得花：先約好每月固定存一筆，剩下的再自由運用。") : tr("存錢不成問題：記得也留一筆一起享受生活的預算。");
   const robs = [A, B].filter(X => X.groups.比劫 >= 2 && X.share[CONTROLS[X.el]] < 0.15).map(X => X.n);
-  out.push({ id: "money", title: "金錢觀和理財分工", text: `${A.n}${MONEY[A.main]}；${B.n}${MONEY[B.main]}。${moneyTip}${robs.length ? `${robs.join("和")}重朋友、講義氣，借錢給朋友或合夥之前，先和另一半商量。` : ""}` });
-  const lead = F.stemRel === "A剋B" ? `${A.n}比較習慣拿主意，大事記得先問${B.n}的想法。` : F.stemRel === "B剋A" ? `${B.n}比較習慣拿主意，大事記得先問${A.n}的想法。`
-    : F.stemRel === "A生B" ? `${A.n}比較會照顧人，別讓家務都落在${A.n}身上。` : F.stemRel === "B生A" ? `${B.n}比較會照顧人，別讓家務都落在${B.n}身上。` : "兩人地位相當，大事一起決定。";
-  out.push({ id: "home", title: "家務和決策", text: `${lead}依兩人的個性，${A.n}適合負責${CHORES[A.main]}${A.main === B.main ? `，${B.n}也一樣，可以輪流` : `，${B.n}適合負責${CHORES[B.main]}`}。` });
+  out.push({ id: "money", title: tr("金錢觀和理財分工"), text: tr("{a}{ma}；{b}{mb}。{tip}{robs}", {
+    a: A.n, ma: MONEY[A.main], b: B.n, mb: MONEY[B.main], tip: moneyTip,
+    robs: robs.length ? tr("{who}重朋友、講義氣，借錢給朋友或合夥之前，先和另一半商量。", { who: list(robs, "和") }) : "",
+  }) });
+  const lead = F.stemRel === "A剋B" ? tr("{x}比較習慣拿主意，大事記得先問{yOf}想法。", { x: A.n, yOf: B.of }) : F.stemRel === "B剋A" ? tr("{x}比較習慣拿主意，大事記得先問{yOf}想法。", { x: B.n, yOf: A.of })
+    : F.stemRel === "A生B" ? tr("{x}比較會照顧人，別讓家務都落在{x2}身上。", { x: A.n, x2: A.n }) : F.stemRel === "B生A" ? tr("{x}比較會照顧人，別讓家務都落在{x2}身上。", { x: B.n, x2: B.n }) : tr("兩人地位相當，大事一起決定。");
+  out.push({ id: "home", title: tr("家務和決策"), text: tr("{lead}依兩人的個性，{a}適合負責{ca}{rest}。", {
+    lead, a: A.n, ca: CHORES[A.main],
+    rest: A.main === B.main ? tr("，{b}也一樣，可以輪流", { b: B.n }) : tr("，{b}適合負責{cb}", { b: B.n, cb: CHORES[B.main] }),
+  }) });
   const yk = mainKind(F.yearRel), mk = mainKind(F.monthRel);
   const fam = [];
-  if (yk === "六合" || yk === "三合") fam.push("生肖相合，傳統上兩家人往來融洽。");
-  else if (yk === "相沖") fam.push("生肖相沖，兩家的生活習慣或觀念可能不太一樣，多認識彼此的家人會有幫助。");
-  else if (yk === "相害" || yk === "相刑" || yk === "相破") fam.push("兩家往來時容易因小事誤會，有事由自己家的那一方先溝通。");
-  if (mk === "六合" || mk === "三合") fam.push("月柱（父母宮）相合，和對方的父母容易處得來。");
-  else if (mk === "相沖") fam.push("月柱（父母宮）相沖，和對方父母的生活習慣不同，見面時多一點耐心。");
-  for (const X of [A, B]) if (X.groups.印 >= 2) fam.push(`${X.n}很重視家人，節日和家庭聚會對${X.n}很重要。`);
-  fam.push("遇到長輩的意見，先兩人有共識，再由各自那一方的家人溝通。");
-  out.push({ id: "family", title: "雙方家人和長輩", text: fam.join("") });
+  if (yk === "六合" || yk === "三合") fam.push(tr("生肖相合，傳統上兩家人往來融洽。"));
+  else if (yk === "相沖") fam.push(tr("生肖相沖，兩家的生活習慣或觀念可能不太一樣，多認識彼此的家人會有幫助。"));
+  else if (yk === "相害" || yk === "相刑" || yk === "相破") fam.push(tr("兩家往來時容易因小事誤會，有事由自己家的那一方先溝通。"));
+  if (mk === "六合" || mk === "三合") fam.push(tr("月柱（父母宮）相合，和對方的父母容易處得來。"));
+  else if (mk === "相沖") fam.push(tr("月柱（父母宮）相沖，和對方父母的生活習慣不同，見面時多一點耐心。"));
+  for (const X of [A, B]) if (X.groups.印 >= 2) fam.push(tr("{x}很重視家人，節日和家庭聚會對{x2}很重要。", { x: X.n, x2: X.n }));
+  fam.push(tr("遇到長輩的意見，先兩人有共識，再由各自那一方的家人溝通。"));
+  out.push({ id: "family", title: tr("雙方家人和長輩"), text: run(fam) });
   const hk = F.hourRel ? mainKind(F.hourRel) : undefined;
-  const noHour = [A, B].filter(X => !X.hourB).map(X => X.n);
-  const kids = F.hourRel === null ? `${noHour.length === 2 ? "兩人的時辰都" : `${noHour[0]}的時辰`}不詳，子女宮（時柱）先不看。`
-    : hk === "六合" || hk === "三合" ? "子女宮（時柱）相合，對孩子的期待和教養方式容易一致。"
-      : hk === "相沖" ? "子女宮（時柱）相沖，教養觀可能不同，先討論好原則，在孩子面前意見一致。"
-        : "子女宮（時柱）沒有明顯的合沖，教養方式可以邊走邊調整。";
-  out.push({ id: "kids", title: "子女與教養", text: `${kids}${A.n}${PARENTING[A.main]}，${B.n}${A.main === B.main ? "也是" : PARENTING[B.main]}。要不要生、什麼時候生，是兩個人一起的選擇；這裡只談教養的風格。` });
+  const noHour = [A, B].filter(X => !X.hourB);
+  const kids = F.hourRel === null ? (noHour.length === 2 ? tr("兩人的時辰都不詳，子女宮（時柱）先不看。") : tr("{xOf}時辰不詳，子女宮（時柱）先不看。", { xOf: noHour[0].of }))
+    : hk === "六合" || hk === "三合" ? tr("子女宮（時柱）相合，對孩子的期待和教養方式容易一致。")
+      : hk === "相沖" ? tr("子女宮（時柱）相沖，教養觀可能不同，先討論好原則，在孩子面前意見一致。")
+        : tr("子女宮（時柱）沒有明顯的合沖，教養方式可以邊走邊調整。");
+  const v = { kids, a: A.n, pa: PARENTING[A.main], b: B.n, pb: PARENTING[B.main] };
+  out.push({ id: "kids", title: tr("子女與教養"), text: A.main === B.main
+    ? tr("{kids}{a}{pa}，{b}也是。要不要生、什麼時候生，是兩個人一起的選擇；這裡只談教養的風格。", v)
+    : tr("{kids}{a}{pa}，{b}{pb}。要不要生、什麼時候生，是兩個人一起的選擇；這裡只談教養的風格。", v) });
   return out;
 }
 
 // ---------- 未來十年 ----------
 const flowOf = name => pillarOf(name);
+// A sign of marriage luck in a year, as said with the person's name in 好事.
+const SIGN_LINE = { 紅鸞星動: "{x}紅鸞星動", 天喜星到: "{x}天喜星到", 流年合夫妻宮: "{x}流年合夫妻宮", 配偶星到位: "{x}配偶星到位", 伴侶星到位: "{x}伴侶星到位" };
 function yearSignals(X, flow, neutral, age) {
   const p = flowOf(flow), stars = luckStars(X.ctx, flow), els = spouseElements(X, neutral);
   const wed = [];
   if (stars.includes("紅鸞")) wed.push("紅鸞星動");
   if (stars.includes("天喜")) wed.push("天喜星到");
   if (sixCombine(p.branch, X.dayB)) wed.push("流年合夫妻宮");
-  if (els.some(e => (e === p.stemEl || e === p.branchEl) && X.a.useful.includes(e))) wed.push(`${neutral ? "伴侶星" : "配偶星"}到位`);
+  if (els.some(e => (e === p.stemEl || e === p.branchEl) && X.a.useful.includes(e))) wed.push(neutral ? "伴侶星到位" : "配偶星到位");
   const y = age >= 0 ? yearReading(X.chart, X.a, age) : null;
   return {
     wed: age >= 18 ? wed : [], peach: stars.includes("桃花"), clashPalace: clash(p.branch, X.dayB),
@@ -573,15 +600,16 @@ function yearsOf(A, B, now, neutral) {
     const state = wed ? "good" : care ? "care" : good ? "good" : "mid";
     const goods = [], watches = [];
     for (const [X, s] of [[A, sa], [B, sb]]) {
-      if (s.wed.length) goods.push(`${X.n}${s.wed[0]}`);
-      else if (s.tone === "吉") goods.push(`${X.n}運勢順，能多照顧另一半`);
-      else if (s.peach) goods.push(`${X.n}人緣好、魅力強`);
-      if (s.clashPalace) watches.push(`${X.n}的夫妻宮逢沖，生活節奏容易變動，重要的事一起商量`);
-      else if (s.love <= -2) watches.push(`${X.n}在感情上容易有摩擦，多一點耐心`);
-      else if (s.tone === "凶") watches.push(`${X.n}運勢宜守，壓力大時記得說出來`);
+      const v = { x: X.n, xOf: X.of };
+      if (s.wed.length) goods.push(tr(SIGN_LINE[s.wed[0]], { x: isEn() && s.wed[0] === "流年合夫妻宮" ? X.of : X.n }));
+      else if (s.tone === "吉") goods.push(tr("{x}運勢順，能多照顧另一半", v));
+      else if (s.peach) goods.push(tr("{x}人緣好、魅力強", v));
+      if (s.clashPalace) watches.push(tr("{xOf}夫妻宮逢沖，生活節奏容易變動，重要的事一起商量", v));
+      else if (s.love <= -2) watches.push(tr("{x}在感情上容易有摩擦，多一點耐心", v));
+      else if (s.tone === "凶") watches.push(tr("{x}運勢宜守，壓力大時記得說出來", v));
     }
-    const goodText = wed ? `${goods.join("，")}：兩人的婚緣都旺，適合談婚事、規畫未來。` : goods.length ? `${goods.join("；")}。` : "感情平穩，適合一起規畫生活。";
-    const watchText = watches.length ? `${watches.join("；")}。` : "沒有特別要擔心的地方，維持日常的關心就好。";
+    const goodText = wed ? tr("{goods}：兩人的婚緣都旺，適合談婚事、規畫未來。", { goods: list(goods, "，") }) : goods.length ? end(semi(goods)) : tr("感情平穩，適合一起規畫生活。");
+    const watchText = watches.length ? end(semi(watches)) : tr("沒有特別要擔心的地方，維持日常的關心就好。");
     out.push({ year, pillar: flow, ages, tones: [sa.tone, sb.tone], state, wed, wedEach: [sa.wed, sb.wed], good: goodText, watch: watchText });
   }
   return out;
@@ -589,27 +617,28 @@ function yearsOf(A, B, now, neutral) {
 function wedOf(A, B, years, neutral) {
   const both = years.filter(y => y.wed).map(y => y.year);
   const each = [0, 1].map(i => years.filter(y => y.wedEach[i].length).map(y => y.year));
+  const yearsOfList = ys => (ys.length ? tr("{list} 年", { list: list(ys.map(String)) }) : tr("沒有特別的年份"));
   let text;
   if (both.length) {
     const y = years.find(x => x.wed);
-    text = `${both.join("、")} 年兩人都婚緣較旺。以 ${y.year} 年為例，${A.n}${y.wedEach[0].join("、")}，${B.n}${y.wedEach[1].join("、")}。`;
+    text = tr("{years} 年兩人都婚緣較旺。以 {year} 年為例，{a}{sa}，{b}{sb}。", { years: list(both.map(String)), year: y.year, a: A.n, sa: list(y.wedEach[0].map(trw)), b: B.n, sb: list(y.wedEach[1].map(trw)) });
   } else if (each[0].length || each[1].length) {
-    text = `未來十年兩人婚緣旺的年份不同步：${A.n}是 ${each[0].join("、") || "沒有特別的年份"}${each[0].length ? " 年" : ""}，${B.n}是 ${each[1].join("、") || "沒有特別的年份"}${each[1].length ? " 年" : ""}。可以挑其中一人的年份，再搭配下面的結婚月份。`;
-  } else text = "未來十年沒有特別突出的婚緣年份，哪一年結婚都可以，挑兩人都方便的時候就好。";
-  return { both, each, text: `${text}婚緣年份看的是紅鸞、天喜、流年合夫妻宮和${neutral ? "伴侶星" : "配偶星"}到位，是傳統擇年的參考。` };
+    text = tr("未來十年兩人婚緣旺的年份不同步：{a}是 {ya}，{b}是 {yb}。可以挑其中一人的年份，再搭配下面的結婚月份。", { a: A.n, ya: yearsOfList(each[0]), b: B.n, yb: yearsOfList(each[1]) });
+  } else text = tr("未來十年沒有特別突出的婚緣年份，哪一年結婚都可以，挑兩人都方便的時候就好。");
+  return { both, each, text: run([text, tr("婚緣年份看的是紅鸞、天喜、流年合夫妻宮和{word}到位，是傳統擇年的參考。", { word: neutral ? "伴侶星" : "配偶星" })]) };
 }
 function monthsOf(A, B, neutral) {
   const women = [A, B].filter(X => X.sex === "female");
-  const name = m => MONTH_NAME[m];
-  if (!women.length) return { women: [], text: "傳統的行嫁月只看女方的出生年，這裡不適用；可以直接參考農民曆上「宜嫁娶」的日子。" };
-  const list = women.map(X => ({ who: X.n, ...marriageMonths(X.yearB) }));
-  const say = w => `${w.who}（屬${ZODIAC[[A, B].find(X => X.n === w.who).yearB]}）的大利月是${w.best.map(name).join("、")}，小利月是${w.second.map(name).join("、")}`;
-  let text = `${list.map(say).join("；")}。`;
-  if (list.length === 2) {
-    const common = list[0].best.filter(m => list[1].best.includes(m));
-    text += common.length ? `兩位共同的大利月是${common.map(name).join("、")}。` : "兩位的大利月不同，可以各挑一個大利月或小利月，兩人商量就好。";
-  } else if (!neutral) text = `傳統的行嫁月看女方的出生年：${text}`;
-  return { women: list, text: `${text}月份以節氣月（立春起算）為準，和農曆月份在月初、月底可能差幾天；其他月份不是不好，只是傳統擇月比較少選，和婚姻好壞沒有直接關係。` };
+  const name = m => trw(MONTH_NAME[m]);
+  if (!women.length) return { women: [], text: tr("傳統的行嫁月只看女方的出生年，這裡不適用；可以直接參考農民曆上「宜嫁娶」的日子。") };
+  const months = women.map(X => ({ who: X.n, ...marriageMonths(X.yearB) }));
+  const say = w => tr("{who}（屬{z}）的大利月是{best}，小利月是{second}", { who: w.who, z: ZODIAC[[A, B].find(X => X.n === w.who).yearB], best: list(w.best.map(name)), second: list(w.second.map(name)) });
+  let text = end(semi(months.map(say)));
+  if (months.length === 2) {
+    const common = months[0].best.filter(m => months[1].best.includes(m));
+    text = run([text, common.length ? tr("兩位共同的大利月是{months}。", { months: list(common.map(name)) }) : tr("兩位的大利月不同，可以各挑一個大利月或小利月，兩人商量就好。")]);
+  } else if (!neutral) text = tr("傳統的行嫁月看女方的出生年：{text}", { text });
+  return { women: months, text: run([text, tr("月份以節氣月（立春起算）為準，和農曆月份在月初、月底可能差幾天；其他月份不是不好，只是傳統擇月比較少選，和婚姻好壞沒有直接關係。")]) };
 }
 
 // ---------- 一起開運、年齡差 ----------
@@ -619,28 +648,33 @@ const HOME = {
 };
 function luckOf(A, B) {
   const shared = A.a.useful.filter(e => B.a.useful.includes(e));
+  // 金 the colour is gold in English (金 the element is Metal).
+  const colors = e => list(ELEMENT_LUCK[e].colors.map(c => (isEn() && c === "金" ? trw("金色") : trw(c))));
   if (shared.length) {
     const e = shared[0], L = ELEMENT_LUCK[e];
-    return { elements: shared, text: `兩人的喜用都有${shared.join("、")}：${TOGETHER[e]}；家裡${HOME[e]}，多用${L.colors.join("、")}色；一起出遊時，往${L.direction}走走。不需要買任何開運物品，兩個人一起做這些事，本身就是在經營感情。` };
+    return { elements: shared, text: tr("兩人的喜用都有{els}：{together}；家裡{home}，多用{colors}色；一起出遊時，往{dir}走走。不需要買任何開運物品，兩個人一起做這些事，本身就是在經營感情。", { els: list(shared.map(trw)), together: TOGETHER[e], home: HOME[e], colors: colors(e), dir: L.direction }) };
   }
   const withUseful = [A, B].filter(X => X.useful);
-  const parts = withUseful.map(X => `${X.n}的用神是${X.useful}（${ELEMENT_LUCK[X.useful].colors.join("、")}色，${ELEMENT_LUCK[X.useful].direction}）`);
-  const plan = withUseful.length === 2 ? `可以輪流安排：這次${TOGETHER[A.useful]}，下次換成${TOGETHER[B.useful]}。`
-    : withUseful.length === 1 ? `約會時可以多安排${TOGETHER[withUseful[0].useful]}。` : "";
-  return { elements: withUseful.map(X => X.useful), text: `兩人的喜用不太一樣${parts.length ? `：${parts.join("；")}` : ""}。${plan}家裡各留一個照自己喜好布置的角落。不需要買任何開運物品，一起做這些事，本身就是在經營感情。` };
+  const parts = withUseful.map(X => tr("{xOf}用神是{u}（{colors}色，{dir}）", { xOf: X.of, u: X.useful, colors: colors(X.useful), dir: ELEMENT_LUCK[X.useful].direction }));
+  const plan = withUseful.length === 2 ? tr("可以輪流安排：這次{a}，下次換成{b}。", { a: TOGETHER[A.useful], b: TOGETHER[B.useful] })
+    : withUseful.length === 1 ? tr("約會時可以多安排{together}。", { together: TOGETHER[withUseful[0].useful] }) : "";
+  return { elements: withUseful.map(X => X.useful), text: run([
+    parts.length ? tr("兩人的喜用不太一樣：{parts}。", { parts: semi(parts) }) : tr("兩人的喜用不太一樣。"), plan,
+    tr("家裡各留一個照自己喜好布置的角落。不需要買任何開運物品，一起做這些事，本身就是在經營感情。"),
+  ].filter(Boolean)) };
 }
 function ageOf(A, B, neutral) {
   const d = Math.abs(A.by - B.by);
   const woman = !neutral ? [A, B].find(X => X.sex === "female") : null, man = !neutral ? [A, B].find(X => X.sex !== "female") : null;
   const wifeOlder = woman && man ? man.by - woman.by : 0;
-  if (d === 0) return "同一年出生：成長的時代背景相同，很多話題不用解釋，回憶也特別有共鳴。";
-  if (wifeOlder === 3) return "女大三，抱金磚：傳統上說妻子比丈夫大三歲，丈夫有福氣。台語也說「某大姊，坐金交椅」，娶年紀較長的太太，先生像坐金交椅一樣享福。";
-  if (wifeOlder > 0) return `相差 ${d} 歲，${woman.n}比較年長。台語說「某大姊，坐金交椅」：娶年紀較長的太太，先生像坐金交椅一樣享福。`;
-  if (d === 6) return "相差六歲：民間說差六歲生肖相沖，其實相差六歲不代表不合，重點在兩人的個性和相處。";
-  if (d === 3 || d === 9) return `相差 ${d} 歲：民間有「差三、六、九歲不好」的說法，卻也有「女大三，抱金磚」，兩種說法互相矛盾，可見年齡俗語不是一套一致的規則，聽聽就好。`;
-  if (d === 4 || d === 8) return `相差 ${d} 歲：相差四歲或八歲的兩個人，生肖一定是三合，傳統上視為好組合。`;
-  if (d % 12 === 0) return `相差 ${d} 歲，剛好${d === 12 ? "一輪" : `${d / 12} 輪`}、同生肖：步調相近，年長的一方又多一份照顧。`;
-  return `相差 ${d} 歲：年齡差多少不是重點，彼此的生活節奏和價值觀才是。`;
+  if (d === 0) return tr("同一年出生：成長的時代背景相同，很多話題不用解釋，回憶也特別有共鳴。");
+  if (wifeOlder === 3) return tr("女大三，抱金磚：傳統上說妻子比丈夫大三歲，丈夫有福氣。台語也說「某大姊，坐金交椅」，娶年紀較長的太太，先生像坐金交椅一樣享福。");
+  if (wifeOlder > 0) return tr("相差 {d} 歲，{w}比較年長。台語說「某大姊，坐金交椅」：娶年紀較長的太太，先生像坐金交椅一樣享福。", { d, w: woman.n });
+  if (d === 6) return tr("相差六歲：民間說差六歲生肖相沖，其實相差六歲不代表不合，重點在兩人的個性和相處。");
+  if (d === 3 || d === 9) return tr("相差 {d} 歲：民間有「差三、六、九歲不好」的說法，卻也有「女大三，抱金磚」，兩種說法互相矛盾，可見年齡俗語不是一套一致的規則，聽聽就好。", { d });
+  if (d === 4 || d === 8) return tr("相差 {d} 歲：相差四歲或八歲的兩個人，生肖一定是三合，傳統上視為好組合。", { d });
+  if (d % 12 === 0) return tr("相差 {d} 歲，剛好{cycles}、同生肖：步調相近，年長的一方又多一份照顧。", { d, cycles: d === 12 ? tr("一輪") : tr("{n} 輪", { n: d / 12 }) });
+  return tr("相差 {d} 歲：年齡差多少不是重點，彼此的生活節奏和價值觀才是。", { d });
 }
 
 // ---------- 主程式 ----------
@@ -648,7 +682,7 @@ const ORDER = ["palace", "useful", "star", "day", "elements", "zodiac", "nayin"]
 export function hehunReading({ a, b, now }) {
   let an = typeof a.name === "string" && a.name.trim() ? a.name.trim() : null, bn = typeof b.name === "string" && b.name.trim() ? b.name.trim() : null;
   if (an && an === bn) an = bn = null;
-  const A = personOf(a, an || "你"), B = personOf(b, bn || "對方");
+  const A = personOf(a, nameForms(an, "你")), B = personOf(b, nameForms(bn, "對方"));
   const neutral = A.sex === B.sex;
   const F = { ...factsOf(A, B, neutral), neutral, A, B };
   const pr = partnerReading({ me: { pillars: A.names, analysis: A.a, sex: A.sex, name: an || "" }, partner: { pillars: B.names, analysis: B.a, sex: B.sex, name: bn || "" }, order: ORDER });
@@ -657,17 +691,17 @@ export function hehunReading({ a, b, now }) {
   // Three chips for the top card: the good ones first, at most one tension, then quiet ones. A 命卦 name shows only
   // when it is a kind one (延年、生氣、天醫、伏位); the parts of the score fill in last.
   const chips = [...pr.chips];
-  if (F.seenAB.length && F.seenBA.length) chips.push({ text: "桃花紅鸞互見", kind: "good" });
-  if (GUA_SCORE[F.gua] >= 4) chips.push({ text: `命卦${F.gua}`, kind: GUA_SCORE[F.gua] === 5 ? "good" : "mid" });
-  if (F.nayin.rel !== "剋") chips.push({ text: F.nayin.rel === "生" ? "納音相生" : "納音比和", kind: F.nayin.rel === "生" ? "good" : "mid" });
-  for (const p of score.parts.slice().sort((x, y) => y.got / y.max - x.got / x.max)) chips.push({ text: p.why, kind: p.got / p.max >= 0.7 ? "good" : "mid", spare: true });
-  const seen = new Set(), list = chips.filter(c => !seen.has(c.text) && seen.add(c.text));
-  const good = list.filter(c => c.kind === "good" && !c.spare), care = list.filter(c => c.kind === "care");
+  if (F.seenAB.length && F.seenBA.length) chips.push({ text: tr("桃花紅鸞互見"), kind: "good" });
+  if (GUA_SCORE[F.gua] >= 4) chips.push({ text: tr("命卦{gua}", { gua: F.gua }), kind: GUA_SCORE[F.gua] === 5 ? "good" : "mid" });
+  if (F.nayin.rel !== "剋") chips.push({ text: F.nayin.rel === "生" ? tr("納音相生") : tr("納音比和"), kind: F.nayin.rel === "生" ? "good" : "mid" });
+  for (const p of score.parts.slice().sort((x, y) => y.got / y.max - x.got / x.max)) chips.push({ text: tidy(p.why), kind: p.got / p.max >= 0.7 ? "good" : "mid", spare: true });
+  const seen = new Set(), chipList = chips.filter(c => !seen.has(c.text) && seen.add(c.text));
+  const good = chipList.filter(c => c.kind === "good" && !c.spare), care = chipList.filter(c => c.kind === "care");
   const hero = [...good.slice(0, care.length ? 2 : 3), ...care.slice(0, 1)];
-  for (const c of list) if (hero.length < 3 && !hero.includes(c)) hero.push(c);
+  for (const c of chipList) if (hero.length < 3 && !hero.includes(c)) hero.push(c);
   const person = X => ({ n: X.n, sex: X.sex, pillars: X.names, zodiac: ZODIAC[X.yearB], stem: X.stem, element: X.el, solarYear: X.solar, gua: X.gua });
-  return {
-    people: [person(A), person(B)], neutral, score, type, chips: hero.map(({ text, kind }) => ({ text, kind })), summary: pr.summary, advice: pr.advice, tone: pr.tone, net: pr.net,
+  const out = {
+    people: [person(A), person(B)], neutral, score, type, chips: hero.map(({ text, kind }) => ({ text: tidy(text), kind })), summary: pr.summary, advice: pr.advice, tone: pr.tone, net: pr.net,
     dims: dimsOf(A, B, F, score, years),
     checks: checksOf(A, B, F, pr),
     loves: [loveOf(A, B, F, neutral), loveOf(B, A, F, neutral)],
@@ -678,4 +712,21 @@ export function hehunReading({ a, b, now }) {
     luck: luckOf(A, B),
     age: ageOf(A, B, neutral),
   };
+  return isEn() ? tidied(out) : out;
+}
+// English: every sentence the page shows, tidied (partner.js tidy); ids, kinds and the Chinese values stay as they are.
+function tidied(r) {
+  const t = tidy;
+  r.score.parts = r.score.parts.map(p => ({ ...p, label: t(p.label), why: t(p.why) }));
+  r.type = { ...r.type, label: t(r.type.label), line: t(r.type.line) };
+  r.dims = r.dims.map(d => ({ ...d, label: t(d.label), strength: t(d.strength), watch: t(d.watch), try: t(d.try) }));
+  r.checks = r.checks.map(c => ({ ...c, title: t(c.title), paragraphs: c.paragraphs.map(t), items: c.items.map(it => ({ label: t(it.label), text: t(it.text) })) }));
+  r.loves = r.loves.map(l => ({ ...l, lines: l.lines.map(t), seen: t(l.seen) }));
+  r.guide = r.guide.map(g => ({ ...g, title: t(g.title), text: t(g.text) }));
+  r.years = r.years.map(y => ({ ...y, good: t(y.good), watch: t(y.watch) }));
+  r.wed = { ...r.wed, text: t(r.wed.text) };
+  r.months = { ...r.months, text: t(r.months.text) };
+  r.luck = { ...r.luck, text: t(r.luck.text) };
+  r.age = t(r.age);
+  return r;
 }

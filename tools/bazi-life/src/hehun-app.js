@@ -1,5 +1,8 @@
 // 合婚分頁：兩個人的生日，排盤引擎馬上算出完整合婚（core/hehun.js），全部在瀏覽器裡算、不上傳。按「AI 深度合婚」
 // 才把兩個人的出生資料送到網站的 Worker（/api/reading 的合婚三段，ai-reading.js），暱稱不送。
+// English (README「中／英切換」): the result is the reading in the page's language (core/tr.js, the shared catalog from
+// english.js) and its own words through t(); it is written again when the language changes. When English is on but
+// the catalog cannot be fetched (a file preview), the result stays Chinese and the tab's note says so.
 import { PLACE_GROUPS, findPlace } from "./core/places.js";
 import { computeChart } from "./core/chart.js";
 import { hehunReading } from "./core/hehun.js";
@@ -11,6 +14,9 @@ import { trackOnce } from "./stats.js";
 import { SHICHEN } from "./core/shichen.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
 import { initTimeField, readTimeField, syncTimeField, timeFieldIds } from "./time-field.js";
+import { t, lang } from "./i18n.js";
+import { ensureEnglish, englishNow } from "./english.js";
+import { setReadingLang, trw } from "./core/tr.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -45,6 +51,7 @@ export function initMatch(h) {
   $("#hh-soon-btn").addEventListener("click", () => { $("#hh-soon-msg").hidden = false; trackOnce("ai_match"); });
   $("#hh-ai-body").addEventListener("click", e => { const b = e.target.closest("[data-ai-retry]"); if (b && ai) askParts(ai, [b.dataset.aiRetry]); });
   if (!$("#form-match").hidden) onMatchTab("match");
+  document.addEventListener("langchange", () => { if (shown) redraw(); });
 }
 
 // The tab was opened: fill in what 我的人生 already knows, and show the result only under this tab.
@@ -70,7 +77,7 @@ function restore() {
   for (const p of ["ma", "mb"]) syncTimeField(p);
 }
 function clearForm() {
-  if (!confirm("要清空合婚的資料嗎？填過的生日會刪掉。")) return;
+  if (!confirm(t("要清空合婚的資料嗎？填過的生日會刪掉。"))) return;
   $("#form-match").reset();
   for (const p of ["ma", "mb"]) { $(`#${p}-place`).value = "臺北市"; syncTimeField(p); }
   DRAFT.clear();
@@ -140,29 +147,49 @@ export function openMatch({ me, partner }) {
 
 function readPerson(p, label) {
   const [y, m, d] = ($(`#${p}-date`).value || "").split("-").map(Number);
-  if (!y) return { error: `請填${label}的出生日期。` };
-  if (y < 1900 || y > 2100) return { error: `${label}的出生年份請在 1900 到 2100 年之間。` };
+  if (!y) return { error: t(`請填${label}的出生日期。`) };
+  if (y < 1900 || y > 2100) return { error: t(`${label}的出生年份請在 1900 到 2100 年之間。`) };
   const hour = readTimeField(p);
-  if (hour.error) return { error: `${label}的出生時間：${hour.error}` };
+  if (hour.error) return { error: t(`${label}的出生時間：{error}`, { error: t(hour.error) }) };
   return { date: { y, m, d }, time: hour.time, place: findPlace($(`#${p}-place`).value), sex: $(`#${p}-sex-f`).checked ? "female" : "male", name: clean($(`#${p}-name`).value), ...(hour.zi === "late" ? { zi: "late" } : {}) };
 }
 
 // ---------- 合婚 ----------
-function compute() {
+// The reading in the page's language: English once its catalog is here (english.js), else Chinese. The readings'
+// language is left as the page's (life-app.js sets its own at the end of a life).
+function readingOf(a, b) {
+  const L = englishNow();
+  setReadingLang(L);
+  const chartOf = x => computeChart({ date: x.date, time: x.time, place: x.place, sex: x.sex, options: { solar: "true", zi: x.zi === "late" ? "late" : "early" } }, { lean: true });
+  return { r: hehunReading({ a: { chart: chartOf(a), sex: a.sex, name: a.name }, b: { chart: chartOf(b), sex: b.sex, name: b.name }, now: new Date().getFullYear() }), en: !!L };
+}
+// The result on screen again, in the language now chosen (the langchange event), waiting for the English first.
+async function redraw() {
+  if (lang() === "en" && !englishNow()) { const p = ensureEnglish(); if (p) await p; }
+  if (!shown) return;
+  const { r, en } = readingOf(shown.a, shown.b);
+  shown.r = r;
+  $("#hh-body").innerHTML = resultHTML(r, en);
+  noteFor(en);
+}
+// The tab's note (「合婚的解說目前是中文…」) shows only while English is on and the result could not be English.
+const noteFor = en => { $("#hh-en-note").hidden = !(lang() === "en" && !en); };
+async function compute() {
   const a = readPerson("ma", "你"), b = readPerson("mb", "對方");
   if (a.error || b.error) return hooks.showError(a.error || b.error);
   hooks.showError("");
-  let r;
+  if (lang() === "en" && !englishNow()) { const p = ensureEnglish(); if (p) await p; }
+  let r, en;
   try {
-    const chartOf = x => computeChart({ date: x.date, time: x.time, place: x.place, sex: x.sex, options: { solar: "true", zi: x.zi === "late" ? "late" : "early" } }, { lean: true });
-    r = hehunReading({ a: { chart: chartOf(a), sex: a.sex, name: a.name }, b: { chart: chartOf(b), sex: b.sex, name: b.name }, now: new Date().getFullYear() });
+    ({ r, en } = readingOf(a, b));
   } catch (e) {
     console.error(e);
-    return hooks.showError("這個日期或地點沒辦法排盤，請再檢查一次。");
+    return hooks.showError(t("這個日期或地點沒辦法排盤，請再檢查一次。"));
   }
   shown = { a, b, r };
   ai = null;
-  $("#hh-body").innerHTML = resultHTML(r);
+  $("#hh-body").innerHTML = resultHTML(r, en);
+  noteFor(en);
   $("#hh-life-name").value = b.name || "";
   $("#hh-life-same").hidden = a.sex !== b.sex;
   lifeError("");
@@ -173,30 +200,41 @@ function compute() {
 
 const STATE = { good: "順勢", mid: "平穩", care: "要多體諒" };
 const p = text => `<p>${esc(text)}</p>`;
-function resultHTML(r) {
+// The engine's values that stay Chinese in the reading (pillars, the zodiac animal, the day stem), in the page's
+// language: 甲子 → Jia Zi; a name starts with a capital in English (you → You).
+// The result's words follow the reading: English with an English reading, else all Chinese (t() only when English).
+let english = false;
+const en = () => english;
+const T = (zh, vars) => (english ? t(zh, vars) : vars ? zh.replace(/\{(\w+)\}/g, (all, k) => (k in vars ? String(vars[k]) : all)) : zh);
+const pillarText = name => (en() ? [...name].map(trw).join(" ") : name);
+const nameText = n => (en() ? String(n).replace(/^[a-z]/, c => c.toUpperCase()) : n);
+function resultHTML(r, inEnglish) {
+  english = inEnglish;
   const [A, B] = r.people;
-  const who = X => `<div class="hh-who"><b>${esc(X.n)}</b><span class="num">${esc(X.pillars.join(" "))}</span><span>屬${esc(X.zodiac)}・${esc(X.stem + X.element)}日主</span></div>`;
+  const who = X => `<div class="hh-who"><b>${esc(nameText(X.n))}</b><span class="num">${esc(X.pillars.map(pillarText).join(en() ? " · " : " "))}</span><span>${esc(T("屬{zodiac}・{stem}日主", { zodiac: trw(X.zodiac), stem: en() ? `${trw(X.stem)} ${trw(X.element)}` : X.stem + X.element }))}</span></div>`;
   const hero = `<div class="hh-hero">
     <div class="hh-pair">${who(A)}<span class="hh-heart" aria-hidden="true">♥</span>${who(B)}</div>
-    <div class="hh-type"><span class="hh-kicker">你們的關係類型</span><span class="hh-label">${esc(r.type.label)}</span><p>${esc(r.type.line)}</p></div>
-    <div class="hh-score"><span class="hh-num">${r.score.total}</span><span class="hh-of">／100 契合度</span></div>
+    <div class="hh-type"><span class="hh-kicker">${esc(T("你們的關係類型"))}</span><span class="hh-label">${esc(r.type.label)}</span><p>${esc(r.type.line)}</p></div>
+    <div class="hh-score"><span class="hh-num">${r.score.total}</span><span class="hh-of">${esc(T("／100 契合度"))}</span></div>
     <p class="hh-chips">${r.chips.map(c => `<span class="c-${c.kind}">${esc(c.text)}</span>`).join("")}</p>
     <p class="hh-summary">${esc(r.summary)}</p>
-    <p class="fine">分數高不代表一定幸福，分數低代表要多花一點心思溝通。命理說的是傾向，不是注定。</p>
+    <p class="fine">${esc(T("分數高不代表一定幸福，分數低代表要多花一點心思溝通。命理說的是傾向，不是注定。"))}</p>
   </div>`;
-  const bars = `<section class="hh-sec"><h3>契合度怎麼算</h3><div class="hh-bars">${r.score.parts.map(x => `<div class="hh-bar"><span class="l">${esc(x.label)}</span><span class="track"><span class="fill" style="width:${Math.round((100 * x.got) / x.max)}%"></span></span><span class="n">${x.got}/${x.max}</span><span class="why">${esc(x.why)}</span></div>`).join("")}</div><p class="fine">夫妻宮、日柱和用神最重；生肖、納音、命卦這些民俗方法比重小，只當參考。</p></section>`;
-  const dims = `<section class="hh-sec"><h3>六大面向</h3>${radar(r.dims)}<div class="hh-dims">${r.dims.map(d => `<article class="hh-dim"><header><b>${esc(d.label)}</b><span class="num">${d.value}</span></header><div class="hh-meter"><span style="width:${d.value}%"></span></div><p><b>優勢</b>${esc(d.strength)}</p><p><b>要留意</b>${esc(d.watch)}</p><p><b>這週試試</b>${esc(d.try)}</p></article>`).join("")}</div></section>`;
-  const checks = `<section class="hh-sec"><h3>傳統合婚九項</h3><p class="fine">主要：現代命理師最重視的三項；輔助：參考用；民俗：長輩常問的老方法，只當參考。</p>${r.checks.map((c, i) => `<details class="hh-check"${i < 3 ? " open" : ""}><summary><span class="t">${esc(c.title)}</span><span class="hh-tag lv-${esc(c.level)}">${esc(c.level)}</span><span class="hh-tag vd-${esc(c.verdict)}">${esc(c.verdict)}</span></summary>${c.paragraphs.map(p).join("")}${c.items.map(it => `<p class="item"><b>${esc(it.label)}</b>　${esc(it.text)}</p>`).join("")}</details>`).join("")}</section>`;
-  const loves = `<section class="hh-sec"><h3>兩個人的感情樣貌</h3><div class="hh-loves">${r.loves.map(l => `<article class="hh-love"><h4>${esc(l.who)}</h4>${l.lines.map(p).join("")}<p class="seen">${esc(l.seen)}</p></article>`).join("")}</div></section>`;
-  const guide = `<section class="hh-sec"><h3>相處說明書</h3><dl class="hh-guide">${r.guide.map(g => `<div><dt>${esc(g.title)}</dt><dd>${esc(g.text)}</dd></div>`).join("")}</dl>${r.advice.length ? `<ul class="hh-advice">${r.advice.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</section>`;
-  const tone = t => { const w = toneWord(t); return `<span class="ai-tone t-${w}">${w}</span>`; };
-  const years = r.years.length ? `<section class="hh-sec"><h3>未來十年，你們的感情</h3>
-    <div class="hh-strip">${r.years.map(y => `<span class="yr s-${y.state}${y.wed ? " wed" : ""}"><b>${y.year}</b>${y.wed ? "宜婚" : STATE[y.state]}</span>`).join("")}</div>
-    <p class="hh-legend"><span><i class="s-good" style="background:var(--indigo-wash)"></i>順勢</span><span><i style="background:var(--wash)"></i>平穩</span><span><i style="background:var(--seal-wash)"></i>要多體諒</span><span>紅框：兩人都婚緣較旺的年份</span></p>
-    <ol class="hh-years">${r.years.map(y => `<li><div class="yh"><b>${y.year} 年</b><span>${esc(y.pillar)}年</span><span>${esc(A.n)} ${y.ages[0]} 歲</span>${tone(y.tones[0])}<span>${esc(B.n)} ${y.ages[1]} 歲</span>${tone(y.tones[1])}${y.wed ? '<span class="ai-tone t-wed">宜婚</span>' : ""}</div><p><b>好事</b>${esc(y.good)}</p><p><b>要注意</b>${esc(y.watch)}</p></li>`).join("")}</ol></section>` : "";
-  const more = `<section class="hh-sec"><h3>宜婚年份與結婚月份</h3>${p(r.wed.text)}${p(r.months.text)}</section>
-    <section class="hh-sec"><h3>一起開運</h3>${p(r.luck.text)}</section>
-    <section class="hh-sec"><h3>年齡差小知識</h3>${p(r.age)}</section>`;
+  const bars = `<section class="hh-sec"><h3>${esc(T("契合度怎麼算"))}</h3><div class="hh-bars">${r.score.parts.map(x => `<div class="hh-bar"><span class="l">${esc(x.label)}</span><span class="track"><span class="fill" style="width:${Math.round((100 * x.got) / x.max)}%"></span></span><span class="n">${x.got}/${x.max}</span><span class="why">${esc(x.why)}</span></div>`).join("")}</div><p class="fine">${esc(T("夫妻宮、日柱和用神最重；生肖、納音、命卦這些民俗方法比重小，只當參考。"))}</p></section>`;
+  const dims = `<section class="hh-sec"><h3>${esc(T("六大面向"))}</h3>${radar(r.dims)}<div class="hh-dims">${r.dims.map(d => `<article class="hh-dim"><header><b>${esc(d.label)}</b><span class="num">${d.value}</span></header><div class="hh-meter"><span style="width:${d.value}%"></span></div><p><b>${esc(T("優勢"))}</b>${esc(d.strength)}</p><p><b>${esc(T("要留意"))}</b>${esc(d.watch)}</p><p><b>${esc(T("這週試試"))}</b>${esc(d.try)}</p></article>`).join("")}</div></section>`;
+  const checks = `<section class="hh-sec"><h3>${esc(T("傳統合婚九項"))}</h3><p class="fine">${esc(T("主要：現代命理師最重視的三項；輔助：參考用；民俗：長輩常問的老方法，只當參考。"))}</p>${r.checks.map((c, i) => `<details class="hh-check"${i < 3 ? " open" : ""}><summary><span class="t">${esc(c.title)}</span><span class="hh-tag lv-${esc(c.level)}">${esc(T(c.level))}</span><span class="hh-tag vd-${esc(c.verdict)}">${esc(T(c.verdict))}</span></summary>${c.paragraphs.map(p).join("")}${c.items.map(it => `<p class="item"><b>${esc(it.label)}</b>${en() ? " " : "　"}${esc(it.text)}</p>`).join("")}</details>`).join("")}</section>`;
+  const loves = `<section class="hh-sec"><h3>${esc(T("兩個人的感情樣貌"))}</h3><div class="hh-loves">${r.loves.map(l => `<article class="hh-love"><h4>${esc(nameText(l.who))}</h4>${l.lines.map(p).join("")}<p class="seen">${esc(l.seen)}</p></article>`).join("")}</div></section>`;
+  const guide = `<section class="hh-sec"><h3>${esc(T("相處說明書"))}</h3><dl class="hh-guide">${r.guide.map(g => `<div><dt>${esc(g.title)}</dt><dd>${esc(g.text)}</dd></div>`).join("")}</dl>${r.advice.length ? `<ul class="hh-advice">${r.advice.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</section>`;
+  const tone = x => { const w = toneWord(x); return `<span class="ai-tone t-${w}">${esc(T(w))}</span>`; };
+  const age = (X, n) => `<span>${esc(T("{name} {age} 歲", { name: nameText(X.n), age: n }))}</span>`;
+  const wedTag = esc(T("宜婚"));
+  const years = r.years.length ? `<section class="hh-sec"><h3>${esc(T("未來十年，你們的感情"))}</h3>
+    <div class="hh-strip">${r.years.map(y => `<span class="yr s-${y.state}${y.wed ? " wed" : ""}"><b>${y.year}</b>${y.wed ? wedTag : esc(T(STATE[y.state]))}</span>`).join("")}</div>
+    <p class="hh-legend"><span><i class="s-good" style="background:var(--indigo-wash)"></i>${esc(T("順勢"))}</span><span><i style="background:var(--wash)"></i>${esc(T("平穩"))}</span><span><i style="background:var(--seal-wash)"></i>${esc(T("要多體諒"))}</span><span>${esc(T("紅框：兩人都婚緣較旺的年份"))}</span></p>
+    <ol class="hh-years">${r.years.map(y => `<li><div class="yh"><b>${esc(T("{year} 年", { year: y.year }))}</b><span>${esc(T("{pillar}年", { pillar: pillarText(y.pillar) }))}</span>${age(A, y.ages[0])}${tone(y.tones[0])}${age(B, y.ages[1])}${tone(y.tones[1])}${y.wed ? `<span class="ai-tone t-wed">${wedTag}</span>` : ""}</div><p><b>${esc(T("好事"))}</b>${esc(y.good)}</p><p><b>${esc(T("要注意"))}</b>${esc(y.watch)}</p></li>`).join("")}</ol></section>` : "";
+  const more = `<section class="hh-sec"><h3>${esc(T("宜婚年份與結婚月份"))}</h3>${p(r.wed.text)}${p(r.months.text)}</section>
+    <section class="hh-sec"><h3>${esc(T("一起開運"))}</h3>${p(r.luck.text)}</section>
+    <section class="hh-sec"><h3>${esc(T("年齡差小知識"))}</h3>${p(r.age)}</section>`;
   return hero + bars + dims + checks + loves + guide + years + more;
 }
 
@@ -210,7 +248,7 @@ function radar(dims) {
     const [x, y] = at(i, R + 16), anchor = Math.abs(x - cx) < 1 ? "middle" : x > cx ? "start" : "end";
     return `<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="${anchor}">${esc(d.label)} <tspan class="v">${d.value}</tspan></text>`;
   }).join("");
-  return `<svg class="hh-radar" viewBox="-70 -4 380 250" role="img" aria-label="六大面向：${dims.map(d => `${d.label} ${d.value}`).join("、")}">
+  return `<svg class="hh-radar" viewBox="${en() ? "-110 -4 460 250" : "-70 -4 380 250"}" role="img" aria-label="${esc(T("六大面向：{list}", { list: dims.map(d => `${d.label} ${d.value}`).join(en() ? ", " : "、") }))}">
     ${[R, (R * 2) / 3, R / 3].map(r => `<polygon class="grid" points="${ring(r)}"/>`).join("")}
     ${dims.map((_, i) => { const [x, y] = at(i, R); return `<line class="axis" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join("")}
     <polygon class="area" points="${pts.map(q => q.map(v => v.toFixed(1)).join(",")).join(" ")}"/>
@@ -229,13 +267,14 @@ function startLife() {
   if (!shown) return;
   const { a, b } = shown;
   const name = clean($("#hh-life-name").value);
-  if (!name) { lifeError("請幫對方取個名字，故事裡會用這個名字稱呼對方。"); $("#hh-life-name").focus(); return; }
+  if (!name) { lifeError(t("請幫對方取個名字，故事裡會用這個名字稱呼對方。")); $("#hh-life-name").focus(); return; }
   const partner = { name, date: b.date, time: b.time, sex: b.sex, only: true, ...(b.place ? { place: b.place } : {}), ...(b.zi === "late" && b.time ? { zi: "late" } : {}) };
   const met = yearIn("#hh-life-met"), wed = yearIn("#hh-life-wed");
   if (met !== undefined) partner.metYear = Number.isInteger(met) ? met : NaN;
   if (wed !== undefined) partner.marriedYear = Number.isInteger(wed) ? wed : NaN;
   const family = { siblings: [], onlyChild: false, partner };
-  const problems = checkFamily(family, a.date, a.sex);
+  setReadingLang(englishNow());
+  const problems = checkFamily(family, a.date, a.sex, { english: en() });
   if (problems.length) { lifeError(problems.join(" ")); return; }
   lifeError("");
   hooks.begin({ date: a.date, time: a.time, place: a.place, sex: a.sex, ...(a.zi === "late" ? { zi: "late" } : {}) }, null, { name: a.name, family });

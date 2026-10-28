@@ -24,10 +24,13 @@
 // fate; health is never a diagnosis. The static tables are exported for reuse.
 import { SixtyCycle, SolarDay, SolarTime } from "tyme4ts";
 import { zh } from "./zh.js";
-import { ELEMENTS, GROUPS, SCHOOLS, groupOf, elementOf } from "./analysis.js";
+import { ELEMENTS, GROUPS, SCHOOLS, groupOf, elementOf, tiaohouNote } from "./analysis.js";
 import {
-  natalStars, natalRelations, seasonalStates, strengthFactors, tenGodCounts, elementRoles, luckStars, STEMS, BRANCHES,
+  natalStars, natalRelations, seasonalStates, strengthFactors, tenGodCounts, elementRoles, luckStars, STEMS, BRANCHES, glue, pillarWord,
 } from "./detail.js";
+import { tr, trw, readingLang } from "./tr.js";
+
+const hasCJK = t => /[\u3000-\u303f\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(String(t));
 
 // ---------- 靜態表 ----------
 
@@ -287,8 +290,7 @@ const SECTIONS = [
 export const SECTION_IDS = SECTIONS.map(([id]) => id);
 const TITLE = Object.fromEntries(SECTIONS);
 
-export const DISCLAIMER = "本詳批依傳統子平八字的理論與本專案的推算規則寫成，是文化參考與自我觀察的工具，不是對人生的保證或預言。"
-  + "命理各派說法不一，健康、財務、法律與婚姻等重要決定，請以專業意見與自己的判斷為準。";
+export const DISCLAIMER = "本詳批依傳統子平八字的理論與本專案的推算規則寫成，是文化參考與自我觀察的工具，不是對人生的保證或預言。命理各派說法不一，健康、財務、法律與婚姻等重要決定，請以專業意見與自己的判斷為準。";
 
 
 // ---------- 小工具 ----------
@@ -314,44 +316,80 @@ const STATE_NOTE = { 旺: "，最有力量", 相: "，受月令生扶", 休: "�
 // element (the median strongest element holds 0.375; an average element 0.2).
 const HEAVY = 0.42;
 
+// The reading's language (core/tr.js). Every sentence is a Chinese template through tr() and every word shown through
+// trw(); what is left here is how pieces are put side by side, which differs only in punctuation and spaces.
+const en = () => readingLang() === "en";
+const EN_SEP = { "、": ", ", "，": ", ", "；": "; ", "・": " · ", "": " ", " ": ", " };
+const join = (list, zhSep = "、") => list.join(en() ? EN_SEP[zhSep] : zhSep);
+const J = (list, zhSep = "、") => join(list.map(trw), zhSep);   // Chinese words, shown
+// Phrases from the tables above are read as sentences (tr), so a phrase never takes the English of a word spelt the
+// same (金 the colour, not the element; 太陽 the image, not the spirit). Trades and careers are words (trw).
+const JP = (list, zhSep = "、") => join(list.map(t => tr(t)), zhSep);
+const para = (...parts) => join(parts.filter(Boolean), "");      // sentences one after another
+const stop = t => `${t}${en() ? "." : "。"}`;
+// A sentence that starts with a piece of another sentence starts with a capital in English.
+const cap = t => (en() ? String(t).replace(/^(\W*)(\w)/, (all, lead, c) => lead + c.toUpperCase()) : t);
+const bracket = t => (en() ? ` (${t})` : `（${t}）`);
+const paren = (a, b) => `${a}${bracket(b)}`;
+const se = stem => trw(`${stem}${STEM_EL[stem]}`);               // 甲木, Yang Wood (Jia)
+const be = (branch, el) => trw(`${branch}${el}`);                // 子水, Zi (Water)
+// A structure's name: the ten ordinary ones as sentences (their reading English), the special ones as BaZi words.
+const patName = p => (PATTERN_TEXT[p] ? tr(p) : trw(p));
+const role1 = r => tr(ROLE_ZH[r]);                                 // 年, Year
+
 const uniq = list => [...new Set(list)];
-const listWords = items => (items.length <= 1 ? items.join("") : `${items.slice(0, -1).join("、")}和${items[items.length - 1]}`);
+const listWords = items => (items.length <= 1 ? items.join("") : tr("{a}和{b}", { a: join(items.slice(0, -1), "、"), b: items[items.length - 1] }));
+// A與B（與C）: what the Chinese joins with 與.
+const andJoin = list => (list.length ? list.reduce((a, b) => tr("{a}與{b}", { a, b })) : "");
 const pct = x => `${Math.round(x * 100)}%`;
-const ymd = s => { const [y, m, d] = s.slice(0, 10).split("-").map(Number); return `${y} 年 ${m} 月 ${d} 日`; };
+const ymd = s => {
+  const [y, m, d] = s.slice(0, 10).split("-").map(Number);
+  if (en()) return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  return `${y} 年 ${m} 月 ${d} 日`;
+};
 const hm = s => s.slice(11, 16);
 const nayinOf = name => zh(SixtyCycle.fromName(name).getSound().getName());
-const section = (id, paragraphs, items = []) => ({ id, title: TITLE[id], paragraphs: paragraphs.filter(Boolean), items });
+const section = (id, paragraphs, items = []) => ({ id, title: tr(TITLE[id]), paragraphs: paragraphs.filter(Boolean), items: items.map(it => ({ ...it, label: cap(it.label) })) });
 
-// 「年、時兩干」
+// 年干, 月支, 時柱 and 「年、時兩干」
+const ONE = { 干: "{role}干", 支: "{role}支", 柱: "{role}柱" };
+const MANY = { 干: "{roles}干", 支: "{roles}支", 柱: "{roles}柱" };
 function rolesWord(roles, part) {
   const u = uniq(roles).sort((x, y) => ORDER.indexOf(x) - ORDER.indexOf(y));
-  return u.length === 1 ? `${ROLE_ZH[u[0]]}${part}` : `${u.map(r => ROLE_ZH[r]).join("、")}${COUNT[u.length]}${part}`;
+  if (u.length === 1) return tr(ONE[part], { role: role1(u[0]) });
+  return tr(MANY[part], { roles: en() ? listWords(u.map(role1)) : `${u.map(r => ROLE_ZH[r]).join("、")}${COUNT[u.length]}` });
 }
+// 年支辰 (a branch in its pillar)
+const rb = (role, branch) => tr("{role}支{b}", { role: role1(role), b: trw(branch) });
 // [{ role, stem }] → 「年、時兩干的戊土、月干甲木」
 function stemsWords(list, withEl = true) {
   const by = new Map();
   for (const x of list) by.set(x.stem, [...(by.get(x.stem) || []), x.role]);
-  return [...by].map(([stem, roles]) => {
-    const s = withEl ? `${stem}${STEM_EL[stem]}` : stem;
-    return roles.length === 1 ? `${ROLE_ZH[roles[0]]}干${s}` : `${rolesWord(roles, "干")}的${s}`;
-  }).join("、");
+  const parts = [...by].map(([stem, roles]) => {
+    const s = withEl ? se(stem) : trw(stem);
+    return roles.length === 1 ? tr("{role}干{s}", { role: role1(roles[0]), s }) : tr("{where}的{s}", { where: rolesWord(roles, "干"), s });
+  });
+  return en() ? listWords(parts) : parts.join("、");
 }
 // [{ role, name }] (branches) → 「年支辰」 or 「辰、丑兩支」
 function branchesWords(list) {
-  return list.length === 1 ? `${ROLE_ZH[list[0].role]}支${list[0].name}` : `${list.map(x => x.name).join("、")}${COUNT[list.length]}支`;
+  return list.length === 1 ? rb(list[0].role, list[0].name)
+    : tr("{names}支", { names: en() ? listWords(list.map(x => trw(x.name))) : `${list.map(x => x.name).join("、")}${COUNT[list.length]}` });
 }
 // Hidden stems [{ role, branch, type }] → 「時支子的本氣與辰、丑之中」
 function hiddenBrief(hid) {
   const main = hid.filter(h => h.type === "本氣"), rest = hid.filter(h => h.type !== "本氣");
   const parts = [];
-  if (main.length) parts.push(`${listWords(uniq(main.map(h => `${ROLE_ZH[h.role]}支${h.branch}`)))}的本氣`);
-  if (rest.length) parts.push(`${uniq(rest.map(h => h.branch)).join("、")}之中`);
-  return parts.join("與");
+  if (main.length) parts.push(tr("{list}的本氣", { list: listWords(uniq(main.map(h => rb(h.role, h.branch)))) }));
+  if (rest.length) parts.push(tr("{list}之中", { list: J(uniq(rest.map(h => h.branch))) }));
+  return andJoin(parts);
 }
 
 // The last pass: each glossary term gets its plain-words gloss at its first use in reading order (paragraphs, then
-// items, section by section). Uses inside 「」 or （） are skipped so glosses never nest.
+// items, section by section). Uses inside 「」 or （） are skipped so glosses never nest. In English the term is found
+// by its English word and the gloss keeps the Chinese term in front: Day Master (日主, the stem of your birth day…).
 function glossAll(sections) {
+  if (en()) return glossEnglish(sections);
   const keys = Object.keys(GLOSSARY).sort((x, y) => y.length - x.length), seen = new Set();
   const enclosed = (t, i) => {
     const before = t.slice(0, i), n = re => (before.match(re) || []).length;
@@ -371,6 +409,38 @@ function glossAll(sections) {
     let out = text;
     for (const h of hits.sort((x, y) => y.i - x.i)) {
       out = `${out.slice(0, h.i + h.k.length)}（${GLOSSARY[h.k]}）${out.slice(h.i + h.k.length)}`;
+      seen.add(h.k);
+    }
+    return out;
+  };
+  for (const s of sections) {
+    s.paragraphs = s.paragraphs.map(apply);
+    s.items = s.items.map(it => ({ ...it, text: apply(it.text) }));
+  }
+  return sections;
+}
+function glossEnglish(sections) {
+  const escape = t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const terms = Object.keys(GLOSSARY).map(k => ({ k, word: String(trw(k)).replace(/^(?:the|an?) /i, "") }))
+    .filter(t => !hasCJK(t.word)).sort((x, y) => y.word.length - x.word.length);
+  const seen = new Set();
+  const enclosed = (t, i) => { const before = t.slice(0, i); return (before.match(/\(/g) || []).length > (before.match(/\)/g) || []).length; };
+  const apply = text => {
+    const hits = [];
+    for (const t of terms) {
+      if (seen.has(t.k)) continue;
+      const re = new RegExp(`\\b${escape(t.word)}\\b`, "gi");
+      for (let m = re.exec(text); m; m = re.exec(text)) {
+        const i = m.index, end = i + m[0].length;
+        if (text.slice(end, end + 2) === " (" || enclosed(text, i)) continue;
+        if (hits.some(h => i < h.end && h.i < end)) continue;
+        hits.push({ k: t.k, i, end });
+        break;
+      }
+    }
+    let out = text;
+    for (const h of hits.sort((x, y) => y.i - x.i)) {
+      out = `${out.slice(0, h.end)} (${h.k}, ${tr(GLOSSARY[h.k])})${out.slice(h.end)}`;
       seen.add(h.k);
     }
     return out;
@@ -444,65 +514,91 @@ function branchesWithStar(c, star) {
 }
 
 // ---------- 基本資料 ----------
+// The birthplace for a reader: its own English, else its county's (臺中市西屯 → Taichung).
+function placeWord(name) {
+  const w = trw(name);
+  if (!en() || !hasCJK(w)) return w;
+  const county = (name.match(/^..[縣市]/) || [])[0];
+  return county ? trw(county) : w;
+}
+// 農曆 in English, from the entered date (as chart.lunar is).
+function lunarText(c, lunar) {
+  if (!en()) return lunar;
+  const { y, m, d } = c.chart.input.date, day = SolarDay.fromYmd(y, m, d).getLunarDay(), month = day.getLunarMonth();
+  const vars = { year: pillarWord(month.getLunarYear().getSixtyCycle().getName()), month: month.getMonth(), day: day.getDay() };
+  return month.isLeap() ? tr("農曆{year}年閏{month}月{day}日", vars) : tr("農曆{year}年{month}月{day}日", vars);
+}
 function basics(c) {
   const { chart, P } = c, out = [];
-  if (c.name) out.push({ label: "姓名", value: c.name });
-  out.push({ label: "性別", value: c.male ? "乾造（男）" : "坤造（女）" });
-  const place = chart.input.place.name || "自訂地點";
+  if (c.name) out.push({ label: tr("姓名"), value: trw(c.name) });
+  out.push({ label: tr("性別"), value: tr(c.male ? "乾造（男）" : "坤造（女）") });
+  const place = placeWord(chart.input.place.name || "自訂地點");
   const shichen = chart.time.shichen;
-  out.push({ label: "國曆", value: `${ymd(chart.time.entered)}${c.hourKnown ? (shichen ? ` ${shichen}時` : ` ${hm(chart.time.entered)}`) : "，時辰不詳"}（${place}）` });
+  const time = c.hourKnown ? (shichen ? tr(" {b}時", { b: trw(shichen) }) : ` ${hm(chart.time.entered)}`) : tr("，時辰不詳");
+  out.push({ label: tr("國曆"), value: tr("{date}{time}（{place}）", { date: ymd(chart.time.entered), time, place }) });
   const mode = chart.input.options.solar;
   if (c.hourKnown && mode !== "clock" && !shichen) {
     const vs = Math.round(Math.abs(chart.time.vsEntered)), sign = chart.time.vsEntered < 0 ? "−" : "+";
-    out.push({ label: mode === "mean" ? "平太陽時" : "真太陽時", value: `${ymd(chart.time.solarClock)} ${hm(chart.time.solarClock)}（鐘錶 ${hm(chart.time.entered)}，${vs ? `校正 ${sign}${vs} 分鐘` : "與鐘錶時間相同"}）` });
+    const fix = vs ? tr("校正 {sign}{vs} 分鐘", { sign, vs }) : tr("與鐘錶時間相同");
+    out.push({ label: tr(mode === "mean" ? "平太陽時" : "真太陽時"), value: tr("{date} {time}（鐘錶 {clock}，{fix}）", { date: ymd(chart.time.solarClock), time: hm(chart.time.solarClock), clock: hm(chart.time.entered), fix }) });
   }
   const lunar = chart.lunar.replace(/^農曆/, "");
-  let lunarValue = lunar;
+  let lunarValue = lunarText(c, lunar);
   if (c.hourKnown) {
-    lunarValue += ` ${P.hour.branch.name}時`;
+    lunarValue += tr(" {b}時", { b: trw(P.hour.branch.name) });
     const solarDate = chart.time.solarClock.slice(0, 10), civil = chart.time.entered.slice(0, 10);
     // After 23:00 true solar time, on the entered day or (summer time, far west) on the evening before it.
     const night = Number(chart.time.solarClock.slice(11, 13)) >= 23, before = solarDate < civil;
     // The other 子時 school's day pillar, when it differs (chart.variants; a lean chart has none).
     const other = (chart.variants || []).find(v => v.options && v.options.zi && v.changed.includes("day"));
     const late = chart.input.options.zi === "late";
+    const alt = { day: other ? pillarWord(other.pillars.day) : "" };
+    const ifNew = other ? tr("；若 23 點換日，日柱是{day}", alt) : "", ifLate = other ? tr("；若採夜子時，日柱是{day}", alt) : "";
     if (night && before) lunarValue += late
-      ? `（採夜子時：真太陽時是前一天 23 點後，日柱算前一天，農曆仍依填寫的日期${other ? `；若 23 點換日，日柱是${other.pillars.day}` : ""}）`
-      : `（真太陽時是前一天 23 點後，23 點已換日，日柱就是填寫的這一天${other ? `；若採夜子時，日柱是${other.pillars.day}` : ""}）`;
+      ? tr("（採夜子時：真太陽時是前一天 23 點後，日柱算前一天，農曆仍依填寫的日期{other}）", { other: ifNew })
+      : tr("（真太陽時是前一天 23 點後，23 點已換日，日柱就是填寫的這一天{other}）", { other: ifLate });
     else if (night) lunarValue += late
-      ? `（採夜子時：23 點後出生，日柱仍算當天${other ? `；若 23 點換日，日柱是${other.pillars.day}` : ""}）`
-      : `（23 點後出生，日柱已換到次日${other ? `；若採夜子時，日柱是${other.pillars.day}` : ""}）`;
-    else if (before) lunarValue += "（真太陽時還在前一天晚上，日柱以前一天論，農曆仍依填寫的日期）";
-    else if (solarDate > civil) lunarValue += "（真太陽時已過午夜，日柱以次日論）";
+      ? tr("（採夜子時：23 點後出生，日柱仍算當天{other}）", { other: ifNew })
+      : tr("（23 點後出生，日柱已換到次日{other}）", { other: ifLate });
+    else if (before) lunarValue += tr("（真太陽時還在前一天晚上，日柱以前一天論，農曆仍依填寫的日期）");
+    else if (solarDate > civil) lunarValue += tr("（真太陽時已過午夜，日柱以次日論）");
   }
-  out.push({ label: "農曆", value: lunarValue });
+  out.push({ label: tr("農曆"), value: lunarValue });
   const lunarYear = (/^(..)年/.exec(lunar) || [])[1];
-  out.push({ label: "生肖", value: `${chart.zodiac}（以立春換年，年柱${P.year.name}${lunarYear && lunarYear !== P.year.name ? `；農曆仍是${lunarYear}年，但八字已過立春` : ""}）` });
+  const lichun = lunarYear && lunarYear !== P.year.name ? tr("；農曆仍是{year}年，但八字已過立春", { year: pillarWord(lunarYear) }) : "";
+  out.push({ label: tr("生肖"), value: tr("{animal}（以立春換年，年柱{pillar}{note}）", { animal: trw(chart.zodiac), pillar: pillarWord(P.year.name), note: lichun }) });
   // 出生在節氣後幾天
   const birth = Date.parse(`${chart.time.entered.replace(" ", "T")}:00Z`);
   const prev = Date.parse(`${chart.terms.prev.time.replace(" ", "T")}:00Z`);
   const gap = Math.max(0, birth - prev), days = Math.floor(gap / 86400000), hours = Math.floor((gap % 86400000) / 3600000);
-  const after = days ? `${days} 天${hours ? ` ${hours} 小時` : ""}` : `${hours} 小時`;
+  const after = days ? (hours ? tr("{d} 天 {h} 小時", { d: days, h: hours }) : tr("{d} 天", { d: days })) : tr("{h} 小時", { h: hours });
   const t = chart.terms;
-  out.push({ label: "節氣", value: `${c.hourKnown ? "" : "約"}${t.prev.name}後 ${after}（${t.prev.name}：${ymd(t.prev.time)} ${hm(t.prev.time)}；下一個節是${t.next.name}，${ymd(t.next.time)} ${hm(t.next.time)}）` });
+  const termVars = { term: trw(t.prev.name), after, date: ymd(t.prev.time), time: hm(t.prev.time), next: trw(t.next.name), ndate: ymd(t.next.time), ntime: hm(t.next.time) };
+  out.push({ label: tr("節氣"), value: c.hourKnown ? tr("{term}後 {after}（{term}：{date} {time}；下一個節是{next}，{ndate} {ntime}）", termVars)
+    : tr("約{term}後 {after}（{term}：{date} {time}；下一個節是{next}，{ndate} {ntime}）", termVars) });
   const commander = commanderOf(c);
-  if (commander) out.push({ label: "人元司令", value: `${commander}${STEM_EL[commander]}用事`, note: "出生時月令裡當值的藏干" });
+  if (commander) out.push({ label: tr("人元司令"), value: tr("{stem}用事", { stem: se(commander) }), note: tr("出生時月令裡當值的藏干") });
   const s = chart.luck.start;
-  const span = [s.years && `${s.years} 年`, s.months && `${s.months} 個月`, s.days && `${s.days} 天`].filter(Boolean).join(" ");
+  const span = join([s.years && tr("{y} 年", { y: s.years }), s.months && tr("{m} 個月", { m: s.months }), s.days && tr("{d} 天", { d: s.days })].filter(Boolean), " ");
   const [ty, tm, td] = s.date.split("-").map(Number);
   const turn = SolarTime.fromYmdHms(ty, tm, td, 12, 0, 0).getLunarHour().getSixtyCycleHour().getYear().getHeavenStem().getName();
-  out.push({ label: "起運", value: `出生後${span ? ` ${span}` : "不久"}起運（${ymd(s.date)}交運，虛歲 ${s.age} 歲），大運${chart.luck.forward ? "順行" : "逆行"}，此後每十年換一步運（逢${turn}年交運）${c.hourKnown ? "" : "；時辰不詳，以中午估算"}` });
+  const luckVars = { span, date: ymd(s.date), age: s.age, dir: tr(chart.luck.forward ? "順行" : "逆行"), turn: trw(turn), tail: c.hourKnown ? "" : tr("；時辰不詳，以中午估算") };
+  out.push({ label: tr("起運"), value: span ? tr("出生後 {span}起運（{date}交運，虛歲 {age} 歲），大運{dir}，此後每十年換一步運（逢{turn}年交運）{tail}", luckVars)
+    : tr("出生後不久起運（{date}交運，虛歲 {age} 歲），大運{dir}，此後每十年換一步運（逢{turn}年交運）{tail}", luckVars) });
   const x = chart.extras;
-  if (x.ownSign) out.push({ label: "命宮", value: `${x.ownSign}（${nayinOf(x.ownSign)}）`, note: "先天的人生基調" });
-  if (x.bodySign) out.push({ label: "身宮", value: `${x.bodySign}（${nayinOf(x.bodySign)}）`, note: "後天努力的方向" });
+  const sign = n => paren(pillarWord(n), trw(nayinOf(n)));
+  if (x.ownSign) out.push({ label: tr("命宮"), value: sign(x.ownSign), note: tr("先天的人生基調") });
+  if (x.bodySign) out.push({ label: tr("身宮"), value: sign(x.bodySign), note: tr("後天努力的方向") });
   // 胎元 needs only the month pillar: the next stem and the third branch after.
   const fetal = x.fetalOrigin || `${STEMS[(STEMS.indexOf(P.month.stem.name) + 1) % 10]}${BRANCHES[(BRANCHES.indexOf(P.month.branch.name) + 3) % 12]}`;
-  out.push({ label: "胎元", value: `${fetal}（${nayinOf(fetal)}）`, note: "受胎的月份，看先天的稟賦" });
-  if (x.fetalBreath) out.push({ label: "胎息", value: `${x.fetalBreath}（${nayinOf(x.fetalBreath)}）`, note: "日柱的暗合，看內在的氣質" });
+  out.push({ label: tr("胎元"), value: sign(fetal), note: tr("受胎的月份，看先天的稟賦") });
+  if (x.fetalBreath) out.push({ label: tr("胎息"), value: sign(x.fetalBreath), note: tr("日柱的暗合，看內在的氣質") });
   const a = c.a;
-  out.push({ label: "命局", value: `${c.dm}${c.de}日主・${a.strength}・${a.special ? `${a.special.name}（月令${a.pattern}）` : a.pattern}${a.useful.length ? `・用神${a.useful[0]}` : ""}` });
-  out.push({ label: "五行", value: `${ELEMENTS.map(e => `${e} ${chart.elements[e]}`).join("、")}${chart.missing.length ? `（缺${chart.missing.join("、")}）` : "（五行俱全）"}` });
-  return out;
+  const pattern = a.special ? tr("{name}（月令{pattern}）", { name: patName(a.special.name), pattern: patName(a.pattern) }) : patName(a.pattern);
+  out.push({ label: tr("命局"), value: join([tr("{stem}日主", { stem: se(c.dm) }), trw(a.strength), pattern, ...(a.useful.length ? [tr("用神{e}", { e: trw(a.useful[0]) })] : [])], "・") });
+  const counts = join(ELEMENTS.map(e => `${trw(e)} ${chart.elements[e]}`), "、");
+  out.push({ label: tr("五行"), value: `${counts}${chart.missing.length ? tr("（缺{els}）", { els: J(chart.missing) }) : tr("（五行俱全）")}` });
+  return out.map(b => ({ ...b, label: cap(b.label) }));
 }
 
 // 人元司令: the hidden stem in charge on the birth day (tyme4ts 人元司令分野). On a 節 day before the 節 moment the
@@ -516,22 +612,71 @@ function commanderOf(c) {
   return null;
 }
 
+// The chart's birth-time caveats (core/chart.js and core/time.js write them in Chinese): in English each is matched
+// against the sentence it was made from and written again from what it holds.
+const NOTE_TEMPLATES = [
+  "這個時間在當地出現了兩次（日光節約時間結束時，時鐘撥回一小時）。目前用第 {n} 次，可以切換。",
+  "這個時間在當地不存在（日光節約時間開始時，時鐘直接跳過 {n} 分鐘），已當成標準時間計算。",
+  "當時這裡還沒有標準時間，用的是地方平時（UTC{offset}）。",
+  "當時實施日光節約時間，時鐘比標準時間快 {n} 分鐘，已自動扣除。",
+  "當時的標準時間是 UTC{offset}，和現在的 UTC{now} 不同，已自動換算。",
+  "依你選的{b}時排日柱和時柱，不再做真太陽時校正；起運以這個時辰的中間估算。",
+  "時辰不詳：只排年、月、日三柱，起運以中午 12 點估算。",
+  "這一天 {time} 交「{term}」：在那之前出生，月柱是 {m0}{y0}；之後是 {m1}{y1}。",
+  "如果家裡記下的已經是扣掉夏令時間的標準時間，{what}：{changes}。",
+];
+const unfill = (template, text) => {
+  const names = [];
+  const re = template.replace(/[.*+?^$()|[\]\\]/g, "\\$&").replace(/\{(\w+)\}/g, (all, k) => { names.push(k); return "(.*?)"; });
+  const m = new RegExp(`^${re}$`, "s").exec(text);
+  return m ? Object.fromEntries(names.map((k, i) => [k, m[i + 1]])) : null;
+};
+function noteText(c, text) {
+  if (!en()) return text;
+  for (const t of NOTE_TEMPLATES) {
+    const v = unfill(t, text);
+    if (!v) continue;
+    if (v.b) v.b = trw(v.b);
+    if (v.term !== undefined) {
+      v.term = trw(v.term); v.m0 = pillarWord(v.m0); v.m1 = pillarWord(v.m1);
+      v.y0 = v.y0 ? tr("、年柱是 {p}", { p: pillarWord(v.y0.replace(/^、年柱是 /, "")) }) : "";
+      v.y1 = v.y1 ? tr("、{p}年柱", { p: pillarWord(v.y1.replace(/^、/, "")) }) : "";
+    }
+    if (v.what !== undefined) {
+      const again = unfill("請改選第 {n} 次出現的時間", v.what), fill2 = /^請改填 (.*?)(?:，並選第 (\d+) 次出現的時間)?$/.exec(v.what);
+      if (again) v.what = tr("請改選第 {n} 次出現的時間", again);
+      else if (fill2) {
+        const full = /^(\d+) 年 (\d+) 月 (\d+) 日 (.*)$/.exec(fill2[1]), short = /^(\d+) 月 (\d+) 日 (.*)$/.exec(fill2[1]);
+        const when = full ? `${ymd(`${full[1]}-${full[2].padStart(2, "0")}-${full[3].padStart(2, "0")}`)} ${full[4]}`
+          : short ? tr("{m} 月 {d} 日 {time}", { m: short[1], d: short[2], time: short[3] }) : fill2[1];
+        v.what = tr("請改填 {when}{occ}", { when, occ: fill2[2] ? tr("，並選第 {n} 次出現的時間", { n: fill2[2] }) : "" });
+      }
+      v.changes = v.changes === "四柱都不會變" ? tr("四柱都不會變") : join(v.changes.split("、").map(ch => {
+        const x = /^(.柱)(..)會變成(..)$/.exec(ch);
+        return x ? tr("{pillar}{now}會變成{then}", { pillar: trw(x[1]), now: pillarWord(x[2]), then: pillarWord(x[3]) }) : ch;
+      }), "、");
+    }
+    return tr(t, v);
+  }
+  return text;
+}
+
 // ---------- 排盤表 ----------
 function table(c) {
   const ps = c.pillars;
   return {
-    columns: ps.map(p => p.label),
+    columns: ps.map(p => trw(p.label)),
     rows: [
-      { label: "主星", cells: ps.map(p => (p.role === "day" ? (c.male ? "元男" : "元女") : p.stem.god)) },
-      { label: "天干", cells: ps.map(p => p.stem.name), elements: ps.map(p => p.stem.element) },
-      { label: "地支", cells: ps.map(p => p.branch.name), elements: ps.map(p => p.branch.element) },
-      { label: "藏干", cells: ps.map(p => p.branch.hidden.map(h => `${h.name}${h.element}`)) },
-      { label: "副星", cells: ps.map(p => p.branch.hidden.map(h => h.god)) },
-      { label: "星運", cells: ps.map(p => p.terrain) },
-      { label: "自坐", cells: ps.map(p => p.seat) },
-      { label: "空亡", cells: ps.map(p => p.void) },
-      { label: "納音", cells: ps.map(p => p.nayin) },
-      { label: "神煞", cells: ps.map(p => c.stars[p.role] || []) },
+      { label: tr("主星"), cells: ps.map(p => (p.role === "day" ? tr(c.male ? "元男" : "元女") : trw(p.stem.god))) },
+      { label: tr("天干"), cells: ps.map(p => trw(p.stem.name)), elements: ps.map(p => p.stem.element) },
+      { label: tr("地支"), cells: ps.map(p => trw(p.branch.name)), elements: ps.map(p => p.branch.element) },
+      { label: tr("藏干"), cells: ps.map(p => p.branch.hidden.map(h => se(h.name))) },
+      { label: tr("副星"), cells: ps.map(p => p.branch.hidden.map(h => trw(h.god))) },
+      { label: tr("星運"), cells: ps.map(p => trw(p.terrain)) },
+      { label: tr("自坐"), cells: ps.map(p => trw(p.seat)) },
+      { label: tr("空亡"), cells: ps.map(p => J([...p.void], "")) },
+      { label: tr("納音"), cells: ps.map(p => trw(p.nayin)) },
+      { label: tr("神煞"), cells: ps.map(p => (c.stars[p.role] || []).map(trw)) },
     ],
   };
 }
@@ -543,18 +688,18 @@ const CONTROL_IMAGE = { 木: "取其修剪成材", 火: "取其水火既濟", �
 // The function of an element the chart wants, in a few words.
 function useFunction(c, e) {
   const g = c.eg[e], s = c.a.strength, v = c.a.views[e] || { likes: [] };
-  if (s === "從弱") return "順從旺勢";
-  if (s === "專旺") return congqiang(c.a) ? "順其強勢" : "順其旺氣";
+  if (s === "從弱") return tr("順從旺勢");
+  if (s === "專旺") return tr(congqiang(c.a) ? "順其強勢" : "順其旺氣");
   if (v.likes.includes("扶抑")) {
-    if (g === "印") return "取其生身";
-    if (g === "比劫") return "取其幫身";
-    if (g === "食傷") return c.a.pattern === "七殺格" ? "取其制殺" : OUTPUT_IMAGE[c.de];
-    if (g === "財") return c.share[c.ge.印] >= 0.3 ? "取其制印" : "取其耗身生財";
-    if (g === "官殺") return CONTROL_IMAGE[c.de];
+    if (g === "印") return tr("取其生身");
+    if (g === "比劫") return tr("取其幫身");
+    if (g === "食傷") return tr(c.a.pattern === "七殺格" ? "取其制殺" : OUTPUT_IMAGE[c.de]);
+    if (g === "財") return tr(c.share[c.ge.印] >= 0.3 ? "取其制印" : "取其耗身生財");
+    if (g === "官殺") return tr(CONTROL_IMAGE[c.de]);
   }
-  if (v.likes.includes("格局")) return `合${c.a.pattern}所喜的${(PATTERN_LIKES[c.a.pattern] || {})[g] || GROUP_WORD[g]}`;
-  if (v.likes.includes("調候")) return "取其調候";
-  return `取${GROUP_WORD[g]}之用`;
+  if (v.likes.includes("格局")) return tr("合{pattern}所喜的{what}", { pattern: patName(c.a.pattern), what: (PATTERN_LIKES[c.a.pattern] || {})[g] ? trw(PATTERN_LIKES[c.a.pattern][g]) : trw(GROUP_WORD[g]) });
+  if (v.likes.includes("調候")) return tr("取其調候");
+  return tr("取{g}之用", { g: trw(GROUP_WORD[g]) });
 }
 
 // The classical line for a group that is far too heavy, when it fits this chart.
@@ -573,73 +718,81 @@ function excessLine(c) {
 
 function rootPhrase(c) {
   const r = c.factors.roots;
-  if (!r.length) return `地支不見${c.de}，日主無根`;
+  if (!r.length) return tr("地支不見{de}，日主無根", { de: trw(c.de) });
   const main = r.filter(x => x.strength === "本氣");
-  if (main.length) return `在${listWords(main.map(x => `${ROLE_ZH[x.role]}支${x.branch}`))}有本氣之根`;
-  if (r.length === 1) return `只在${ROLE_ZH[r[0].role]}支${r[0].branch}中有一點${r[0].strength}之根`;
+  if (main.length) return tr("在{where}有本氣之根", { where: listWords(main.map(x => rb(x.role, x.branch))) });
+  if (r.length === 1) return tr("只在{where}中有一點{kind}之根", { where: rb(r[0].role, r[0].branch), kind: trw(r[0].strength) });
   const kinds = uniq(r.map(x => x.strength));
-  return kinds.length === 1 ? `在${listWords(r.map(x => `${ROLE_ZH[x.role]}支${x.branch}`))}中有${kinds[0]}之根`
-    : `在${r.map(x => `${ROLE_ZH[x.role]}支${x.branch}（${x.strength}）`).join("、")}中有根，根氣不深`;
+  return kinds.length === 1 ? tr("在{where}中有{kind}之根", { where: listWords(r.map(x => rb(x.role, x.branch))), kind: trw(kinds[0]) })
+    : tr("在{list}中有根，根氣不深", { list: join(r.map(x => paren(rb(x.role, x.branch), trw(x.strength))), "、") });
 }
 function helpPhrase(c) {
   const f = c.factors;
   const stems = f.born.filter(x => x.part === "stem").map(x => ({ role: x.role, stem: x.name }));
   const branches = f.born.filter(x => x.part === "branch").map(x => ({ role: x.role, name: x.name }));
-  const born = [stems.length ? stemsWords(stems) : "", branches.length ? branchesWords(branches) : ""].filter(Boolean).join("與");
+  const born = andJoin([stems.length ? stemsWords(stems) : "", branches.length ? branchesWords(branches) : ""].filter(Boolean));
   const parts = [];
-  if (born) parts.push(`${born}生身`);
-  if (f.helped.length) parts.push(`${stemsWords(f.helped.map(x => ({ role: x.role, stem: x.name })))}幫身`);
-  return parts.join("，");
+  if (born) parts.push(tr("{born}生身", { born }));
+  if (f.helped.length) parts.push(tr("{who}幫身", { who: stemsWords(f.helped.map(x => ({ role: x.role, stem: x.name }))) }));
+  return join(parts, "，");
 }
 function strengthSentence(c) {
   const f = c.factors, s = c.a.strength, root = rootPhrase(c), help = helpPhrase(c);
-  const g = drainGroup(c), drain = `${GROUP_WORD[g]}（${c.ge[g]}）${DRAIN_WORD[g]}較重`;
+  const g = drainGroup(c), drain = tr("{g}（{e}）{how}較重", { g: trw(GROUP_WORD[g]), e: trw(c.ge[g]), how: trw(DRAIN_WORD[g]) });
   if (s === "身強" || s === "專旺") {
     const deep = f.ling || f.roots.some(r => r.strength === "本氣");
-    const verdict = s !== "專旺" ? "身強" : c.a.special && c.a.special.kind === "從強" ? "印比成勢，近於從強" : "日主極旺，近於專旺";
-    return `${root}，${help ? `${deep ? "又有" : "但"}${help}` : "又得月令之氣"}，綜合下來${verdict}，強在${strongSource(c) === "印" ? "印星" : "比劫"}。`;
+    const verdict = s !== "專旺" ? trw("身強") : tr(c.a.special && c.a.special.kind === "從強" ? "印比成勢，近於從強" : "日主極旺，近於專旺");
+    return tr("{root}，{help}，綜合下來{verdict}，強在{source}。", { root, help: help ? tr(deep ? "又有{help}" : "但{help}", { help }) : tr("又得月令之氣"), verdict, source: trw(strongSource(c) === "印" ? "印星" : "比劫") });
   }
-  if (s === "身弱") return `${root}${help ? `，雖有${help}` : ""}，但${drain}，綜合下來身弱。`;
-  if (s === "從弱") return `${root}，${help ? `只有${help}，` : "生扶極少，"}${drain}，日主極弱而有從象，屬於從弱。`;
-  if (s === "中和") return `${root}${help ? `，${help}` : ""}，生扶與剋洩的力量大致相當，強弱屬於中和。`;
-  return `${root}${help ? `，${help}` : ""}，綜合下來判為${s}。`;
+  if (s === "身弱") return tr("{root}{help}，但{drain}，綜合下來身弱。", { root, help: help ? tr("，雖有{help}", { help }) : "", drain });
+  if (s === "從弱") return tr("{root}，{help}{drain}，日主極弱而有從象，屬於從弱。", { root, help: help ? tr("只有{help}，", { help }) : tr("生扶極少，"), drain });
+  if (s === "中和") return help ? tr("{root}，{help}，生扶與剋洩的力量大致相當，強弱屬於中和。", { root, help }) : tr("{root}，生扶與剋洩的力量大致相當，強弱屬於中和。", { root });
+  return help ? tr("{root}，{help}，綜合下來判為{s}。", { root, help, s: trw(s) }) : tr("{root}，綜合下來判為{s}。", { root, s: trw(s) });
 }
 
 function summary(c) {
   const { a, dm, de, mb } = c;
   const wang = elementInState(c, "旺"), st = c.states[de];
-  const chartName = `${c.male ? "乾造" : "坤造"}${c.names.join("、")}${c.hourKnown ? "" : "（時辰不詳，以三柱論）"}`;
-  const s1 = `${c.name ? `${c.name}的命盤為` : ""}${chartName}，日主${dm}${de}如${DAY_MASTER_TEXT[dm].image}，生於${mb}月${wang}旺之時，${de}${st === "旺" ? "當令而旺" : `處於「${st}」`}，${c.factors.ling ? "得令" : "失令"}。`;
+  const chartName = tr(c.male ? "乾造{pillars}{tail}" : "坤造{pillars}{tail}", { pillars: join(c.names.map(pillarWord), "、"), tail: c.hourKnown ? "" : tr("（時辰不詳，以三柱論）") });
+  const v1 = {
+    name: c.name ? trw(c.name) : "", chart: chartName, stem: se(dm), image: trw(DAY_MASTER_TEXT[dm].image), branch: trw(mb), wang: trw(wang),
+    state: st === "旺" ? tr("{de}當令而旺", { de: trw(de) }) : tr("{de}處於「{st}」", { de: trw(de), st: trw(st) }), ling: trw(c.factors.ling ? "得令" : "失令"),
+  };
+  const s1 = c.name ? tr("{name}的命盤為{chart}，日主{stem}如{image}，生於{branch}月{wang}旺之時，{state}，{ling}。", v1)
+    : tr("{chart}，日主{stem}如{image}，生於{branch}月{wang}旺之時，{state}，{ling}。", v1);
   const s2 = strengthSentence(c);
   const main = c.P.month.branch.hidden[0];
   const shown = c.pillars.filter(p => p.role !== "day" && p.stem.name === main.name).map(p => p.role);
-  const s3 = `月令${mb}的本氣${main.name}${main.element}是${main.god}，${shown.length ? `透出${rolesWord(shown, "干")}` : "藏而不透"}，${a.special ? `月令取${a.pattern}，但全局改以${a.special.name}論` : `取${a.pattern}`}。`;
+  const s3 = tr("月令{mb}的本氣{main}是{god}，{show}，{pattern}。", {
+    mb: trw(mb), main: se(main.name), god: trw(main.god), show: shown.length ? tr("透出{where}", { where: rolesWord(shown, "干") }) : tr("藏而不透"),
+    pattern: a.special ? tr("月令取{pattern}，但全局改以{name}論", { pattern: patName(a.pattern), name: patName(a.special.name) }) : tr("取{pattern}", { pattern: patName(a.pattern) }),
+  });
   const ex = excessLine(c);
-  const lead = ex ? `全局${ex.element}重，正應了古訣「${ex.line}」；` : "";
+  const lead = ex ? tr("全局{e}重，正應了古訣「{line}」；", { e: trw(ex.element), line: trw(ex.line) }) : "";
   const u = a.useful;
   const s4 = u.length
-    ? `${lead}以${u[0]}為用神，${useFunction(c, u[0])}${u.length > 1 ? `，${u.slice(1).join("、")}為喜` : ""}${a.avoid.length ? `，忌${a.avoid.join("、")}` : ""}。`
-    : `${lead}各派喜忌互相抵消，五行沒有特別突出的用神，取用以維持平衡為主。`;
-  return section("summary", [s1 + s2 + s3 + s4]);
+    ? tr("{lead}以{u}為用神，{fn}{xi}{ji}。", { lead, u: trw(u[0]), fn: useFunction(c, u[0]), xi: u.length > 1 ? tr("，{els}為喜", { els: J(u.slice(1)) }) : "", ji: a.avoid.length ? tr("，忌{els}", { els: J(a.avoid) }) : "" })
+    : tr("{lead}各派喜忌互相抵消，五行沒有特別突出的用神，取用以維持平衡為主。", { lead });
+  return section("summary", [para(s1, s2, s3, s4)]);
 }
 
 // ---------- 2 五行與旺衰 ----------
 const PALACE_BRANCH = { year: "祖上與童年", month: "父母兄弟與成長環境", day: "配偶宮", hour: "子女與晚年" };
 const PALACE_STEM = { year: "祖上長輩", month: "父母", day: "自己", hour: "子女" };
 const REL_MEANING = {
-  天干五合: () => "天干相合，主有情、互相牽絆",
-  天干相沖: () => "天干相沖，想法與做法容易互相拉扯",
-  六合: () => "地支六合，主和合、有助力，也有牽絆不易分開之意",
-  六沖: () => "地支相沖，主變動與對立，所牽動的人事容易聚少離多或起伏較大",
-  相刑: () => "地支相刑，主摩擦與壓力，相處上要多些包容",
-  自刑: () => "同一地支自刑，主自己和自己拉扯、容易想太多",
-  六害: () => "地支相害，主暗中的耗損與誤會，凡事宜把話說清楚",
-  相破: () => "地支相破，主小破損或計畫被打斷，影響通常不大",
-  半合: r => `半合${r.element}局，${r.element}的力量被帶起來`,
-  拱合: r => `拱合${r.element}局（缺中間的旺支），暗中有${r.element}的氣勢`,
-  三合: r => `三合成${r.element}局，${r.element}的力量大增`,
-  三會: r => `三會${SIDE[r.element]}${r.element}，${r.element}的氣勢極強`,
-  三刑: () => "三刑俱全，傳統上主壓力與是非較多，行事宜守法、謹慎",
+  天干五合: () => tr("天干相合，主有情、互相牽絆"),
+  天干相沖: () => tr("天干相沖，想法與做法容易互相拉扯"),
+  六合: () => tr("地支六合，主和合、有助力，也有牽絆不易分開之意"),
+  六沖: () => tr("地支相沖，主變動與對立，所牽動的人事容易聚少離多或起伏較大"),
+  相刑: () => tr("地支相刑，主摩擦與壓力，相處上要多些包容"),
+  自刑: () => tr("同一地支自刑，主自己和自己拉扯、容易想太多"),
+  六害: () => tr("地支相害，主暗中的耗損與誤會，凡事宜把話說清楚"),
+  相破: () => tr("地支相破，主小破損或計畫被打斷，影響通常不大"),
+  半合: r => tr("半合{e}局，{e}的力量被帶起來", { e: trw(r.element) }),
+  拱合: r => tr("拱合{e}局（缺中間的旺支），暗中有{e}的氣勢", { e: trw(r.element) }),
+  三合: r => tr("三合成{e}局，{e}的力量大增", { e: trw(r.element) }),
+  三會: r => tr("三會{side}{e}，{e}的氣勢極強", { side: trw(SIDE[r.element]), e: trw(r.element) }),
+  三刑: () => tr("三刑俱全，傳統上主壓力與是非較多，行事宜守法、謹慎"),
 };
 const ROLE_NOTE = { 用神: "屬於有助力的力量", 喜神: "屬於有助力的力量", 忌神: "這股力量要多留意", 仇神: "這股力量要多留意", 閒神: "作用中性" };
 
@@ -654,112 +807,124 @@ function orderedRoles(c, r) {
   const ref = r.kind === "半合" || r.kind === "拱合" ? TRIADS.find(t => r.roles.every(x => t.includes(ch(x)))) || "" : PAIR_ORDER[r.kind] || "";
   return ref ? r.roles.slice().sort((x, y) => ref.indexOf(ch(x)) - ref.indexOf(ch(y))) : r.roles;
 }
+const REL_NAME = {
+  天干五合: "{chars}合{e}", 天干相沖: "{chars}相沖", 六合: "{chars}合{e}", 六沖: "{chars}相沖", 相刑: "{chars}相刑", 自刑: "{chars}自刑",
+  六害: "{chars}相害", 相破: "{chars}相破", 半合: "{chars}半合{e}局", 拱合: "{chars}拱{e}局", 三合: "{chars}三合{e}局", 三會: "{chars}三會{side}{e}", 三刑: "{chars}三刑",
+};
 function relLabel(c, r) {
   const roles = orderedRoles(c, r);
-  const chars = roles.map(role => (r.part === "stem" ? c.P[role].stem.name : c.P[role].branch.name)).join("");
-  const name = {
-    天干五合: `${chars}合${r.element}`, 天干相沖: `${chars}相沖`, 六合: `${chars}合${r.element}`, 六沖: `${chars}相沖`, 相刑: `${chars}相刑`,
-    自刑: `${chars}自刑`, 六害: `${chars}相害`, 相破: `${chars}相破`, 半合: `${chars}半合${r.element}局`, 拱合: `${chars}拱${r.element}局`,
-    三合: `${chars}三合${r.element}局`, 三會: `${chars}三會${SIDE[r.element] || ""}${r.element}`, 三刑: `${chars}三刑`,
-  }[r.kind] || r.text;
-  return `${name}（${roles.map(role => `${ROLE_ZH[role]}${r.part === "stem" ? "干" : "支"}`).join("・")}）`;
+  const chars = roles.map(role => (r.part === "stem" ? c.P[role].stem.name : c.P[role].branch.name));
+  const name = REL_NAME[r.kind] ? tr(REL_NAME[r.kind], { chars: en() ? chars.map(trw).join("-") : chars.join(""), e: r.element ? trw(r.element) : "", side: trw(SIDE[r.element] || "") }) : r.text;
+  return paren(name, join(roles.map(role => tr(r.part === "stem" ? ONE.干 : ONE.支, { role: role1(role) })), "・"));
 }
 
 function relText(c, r) {
-  const palaces = uniq(r.roles.map(role => (r.part === "stem" ? PALACE_STEM : PALACE_BRANCH)[role]));
+  // 父母、自己、子女 as words (the labels of the same Chinese are capitalised), the other palaces as phrases.
+  const palaces = uniq(r.roles.map(role => (r.part === "stem" ? PALACE_STEM : PALACE_BRANCH)[role])).map(p => (["父母", "自己", "子女"].includes(p) ? trw(p) : tr(p)));
   const meaning = (REL_MEANING[r.kind] || (() => r.text))(r);
-  let t = `${meaning}，牽動${listWords(palaces)}`;
+  let t = tr("{meaning}，牽動{palaces}", { meaning, palaces: listWords(palaces) });
   if (r.element) {
     const role = c.roles[r.element], combine = ["六合", "天干五合"].includes(r.kind);
-    t += `；${combine ? `合出的${r.element}` : r.element}是${role}，${ROLE_NOTE[role]}`;
+    t += tr(combine ? "；合出的{e}是{role}，{note}" : "；{e}是{role}，{note}", { e: trw(r.element), role: trw(role), note: tr(ROLE_NOTE[role]) });
     // 合絆: the 用神 tied up by a combination that turns toward an unfavourable element.
     const u0 = c.a.useful[0];
     if (combine && roleIsBad(role) && u0 && u0 !== r.element) {
       const tied = r.roles.map(x => c.P[x]).find(p => !(r.part === "stem" && p.role === "day") && (r.part === "stem" ? p.stem.element : p.branch.element) === u0);
-      if (tied) t += `；${r.part === "stem" ? tied.stem.name : tied.branch.name}${u0}本是用神，被合住而轉向${r.element}，作用打了折扣，也就是合絆`;
+      if (tied) t += tr("；{name}{u}本是用神，被合住而轉向{e}，作用打了折扣，也就是合絆", { name: trw(r.part === "stem" ? tied.stem.name : tied.branch.name), u: trw(u0), e: trw(r.element) });
     }
   }
-  if (r.kind === "天干五合" && r.roles.includes("day")) t += "；日干逢合，為人重情，也容易被人情牽絆";
+  if (r.kind === "天干五合" && r.roles.includes("day")) t += tr("；日干逢合，為人重情，也容易被人情牽絆");
   if (["天干五合", "六合"].includes(r.kind) && r.roles.some(role => c.relations.filter(x => x.kind === r.kind && x.roles.includes(role)).length > 1)) {
-    t += `；同一${r.part === "stem" ? "干" : "支"}被兩方相合，稱爭合，合力分散`;
+    t += tr(r.part === "stem" ? "；同一干被兩方相合，稱爭合，合力分散" : "；同一支被兩方相合，稱爭合，合力分散");
   }
-  if (r.kind === "六沖" && r.roles.includes("month")) t += "；月令受沖，成長環境與事業根基較多變動";
-  if (r.kind === "六沖" && r.roles.includes("day")) t += "；日支是配偶宮，感情與居住上較多變化";
-  return `${t}。`;
+  if (r.kind === "六沖" && r.roles.includes("month")) t += tr("；月令受沖，成長環境與事業根基較多變動");
+  if (r.kind === "六沖" && r.roles.includes("day")) t += tr("；日支是配偶宮，感情與居住上較多變化");
+  return stop(t);
 }
 
 function elementsSection(c) {
   const { chart, a, mb, de } = c;
   const order = ELEMENTS.slice().sort((x, y) => a.scores[y] - a.scores[x]);
   const [top, second] = order, weak = order[4];
-  const counts = ELEMENTS.map(e => `${e} ${chart.elements[e]}`).join("、");
-  const weakWord = c.share[weak] < 0.005 ? `${weak}${weak === de ? "除了日主本身" : ""}完全不見`
-    : weak === de ? `${weak}除了日主本身只佔約 ${pct(c.share[weak])}，最弱` : `${weak}最弱（約 ${pct(c.share[weak])}）`;
-  const s1 = `${c.hourKnown ? "八" : "年、月、日六"}個字的五行是${counts}；連同地支藏干與月令的分量一起計算，${top}最旺（約 ${pct(c.share[top])}），${second}次之，${weakWord}。`;
-  const seq = ["旺", "相", "休", "囚", "死"].map(s => `${elementInState(c, s)}${s}`).join("、");
-  const s2 = `${mb}月${SEASON_WORD[mb]}，五行旺相休囚死依序為${seq}，日主${c.dm}${de}正處「${c.states[de]}」${STATE_NOTE[c.states[de]]}。`;
+  const counts = join(ELEMENTS.map(e => `${trw(e)} ${chart.elements[e]}`), "、");
+  const w = { e: trw(weak), p: pct(c.share[weak]) };
+  const weakWord = c.share[weak] < 0.005 ? tr(weak === de ? "{e}除了日主本身完全不見" : "{e}完全不見", w)
+    : weak === de ? tr("{e}除了日主本身只佔約 {p}，最弱", w) : tr("{e}最弱（約 {p}）", w);
+  const v1 = { counts, top: trw(top), p: pct(c.share[top]), second: trw(second), weak: weakWord };
+  const s1 = c.hourKnown ? tr("八個字的五行是{counts}；連同地支藏干與月令的分量一起計算，{top}最旺（約 {p}），{second}次之，{weak}。", v1)
+    : tr("年、月、日六個字的五行是{counts}；連同地支藏干與月令的分量一起計算，{top}最旺（約 {p}），{second}次之，{weak}。", v1);
+  const seq = join(["旺", "相", "休", "囚", "死"].map(s => (en() ? paren(trw(elementInState(c, s)), trw(s)) : `${elementInState(c, s)}${s}`)), "、");
+  const s2 = tr("{mb}月{season}，五行旺相休囚死依序為{seq}，日主{dm}正處「{st}」{note}。", { mb: trw(mb), season: tr(SEASON_WORD[mb]), seq, dm: se(c.dm), st: trw(c.states[de]), note: tr(STATE_NOTE[c.states[de]]) });
   const MISSING_NOTE = { 用神: "大運流年補到時最有感", 喜神: "補到時有助力", 忌神: "缺了反而少一分干擾", 仇神: "缺了也無妨", 閒神: "補不補都無妨" };
   const parts = chart.missing.map(e => {
     const hid = presence(c, e).hid, role = c.roles[e];
-    return hid.length
-      ? `表面上缺${e}，但${uniq(hid.map(h => `${h.branch}中藏${h.stem}${e}`)).join("、")}，屬於藏而不透；${e}是${role}，${MISSING_NOTE[role]}`
-      : `${e}連藏干都沒有，是真正的缺${e}；${e}是${role}，${MISSING_NOTE[role]}`;
+    const v = { e: trw(e), role: trw(role), note: tr(MISSING_NOTE[role]), hid: join(uniq(hid.map(h => tr("{b}中藏{s}", { b: trw(h.branch), s: se(h.stem) }))), "、") };
+    return hid.length ? tr("表面上缺{e}，但{hid}，屬於藏而不透；{e}是{role}，{note}", v) : tr("{e}連藏干都沒有，是真正的缺{e}；{e}是{role}，{note}", v);
   });
   if (c.share[top] >= HEAVY) {
     const role = c.roles[top];
-    parts.push(`${top}佔全局約 ${pct(c.share[top])}，明顯偏重${roleIsBad(role) ? `，而且是${role}，化解它是這張盤的主要課題` : roleIsGood(role) ? `，好在是${role}` : ""}`);
+    const tail = roleIsBad(role) ? tr("，而且是{role}，化解它是這張盤的主要課題", { role: trw(role) }) : roleIsGood(role) ? tr("，好在是{role}", { role: trw(role) }) : "";
+    parts.push(tr("{e}佔全局約 {p}，明顯偏重{tail}", { e: trw(top), p: pct(c.share[top]), tail }));
   }
-  const s3 = `${chart.missing.length ? "" : "五行俱全，沒有缺；"}${parts.length ? parts.join("；") : "各五行的分量沒有特別懸殊"}。`;
+  const s3 = chart.missing.length ? stop(cap(join(parts, "；"))) : parts.length ? tr("五行俱全，沒有缺；{parts}。", { parts: join(parts, "；") }) : tr("五行俱全，沒有缺；各五行的分量沒有特別懸殊。");
   const items = c.relations.map(r => ({ label: relLabel(c, r), text: relText(c, r) }));
-  const s4 = items.length ? "" : "四柱之間沒有明顯的合、沖、刑、害，結構單純、彼此干擾少。";
-  return section("elements", [s1 + s2 + s3 + s4], items);
+  const s4 = items.length ? "" : tr("四柱之間沒有明顯的合、沖、刑、害，結構單純、彼此干擾少。");
+  return section("elements", [para(s1, s2, s3, s4)], items);
 }
 
 // ---------- 3 日主強弱 ----------
 function strengthSection(c) {
   const { a, dm, de, mb } = c, f = c.factors, yin = c.ge.印;
-  const ling = `${dm}${de}生於${mb}月，${mb}月${elementInState(c, "旺")}旺，${de}處「${f.state}」，${f.ling ? "得令" : "失令"}。`;
+  const ling = tr("{dm}生於{mb}月，{mb}月{wang}旺，{de}處「{st}」，{ling}。", { dm: se(dm), mb: trw(mb), wang: trw(elementInState(c, "旺")), de: trw(de), st: trw(f.state), ling: trw(f.ling ? "得令" : "失令") });
   let root;
   if (f.roots.length) {
     const list = f.roots.map(r => {
       const p = c.P[r.role], h = p.branch.hidden.find(x => x.element === de);
-      const mark = p.terrain === "臨官" ? "，是日主的祿位" : p.terrain === "帝旺" ? "，是日主的刃位" : "";
-      return `${ROLE_ZH[r.role]}支${r.branch}（${r.strength}${h ? `${h.name}${h.element}` : ""}${mark}）`;
+      const mark = p.terrain === "臨官" ? tr("，是日主的祿位") : p.terrain === "帝旺" ? tr("，是日主的刃位") : "";
+      return paren(rb(r.role, r.branch), `${join([trw(r.strength), h ? se(h.name) : ""].filter(Boolean), "")}${mark}`);
     });
-    const depth = f.roots.some(r => r.strength === "本氣") ? "根深而穩" : f.roots.some(r => r.strength === "中氣") ? "根氣中等" : "根淺";
-    root = `日主在${list.join("、")}通根，${depth}。`;
-  } else root = `地支沒有${de}，日主不通根，根基較虛。`;
+    const depth = tr(f.roots.some(r => r.strength === "本氣") ? "根深而穩" : f.roots.some(r => r.strength === "中氣") ? "根氣中等" : "根淺");
+    root = tr("日主在{list}通根，{depth}。", { list: join(list, "、"), depth });
+  } else root = tr("地支沒有{de}，日主不通根，根基較虛。", { de: trw(de) });
   const bornStems = f.born.filter(x => x.part === "stem"), bornBranches = f.born.filter(x => x.part === "branch");
   let born;
   if (f.born.length) {
     const stemsPart = bornStems.length
-      ? `${bornStems.map(x => `${ROLE_ZH[x.role]}干${x.name}`).join("、")}（${uniq(bornStems.map(x => c.P[x.role].stem.god)).join("、")}，${yin}）透出` : "";
-    const branchPart = bornBranches.length ? `${bornBranches.map(x => `${ROLE_ZH[x.role]}支${x.name}`).join("、")}的本氣${bornStems.length ? "也" : ""}是${yin}` : "";
-    born = `${[stemsPart, branchPart].filter(Boolean).join("，")}，${f.born.length === 1 ? "只有一處" : `共${COUNT[f.born.length]}處`}印星生身。`;
-  } else born = `命中沒有${yin}，也就是沒有印星生身。`;
+      ? tr("{list}（{gods}，{yin}）透出", { list: join(bornStems.map(x => tr("{role}干{s}", { role: role1(x.role), s: trw(x.name) })), "、"), gods: J(uniq(bornStems.map(x => c.P[x.role].stem.god))), yin: trw(yin) }) : "";
+    const bv = { list: join(bornBranches.map(x => rb(x.role, x.name)), "、"), yin: trw(yin) };
+    const branchPart = bornBranches.length ? tr(bornStems.length ? "{list}的本氣也是{yin}" : "{list}的本氣是{yin}", bv) : "";
+    const parts = join([stemsPart, branchPart].filter(Boolean), "，");
+    born = f.born.length === 1 ? tr("{parts}，只有一處印星生身。", { parts }) : tr("{parts}，共{n}處印星生身。", { parts, n: COUNT[f.born.length] });
+  } else born = tr("命中沒有{yin}，也就是沒有印星生身。", { yin: trw(yin) });
   const helped = f.helped.length
-    ? `${f.helped.map(x => `${ROLE_ZH[x.role]}干${x.name}`).join("、")}和日主同為${de}（比劫），在天干幫身。`
-    : "天干沒有比肩、劫財這類比劫幫身。";
-  const items = [{ label: "得令", text: ling }, { label: "得地", text: root }, { label: "得生", text: born }, { label: "得助", text: helped }];
+    ? tr("{list}和日主同為{de}（比劫），在天干幫身。", { list: join(f.helped.map(x => tr("{role}干{s}", { role: role1(x.role), s: trw(x.name) })), "、"), de: trw(de) })
+    : tr("天干沒有比肩、劫財這類比劫幫身。");
+  const items = [{ label: tr("得令"), text: ling }, { label: tr("得地"), text: root }, { label: tr("得生"), text: born }, { label: tr("得助"), text: helped }];
   const shallow = f.roots.length && f.roots.every(r => r.strength === "餘氣");
   const have = [f.ling && "得令", f.roots.length && (shallow ? "得地（根淺）" : "得地"), f.born.length && "得生", f.helped.length && "得助"].filter(Boolean);
   const lack = ["得令", "得地", "得生", "得助"].filter(x => !have.some(h => h.startsWith(x)));
-  const s1 = `四項之中${have.length ? `占了${have.join("、")}` : "一項都不占"}${have.length && lack.length ? `，缺${lack.join("、")}` : ""}；生扶日主的力量約佔全局 ${pct(a.support)}（一般命局約四成），判為${strengthLabel(a)}。`;
+  const s1 = tr("四項之中{have}{lack}；生扶日主的力量約佔全局 {p}（一般命局約四成），判為{verdict}。", {
+    have: have.length ? tr("占了{list}", { list: J(have) }) : tr("一項都不占"), lack: have.length && lack.length ? tr("，缺{list}", { list: J(lack) }) : "",
+    p: pct(a.support), verdict: trw(strengthLabel(a)),
+  });
   let s2;
   if (a.strength === "身強") s2 = strongSource(c) === "印"
-    ? `力量主要來自印星（${yin}）的生扶，屬於「印旺身強」：靠學習、長輩與環境撐起來的強，和同類幫身的強不同。`
-    : `力量主要來自同類的${de}，屬於「比劫身強」：自我與行動力都強，需要有出口或約束。`;
+    ? tr("力量主要來自印星（{yin}）的生扶，屬於「印旺身強」：靠學習、長輩與環境撐起來的強，和同類幫身的強不同。", { yin: trw(yin) })
+    : tr("力量主要來自同類的{de}，屬於「比劫身強」：自我與行動力都強，需要有出口或約束。", { de: trw(de) });
   else if (a.strength === "身弱") {
     const g = drainGroup(c);
-    s2 = `最耗日主的是${GROUP_WORD[g]}（${c.ge[g]}），屬於「${{ 食傷: "洩多身弱", 財: "財多身弱", 官殺: "殺重身輕" }[g]}」，凡事宜先求穩、再求進。`;
-  } else if (a.strength === "中和") s2 = `生扶與剋洩大致平衡，喜忌也就較溫和，整體${leansStrong(c) ? "略偏強" : "略偏弱"}一些。`;
-  else if (a.strength === "從弱") s2 = `日主幾乎無根、生扶極少，傳統上可視為${a.special.name}：不再扶身，${a.special.follows ? `而是順從${GROUP_WORD[a.special.follows]}的旺勢`
-    : (a.special.heavy || []).length === 2 ? `而是順從${a.special.heavy.map(g => GROUP_WORD[g]).join("與")}的旺勢，以財星居中調和` : "而是順從食傷、財、官殺的整體旺勢"}。`;
+    s2 = tr("最耗日主的是{g}（{e}），屬於「{kind}」，凡事宜先求穩、再求進。", { g: trw(GROUP_WORD[g]), e: trw(c.ge[g]), kind: tr({ 食傷: "洩多身弱", 財: "財多身弱", 官殺: "殺重身輕" }[g]) });
+  } else if (a.strength === "中和") s2 = tr(leansStrong(c) ? "生扶與剋洩大致平衡，喜忌也就較溫和，整體略偏強一些。" : "生扶與剋洩大致平衡，喜忌也就較溫和，整體略偏弱一些。");
+  else if (a.strength === "從弱") s2 = tr("日主幾乎無根、生扶極少，傳統上可視為{name}：不再扶身，{how}。", {
+    name: patName(a.special.name),
+    how: a.special.follows ? tr("而是順從{g}的旺勢", { g: trw(GROUP_WORD[a.special.follows]) })
+      : (a.special.heavy || []).length === 2 ? tr("而是順從{gs}的旺勢，以財星居中調和", { gs: andJoin(a.special.heavy.map(g => trw(GROUP_WORD[g]))) }) : tr("而是順從食傷、財、官殺的整體旺勢"),
+  });
   else if (a.strength === "專旺") s2 = a.special.kind === "從強"
-    ? `印星與比劫佔了全局大半，而印星更重，傳統上可視為${a.special.name}：順其強勢，忌財星、官殺逆勢。`
-    : `日主之氣佔了全局大半，傳統上可視為${a.special.name}：順其旺氣，忌強行剋制。`;
-  else s2 = `${leansStrong(c) ? "整體偏強，宜洩、宜耗" : "整體偏弱，宜生、宜扶"}，取用以平衡為原則。`;
-  return section("strength", [s1 + s2, schoolsSentence(c)], items);
+    ? tr("印星與比劫佔了全局大半，而印星更重，傳統上可視為{name}：順其強勢，忌財星、官殺逆勢。", { name: patName(a.special.name) })
+    : tr("日主之氣佔了全局大半，傳統上可視為{name}：順其旺氣，忌強行剋制。", { name: patName(a.special.name) });
+  else s2 = tr(leansStrong(c) ? "整體偏強，宜洩、宜耗，取用以平衡為原則。" : "整體偏弱，宜生、宜扶，取用以平衡為原則。");
+  return section("strength", [para(s1, s2), schoolsSentence(c)], items);
 }
 
 // What each school thinks, and where they agree or split.
@@ -767,24 +932,26 @@ function schoolsSentence(c) {
   const a = c.a;
   const likesOf = s => ELEMENTS.filter(e => (a.schools[s].element[e] || 0) > 0).sort((x, y) => a.schools[s].element[y] - a.schools[s].element[x]);
   const fy = likesOf("扶抑"), gj = likesOf("格局"), th = a.schools.調候;
+  const likes = list => (list.length ? tr("喜{els}", { els: J(list) }) : tr("沒有明顯偏好"));
   // 從格／專旺: 調候 and 格局 step aside (analysis.js), so only the special structure's own likes count.
-  if (a.special && th.abstain) return `各派看法：${a.special.name}已不是一般的強弱平衡，調候與格局兩派讓位，只依${a.special.name}順勢取用，${fy.length ? `喜${fy.join("、")}` : "沒有明顯偏好"}。本報告依此取用。`;
-  const parts = [`扶抑一派看強弱（${a.schools.扶抑.verdict}），${fy.length ? `喜${fy.join("、")}` : "沒有明顯偏好"}`];
-  if (th.abstain) parts.push(`調候一派認為${th.verdict}寒暖適中，不特別偏好`);
-  else if (th.stems && th.stems.length) parts.push(`調候一派依《窮通寶鑑》取${th.stems.join("、")}`);
-  else parts.push(`調候一派${likesOf("調候").length ? `喜${likesOf("調候").join("、")}` : "沒有明顯偏好"}`);
-  parts.push(`格局一派以${a.pattern}論，${gj.length ? `喜${gj.join("、")}` : "沒有明顯偏好"}`);
+  if (a.special && th.abstain) return tr("各派看法：{name}已不是一般的強弱平衡，調候與格局兩派讓位，只依{name}順勢取用，{likes}。本報告依此取用。", { name: patName(a.special.name), likes: likes(fy) });
+  const parts = [tr("扶抑一派看強弱（{verdict}），{likes}", { verdict: trw(a.schools.扶抑.verdict), likes: likes(fy) })];
+  if (th.abstain) parts.push(tr("調候一派認為{season}寒暖適中，不特別偏好", { season: trw(th.verdict) }));
+  else if (th.stems && th.stems.length) parts.push(tr("調候一派依《窮通寶鑑》取{stems}", { stems: J(th.stems) }));
+  else parts.push(tr("調候一派{likes}", { likes: likes(likesOf("調候")) }));
+  parts.push(tr("格局一派以{pattern}論，{likes}", { pattern: patName(a.pattern), likes: likes(gj) }));
   const voting = SCHOOLS.filter(s => !a.schools[s].abstain);
   const all = voting.length >= 2 ? ELEMENTS.filter(e => a.views[e].likes.length === voting.length) : [];
   const split = ELEMENTS.filter(e => a.views[e].likes.length && a.views[e].dislikes.length);
   const tail = [];
-  if (all.length) tail.push(`${COUNT[voting.length]}派都喜${all.join("、")}`);
-  if (split.length) tail.push(`在${split.join("、")}上意見分歧（${split.map(e => `${a.views[e].likes.join("、")}喜${e}，${a.views[e].dislikes.join("、")}忌${e}`).join("；")}）`);
+  if (all.length) tail.push(tr("{n}派都喜{els}", { n: COUNT[voting.length], els: J(all) }));
+  if (split.length) tail.push(tr("在{els}上意見分歧（{detail}）", { els: J(split), detail: join(split.map(e => tr("{likers}喜{e}，{haters}忌{e}", { likers: J(a.views[e].likes), e: trw(e), haters: J(a.views[e].dislikes) })), "；") }));
   // A single school in charge (the page lets the reader pick one) shows as favour equal to that school's votes.
   const same = s => ELEMENTS.every(e => Math.abs((a.favor[e] || 0) - (a.schools[s].element[e] || 0)) < 0.011);
   const alike = SCHOOLS.every(s => ELEMENTS.every(e => (a.schools[s].element[e] || 0) === (a.schools.扶抑.element[e] || 0)));
   const only = !alike && SCHOOLS.filter(same).length === 1 ? SCHOOLS.find(same) : null;
-  return `各派看法：${parts.join("；")}。${tail.length ? `${tail.join("，")}，` : ""}${only ? `本報告依${only}一派取用` : "本報告以各派加權綜合取用"}。`;
+  const v = { parts: join(parts, "；"), tail: join(tail, "，"), how: only ? tr("本報告依{school}一派取用", { school: trw(only) }) : tr("本報告以各派加權綜合取用") };
+  return tail.length ? tr("各派看法：{parts}。{tail}，{how}。", v) : tr("各派看法：{parts}。{how}。", v);
 }
 
 // ---------- 4 格局與用神 ----------
@@ -792,77 +959,80 @@ const whereVisible = (c, group) => stemsWords(visibleOf(c, group).map(x => ({ ro
 // 「食神（日支丑、時支子）」 for the 本氣 and 中氣 of a group.
 function whereHidden(c, group) {
   const list = hiddenOf(c, group, ["本氣", "中氣"]);
-  return `${uniq(list.map(h => h.god)).join("、")}（${uniq(list.map(h => `${ROLE_ZH[h.role]}支${h.branch}`)).join("、")}）`;
+  return paren(J(uniq(list.map(h => h.god))), join(uniq(list.map(h => rb(h.role, h.branch))), "、"));
 }
 // 成格／破格 in simple terms (simplified from 子平真詮): what helps the structure, what is only hidden, what breaks it.
 function patternCheck(c) {
   const a = c.a, s = a.strength, pat = a.pattern;
   // A 從 or 專旺 chart is read as that special structure: the ordinary 成格／破格 rules assume a balanced day master.
   // analysis.js special: 從兒、從財、從殺、從勢, 從強, or 專旺 (曲直、炎上… in its season), each with its own likes and fears.
-  if (s === "從弱") return { good: [], hidden: "", bad: [], verdict: `日主從弱，改以${a.special.name}論：${a.special.note}，順勢時格局反而清` };
-  if (s === "專旺") return { good: [], hidden: "", bad: [], verdict: `${a.special.kind === "從強" ? "印比成勢" : "日主一氣獨旺"}，改以${a.special.name}論：${a.special.note}` };
+  if (s === "從弱") return { good: [], hidden: "", bad: [], verdict: tr("日主從弱，改以{name}論：{note}，順勢時格局反而清", { name: patName(a.special.name), note: tr(a.special.note) }) };
+  if (s === "專旺") return { good: [], hidden: "", bad: [], verdict: tr(a.special.kind === "從強" ? "印比成勢，改以{name}論：{note}" : "日主一氣獨旺，改以{name}論：{note}", { name: patName(a.special.name), note: tr(a.special.note) }) };
   const vis = g => visibleOf(c, g).length > 0, hid = g => hiddenOf(c, g, ["本氣", "中氣"]).length > 0;
   const okStrength = s === "身強" || s === "中和" || s === "專旺";
   const good = [], hidden = [], bad = [];
+  const shows = (where, text) => tr("{where}透出，{text}", { where, text: trw(text) });
   const support = (g, text) => {
-    if (vis(g)) good.push(`${whereVisible(c, g)}透出，${text}`);
+    if (vis(g)) good.push(shows(whereVisible(c, g), text));
     else if (hid(g)) hidden.push({ where: whereHidden(c, g), text });
   };
+  // The short classical phrases are words (trw), so each keeps one English whatever sentence it stands in.
+  const add = (list, text) => list.push(trw(text));
   switch (pat) {
     case "正官格":
       support("財", "財星生官"); support("印", "印星護官");
-      if (okStrength) good.push("日主足以任官"); else if (!vis("印")) bad.push("身弱難以任官");
-      if (visGod(c, "傷官") && !vis("印")) bad.push("傷官透出剋官（傷官見官）");
-      if (visGod(c, "七殺")) bad.push("七殺也透出，官殺混雜");
+      if (okStrength) add(good, "日主足以任官"); else if (!vis("印")) add(bad, "身弱難以任官");
+      if (visGod(c, "傷官") && !vis("印")) add(bad, "傷官透出剋官（傷官見官）");
+      if (visGod(c, "七殺")) add(bad, "七殺也透出，官殺混雜");
       break;
     case "七殺格":
-      if (visGod(c, "食神")) good.push(`${stemsWords(c.gods.食神.visible)}透出，食神制殺`);
-      else if (visGod(c, "傷官")) good.push(`${stemsWords(c.gods.傷官.visible)}透出，傷官駕殺`);
+      if (visGod(c, "食神")) good.push(shows(stemsWords(c.gods.食神.visible), "食神制殺"));
+      else if (visGod(c, "傷官")) good.push(shows(stemsWords(c.gods.傷官.visible), "傷官駕殺"));
       else if (hid("食傷")) hidden.push({ where: whereHidden(c, "食傷"), text: "制殺" });
       support("印", "印星化殺");
-      if (s === "身強") good.push("身強能敵殺");
-      if (vis("財") && !vis("食傷") && !vis("印")) bad.push("財星生殺而無制");
-      if (isWeak(c) && !vis("印") && !vis("食傷")) bad.push("身弱殺重而無制化（殺重身輕）");
-      if (visGod(c, "正官")) bad.push("正官也透出，官殺混雜");
+      if (s === "身強") add(good, "身強能敵殺");
+      if (vis("財") && !vis("食傷") && !vis("印")) add(bad, "財星生殺而無制");
+      if (isWeak(c) && !vis("印") && !vis("食傷")) add(bad, "身弱殺重而無制化（殺重身輕）");
+      if (visGod(c, "正官")) add(bad, "正官也透出，官殺混雜");
       break;
     case "正財格": case "偏財格":
       support("食傷", "食傷生財"); support("官殺", "財旺生官");
-      if (okStrength) good.push(s === "中和" ? "日主能任財" : "日主身強能任財");
-      else if (vis("印") || vis("比劫")) good.push("身弱而有印比相扶，仍能任財");
-      else bad.push("財多身弱，力不從心");
-      if (vis("比劫") && !vis("官殺")) bad.push("比劫透出，有奪財之憂（比劫奪財）");
-      else if (!vis("比劫")) good.push("比劫不透，財星不被爭奪");
+      if (okStrength) add(good, s === "中和" ? "日主能任財" : "日主身強能任財");
+      else if (vis("印") || vis("比劫")) add(good, "身弱而有印比相扶，仍能任財");
+      else add(bad, "財多身弱，力不從心");
+      if (vis("比劫") && !vis("官殺")) add(bad, "比劫透出，有奪財之憂（比劫奪財）");
+      else if (!vis("比劫")) add(good, "比劫不透，財星不被爭奪");
       break;
     case "正印格": case "偏印格":
       support("官殺", "官殺生印");
-      if (s === "身弱" || s === "中和") good.push("日主得印生扶");
-      if (s === "身強" && vis("財")) good.push("印旺身強，有財星制印");
-      if (vis("財") && isWeak(c)) bad.push("財星透出壞印（財星壞印）");
-      if (pat === "偏印格" && visGod(c, "食神") && !vis("財")) bad.push("偏印與食神同透（梟神奪食）");
-      if (s === "身強" && !vis("財") && !vis("食傷")) bad.push("印多身旺而缺少出口");
+      if (s === "身弱" || s === "中和") add(good, "日主得印生扶");
+      if (s === "身強" && vis("財")) add(good, "印旺身強，有財星制印");
+      if (vis("財") && isWeak(c)) add(bad, "財星透出壞印（財星壞印）");
+      if (pat === "偏印格" && visGod(c, "食神") && !vis("財")) add(bad, "偏印與食神同透（梟神奪食）");
+      if (s === "身強" && !vis("財") && !vis("食傷")) add(bad, "印多身旺而缺少出口");
       break;
     case "食神格":
       support("財", "食神生財");
-      if (visGod(c, "七殺")) good.push("食神制殺");
-      if (okStrength) good.push("日主能洩");
-      if (visGod(c, "偏印") && !vis("財")) bad.push("偏印透出奪食（梟神奪食）");
-      if (isWeak(c) && !vis("印")) bad.push("身弱洩氣太過");
+      if (visGod(c, "七殺")) add(good, "食神制殺");
+      if (okStrength) add(good, "日主能洩");
+      if (visGod(c, "偏印") && !vis("財")) add(bad, "偏印透出奪食（梟神奪食）");
+      if (isWeak(c) && !vis("印")) add(bad, "身弱洩氣太過");
       break;
     case "傷官格":
       support("財", "傷官生財");
-      if (vis("印") && !isStrong(c)) good.push("傷官佩印");
-      if (visGod(c, "正官") && !vis("財") && !vis("印")) bad.push("傷官見官");
-      if (isWeak(c) && !vis("印")) bad.push("身弱洩氣太過");
+      if (vis("印") && !isStrong(c)) add(good, "傷官佩印");
+      if (visGod(c, "正官") && !vis("財") && !vis("印")) add(bad, "傷官見官");
+      if (isWeak(c) && !vis("印")) add(bad, "身弱洩氣太過");
       break;
     case "建祿格": case "月刃格": {
       const lu = pat === "建祿格";
-      if (visGod(c, "正官")) good.push(`${stemsWords(c.gods.正官.visible)}透出，${lu ? "建祿用官" : "官星制刃"}`);
-      if (visGod(c, "七殺")) good.push(`${stemsWords(c.gods.七殺.visible)}透出，${lu ? "七殺制身" : "陽刃駕殺"}`);
+      if (visGod(c, "正官")) good.push(shows(stemsWords(c.gods.正官.visible), lu ? "建祿用官" : "官星制刃"));
+      if (visGod(c, "七殺")) good.push(shows(stemsWords(c.gods.七殺.visible), lu ? "七殺制身" : "陽刃駕殺"));
       if (!vis("官殺") && hid("官殺")) hidden.push({ where: whereHidden(c, "官殺"), text: lu ? "制祿" : "制刃" });
-      if (vis("食傷")) good.push(`${whereVisible(c, "食傷")}透出，食傷洩秀`);
-      if (vis("財") && (vis("食傷") || vis("官殺"))) good.push("財星得用");
-      if (!vis("官殺") && !vis("食傷")) bad.push("缺少透出的官殺或食傷來疏導");
-      if (vis("比劫") && !vis("官殺")) bad.push("比劫透出而無制");
+      if (vis("食傷")) good.push(shows(whereVisible(c, "食傷"), "食傷洩秀"));
+      if (vis("財") && (vis("食傷") || vis("官殺"))) add(good, "財星得用");
+      if (!vis("官殺") && !vis("食傷")) add(bad, "缺少透出的官殺或食傷來疏導");
+      if (vis("比劫") && !vis("官殺")) add(bad, "比劫透出而無制");
       break;
     }
     default: break;
@@ -871,42 +1041,54 @@ function patternCheck(c) {
   if (!bad.length) verdict = good.length >= 2 ? (hidden.length ? "屬於成格，行運引出藏干時更能發揮" : "格局清純，屬於成格")
     : good.length ? "格局尚稱完整" : hidden.length ? "格局之氣多藏在地支，成就要靠行運引出" : "格局平淡，成敗多看行運";
   else verdict = good.length || hidden.length ? "成中帶破，屬中等格局，行運補其不足時最能發揮" : "格局受損（俗稱破格），成就更依賴後天努力與行運";
+  verdict = tr(verdict);
   // A clash on the month branch shakes the structure rather than breaking it: said, but not counted against it.
-  if (monthClashed(c)) verdict += "；只是月令受沖，格局根基較易動搖，遇到沖月令的年份要穩住本業";
-  const hiddenText = hidden.length ? `${hidden.map(h => h.where).join("與")}${hidden.length > 1 ? "都" : ""}藏而未透，暗有${hidden.map(h => h.text).join("、")}之勢` : "";
+  if (monthClashed(c)) verdict = tr("{verdict}；只是月令受沖，格局根基較易動搖，遇到沖月令的年份要穩住本業", { verdict });
+  const hv = { where: andJoin(hidden.map(h => h.where)), what: J(hidden.map(h => h.text)) };
+  const hiddenText = hidden.length ? tr(hidden.length > 1 ? "{where}都藏而未透，暗有{what}之勢" : "{where}藏而未透，暗有{what}之勢", hv) : "";
   return { good, hidden: hiddenText, bad, verdict };
 }
 
 // Each school's reason for liking or disliking an element (null when it has none to give).
+const LEAN = {
+  strong: { like: { 食傷: ["身強宜洩，食傷洩秀", "身略強宜洩，食傷洩秀"], 財: ["身強能任財", "身略強能任財"], 官殺: ["身強宜剋，官殺制身", "身略強宜剋，官殺制身"] }, dislike: { 比劫: ["身強忌再幫身", "身略強忌再幫身"], 印: ["身強忌再生身", "身略強忌再生身"] } },
+  weak: { like: { 印: ["身弱宜生，印星生身", "身略弱宜生，印星生身"], 比劫: ["身弱宜幫，比劫助身", "身略弱宜幫，比劫助身"] }, dislike: { 食傷: ["身弱忌洩", "身略弱忌洩"], 財: ["身弱忌耗", "身略弱忌耗"], 官殺: ["身弱忌剋", "身略弱忌剋"] } },
+};
 function schoolReason(c, school, e, like) {
   const g = c.eg[e], s = c.a.strength, pat = c.a.pattern;
+  const text = t => (t ? tr(t) : null);
   if (school === "扶抑") {
-    if (s === "從弱") return like ? `${c.a.special.kind}宜順從旺勢` : { 印: `${c.a.special.kind}忌印星生身`, 比劫: `${c.a.special.kind}忌比劫幫身`, 食傷: "從殺忌食傷制殺", 官殺: "從兒忌官殺剋身" }[g] || null;
-    if (s === "專旺" && c.a.special.kind === "從強") return like ? "從強宜順其強勢" : { 食傷: "從強忌食傷洩氣", 財: "從強忌財星壞印", 官殺: "從強忌官殺觸怒" }[g] || null;
-    if (s === "專旺") return like ? "專旺宜順其旺氣" : "專旺忌逆勢剋耗";
-    const mild = s === "中和" ? "略" : "";
-    if (leansStrong(c)) return (like ? { 食傷: `身${mild}強宜洩，食傷洩秀`, 財: `身${mild}強能任財`, 官殺: `身${mild}強宜剋，官殺制身` } : { 比劫: `身${mild}強忌再幫身`, 印: `身${mild}強忌再生身` })[g] || null;
-    return (like ? { 印: `身${mild}弱宜生，印星生身`, 比劫: `身${mild}弱宜幫，比劫助身` } : { 食傷: `身${mild}弱忌洩`, 財: `身${mild}弱忌耗`, 官殺: `身${mild}弱忌剋` })[g] || null;
+    if (s === "從弱") {
+      const kind = { kind: trw(c.a.special.kind) };
+      if (like) return tr("{kind}宜順從旺勢", kind);
+      return g === "印" ? tr("{kind}忌印星生身", kind) : g === "比劫" ? tr("{kind}忌比劫幫身", kind) : text({ 食傷: "從殺忌食傷制殺", 官殺: "從兒忌官殺剋身" }[g]);
+    }
+    if (s === "專旺" && c.a.special.kind === "從強") return text(like ? "從強宜順其強勢" : { 食傷: "從強忌食傷洩氣", 財: "從強忌財星壞印", 官殺: "從強忌官殺觸怒" }[g]);
+    if (s === "專旺") return tr(like ? "專旺宜順其旺氣" : "專旺忌逆勢剋耗");
+    const mild = s === "中和" ? 1 : 0, side = LEAN[leansStrong(c) ? "strong" : "weak"][like ? "like" : "dislike"];
+    return side[g] ? tr(side[g][mild]) : null;
   }
   if (school === "調候") {
-    if (like) { const st = (c.a.schools.調候.stems || []).filter(x => STEM_EL[x] === e); return st.length ? `《窮通寶鑑》取${st.join("、")}` : "依季節調候"; }
-    return { 水: "冬天水寒，忌再添水", 火: "夏天火燥，忌再添火" }[e] || "依季節調候所忌";
+    if (like) { const st = (c.a.schools.調候.stems || []).filter(x => STEM_EL[x] === e); return st.length ? tr("《窮通寶鑑》取{stems}", { stems: J(st) }) : tr("依季節調候"); }
+    return tr({ 水: "冬天水寒，忌再添水", 火: "夏天火燥，忌再添火" }[e] || "依季節調候所忌");
   }
   const reason = ((like ? PATTERN_LIKES : PATTERN_DISLIKES)[pat] || {})[g];
-  return `${pat}${like ? "喜" : "忌"}${reason || GROUP_WORD[g]}`;
+  return tr(like ? "{pattern}喜{what}" : "{pattern}忌{what}", { pattern: patName(pat), what: trw(reason || GROUP_WORD[g]) });
 }
 function roleText(c, e) {
   const v = c.a.views[e], role = c.roles[e];
-  const fmt = (list, like) => list.map(s => [schoolReason(c, s, e, like), s]).filter(([r]) => r).map(([r, s]) => `${r}（${s}）`);
+  const fmt = (list, like) => list.map(s => [schoolReason(c, s, e, like), s]).filter(([r]) => r).map(([r, s]) => paren(r, trw(s)));
   if (role === "閒神") {
     const all = [...fmt(v.likes, true), ...fmt(v.dislikes, false)];
-    return all.length ? `各派看法互相抵消：${all.join("；")}。` : "各派都沒有明顯的喜忌。";
+    return all.length ? tr("各派看法互相抵消：{list}。", { list: join(all, "；") }) : tr("各派都沒有明顯的喜忌。");
   }
   const bad = roleIsBad(role);
   const main = fmt(bad ? v.dislikes : v.likes, !bad), other = fmt(bad ? v.likes : v.dislikes, bad);
-  return `${main.join("；") || "加權後的取捨"}${other.length ? `；但${other.join("；")}` : ""}。`;
+  const first = main.length ? join(main, "；") : tr("加權後的取捨");
+  return other.length ? tr("{main}；但{other}。", { main: first, other: join(other, "；") }) : stop(first);
 }
 
+const ROLE_LABEL = { 喜神: "喜神・{e}（{g}）", 忌神: "忌神・{e}（{g}）", 仇神: "仇神・{e}（{g}）" };
 function patternSection(c) {
   const { a, dm, de, mb } = c;
   const main = c.P.month.branch.hidden[0];
@@ -914,73 +1096,81 @@ function patternSection(c) {
   const group = groupOf(de, main.element);
   const kin = visibleOf(c, group).filter(x => x.stem !== main.name);
   const own = main.god === "比肩" || main.god === "劫財";
-  let s1 = `${mb}月本氣${main.name}${main.element}對${dm}${de}是${main.god}，`;
+  const v = { mb: trw(mb), main: se(main.name), dm: se(dm), god: trw(main.god), pattern: patName(a.pattern) };
+  let s1;
   // 建祿、月刃: the month holds the day master's own element, so there is nothing to "show"; the structure is read
   // from what controls or drains it.
-  if (own) s1 = `${mb}月本氣${main.name}${main.element}和日主同類，是${dm}${de}的${main.god === "比肩" ? "祿（比肩）" : c.a.dayMaster.yang ? "陽刃（劫財）" : "月劫（劫財）"}，取${a.pattern}，成敗要看有沒有官殺制約或食傷疏導`;
-  else if (shown.length) s1 += `並透出${rolesWord(shown, "干")}，取${a.pattern}，格局清楚`;
-  else if (kin.length) s1 += `本身不透，但同屬${GROUP_WORD[group]}的${uniq(kin.map(x => `${x.stem}${STEM_EL[x.stem]}`)).join("、")}透出${rolesWord(kin.map(x => x.role), "干")}，仍取${a.pattern}`;
-  else s1 += `藏而不透，仍取${a.pattern}，只是格局之氣較含蓄`;
+  if (own) s1 = tr(main.god === "比肩" ? "{mb}月本氣{main}和日主同類，是{dm}的祿（比肩），取{pattern}，成敗要看有沒有官殺制約或食傷疏導"
+    : c.a.dayMaster.yang ? "{mb}月本氣{main}和日主同類，是{dm}的陽刃（劫財），取{pattern}，成敗要看有沒有官殺制約或食傷疏導"
+      : "{mb}月本氣{main}和日主同類，是{dm}的月劫（劫財），取{pattern}，成敗要看有沒有官殺制約或食傷疏導", v);
+  else if (shown.length) s1 = tr("{mb}月本氣{main}對{dm}是{god}，並透出{where}，取{pattern}，格局清楚", { ...v, where: rolesWord(shown, "干") });
+  else if (kin.length) s1 = tr("{mb}月本氣{main}對{dm}是{god}，本身不透，但同屬{g}的{kin}透出{where}，仍取{pattern}", { ...v, g: trw(GROUP_WORD[group]), kin: join(uniq(kin.map(x => se(x.stem))), "、"), where: rolesWord(kin.map(x => x.role), "干") });
+  else s1 = tr("{mb}月本氣{main}對{dm}是{god}，藏而不透，仍取{pattern}，只是格局之氣較含蓄", v);
   if (!shown.length || own) {
     const alt = c.P.month.branch.hidden.slice(1).find(h => h.god !== main.god && c.pillars.some(p => p.role !== "day" && p.stem.name === h.name));
     if (alt) {
       const roles = c.pillars.filter(p => p.role !== "day" && p.stem.name === alt.name).map(p => p.role);
-      s1 += `；月令的${alt.type}${alt.name}${alt.element}（${alt.god}）透出${rolesWord(roles, "干")}，也有流派改取${alt.god === "比肩" ? "建祿格" : alt.god === "劫財" ? "月刃格" : `${alt.god}格`}`;
+      s1 += tr("；月令的{type}{stem}（{god}）透出{where}，也有流派改取{pattern}", { type: trw(alt.type), stem: se(alt.name), god: trw(alt.god), where: rolesWord(roles, "干"), pattern: patName(alt.god === "比肩" ? "建祿格" : alt.god === "劫財" ? "月刃格" : `${alt.god}格`) });
     }
   }
-  s1 += "。";
+  s1 = stop(s1);
   const pc = patternCheck(c);
-  const parts = [pc.good.join("，"), pc.hidden, pc.bad.length ? `但${pc.bad.join("、")}` : ""].filter(Boolean);
-  const s2 = `${parts.length ? `${parts.join("；")}，` : ""}${pc.verdict}。`;
+  const parts = [join(pc.good, "，"), pc.hidden, pc.bad.length ? tr("但{list}", { list: join(pc.bad, "、") }) : ""].filter(Boolean);
+  const s2 = parts.length ? tr("{parts}，{verdict}。", { parts: join(parts, "；"), verdict: pc.verdict }) : stop(cap(pc.verdict));
 
-  const u = a.useful, s = a.strength;
+  const u = a.useful;
   const NEED = { 身強: "身強之局宜洩、宜耗、宜剋", 身弱: "身弱之局宜生、宜扶", 中和: "中和之局重在維持平衡", 從弱: "從弱之局宜順從旺勢、不宜扶身", 專旺: "專旺之局宜順其旺氣、不宜強剋", 從強: "從強之局宜順其強勢、喜比劫印星，忌財官逆勢" };
+  const need = tr(NEED[strengthLabel(a)] || NEED.中和);
   const byRole = role => ELEMENTS.filter(e => c.roles[e] === role).sort((x, y) => (a.favor[y] || 0) - (a.favor[x] || 0));
   let s3, s4 = "", s5 = "";
   if (u.length) {
     const xi = byRole("喜神"), ji = byRole("忌神"), qiu = byRole("仇神"), xian = byRole("閒神");
-    s3 = `${NEED[strengthLabel(a)] || NEED.中和}：以${u[0]}（${GROUP_WORD[c.eg[u[0]]]}）為用神，${useFunction(c, u[0])}`
-      + `${xi.length ? `；${xi.join("、")}為喜神` : ""}${ji.length ? `，${ji.join("、")}為忌神` : ""}`
-      + `${qiu.length ? `，${qiu.join("、")}為仇神` : ""}${xian.length ? `，${xian.join("、")}為閒神` : ""}。`;
+    s3 = tr("{need}：以{u}（{g}）為用神，{fn}{xi}{ji}{qiu}{xian}。", {
+      need, u: trw(u[0]), g: trw(GROUP_WORD[c.eg[u[0]]]), fn: useFunction(c, u[0]),
+      xi: xi.length ? tr("；{els}為喜神", { els: J(xi) }) : "", ji: ji.length ? tr("，{els}為忌神", { els: J(ji) }) : "",
+      qiu: qiu.length ? tr("，{els}為仇神", { els: J(qiu) }) : "", xian: xian.length ? tr("，{els}為閒神", { els: J(xian) }) : "",
+    });
     const e = u[0], pr = presence(c, e), st = c.states[e];
-    const stems = EL_STEMS[e].join("、"), branches = EL_BRANCHES[e].join("、");
-    if (pr.vis.length && pr.hid.length) s4 = `用神${e}透出${stemsWords(pr.vis)}，地支也有根（${hiddenBrief(pr.hid)}），有根有苗，在${mb}月處「${st}」。`;
-    else if (pr.vis.length) s4 = `用神${e}透出${stemsWords(pr.vis)}，但地支無根，力量較浮，大運流年遇到${branches}時才更穩。`;
-    else if (pr.hid.length) s4 = `用神${e}沒有透出天干，只藏在${hiddenBrief(pr.hid)}，有根而未透，大運流年遇到${stems}時最能發揮。`;
-    else s4 = `用神${e}在命中不見，是最需要靠大運流年補足的五行，逢${stems}、${branches}的運最為得力。`;
-    const verse = (VERSES[dm] || []).find(v => v.when(c));
-    if (verse) s5 = `《滴天髓》說${dm}${de}「${verse.line}」，${verse.text}。`;
-  } else s3 = `${NEED[strengthLabel(a)] || NEED.中和}，但各派喜忌互相抵消，五行沒有明顯的用神，取用以平衡為主，行運的影響也較溫和。`;
+    const w = { e: trw(e), mb: trw(mb), st: trw(st), stems: J(EL_STEMS[e]), branches: J(EL_BRANCHES[e]), vis: pr.vis.length ? stemsWords(pr.vis) : "", hid: pr.hid.length ? hiddenBrief(pr.hid) : "" };
+    if (pr.vis.length && pr.hid.length) s4 = tr("用神{e}透出{vis}，地支也有根（{hid}），有根有苗，在{mb}月處「{st}」。", w);
+    else if (pr.vis.length) s4 = tr("用神{e}透出{vis}，但地支無根，力量較浮，大運流年遇到{branches}時才更穩。", w);
+    else if (pr.hid.length) s4 = tr("用神{e}沒有透出天干，只藏在{hid}，有根而未透，大運流年遇到{stems}時最能發揮。", w);
+    else s4 = tr("用神{e}在命中不見，是最需要靠大運流年補足的五行，逢{stems}、{branches}的運最為得力。", w);
+    const verse = (VERSES[dm] || []).find(x => x.when(c));
+    if (verse) s5 = tr("《滴天髓》說{dm}「{line}」，{text}。", { dm: se(dm), line: tr(verse.line), text: tr(verse.text) });
+  } else s3 = tr("{need}，但各派喜忌互相抵消，五行沒有明顯的用神，取用以平衡為主，行運的影響也較溫和。", { need });
 
   const items = [];
-  if (u.length) items.push({ label: `用神・${u[0]}（${GROUP_WORD[c.eg[u[0]]]}）`, text: roleText(c, u[0]) });
-  for (const role of ["喜神", "忌神", "仇神"]) for (const e of byRole(role)) items.push({ label: `${role}・${e}（${GROUP_WORD[c.eg[e]]}）`, text: roleText(c, e) });
+  const label = (t, e) => tr(t, { e: trw(e), g: trw(GROUP_WORD[c.eg[e]]) });
+  if (u.length) items.push({ label: label("用神・{e}（{g}）", u[0]), text: roleText(c, u[0]) });
+  for (const role of ["喜神", "忌神", "仇神"]) for (const e of byRole(role)) items.push({ label: label(ROLE_LABEL[role], e), text: roleText(c, e) });
   const xian = byRole("閒神");
-  if (xian.length && u.length) items.push({ label: `閒神・${xian.join("、")}`, text: xian.length === 1 ? roleText(c, xian[0]) : xian.length === 2 ? xian.map(e => `${e}：${roleText(c, e)}`).join("") : "這幾個五行各派看法互相抵消，加權後影響不大。" });
-  items.push({ label: "調候用神", text: tiaohouText(c) });
-  return section("pattern", [s1 + s2, s3 + s4 + s5], items);
+  if (xian.length && u.length) items.push({ label: tr("閒神・{els}", { els: J(xian) }), text: xian.length === 1 ? roleText(c, xian[0]) : xian.length === 2 ? para(...xian.map(e => (en() ? `${trw(e)}: ${roleText(c, e)}` : `${e}：${roleText(c, e)}`))) : tr("這幾個五行各派看法互相抵消，加權後影響不大。") });
+  items.push({ label: tr("調候用神"), text: tiaohouText(c) });
+  return section("pattern", [para(s1, s2), para(s3, s4, s5)], items);
 }
 
 function tiaohouText(c) {
-  const { a, dm, de, mb } = c, th = a.schools.調候, stems = th.stems || [];
-  if (!stems.length) return `${th.note}。`;
+  const { a, dm, mb } = c, th = a.schools.調候, stems = th.stems || [];
+  if (!stems.length) return tiaohouNote(dm, mb);
+  const v = { dm: se(dm), mb: trw(mb), stems: J(stems) };
   if (a.special && th.abstain) {
     const bad = stems.filter(s => a.avoid.includes(STEM_EL[s]));
-    return `依《窮通寶鑑》，${dm}${de}生於${mb}月，一般以${stems.join("、")}調候；但這張命盤以${a.special.name}論，調候讓位給順勢取用${bad.length ? `，其中${bad.map(s => `${s}${STEM_EL[s]}`).join("、")}反而是忌，不宜強求` : ""}。`;
+    return tr("依《窮通寶鑑》，{dm}生於{mb}月，一般以{stems}調候；但這張命盤以{name}論，調候讓位給順勢取用{bad}。", { ...v, name: patName(a.special.name), bad: bad.length ? tr("，其中{list}反而是忌，不宜強求", { list: join(bad.map(se), "、") }) : "" });
   }
   const present = [], absent = [];
   for (const s of stems) {
     const vis = c.pillars.filter(p => p.role !== "day" && p.stem.name === s).map(p => p.role);
-    const hid = uniq(c.pillars.filter(p => p.branch.hidden.some(h => h.name === s)).map(p => `${ROLE_ZH[p.role]}支${p.branch.name}`));
-    if (vis.length) present.push(`${s}${STEM_EL[s]}透出${rolesWord(vis, "干")}`);
-    else if (hid.length) present.push(`${s}${STEM_EL[s]}藏在${hid.join("、")}`);
-    else absent.push(`${s}${STEM_EL[s]}`);
+    const hid = uniq(c.pillars.filter(p => p.branch.hidden.some(h => h.name === s)).map(p => rb(p.role, p.branch.name)));
+    if (vis.length) present.push(tr("{s}透出{where}", { s: se(s), where: rolesWord(vis, "干") }));
+    else if (hid.length) present.push(tr("{s}藏在{where}", { s: se(s), where: join(hid, "、") }));
+    else absent.push(se(s));
   }
-  const state = [present.join("，"), absent.length ? `${absent.join("、")}命中不見` : ""].filter(Boolean).join("；");
+  const state = join([join(present, "，"), absent.length ? tr("{list}命中不見", { list: join(absent, "、") }) : ""].filter(Boolean), "；");
   const hit = stems.find(s => STEM_EL[s] === a.useful[0]), near = stems.find(s => a.useful.includes(STEM_EL[s]));
-  const agree = !a.useful.length ? "" : hit ? `其中${hit}${STEM_EL[hit]}正是用神的方向，調候與用神一致。`
-    : near ? `其中${near}${STEM_EL[near]}屬喜神，方向相近。` : "調候所需和用神不同，傳統上會在行運中兼顧。";
-  return `依《窮通寶鑑》，${dm}${de}生於${mb}月，調候以${stems.join("、")}為要：${state}。${agree}`;
+  const agree = !a.useful.length ? "" : hit ? tr("其中{s}正是用神的方向，調候與用神一致。", { s: se(hit) })
+    : near ? tr("其中{s}屬喜神，方向相近。", { s: se(near) }) : tr("調候所需和用神不同，傳統上會在行運中兼顧。");
+  return para(tr("依《窮通寶鑑》，{dm}生於{mb}月，調候以{stems}為要：{state}。", { ...v, state }), agree);
 }
 
 // ---------- 5 性格 ----------
@@ -1013,31 +1203,32 @@ function godCombo(c) {
     [c.share[c.ge.財] >= HEAVY && c.a.strength === "身弱", "財多身弱，機會多、壓力也多，容易為責任與金錢操心"],
     [c.share[c.ge.官殺] >= HEAVY && c.a.strength === "身弱", "官殺重而身弱，責任感強、自我要求高，也容易把壓力往肚裡吞"],
     [c.share[c.ge.比劫] >= HEAVY && isStrong(c), "比劫成群，自我意識與競爭心都強，講義氣也好勝"],
-    [c.share[c.ge.印] >= HEAVY && isStrong(c), `${congqiang(c.a) ? "印星重重、印比成勢" : "印星重而身強"}，思慮周全、重視安全感，也要提醒自己少一點顧慮、多一點行動`],
+    [c.share[c.ge.印] >= HEAVY && isStrong(c), congqiang(c.a) ? "印星重重、印比成勢，思慮周全、重視安全感，也要提醒自己少一點顧慮、多一點行動" : "印星重而身強，思慮周全、重視安全感，也要提醒自己少一點顧慮、多一點行動"],
     [c.share[c.ge.食傷] >= HEAVY && !isStrong(c), "食傷洩氣重，才華與表達欲旺盛，付出多也容易累，要懂得保留精力"],
   ];
   const hit = list.find(([ok]) => ok);
-  return hit ? hit[1] : null;
+  return hit ? tr(hit[1]) : null;
 }
 function characterSection(c) {
-  const { a, dm, de } = c, info = DAY_MASTER_TEXT[dm];
-  const s1 = `${dm}${de}日主，《滴天髓》論${dm}${de}說「${info.verse}」，性格如${info.image}：${info.nature}。`;
-  const s2 = `需要留意的是，${info.blind}。`;
+  const { a, dm } = c, info = DAY_MASTER_TEXT[dm];
+  const s1 = tr("{dm}日主，《滴天髓》論{dm}說「{verse}」，性格如{image}：{nature}。", { dm: se(dm), verse: tr(info.verse), image: tr(info.image), nature: tr(info.nature) });
+  const s2 = tr("需要留意的是，{blind}。", { blind: tr(info.blind) });
   const ranked = Object.entries(c.counts).sort((x, y) => y[1].weight - x[1].weight || y[1].visible.length - x[1].visible.length);
   const [god, cnt] = ranked[0], t = TEN_GOD_TEXT[god];
-  const where = [cnt.visible.length ? `${rolesWord(cnt.visible, "干")}透出` : "", cnt.hidden.length ? `${rolesWord(cnt.hidden, "支")}${cnt.visible.length ? "也有" : "藏有"}` : ""].filter(Boolean).join("，");
+  const where = join([cnt.visible.length ? tr("{where}透出", { where: rolesWord(cnt.visible, "干") }) : "", cnt.hidden.length ? tr(cnt.visible.length ? "{where}也有" : "{where}藏有", { where: rolesWord(cnt.hidden, "支") }) : ""].filter(Boolean), "，");
   const combo = godCombo(c);
-  const s3 = `十神之中${god}最重（${where}），${t.trait}；${combo || (cnt.weight >= 2 ? `但${god}太重時${t.heavy}` : `盲點是${t.blind}`)}。`;
+  const more = combo || (cnt.weight >= 2 ? tr("但{god}太重時{heavy}", { god: trw(god), heavy: tr(t.heavy) }) : tr("盲點是{blind}", { blind: tr(t.blind) }));
+  const s3 = tr("十神之中{god}最重（{where}），{trait}；{more}。", { god: trw(god), where, trait: tr(t.trait), more });
   const db = c.P.day.branch, dg = db.god;
-  const s4 = `${a.pattern}的人${PATTERN_TEXT[a.pattern] ? PATTERN_TEXT[a.pattern].nature : "各有所長"}；日坐${db.name}${db.element}${dg}，${TEN_GOD_TEXT[dg].seat}。`;
+  const s4 = tr("{pattern}的人{nature}；日坐{db}{god}，{seat}。", { pattern: patName(a.pattern), nature: PATTERN_TEXT[a.pattern] ? tr(PATTERN_TEXT[a.pattern].nature) : tr("各有所長"), db: be(db.name, db.element), god: trw(dg), seat: tr(TEN_GOD_TEXT[dg].seat) });
   const picked = [];
   for (const [star, text] of CHAR_STARS) {
     if (picked.length >= 3) break;
     const w = starWhere(c, star);
     if (w && !picked.some(x => x.text === text)) picked.push({ star, text, where: w });
   }
-  const s5 = picked.length ? `神煞方面，${picked.map((x, i) => `${i && picked[i - 1].where === x.where ? "又見" : `${x.where}見`}${x.star}，${x.text}`).join("；")}。` : "";
-  return section("character", [s1 + s2, s3 + s4 + s5]);
+  const s5 = picked.length ? tr("神煞方面，{list}。", { list: join(picked.map((x, i) => (i && picked[i - 1].where === x.where ? tr("又見{star}，{text}", { star: trw(x.star), text: tr(x.text) }) : tr("{where}見{star}，{text}", { where: x.where, star: trw(x.star), text: tr(x.text) }))), "；") }) : "";
+  return section("character", [para(s1, s2), para(s3, s4, s5)]);
 }
 
 // ---------- 6 六親 ----------
@@ -1047,70 +1238,77 @@ function familySection(c) {
   const MEAN_GOOD = { year: "祖上與早年環境有庇蔭", month: "父母與成長環境是助力", day: "配偶能給你助力", hour: "子女與晚年較有福" };
   const MEAN_BAD = { year: "祖上庇蔭有限，早年多靠自己", month: "成長環境的壓力較大", day: "婚姻需要多花心力經營", hour: "子女與晚年的事要多費心" };
   for (const p of c.pillars) {
-    const w = favorWord(pillarFavor(c, p)), name = p.role === "day" ? `日支${p.branch.name}` : `${p.label}${p.name}`;
+    const w = favorWord(pillarFavor(c, p)), name = p.role === "day" ? tr("日支{b}", { b: trw(p.branch.name) }) : glue(trw(p.label), pillarWord(p.name));
     if (w === "喜") good.push({ p, name }); else if (w === "忌") bad.push({ p, name });
   }
-  const meaning = [...good.map(x => MEAN_GOOD[x.p.role]), ...bad.map(x => MEAN_BAD[x.p.role])].join("，") || "六親助力平均，各有往來";
-  const lean = [good.length ? `${good.map(x => x.name).join("、")}落在喜用` : "", bad.length ? `${bad.map(x => x.name).join("、")}偏忌` : ""].filter(Boolean).join("，");
-  const s1 = `以${dm}${de}日主來看，${lean || "四柱的喜忌大致平均"}：${meaning}。`;
-  const s2 = `以十神論六親，${dm}${de}的母親星是${c.ge.印}（正印）、父親星是${c.ge.財}（偏財）、兄弟姊妹是${de}（比劫），`
-    + `${c.male ? `妻星是${c.ge.財}（財星）、子女星是${c.ge.官殺}（官殺）` : `夫星是${c.ge.官殺}（官殺）、子女星是${c.ge.食傷}（食傷）`}。`;
+  const meaning = join([...good.map(x => tr(MEAN_GOOD[x.p.role])), ...bad.map(x => tr(MEAN_BAD[x.p.role]))], "，") || tr("六親助力平均，各有往來");
+  const lean = join([good.length ? tr("{list}落在喜用", { list: join(good.map(x => x.name), "、") }) : "", bad.length ? tr("{list}偏忌", { list: join(bad.map(x => x.name), "、") }) : ""].filter(Boolean), "，");
+  const s1 = tr("以{dm}日主來看，{lean}：{meaning}。", { dm: se(dm), lean: lean || tr("四柱的喜忌大致平均"), meaning });
+  const kin = { dm: se(dm), yin: trw(c.ge.印), cai: trw(c.ge.財), de: trw(de), gs: trw(c.ge.官殺), ss: trw(c.ge.食傷) };
+  const s2 = tr(c.male ? "以十神論六親，{dm}的母親星是{yin}（正印）、父親星是{cai}（偏財）、兄弟姊妹是{de}（比劫），妻星是{cai}（財星）、子女星是{gs}（官殺）。"
+    : "以十神論六親，{dm}的母親星是{yin}（正印）、父親星是{cai}（偏財）、兄弟姊妹是{de}（比劫），夫星是{gs}（官殺）、子女星是{ss}（食傷）。", kin);
 
   // 父母：正印為母、偏財為父（男女同論）
   const motherGod = hasGod(c, "正印") ? "正印" : hasGod(c, "偏印") ? "偏印" : null;
   const fatherGod = hasGod(c, "偏財") ? "偏財" : hasGod(c, "正財") ? "正財" : null;
   const kinWhere = god => {
     const g = c.gods[god], roots = g.hidden.filter(x => x.type !== "餘氣");
-    if (g.visible.length) return `透出${rolesWord(g.visible.map(x => x.role), "干")}${roots.length ? "，地支也有根" : ""}`;
-    return `只藏在${uniq(g.hidden.map(x => `${ROLE_ZH[x.role]}支${x.branch}`)).join("、")}中`;
+    if (g.visible.length) return tr(roots.length ? "透出{where}，地支也有根" : "透出{where}", { where: rolesWord(g.visible.map(x => x.role), "干") });
+    return tr("只藏在{list}中", { list: join(uniq(g.hidden.map(x => rb(x.role, x.branch))), "、") });
   };
   let mother, father;
   if (motherGod) {
     const role = c.roles[c.ge.印];
-    mother = `母親星${motherGod === "偏印" ? "以偏印代" : "正印"}（${c.ge.印}）${kinWhere(motherGod)}，${visGod(c, motherGod) ? "母親的照顧與影響明顯" : "母親的影響較含蓄"}`
-      + (roleIsGood(role) ? "；印星是喜用，母親的支持對你幫助很大。" : roleIsBad(role) ? `；但印星屬${role}，母親的關愛有時會變成壓力或過度保護，彼此保留空間更好。` : "。");
-  } else mother = `命中不見印星（${c.ge.印}），傳統上解讀為較早學會靠自己；和母親實際的關係，還是看彼此怎麼相處。`;
+    const tail = roleIsGood(role) ? tr("；印星是喜用，母親的支持對你幫助很大。") : roleIsBad(role) ? tr("；但印星屬{role}，母親的關愛有時會變成壓力或過度保護，彼此保留空間更好。", { role: trw(role) }) : stop("");
+    mother = tr(motherGod === "偏印" ? "母親星以偏印代（{e}）{where}，{effect}{tail}" : "母親星正印（{e}）{where}，{effect}{tail}", { e: trw(c.ge.印), where: kinWhere(motherGod), effect: tr(visGod(c, motherGod) ? "母親的照顧與影響明顯" : "母親的影響較含蓄"), tail });
+  } else mother = tr("命中不見印星（{e}），傳統上解讀為較早學會靠自己；和母親實際的關係，還是看彼此怎麼相處。", { e: trw(c.ge.印) });
   if (fatherGod) {
     const role = c.roles[c.ge.財];
-    father = `父親星${fatherGod === "正財" ? "以正財代" : "偏財"}（${c.ge.財}）${kinWhere(fatherGod)}，${visGod(c, fatherGod) ? "父親在你成長中的角色鮮明" : "父親的角色較含蓄"}`
-      + (c.share[c.ge.比劫] >= 0.3 && !visGod(c, fatherGod) ? "，比劫又重，傳統上說父親較辛勞" : "")
-      + (roleIsGood(role) ? "；財星是喜用，父親對你仍有實質的支持。" : roleIsBad(role) ? `；財星屬${role}，和父親在觀念與金錢上宜多溝通。` : "。");
-  } else father = `命中不見財星（${c.ge.財}），從十神只看得出父親這顆星不顯；和父親實際的關係，還是看彼此怎麼相處。`;
+    const extra = c.share[c.ge.比劫] >= 0.3 && !visGod(c, fatherGod) ? tr("，比劫又重，傳統上說父親較辛勞") : "";
+    const tail = roleIsGood(role) ? tr("；財星是喜用，父親對你仍有實質的支持。") : roleIsBad(role) ? tr("；財星屬{role}，和父親在觀念與金錢上宜多溝通。", { role: trw(role) }) : stop("");
+    father = tr(fatherGod === "正財" ? "父親星以正財代（{e}）{where}，{effect}{extra}{tail}" : "父親星偏財（{e}）{where}，{effect}{extra}{tail}", { e: trw(c.ge.財), where: kinWhere(fatherGod), effect: tr(visGod(c, fatherGod) ? "父親在你成長中的角色鮮明" : "父親的角色較含蓄"), extra, tail });
+  } else father = tr("命中不見財星（{e}），從十神只看得出父親這顆星不顯；和父親實際的關係，還是看彼此怎麼相處。", { e: trw(c.ge.財) });
 
   // 兄弟：比劫與月柱
   const bjVis = visibleOf(c, "比劫"), bjHid = hiddenOf(c, "比劫"), bjRole = c.roles[de];
   const bjMain = bjHid.filter(x => x.type === "本氣");
-  const siblings = `${bjVis.length ? `比劫透出${stemsWords(bjVis)}，兄弟姊妹或朋友在你生命中份量不輕`
-    : bjMain.length ? `比劫藏在${uniq(bjMain.map(x => x.branch)).join("、")}的本氣，手足緣分不淺，只是各有各的發展`
-      : bjHid.length ? `比劫只藏在${uniq(bjHid.map(x => x.branch)).join("、")}中，兄弟姊妹各自獨立，助力有限` : "命中不見比劫，凡事多靠自己，和手足各忙各的"}`
-    + `${roleIsGood(bjRole) ? "；比劫是喜用，手足與朋友是助力，合作共事有好處。" : roleIsBad(bjRole) ? `；比劫屬${bjRole}，和手足、朋友合夥或有金錢往來時，要先把話講清楚。` : "。"}`;
+  const siblings = (bjVis.length ? tr("比劫透出{where}，兄弟姊妹或朋友在你生命中份量不輕", { where: stemsWords(bjVis) })
+    : bjMain.length ? tr("比劫藏在{list}的本氣，手足緣分不淺，只是各有各的發展", { list: J(uniq(bjMain.map(x => x.branch))) })
+      : bjHid.length ? tr("比劫只藏在{list}中，兄弟姊妹各自獨立，助力有限", { list: J(uniq(bjHid.map(x => x.branch))) }) : tr("命中不見比劫，凡事多靠自己，和手足各忙各的"))
+    + (roleIsGood(bjRole) ? tr("；比劫是喜用，手足與朋友是助力，合作共事有好處。") : roleIsBad(bjRole) ? tr("；比劫屬{role}，和手足、朋友合夥或有金錢往來時，要先把話講清楚。", { role: trw(bjRole) }) : stop(""));
 
   // 配偶：日支與配偶星（婚姻感情一節再細看）
   const star = c.male ? "財" : "官殺", starEl = c.ge[star], starRole = c.roles[starEl];
   const starGods = GROUP_GODS[star].filter(g => hasGod(c, g));
-  const spouse = `配偶宮日支${P.day.branch.name}坐${P.day.branch.god}，${SPOUSE_BY_GOD[P.day.branch.god]}；`
-    + (starGods.length ? `${c.male ? "妻星" : "夫星"}${starGods.join("、")}（${starEl}）${roleIsGood(starRole) ? "是喜用，另一半能帶給你實質的幫助" : roleIsBad(starRole) ? "偏忌，兩人需要在相處中多磨合" : "平穩，相處貴在互相體諒"}。`
-      : `${c.male ? "妻星" : "夫星"}（${starEl}）在命中不顯，緣分可能來得較晚，或需要自己主動經營。`);
+  const sv = { gods: J(starGods), e: trw(starEl), how: tr(roleIsGood(starRole) ? "是喜用，另一半能帶給你實質的幫助" : roleIsBad(starRole) ? "偏忌，兩人需要在相處中多磨合" : "平穩，相處貴在互相體諒") };
+  const spouse = tr("配偶宮日支{b}坐{god}，{desc}；", { b: trw(P.day.branch.name), god: trw(P.day.branch.god), desc: tr(SPOUSE_BY_GOD[P.day.branch.god]) })
+    + (starGods.length ? tr(c.male ? "妻星{gods}（{e}）{how}。" : "夫星{gods}（{e}）{how}。", sv)
+      : tr(c.male ? "妻星（{e}）在命中不顯，緣分可能來得較晚，或需要自己主動經營。" : "夫星（{e}）在命中不顯，緣分可能來得較晚，或需要自己主動經營。", sv));
 
   // 子女：時柱；男命官殺、女命食傷
   const kid = c.male ? "官殺" : "食傷", kidEl = c.ge[kid], kidGods = GROUP_GODS[kid].filter(g => hasGod(c, g)), kidRole = c.roles[kidEl];
-  const kidStar = `${c.male ? "男命以官殺" : "女命以食傷"}為子女星，${kidGods.length ? `${kidGods.join("、")}（${kidEl}）${kidGods.some(g => visGod(c, g)) ? "透出天干，與子女的緣分明朗" : "藏而不透，與子女的緣分需要時間經營"}` : `${kidEl}在命中不顯，傳統上說子女緣可能來得較晚（要不要生、何時生，仍是自己的選擇）`}${roleIsGood(kidRole) ? "，子女星是喜用，日後子女是你的助力" : ""}`;
+  const kv = { gods: J(kidGods), e: trw(kidEl) };
+  const kidStar = tr(c.male ? "男命以官殺為子女星，{what}{help}" : "女命以食傷為子女星，{what}{help}", {
+    what: kidGods.length ? tr(kidGods.some(g => visGod(c, g)) ? "{gods}（{e}）透出天干，與子女的緣分明朗" : "{gods}（{e}）藏而不透，與子女的緣分需要時間經營", kv)
+      : tr("{e}在命中不顯，傳統上說子女緣可能來得較晚（要不要生、何時生，仍是自己的選擇）", kv),
+    help: roleIsGood(kidRole) ? tr("，子女星是喜用，日後子女是你的助力") : "",
+  });
   let children;
   if (P.hour) {
     const hs = c.roles[P.hour.stem.element], hb = c.roles[P.hour.branch.element];
     const flow = roleIsBad(hs) && roleIsGood(hb) ? "先難後易，晚年漸入佳境" : roleIsGood(hs) && roleIsBad(hb) ? "先易後難，晚年宜早作安排"
       : roleIsGood(hs) && roleIsGood(hb) ? "晚年較有福氣" : roleIsBad(hs) && roleIsBad(hb) ? "養育子女要多花心力，晚年宜自己預作安排" : "晚年平穩";
-    children = `${kidStar}；時柱${P.hour.name}（時干屬${hs}、時支屬${hb}），${flow}。`;
-  } else children = `時辰不詳，子女宮無法細看，只從子女星論：${kidStar}。`;
+    children = tr("{kid}；時柱{p}（時干屬{hs}、時支屬{hb}），{flow}。", { kid: kidStar, p: pillarWord(P.hour.name), hs: trw(hs), hb: trw(hb), flow: tr(flow) });
+  } else children = tr("時辰不詳，子女宮無法細看，只從子女星論：{kid}。", { kid: kidStar });
 
   const items = [
-    { label: "父母", text: mother + father }, { label: "兄弟姊妹", text: siblings },
-    { label: "配偶", text: spouse }, { label: "子女", text: children },
+    { label: tr("父母"), text: para(mother, father) }, { label: tr("兄弟姊妹"), text: siblings },
+    { label: tr("配偶"), text: spouse }, { label: tr("子女"), text: children },
   ];
   // 十神看六親只是傾向: said in this section itself, for readers who were adopted, lost a parent, grew up in a blended
   // family or chose not to have children, with a pointer to the 合盤 that reads a real family member.
-  const s3 = "十神論六親只看得出傾向，不能代替真實的家庭經驗：被收養、在重組家庭長大、選擇不生，或親人已不在身邊的人，請以自己的實際情況為準；想看和某位家人合不合，填入他的生日做合盤會更準。";
-  return section("family", [s1 + s2 + s3], items);
+  const s3 = tr("十神論六親只看得出傾向，不能代替真實的家庭經驗：被收養、在重組家庭長大、選擇不生，或親人已不在身邊的人，請以自己的實際情況為準；想看和某位家人合不合，填入他的生日做合盤會更準。");
+  return section("family", [para(s1, s2, s3)], items);
 }
 
 // ---------- 7 事業 ----------
@@ -1127,12 +1325,13 @@ const CAREER_STARS = [
   ["魁罡", "有領導氣魄，適合決策、執法或管理"], ["天乙貴人", "職場上容易遇到提攜的貴人"], ["學堂", "學習力強，適合持續進修的專業"],
 ];
 function careerSection(c) {
-  const { a, dm, de } = c, pt = PATTERN_TEXT[a.pattern];
-  const s1 = pt ? `${dm}${de}${a.pattern}的人${pt.nature}，傳統上適合${pt.careers.join("、")}等工作。`
-    : `${dm}${de}日主以${a.pattern}論，選擇工作時宜順著用神的五行與自己的專長。`;
+  const { a, dm } = c, pt = PATTERN_TEXT[a.pattern];
+  const v = { dm: se(dm), pattern: patName(a.pattern) };
+  const s1 = pt ? tr("{dm}{pattern}的人{nature}，傳統上適合{careers}等工作。", { ...v, nature: tr(pt.nature), careers: J(pt.careers) })
+    : tr("{dm}日主以{pattern}論，選擇工作時宜順著用神的五行與自己的專長。", v);
   const drivers = ["官殺", "食傷", "財", "印", "比劫"].filter(g => visibleOf(c, g).length).sort((x, y) => c.share[c.ge[y]] - c.share[c.ge[x]]).slice(0, 2);
-  const shownAs = g => { const v = visibleOf(c, g); return `${GROUP_WORD[g]}${uniq(v.map(x => `${x.stem}${STEM_EL[x.stem]}`)).join("、")}透出${rolesWord(v.map(x => x.role), "干")}`; };
-  const s2 = drivers.length ? `${drivers.map(g => `${shownAs(g)}，${DRIVER[g]}`).join("；")}。` : "命中十神多藏而不透，做事低調務實，實力要靠時間慢慢被看見。";
+  const shownAs = g => { const list = visibleOf(c, g); return tr("{g}{stems}透出{where}，{driver}", { g: trw(GROUP_WORD[g]), stems: join(uniq(list.map(x => se(x.stem))), "、"), where: rolesWord(list.map(x => x.role), "干"), driver: tr(DRIVER[g]) }); };
+  const s2 = drivers.length ? stop(cap(join(drivers.map(shownAs), "；"))) : tr("命中十神多藏而不透，做事低調務實，實力要靠時間慢慢被看見。");
   // 受雇或自營
   let own = 0, job = 0;
   if (isStrong(c)) own++; else if (isWeak(c)) job++;
@@ -1144,14 +1343,14 @@ function careerSection(c) {
   if (visibleOf(c, "印").length) job++;
   if (["正官格", "正財格", "正印格", "偏印格"].includes(a.pattern)) job++;
   if (c.share[c.ge.財] >= HEAVY && isWeak(c)) job++;
-  const way = own >= job + 2 ? "具備自己開創的條件，適合創業、自營，或在組織裡擔任開疆闢土的角色"
+  const way = tr(own >= job + 2 ? "具備自己開創的條件，適合創業、自營，或在組織裡擔任開疆闢土的角色"
     : job >= own + 2 ? "較適合在穩定的組織裡發揮專業、按部就班升遷；若想創業，宜先累積資源與人脈"
-      : "受雇與自營都可行：前期在組織裡累積實力，等資源與時機成熟再考慮自立";
+      : "受雇與自營都可行：前期在組織裡累積實力，等資源與時機成熟再考慮自立");
   const stars = CAREER_STARS.map(([star, text]) => [star, text, starWhere(c, star)]).filter(x => x[2]).slice(0, 2);
-  const s3 = `整體而言，${way}${stars.length ? `；${stars.map(([star, text, w]) => `${w}見${star}，${text}`).join("，")}` : ""}。`;
-  const items = a.useful.slice(0, 3).map((e, i) => ({ label: `${i ? "喜神" : "用神"}・${e}`, text: `${ELEMENT_INDUSTRIES[e].join("、")}。` }));
-  if (!items.length) items.push({ label: "五行行業", text: "命局喜忌不明顯，選擇行業時可以興趣與專長為主。" });
-  return section("career", [s1 + s2 + s3], items);
+  const s3 = stars.length ? tr("整體而言，{way}；{stars}。", { way, stars: join(stars.map(([star, text, w]) => tr("{where}見{star}，{text}", { where: w, star: trw(star), text: tr(text) })), "，") }) : tr("整體而言，{way}。", { way });
+  const items = a.useful.slice(0, 3).map((e, i) => ({ label: tr(i ? "喜神・{e}" : "用神・{e}", { e: trw(e) }), text: stop(J(ELEMENT_INDUSTRIES[e])) }));
+  if (!items.length) items.push({ label: tr("五行行業"), text: tr("命局喜忌不明顯，選擇行業時可以興趣與專長為主。") });
+  return section("career", [para(s1, s2, s3)], items);
 }
 
 // ---------- 8 財運 ----------
@@ -1160,38 +1359,39 @@ function wealthSection(c) {
   const g = god => c.gods[god] || { visible: [], hidden: [] };
   const desc = god => {
     const { visible: v, hidden: h } = g(god);
-    if (v.length) return `${god}${uniq(v.map(x => `${x.stem}${STEM_EL[x.stem]}`)).join("、")}透出${rolesWord(v.map(x => x.role), "干")}`;
-    return h.length ? `${god}${uniq(h.map(x => `${x.stem}${STEM_EL[x.stem]}`)).join("、")}藏在${uniq(h.map(x => `${ROLE_ZH[x.role]}支${x.branch}`)).join("、")}中` : "";
+    if (v.length) return tr("{god}{stems}透出{where}", { god: trw(god), stems: join(uniq(v.map(x => se(x.stem))), "、"), where: rolesWord(v.map(x => x.role), "干") });
+    return h.length ? tr("{god}{stems}藏在{list}中", { god: trw(god), stems: join(uniq(h.map(x => se(x.stem))), "、"), list: join(uniq(h.map(x => rb(x.role, x.branch))), "、") }) : "";
   };
   const both = [desc("正財"), desc("偏財")].filter(Boolean);
   const pr = presence(c, ce);
-  const power = pr.vis.length && pr.hid.length ? "財星有根有苗" : pr.vis.length ? "財星透而無根，來得快也去得快" : pr.hid.length ? "財星藏而不透，屬於暗財，宜穩紮穩打" : "財星不顯";
-  const s1 = `${dm}${de}以${ce}為財星：${both.length ? `${both.join("，")}，在${c.mb}月處「${c.states[ce]}」，${power}` : `命中不見${ce}，${power}，財富多靠專業與機運引出`}。`;
+  const power = tr(pr.vis.length && pr.hid.length ? "財星有根有苗" : pr.vis.length ? "財星透而無根，來得快也去得快" : pr.hid.length ? "財星藏而不透，屬於暗財，宜穩紮穩打" : "財星不顯");
+  const v = { dm: se(dm), e: trw(ce), both: join(both, "，"), mb: trw(c.mb), st: trw(c.states[ce]), power };
+  const s1 = both.length ? tr("{dm}以{e}為財星：{both}，在{mb}月處「{st}」，{power}。", v) : tr("{dm}以{e}為財星：命中不見{e}，{power}，財富多靠專業與機運引出。", v);
   const strongEnough = isStrong(c) || a.strength === "中和";
-  const s2 = a.strength === "從弱" ? (a.useful.includes(ce) ? "從格順勢，財星為用時反而能借勢得財。" : "從格順勢，財富宜跟著大環境走，不宜逆勢硬拚。")
+  const s2 = tr(a.strength === "從弱" ? (a.useful.includes(ce) ? "從格順勢，財星為用時反而能借勢得財。" : "從格順勢，財富宜跟著大環境走，不宜逆勢硬拚。")
     : congqiang(a) ? "從強之局忌財星壞印，不宜強求財，靠學識、專業與名聲帶財較順。"
     : a.strength === "專旺" ? "專旺之局不宜強求財，靠專業與名聲帶財較順。"
-      : strongEnough && c.share[ce] >= 0.2 ? `日主${a.strength === "中和" ? "強弱適中" : "身強"}，擔得起財，屬於「身財兩停」，財富靠能力穩步累積。`
+      : strongEnough && c.share[ce] >= 0.2 ? (a.strength === "中和" ? "日主強弱適中，擔得起財，屬於「身財兩停」，財富靠能力穩步累積。" : "日主身強，擔得起財，屬於「身財兩停」，財富靠能力穩步累積。")
         : strongEnough ? "日主有力而財星偏弱，有能力卻要自己開創財源，越主動越有收穫。"
           : c.share[ce] >= 0.3 ? "財多身弱，機會多但壓力也大，宜量力而為，借重團隊或專業。"
-            : "身弱財也不旺，宜以專業技能換取穩定收入，不宜冒進。";
+            : "身弱財也不旺，宜以專業技能換取穩定收入，不宜冒進。");
   const zw = (c.counts.正財 || {}).weight || 0, pw = (c.counts.偏財 || {}).weight || 0;
   const zv = g("正財").visible.length, pv = g("偏財").visible.length;
-  const kind = zv && pv ? "正偏財並透，收入來源多元，也要避免分散"
+  const kind = tr(zv && pv ? "正偏財並透，收入來源多元，也要避免分散"
     : zw > pw ? "正財重於偏財，宜靠薪資、本業與長期投資累積" : pw > zw ? "偏財重於正財，生意、投資與業外收入的機會多，也要設好停損"
-      : zw ? "正偏財份量相當，收入有固定的一份，也有機會財" : "正偏財不顯，財源以穩定工作為主";
+      : zw ? "正偏財份量相當，收入有固定的一份，也有機會財" : "正偏財不顯，財源以穩定工作為主");
   const tomb = TOMB[ce], tombAt = c.pillars.filter(p => p.branch.name === tomb);
   const tombClash = tombAt.length && c.relations.some(r => r.kind === "六沖" && r.roles.some(role => c.P[role].branch.name === tomb));
-  const ku = tombAt.length ? `命帶財庫（${rolesWord(tombAt.map(p => p.role), "支")}${tomb}），有存錢、置產的本能${tombClash ? (c.a.strength === "身強" ? "；財庫逢沖，身強沖開財庫，反而有大筆進帳的機會" : "；財庫逢沖，容易財來財去，宜把錢放在不易動用的地方") : ""}`
-    : `${ce}的財庫在${tomb}，命中沒有，存錢要靠紀律而不是本能`;
-  const s3 = `${kind}；${ku}。`;
+  const ku = tombAt.length ? tr("命帶財庫（{where}{tomb}），有存錢、置產的本能{clash}", { where: rolesWord(tombAt.map(p => p.role), "支"), tomb: trw(tomb), clash: tombClash ? tr(c.a.strength === "身強" ? "；財庫逢沖，身強沖開財庫，反而有大筆進帳的機會" : "；財庫逢沖，容易財來財去，宜把錢放在不易動用的地方") : "" })
+    : tr("{e}的財庫在{tomb}，命中沒有，存錢要靠紀律而不是本能", { e: trw(ce), tomb: trw(tomb) });
+  const s3 = stop(cap(join([kind, ku], "；")));
   const bjVis = visibleOf(c, "比劫").length > 0, bjRole = c.roles[de];
-  const keep = bjVis && roleIsBad(bjRole) && (hasGod(c, "正財") || hasGod(c, "偏財")) ? "比劫透出又屬忌，合夥、借貸與作保要格外謹慎，財務最好和朋友分開"
+  const keep = tr(bjVis && roleIsBad(bjRole) && (hasGod(c, "正財") || hasGod(c, "偏財")) ? "比劫透出又屬忌，合夥、借貸與作保要格外謹慎，財務最好和朋友分開"
     : bjVis && roleIsGood(bjRole) ? "比劫為喜，和朋友、夥伴合作反而能共同生財"
       : c.share[ce] >= 0.3 && isWeak(c) ? "守財的關鍵是量入為出，以穩健的工具累積"
         : visibleOf(c, "食傷").length && strongEnough ? "最適合把技術、口碑與作品變成收入"
-          : zw >= pw ? "最適合自動轉存、定期定額這類「先存再花」的做法，讓收入慢慢累積成資產" : "投資宜設停損、獲利落袋為安，別讓偏財來得快也去得快";
-  return section("wealth", [s1 + s2, `${s3}${keep}。`]);
+          : zw >= pw ? "最適合自動轉存、定期定額這類「先存再花」的做法，讓收入慢慢累積成資產" : "投資宜設停損、獲利落袋為安，別讓偏財來得快也去得快");
+  return section("wealth", [para(s1, s2), para(s3, stop(cap(keep)))]);
 }
 
 // ---------- 9 婚姻感情 ----------
@@ -1210,68 +1410,73 @@ const PARTNER = {
   正財: "務實顧家", 偏財: "大方開朗", 正官: "穩重負責", 七殺: "能幹而懂得退讓", 正印: "包容體貼", 偏印: "尊重你的獨立與想法",
 };
 function marriageSection(c) {
-  const { a, P, dm, de } = c, db = P.day.branch;
-  const s1 = `日支${db.name}是配偶宮，坐${db.god}、星運「${P.day.terrain}」：${SPOUSE_BY_GOD[db.god]}；${TERRAIN_TEXT[P.day.terrain].spouse}。`;
+  const { a, P, dm } = c, db = P.day.branch;
+  const s1 = tr("日支{b}是配偶宮，坐{god}、星運「{terrain}」：{spouse}；{tspouse}。", { b: trw(db.name), god: trw(db.god), terrain: trw(P.day.terrain), spouse: tr(SPOUSE_BY_GOD[db.god]), tspouse: tr(TERRAIN_TEXT[P.day.terrain].spouse) });
   // 配偶星
   const star = c.male ? "財" : "官殺", el = c.ge[star], word = c.male ? "妻星" : "夫星";
   const vis = visibleOf(c, star), hid = hiddenOf(c, star), role = c.roles[el];
-  let s2 = `${c.male ? "男命" : "女命"}的配偶星是${GROUP_WORD[star]}，${dm}${de}的${word}是${el}：`;
-  if (vis.length) s2 += `${stemsWords(vis)}透出${hid.length ? "、地支有根" : "但地支無根"}，${word}${hid.length ? "明朗有力" : "明顯而力量偏浮"}`;
-  else if (hid.length) s2 += `藏在${uniq(hid.map(x => `${ROLE_ZH[x.role]}支${x.branch}`)).join("、")}中、不透天干，感情較含蓄，緣分需要時間醞釀`;
-  else s2 += "命中不見，緣分可能來得較晚，需要自己多主動";
+  const v = { g: trw(GROUP_WORD[star]), dm: se(dm), e: trw(el), word: trw(word), where: vis.length ? stemsWords(vis) : "", list: join(uniq(hid.map(x => rb(x.role, x.branch))), "、") };
+  let s2 = tr(c.male ? "男命的配偶星是{g}，{dm}的妻星是{e}：" : "女命的配偶星是{g}，{dm}的夫星是{e}：", v);
+  if (vis.length) s2 += tr(hid.length ? "{where}透出、地支有根，{word}明朗有力" : "{where}透出但地支無根，{word}明顯而力量偏浮", v);
+  else if (hid.length) s2 += tr("藏在{list}中、不透天干，感情較含蓄，緣分需要時間醞釀", v);
+  else s2 += tr("命中不見，緣分可能來得較晚，需要自己多主動");
   const issues = [];
-  if (c.male && visGod(c, "正財") && visGod(c, "偏財")) issues.push("正偏財並透，異性緣佳，感情上要專一");
-  if (c.male && visibleOf(c, "比劫").length && (vis.length || hid.length) && roleIsBad(c.roles[de])) issues.push("比劫透出爭財，感情裡要防朋友或第三者介入");
-  if (!c.male && visGod(c, "正官") && visGod(c, "七殺")) issues.push("官殺並透，追求者多，宜慎選、不急著定下來");
-  if (!c.male && visGod(c, "傷官") && hasGod(c, "正官")) issues.push("傷官見官，對另一半要求高，相處時宜多欣賞、少挑剔");
+  if (c.male && visGod(c, "正財") && visGod(c, "偏財")) issues.push(tr("正偏財並透，異性緣佳，感情上要專一"));
+  if (c.male && visibleOf(c, "比劫").length && (vis.length || hid.length) && roleIsBad(c.roles[c.de])) issues.push(tr("比劫透出爭財，感情裡要防朋友或第三者介入"));
+  if (!c.male && visGod(c, "正官") && visGod(c, "七殺")) issues.push(tr("官殺並透，追求者多，宜慎選、不急著定下來"));
+  if (!c.male && visGod(c, "傷官") && hasGod(c, "正官")) issues.push(tr("傷官見官，對另一半要求高，相處時宜多欣賞、少挑剔"));
   // A 從格 follows the heavy star, so only a 身弱 chart is weighed down by it.
-  if (c.share[el] >= HEAVY && c.a.strength === "身弱") issues.push(`${word}太重而日主弱，容易在感情中委屈自己，宜保持自我`);
-  s2 += issues.length ? `；${issues.join("；")}。` : "。";
+  if (c.share[el] >= HEAVY && c.a.strength === "身弱") issues.push(tr("{word}太重而日主弱，容易在感情中委屈自己，宜保持自我", v));
+  s2 += issues.length ? stop(`${en() ? "; " : "；"}${join(issues, "；")}`) : stop("");
   // 日支與其他柱的關係
   // The day branch's relations, one clause per kind (a 三刑 replaces its pairs).
   const own = c.relations.filter(r => r.part === "branch" && r.roles.includes("day"));
   const tri = own.some(r => r.kind === "三刑");
   const withWhom = kind => uniq(own.filter(r => r.kind === kind).flatMap(r => r.roles.filter(x => x !== "day"))).sort((x, y) => ORDER.indexOf(x) - ORDER.indexOf(y));
-  const others = kind => withWhom(kind).map(x => `${ROLE_ZH[x]}支${P[x].branch.name}`).join("、");
+  const others = kind => join(withWhom(kind).map(x => rb(x, P[x].branch.name)), "、");
   const REL_LOVE = {
-    六合: () => `日支與${others("六合")}六合，夫妻感情有黏著力${withWhom("六合").includes("hour") ? "，也重視家庭與孩子" : ""}`,
-    半合: () => `日支與${others("半合")}半合，兩人容易有共同目標`,
-    拱合: () => `日支與${others("拱合")}拱合，感情裡暗中有互相成全的力量`,
-    三合: () => "日支參與三合局，夫妻之間凝聚力強",
-    三會: () => "日支參與三會局，家庭觀念重",
-    六沖: () => `日支與${others("六沖")}相沖，感情與居住較多變動，宜多溝通、給彼此空間`,
-    相刑: () => (tri ? "" : `日支與${others("相刑")}相刑，相處中容易有摩擦，宜多包容`),
-    自刑: () => "日支自刑，感情裡容易自尋煩惱，想法說出來就好",
-    三刑: () => "日支捲入三刑，相處中容易有摩擦，要特別多些耐心",
-    六害: () => `日支與${others("六害")}相害，要防誤會累積`,
-    相破: () => `日支與${others("相破")}相破，${withWhom("相破").includes("year") ? "和長輩之間要多體諒" : withWhom("相破").includes("month") ? "和原生家庭之間要多協調" : "小事要及時溝通"}`,
+    六合: () => tr("日支與{others}六合，夫妻感情有黏著力{kids}", { others: others("六合"), kids: withWhom("六合").includes("hour") ? tr("，也重視家庭與孩子") : "" }),
+    半合: () => tr("日支與{others}半合，兩人容易有共同目標", { others: others("半合") }),
+    拱合: () => tr("日支與{others}拱合，感情裡暗中有互相成全的力量", { others: others("拱合") }),
+    三合: () => tr("日支參與三合局，夫妻之間凝聚力強"),
+    三會: () => tr("日支參與三會局，家庭觀念重"),
+    六沖: () => tr("日支與{others}相沖，感情與居住較多變動，宜多溝通、給彼此空間", { others: others("六沖") }),
+    相刑: () => (tri ? "" : tr("日支與{others}相刑，相處中容易有摩擦，宜多包容", { others: others("相刑") })),
+    自刑: () => tr("日支自刑，感情裡容易自尋煩惱，想法說出來就好"),
+    三刑: () => tr("日支捲入三刑，相處中容易有摩擦，要特別多些耐心"),
+    六害: () => tr("日支與{others}相害，要防誤會累積", { others: others("六害") }),
+    相破: () => tr("日支與{others}相破，{what}", { others: others("相破"), what: tr(withWhom("相破").includes("year") ? "和長輩之間要多體諒" : withWhom("相破").includes("month") ? "和原生家庭之間要多協調" : "小事要及時溝通") }),
   };
   const rel = uniq(own.map(r => r.kind)).map(k => (REL_LOVE[k] || (() => ""))()).filter(Boolean);
   // The palace (日支) and the star can disagree: the person helps while the marriage itself needs work, or the reverse.
   const palace = c.roles[db.element], pGood = roleIsGood(palace), pBad = roleIsBad(palace), sGood = roleIsGood(role), sBad = roleIsBad(role);
-  const blend = pBad && sGood ? `配偶宮${db.name}${db.element}屬${palace}、${word}卻是喜用：另一半本身有助力，婚姻的課題在相處模式`
-    : pGood && sBad ? `配偶宮為喜而${word}偏忌：婚姻生活本身和樂，另一半的個性需要磨合`
-      : pGood && sGood ? `配偶宮與${word}都是喜用，婚姻是你的助力`
-        : pBad && sBad ? `配偶宮與${word}都偏忌，感情需要比別人多一分經營，找到對的相處節奏就能穩定`
-          : sGood ? `${word}是${role}，另一半對你有助益` : sBad ? `${word}屬${role}，感情裡的拉扯要用溝通化解`
-            : pGood ? `配偶宮${db.name}${db.element}屬喜用，婚姻生活是你的避風港` : pBad ? `配偶宮${db.name}${db.element}屬${palace}，婚姻需要多花心力經營` : "";
-  const s3 = `${[...rel, blend].filter(Boolean).join("；") || "日支在命局中沒有合沖刑害，感情結構單純穩定"}。`;
+  const bv = { db: be(db.name, db.element), palace: trw(palace), word: trw(word), role: trw(role) };
+  const blend = pBad && sGood ? tr("配偶宮{db}屬{palace}、{word}卻是喜用：另一半本身有助力，婚姻的課題在相處模式", bv)
+    : pGood && sBad ? tr("配偶宮為喜而{word}偏忌：婚姻生活本身和樂，另一半的個性需要磨合", bv)
+      : pGood && sGood ? tr("配偶宮與{word}都是喜用，婚姻是你的助力", bv)
+        : pBad && sBad ? tr("配偶宮與{word}都偏忌，感情需要比別人多一分經營，找到對的相處節奏就能穩定", bv)
+          : sGood ? tr("{word}是{role}，另一半對你有助益", bv) : sBad ? tr("{word}屬{role}，感情裡的拉扯要用溝通化解", bv)
+            : pGood ? tr("配偶宮{db}屬喜用，婚姻生活是你的避風港", bv) : pBad ? tr("配偶宮{db}屬{palace}，婚姻需要多花心力經營", bv) : "";
+  const s3 = stop(cap(join([...rel, blend].filter(Boolean), "；") || tr("日支在命局中沒有合沖刑害，感情結構單純穩定")));
   const u0 = a.useful[0];
-  const s4 = `適合${PARTNER[db.god] || "互相體諒"}的伴侶${u0 ? `；從五行看，個性${ELEMENT_LUCK[u0].trait}、或八字${u0}旺的人，較能補足你` : ""}。`;
+  const pv = { partner: PARTNER[db.god] ? tr(PARTNER[db.god]) : tr("互相體諒"), trait: u0 ? tr(ELEMENT_LUCK[u0].trait) : "", u: u0 ? trw(u0) : "" };
+  const s4 = u0 ? tr("適合{partner}的伴侶；從五行看，個性{trait}、或八字{u}旺的人，較能補足你。", pv) : tr("適合{partner}的伴侶。", pv);
   const items = [];
   const peach = starWhere(c, "桃花");
   if (peach) {
     const inner = ["day", "hour"].some(r => (c.stars[r] || []).includes("桃花")), outer = ["year", "month"].some(r => (c.stars[r] || []).includes("桃花"));
-    items.push({ label: `桃花（${peach}）`, text: `${[inner ? "日、時見桃花稱「牆內桃花」，異性緣多能用在經營婚姻上" : "", outer ? "年、月見桃花稱「牆外桃花」，社交圈廣、異性緣好，婚後宜保持分寸" : ""].filter(Boolean).join("；")}。` });
+    items.push({ label: tr("桃花（{where}）", { where: peach }), text: stop(join([inner ? tr("日、時見桃花稱「牆內桃花」，異性緣多能用在經營婚姻上") : "", outer ? tr("年、月見桃花稱「牆外桃花」，社交圈廣、異性緣好，婚後宜保持分寸") : ""].filter(Boolean), "；")) });
   }
   for (const [star2, text] of Object.entries(LOVE_STARS)) {
     const w = starWhere(c, star2);
-    if (w) items.push({ label: `${star2}（${w}）`, text: `${text}。` });
+    if (w) items.push({ label: paren(trw(star2), w), text: stop(tr(text)) });
   }
   const combine = SIX_COMBINE[db.name], triad = [...TRIADS.find(t => t.includes(db.name))].filter(b => b !== db.name);
   const hong = branchesWithStar(c, "紅鸞"), xi = branchesWithStar(c, "天喜");
-  items.push({ label: "感情較有進展的年份", text: `流年逢${word}（${EL_STEMS[el].join("、")}年或${EL_BRANCHES[el].join("、")}年），流年地支逢${combine}（與日支六合）或${triad.join("、")}（與日支三合），以及紅鸞${hong.length ? `（${hong.join("、")}）` : ""}、天喜${xi.length ? `（${xi.join("、")}）` : ""}之年，感情較容易有進展；實際年份請看流年詳批。` });
-  return section("marriage", [s1 + s2, s3 + s4], items);
+  items.push({ label: tr("感情較有進展的年份"), text: tr("流年逢{word}（{stems}年或{branches}年），流年地支逢{combine}（與日支六合）或{triad}（與日支三合），以及紅鸞{hong}、天喜{xi}之年，感情較容易有進展；實際年份請看流年詳批。", {
+    word: trw(word), stems: J(EL_STEMS[el]), branches: J(EL_BRANCHES[el]), combine: trw(combine), triad: J(triad), hong: hong.length ? bracket(J(hong)) : "", xi: xi.length ? bracket(J(xi)) : "",
+  }) });
+  return section("marriage", [para(s1, s2), para(s3, s4)], items);
 }
 
 // ---------- 10 健康 ----------
@@ -1279,12 +1484,18 @@ function healthSection(c) {
   const { a, dm, de } = c;
   const order = ELEMENTS.slice().sort((x, y) => a.scores[x] - a.scores[y]);
   const weak = order[0], strong = order[4], ji = a.avoid[0];
-  const where = e => { const pr = presence(c, e); return pr.vis.length ? `只透出${stemsWords(pr.vis)}` : pr.hid.length ? `只藏在${uniq(pr.hid.map(x => x.branch)).join("、")}中` : "命中不見"; };
-  const weakWhat = weak === de ? `除了日主本身，${weak}${where(weak).replace(/^只/, "也只")}，是全局最弱的一環` : `${weak}最弱（${where(weak)}）`;
-  const s1 = `傳統說法以五行對應臟腑。這張${dm}${de}命盤${weakWhat}，${weak}主${ELEMENT_ORGANS[weak].organs}，平時宜多保養：${ELEMENT_ORGANS[weak].care}；${SEASON_OF[CONTROLLED_BY[weak]]}${CONTROLLED_BY[weak]}旺剋${weak}時尤其要留意。`;
-  const s2 = c.share[strong] >= 0.3 ? `${strong}最旺（約 ${pct(c.share[strong])}），${strong}主${ELEMENT_ORGANS[strong].organs}，過旺也是負擔，${ELEMENT_ORGANS[strong].care}。` : "";
-  const s3 = ji && ji !== weak && ji !== strong ? `忌神${ji}當令的${SEASON_OF[ji]}，作息宜放慢，${ELEMENT_ORGANS[ji].organs}方面多照顧。` : "";
-  return section("health", [`${s1}${s2}${s3}以上是傳統說法，身體狀況請以醫師診斷為準。`]);
+  // 「只透出…」, and after 除了日主本身 「也只透出…」.
+  const where = (e, also) => {
+    const pr = presence(c, e);
+    if (pr.vis.length) return tr(also ? "也只透出{list}" : "只透出{list}", { list: stemsWords(pr.vis) });
+    return pr.hid.length ? tr(also ? "也只藏在{list}中" : "只藏在{list}中", { list: J(uniq(pr.hid.map(x => x.branch))) }) : tr("命中不見");
+  };
+  const weakWhat = weak === de ? tr("除了日主本身，{e}{where}，是全局最弱的一環", { e: trw(weak), where: where(weak, true) }) : tr("{e}最弱（{where}）", { e: trw(weak), where: where(weak) });
+  const ctrl = CONTROLLED_BY[weak];
+  const s1 = tr("傳統說法以五行對應臟腑。這張{dm}命盤{weak}，{e}主{organs}，平時宜多保養：{care}；{season}{ctrl}旺剋{e}時尤其要留意。", { dm: se(dm), weak: weakWhat, e: trw(weak), organs: tr(ELEMENT_ORGANS[weak].organs), care: tr(ELEMENT_ORGANS[weak].care), season: tr(SEASON_OF[ctrl]), ctrl: trw(ctrl) });
+  const s2 = c.share[strong] >= 0.3 ? tr("{e}最旺（約 {p}），{e}主{organs}，過旺也是負擔，{care}。", { e: trw(strong), p: pct(c.share[strong]), organs: tr(ELEMENT_ORGANS[strong].organs), care: tr(ELEMENT_ORGANS[strong].care) }) : "";
+  const s3 = ji && ji !== weak && ji !== strong ? tr("忌神{e}當令的{season}，作息宜放慢，{organs}方面多照顧。", { e: trw(ji), season: tr(SEASON_OF[ji]), organs: tr(ELEMENT_ORGANS[ji].organs) }) : "";
+  return section("health", [para(s1, s2, s3, tr("以上是傳統說法，身體狀況請以醫師診斷為準。"))]);
 }
 
 // ---------- 11 開運建議 ----------
@@ -1303,24 +1514,26 @@ function adviceOf(c) {
     zodiac,
   };
 }
+// The advice lists as the page shows them (the numbers stay numbers).
+const adviceShown = adv => Object.fromEntries(Object.entries(adv).map(([k, list]) => [k, k === "numbers" ? list : list.map(x => (["elements", "zodiac", "industries"].includes(k) ? trw(x) : tr(x)))]));
 function adviceSection(c, adv) {
-  const { a, dm, de } = c, yb = c.P.year.branch.name, db = c.P.day.branch.name;
-  const base = a.useful.length ? `這張${dm}${de}命盤開運以用神${a.useful[0]}為主${a.useful.length > 1 ? `，喜神${listWords(a.useful.slice(1))}為輔` : ""}${a.avoid.length ? `，忌神${a.avoid[0]}不宜過多` : ""}。`
-    : `這張${dm}${de}命盤喜忌不明顯，開運以補足最弱的${adv.elements[0]}為主。`;
-  const animals = b => { const f = friendsOf(b); return { triad: listWords(f.triad.map(x => ZODIAC_ANIMAL[x])), combine: ZODIAC_ANIMAL[f.combine] }; };
+  const { a, dm } = c, yb = c.P.year.branch.name, db = c.P.day.branch.name;
+  const base = a.useful.length ? tr("這張{dm}命盤開運以用神{u}為主{xi}{ji}。", { dm: se(dm), u: trw(a.useful[0]), xi: a.useful.length > 1 ? tr("，喜神{list}為輔", { list: listWords(a.useful.slice(1).map(trw)) }) : "", ji: a.avoid.length ? tr("，忌神{e}不宜過多", { e: trw(a.avoid[0]) }) : "" })
+    : tr("這張{dm}命盤喜忌不明顯，開運以補足最弱的{e}為主。", { dm: se(dm), e: trw(adv.elements[0]) });
+  const animals = b => { const f = friendsOf(b); return { triad: listWords(f.triad.map(x => trw(ZODIAC_ANIMAL[x]))), combine: trw(ZODIAC_ANIMAL[f.combine]) }; };
   const fy = animals(yb), fd = animals(db);
-  const zod = yb === db ? `生肖方面，與年、日支${yb}三合的${fy.triad}、六合的${fy.combine}，較容易投緣。`
-    : `生肖方面，與年支${yb}三合的${fy.triad}、六合的${fy.combine}，以及與日支${db}三合的${fd.triad}、六合的${fd.combine}，較容易投緣。`;
-  const tag = e => `（${e}）`;
-  const avoidColor = a.avoid.length ? `；忌神${a.avoid[0]}的${ELEMENT_LUCK[a.avoid[0]].colors.join("、")}色不宜大面積使用` : "";
+  const zod = yb === db ? tr("生肖方面，與年、日支{yb}三合的{triad}、六合的{combine}，較容易投緣。", { yb: trw(yb), ...fy })
+    : tr("生肖方面，與年支{yb}三合的{ytriad}、六合的{ycombine}，以及與日支{db}三合的{dtriad}、六合的{dcombine}，較容易投緣。", { yb: trw(yb), ytriad: fy.triad, ycombine: fy.combine, db: trw(db), dtriad: fd.triad, dcombine: fd.combine });
+  const tag = e => bracket(trw(e));
+  const avoidColor = a.avoid.length ? tr("；忌神{e}的{colors}色不宜大面積使用", { e: trw(a.avoid[0]), colors: JP(ELEMENT_LUCK[a.avoid[0]].colors) }) : "";
   const items = [
-    { label: "顏色", text: `${adv.elements.map(e => `${ELEMENT_LUCK[e].colors.join("、")}${tag(e)}`).join("，")}${avoidColor}。` },
-    { label: "方位", text: `${adv.elements.map(e => `${ELEMENT_LUCK[e].direction}${tag(e)}`).join("，")}，求學、工作或居家擺設可多往這些方向。` },
-    { label: "數字", text: `${adv.elements.map(e => `${ELEMENT_LUCK[e].numbers.join("、")}${tag(e)}`).join("，")}，取自河圖數，可用在車牌、門牌或密碼等小地方。` },
-    { label: "行業", text: `${adv.industries.join("、")}。` },
-    { label: "生活習慣", text: `${adv.habits.join("；")}。` },
+    { label: tr("顏色"), text: stop(`${join(adv.elements.map(e => `${JP(ELEMENT_LUCK[e].colors)}${tag(e)}`), "，")}${avoidColor}`) },
+    { label: tr("方位"), text: tr("{list}，求學、工作或居家擺設可多往這些方向。", { list: join(adv.elements.map(e => `${tr(ELEMENT_LUCK[e].direction)}${tag(e)}`), "，") }) },
+    { label: tr("數字"), text: tr("{list}，取自河圖數，可用在車牌、門牌或密碼等小地方。", { list: join(adv.elements.map(e => `${join(ELEMENT_LUCK[e].numbers, "、")}${tag(e)}`), "，") }) },
+    { label: tr("行業"), text: stop(J(adv.industries)) },
+    { label: tr("生活習慣"), text: stop(JP(adv.habits, "；")) },
   ];
-  return section("advice", [base + zod], items);
+  return section("advice", [para(base, zod)], items);
 }
 
 // ---------- 主程式 ----------
@@ -1332,13 +1545,13 @@ export function natalReading(chart, analysis, { name = null } = {}) {
     careerSection(c), wealthSection(c), marriageSection(c), healthSection(c), adviceSection(c, adv),
   ]);
   return {
-    title: "八字命理詳批",
+    title: tr("八字命理詳批"),
     basics: basics(c),
     table: table(c),
     sections,
-    advice: adv,
-    notes: (chart.warnings || []).map(w => w.text),
-    disclaimer: DISCLAIMER,
+    advice: adviceShown(adv),
+    notes: (chart.warnings || []).map(w => noteText(c, w.text)),
+    disclaimer: tr(DISCLAIMER),
   };
 }
 

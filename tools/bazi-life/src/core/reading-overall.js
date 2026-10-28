@@ -21,7 +21,8 @@ const en = () => readingLang() === "en";
 const end = s => (en() ? (/[.!?]$/.test(s) ? s : `${s}.`) : /[。！？]$/.test(s) ? s : `${s}。`);
 // A count of 大運: 兩 in Chinese, 2 in English.
 const count = n => (en() ? n : COUNT[n]);
-const words = list => trJoin(list.map(trw));
+// Words in a list: 火、土 in Chinese, "Fire and Earth" in English.
+const words = list => { const w = list.map(trw); return en() && w.length > 1 ? `${w.slice(0, -1).join(", ")} and ${w[w.length - 1]}` : trJoin(w); };
 
 // 命格: day master, strength, pattern and the roles of the elements.
 function frame(analysis) {

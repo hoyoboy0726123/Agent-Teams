@@ -12,6 +12,7 @@
 //             and a population of random charts keeps the statistical base rates.
 import { pillarOf, groupOf, elementOf } from "./analysis.js";
 import { starContextOf, luckStars, taisui } from "./detail.js";
+import { tr, trw, trJoin } from "./tr.js";
 
 export const DOMAINS = { career: "事業", wealth: "財富", love: "感情", health: "健康", study: "學業", family: "家庭", move: "遷移" };
 export const CHANNELS = ["good", "bad", "change"];
@@ -43,73 +44,73 @@ export function yearEffects(analysis, natal, decadeName, yearName, sex, stars = 
   const groups = new Set([groupOf(dm, y.stemEl), groupOf(dm, y.hidden[0].el)]);
   if (groups.has("官殺")) {
     trig.career.change += ln(1.3); tilt("career", elementOf(dm, "官殺"));
-    reasons.push({ domains: ["career"], text: "官殺星透出：事業有壓力，也有機會" });
-    if (sex === "female") { trig.love.change += ln(1.3); reasons.push({ domains: ["love"], tags: ["spouse"], text: "官殺星透出：女命的官殺是丈夫星，感情容易有進展" }); }
-    else { trig.family.change += ln(1.2); reasons.push({ domains: ["family"], tags: ["children"], text: "官殺星透出：男命的官殺是子女星，和孩子的緣分被引動" }); }
+    reasons.push({ domains: ["career"], text: tr("官殺星透出：事業有壓力，也有機會") });
+    if (sex === "female") { trig.love.change += ln(1.3); reasons.push({ domains: ["love"], tags: ["spouse"], text: tr("官殺星透出：女命的官殺是丈夫星，感情容易有進展") }); }
+    else { trig.family.change += ln(1.2); reasons.push({ domains: ["family"], tags: ["children"], text: tr("官殺星透出：男命的官殺是子女星，和孩子的緣分被引動") }); }
   }
   if (groups.has("財")) {
     trig.wealth.change += ln(1.3); tilt("wealth", elementOf(dm, "財"));
-    reasons.push({ domains: ["wealth"], text: "財星透出：錢財進出變多" });
-    reasons.push({ domains: ["family"], tags: ["father"], text: "財星透出：偏財是父親星，和父親有關的事被引動" });
-    if (sex === "male") { trig.love.change += ln(1.3); reasons.push({ domains: ["love"], tags: ["spouse"], text: "財星透出：男命的財星是妻子星，感情容易有進展" }); }
+    reasons.push({ domains: ["wealth"], text: tr("財星透出：錢財進出變多") });
+    reasons.push({ domains: ["family"], tags: ["father"], text: tr("財星透出：偏財是父親星，和父親有關的事被引動") });
+    if (sex === "male") { trig.love.change += ln(1.3); reasons.push({ domains: ["love"], tags: ["spouse"], text: tr("財星透出：男命的財星是妻子星，感情容易有進展") }); }
   }
   if (groups.has("印")) {
     tilt("study", elementOf(dm, "印")); trig.family.change += ln(1.2); trig.wealth.change += ln(1.15);
-    reasons.push({ domains: ["study"], text: "印星透出：利於讀書和考試" });
-    reasons.push({ domains: ["family"], tags: ["mother"], text: "印星透出：印是母親星，和母親有關的事被引動" });
-    reasons.push({ domains: ["wealth"], tags: ["home"], text: "印星透出：印也代表房子，置產的機會變多" });
+    reasons.push({ domains: ["study"], text: tr("印星透出：利於讀書和考試") });
+    reasons.push({ domains: ["family"], tags: ["mother"], text: tr("印星透出：印是母親星，和母親有關的事被引動") });
+    reasons.push({ domains: ["wealth"], tags: ["home"], text: tr("印星透出：印也代表房子，置產的機會變多") });
   }
   if (groups.has("食傷")) {
     tilt("career", elementOf(dm, "食傷"), 0.15);
-    reasons.push({ domains: ["career"], text: "食傷星透出：表現欲強、想法多" });
-    if (sex === "female") { trig.family.change += ln(1.2); reasons.push({ domains: ["family"], tags: ["children"], text: "食傷星透出：女命的食傷是子女星，和孩子的緣分被引動" }); }
+    reasons.push({ domains: ["career"], text: tr("食傷星透出：表現欲強、想法多") });
+    if (sex === "female") { trig.family.change += ln(1.2); reasons.push({ domains: ["family"], tags: ["children"], text: tr("食傷星透出：女命的食傷是子女星，和孩子的緣分被引動") }); }
   }
   if (groups.has("比劫")) {
     trig.wealth.bad += ln(1.15); trig.family.change += ln(1.15);
-    reasons.push({ domains: ["wealth"], text: "比劫星透出：競爭多，花錢也多" });
-    reasons.push({ domains: ["family"], tags: ["siblings"], text: "比劫星透出：比劫是兄弟姊妹星，和兄弟姊妹的互動變多" });
+    reasons.push({ domains: ["wealth"], text: tr("比劫星透出：競爭多，花錢也多") });
+    reasons.push({ domains: ["family"], tags: ["siblings"], text: tr("比劫星透出：比劫是兄弟姊妹星，和兄弟姊妹的互動變多") });
   }
 
   if (clashes(y.branch, dayP.branch)) {
     trig.love.change += ln(1.5); trig.move.change += ln(1.5); trig.health.bad += ln(1.3);
-    reasons.push({ domains: ["love", "family"], tags: ["spouse"], text: `流年${y.branch}沖日支${dayP.branch}：日支是配偶宮，感情容易變動` });
-    reasons.push({ domains: ["move"], text: `流年${y.branch}沖日支${dayP.branch}：住處容易變動` });
-    reasons.push({ domains: ["health"], text: `流年${y.branch}沖日支${dayP.branch}：要多注意身體` });
+    reasons.push({ domains: ["love", "family"], tags: ["spouse"], text: tr("流年{yb}沖日支{db}：日支是配偶宮，感情容易變動", { yb: y.branch, db: dayP.branch }) });
+    reasons.push({ domains: ["move"], text: tr("流年{yb}沖日支{db}：住處容易變動", { yb: y.branch, db: dayP.branch }) });
+    reasons.push({ domains: ["health"], text: tr("流年{yb}沖日支{db}：要多注意身體", { yb: y.branch, db: dayP.branch }) });
   }
-  if (combines(y.branch, dayP.branch)) { trig.love.good += ln(1.4); reasons.push({ domains: ["love"], tags: ["spouse"], text: `流年${y.branch}合日支${dayP.branch}：日支是配偶宮，容易遇到好的感情機會` }); }
+  if (combines(y.branch, dayP.branch)) { trig.love.good += ln(1.4); reasons.push({ domains: ["love"], tags: ["spouse"], text: tr("流年{yb}合日支{db}：日支是配偶宮，容易遇到好的感情機會", { yb: y.branch, db: dayP.branch }) }); }
   if (clashes(y.branch, monthP.branch)) {
     trig.career.change += ln(1.45); trig.career.good += ln(0.8); trig.family.bad += ln(1.2);
-    reasons.push({ domains: ["career"], text: `流年${y.branch}沖月支${monthP.branch}：工作容易變動` });
-    reasons.push({ domains: ["family"], tags: ["father", "mother"], text: `流年${y.branch}沖月支${monthP.branch}：月柱是父母宮，要多關心父母` });
+    reasons.push({ domains: ["career"], text: tr("流年{yb}沖月支{mb}：工作容易變動", { yb: y.branch, mb: monthP.branch }) });
+    reasons.push({ domains: ["family"], tags: ["father", "mother"], text: tr("流年{yb}沖月支{mb}：月柱是父母宮，要多關心父母", { yb: y.branch, mb: monthP.branch }) });
   }
   if (natal.some(n => "寅申巳亥".includes(pillarOf(n).branch) && clashes(y.branch, pillarOf(n).branch))) {
-    trig.move.change += ln(1.75); reasons.push({ domains: ["move"], text: "驛馬被沖：搬家、出國、換環境的機會大" });
+    trig.move.change += ln(1.75); reasons.push({ domains: ["move"], text: tr("驛馬被沖：搬家、出國、換環境的機會大") });
   }
   if (natal.some(n => "辰戌丑未".includes(pillarOf(n).branch) && clashes(y.branch, pillarOf(n).branch))) {
-    trig.wealth.change += ln(1.35); reasons.push({ domains: ["wealth"], text: "沖開財庫：財務大進大出" });
+    trig.wealth.change += ln(1.35); reasons.push({ domains: ["wealth"], text: tr("沖開財庫：財務大進大出") });
   }
   if (yearName === natal[2] || (stemsClash(y, dayP) && clashes(y.branch, dayP.branch))) {
     for (const k of ["family", "wealth", "health"]) { trig[k].good += ln(0.7); trig[k].bad += ln(1.4); }
-    reasons.push({ domains: ["family", "wealth", "health"], text: yearName === natal[2] ? "流年和日柱相同（伏吟）：家庭、財務、健康容易有波折" : "流年和日柱天剋地沖：家庭、財務、健康容易有波折" });
+    reasons.push({ domains: ["family", "wealth", "health"], text: yearName === natal[2] ? tr("流年和日柱相同（伏吟）：家庭、財務、健康容易有波折") : tr("流年和日柱天剋地沖：家庭、財務、健康容易有波折") });
   }
   // 神煞 and 太歲 the year brings. Like the triggers above they are centred, so they move events in time only.
   const has = new Set(luckStars(stars, yearName));
   const luv = ["紅鸞", "天喜"].filter(x => has.has(x));
-  if (luv.length) { trig.love.change += ln(1.35); trig.love.good += ln(1.1); trig.family.good += ln(1.1); reasons.push({ domains: ["love", "family"], tags: ["spouse"], text: `流年逢${luv.join("、")}：喜慶與姻緣之星，容易有戀愛、婚嫁或添丁的喜事` }); }
-  if (has.has("桃花")) { trig.love.change += ln(1.2); reasons.push({ domains: ["love"], text: "流年逢桃花：異性緣變好，也要防感情糾紛" }); }
-  if (has.has("驛馬")) { trig.move.change += ln(1.4); reasons.push({ domains: ["move"], text: "流年逢驛馬：奔波、搬遷、出外的機會變多" }); }
-  if (has.has("文昌貴人")) { trig.study.good += ln(1.25); reasons.push({ domains: ["study"], text: "流年逢文昌：利於讀書、考試與寫作" }); }
-  if (has.has("天乙貴人")) { trig.career.good += ln(1.1); trig.wealth.good += ln(1.1); reasons.push({ domains: ["career", "wealth"], text: "流年逢天乙貴人：遇到困難容易有人幫忙" }); }
-  if (has.has("羊刃")) { trig.health.bad += ln(1.15); trig.wealth.bad += ln(1.1); reasons.push({ domains: ["health", "wealth"], text: "流年逢羊刃：衝勁強，也要防衝動、受傷與破財" }); }
+  if (luv.length) { trig.love.change += ln(1.35); trig.love.good += ln(1.1); trig.family.good += ln(1.1); reasons.push({ domains: ["love", "family"], tags: ["spouse"], text: tr("流年逢{stars}：喜慶與姻緣之星，容易有戀愛、婚嫁或添丁的喜事", { stars: trJoin(luv.map(trw)) }) }); }
+  if (has.has("桃花")) { trig.love.change += ln(1.2); reasons.push({ domains: ["love"], text: tr("流年逢桃花：異性緣變好，也要防感情糾紛") }); }
+  if (has.has("驛馬")) { trig.move.change += ln(1.4); reasons.push({ domains: ["move"], text: tr("流年逢驛馬：奔波、搬遷、出外的機會變多") }); }
+  if (has.has("文昌貴人")) { trig.study.good += ln(1.25); reasons.push({ domains: ["study"], text: tr("流年逢文昌：利於讀書、考試與寫作") }); }
+  if (has.has("天乙貴人")) { trig.career.good += ln(1.1); trig.wealth.good += ln(1.1); reasons.push({ domains: ["career", "wealth"], text: tr("流年逢天乙貴人：遇到困難容易有人幫忙") }); }
+  if (has.has("羊刃")) { trig.health.bad += ln(1.15); trig.wealth.bad += ln(1.1); reasons.push({ domains: ["health", "wealth"], text: tr("流年逢羊刃：衝勁強，也要防衝動、受傷與破財") }); }
   const ts = taisui(stars.yearBranch, y.branch);
   if (ts.kinds.length) {
     for (const k of ["career", "move", "family"]) trig[k].change += ln(1.15);
-    reasons.push({ domains: ["career", "move", "family"], text: `${ts.kinds.join("、")}：這一年變動較多，傳統上會安太歲、凡事穩紮穩打` });
+    reasons.push({ domains: ["career", "move", "family"], text: tr("{kinds}：這一年變動較多，傳統上會安太歲、凡事穩紮穩打", { kinds: trJoin(ts.kinds.map(trw)) }) });
   }
-  if (ts.spirit === "白虎" || ts.spirit === "病符") { trig.health.bad += ln(ts.spirit === "白虎" ? 1.15 : 1.1); reasons.push({ domains: ["health"], text: `流年犯${ts.spirit}：要多留意身體與安全` }); }
-  if (ts.spirit === "喪門" || ts.spirit === "吊客") { trig.family.bad += ln(1.15); reasons.push({ domains: ["family"], tags: ["father", "mother"], text: `流年犯${ts.spirit}：要多關心家中長輩` }); }
+  if (ts.spirit === "白虎" || ts.spirit === "病符") { trig.health.bad += ln(ts.spirit === "白虎" ? 1.15 : 1.1); reasons.push({ domains: ["health"], text: tr("流年犯{spirit}：要多留意身體與安全", { spirit: ts.spirit }) }); }
+  if (ts.spirit === "喪門" || ts.spirit === "吊客") { trig.family.bad += ln(1.15); reasons.push({ domains: ["family"], tags: ["father", "mother"], text: tr("流年犯{spirit}：要多關心家中長輩", { spirit: ts.spirit }) }); }
   let amplify = 1;
-  if (decadeName && yearName === decadeName) { amplify = 1.75; reasons.push({ domains: Object.keys(DOMAINS), text: "歲運並臨：這一年的起伏會被放大" }); }
+  if (decadeName && yearName === decadeName) { amplify = 1.75; reasons.push({ domains: Object.keys(DOMAINS), text: tr("歲運並臨：這一年的起伏會被放大") }); }
   return { L, favor, trig, amplify, reasons };
 }
 

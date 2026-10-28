@@ -5,6 +5,8 @@
 import { fourPillars } from "./chart.js";
 import { analyse, pillarOf, elementScores, ELEMENTS } from "./analysis.js";
 import { clashes, combines } from "./luck.js";
+import { tr, trw, readingLang } from "./tr.js";
+import { fill } from "../sim/grammar.js";
 
 const STEM_COMBOS = ["甲己", "乙庚", "丙辛", "丁壬", "戊癸"];
 const GENERATES = { 木: "火", 火: "土", 土: "金", 金: "水", 水: "木" };
@@ -33,31 +35,39 @@ export function memberChart(member, place) {
 
 // How two charts get along: each relation adds to 互補 (complement) or 磨合 (tension).
 //   me, other: { pillars: [year, month, day, hour?], analysis }
+// A note's `text` is read in the readings' language (core/tr.js) each time, for the pages that show it; its `zh` (not
+// enumerable) is always the Chinese, for the story (partnerNote).
 export function relate(me, other) {
   const a = me.pillars.map(pillarOf), b = other.pillars.map(pillarOf);
   const notes = [];
-  const add = (score, text, short) => notes.push({ score, text, short });
+  const add = (score, template, vars, short) => {
+    const note = { score, text: "", short };
+    Object.defineProperty(note, "text", { enumerable: true, get: () => tr(template, english(vars)) });
+    Object.defineProperty(note, "zh", { value: fill(template, chinese(vars)) });
+    notes.push(note);
+  };
   const [ya, yb] = [a[0].branch, b[0].branch];
-  if (combines(ya, yb)) add(1, `生肖六合（${ZODIAC[ya]}和${ZODIAC[yb]}）`, "生肖六合");
-  else if (ya !== yb && TRINES.some(t => t.includes(ya) && t.includes(yb))) add(0.6, `生肖三合（${ZODIAC[ya]}和${ZODIAC[yb]}）`, "生肖三合");
-  if (clashes(ya, yb)) add(-1, `生肖相沖（${ZODIAC[ya]}和${ZODIAC[yb]}）`, "生肖相沖");
-  if (pair(HARMS, ya, yb)) add(-0.6, `生肖相害（${ZODIAC[ya]}和${ZODIAC[yb]}）`, "生肖相害");
-  if (pair(PUNISH, ya, yb)) add(-0.5, `生肖相刑（${ZODIAC[ya]}和${ZODIAC[yb]}）`, "生肖相刑");
+  const z = { za: ZODIAC[ya], zb: ZODIAC[yb] };
+  if (combines(ya, yb)) add(1, "生肖六合（{za}和{zb}）", z, "生肖六合");
+  else if (ya !== yb && TRINES.some(t => t.includes(ya) && t.includes(yb))) add(0.6, "生肖三合（{za}和{zb}）", z, "生肖三合");
+  if (clashes(ya, yb)) add(-1, "生肖相沖（{za}和{zb}）", z, "生肖相沖");
+  if (pair(HARMS, ya, yb)) add(-0.6, "生肖相害（{za}和{zb}）", z, "生肖相害");
+  if (pair(PUNISH, ya, yb)) add(-0.5, "生肖相刑（{za}和{zb}）", z, "生肖相刑");
 
   const [da, db] = [a[2], b[2]];
-  const mine = `${da.stem}${da.stemEl}`, theirs = `${db.stem}${db.stemEl}`;
-  if (STEM_COMBOS.includes(da.stem + db.stem) || STEM_COMBOS.includes(db.stem + da.stem)) add(1, `日干相合（${da.stem}${db.stem}合，天合）`, "日干相合");
-  else if (CONTROLS[db.stemEl] === da.stemEl) add(-0.4, `對方的日干${theirs}約束你的日干${mine}（${db.stemEl}剋${da.stemEl}）：對方比較會管你`, "對方的日干約束你");
-  else if (CONTROLS[da.stemEl] === db.stemEl) add(-0.2, `你的日干${mine}約束對方的日干${theirs}（${da.stemEl}剋${db.stemEl}）：你在對方面前比較有主見`, "你的日干約束對方");
-  else if (GENERATES[db.stemEl] === da.stemEl) add(0.4, `對方的日干${theirs}生你的日干${mine}（${db.stemEl}生${da.stemEl}）：對方比較會照顧你`, "對方的日干生你");
-  else if (GENERATES[da.stemEl] === db.stemEl) add(0.2, `你的日干${mine}生對方的日干${theirs}（${da.stemEl}生${db.stemEl}）：你比較會照顧對方`, "你的日干生對方");
-  if (combines(da.branch, db.branch)) add(0.8, `日支六合（${da.branch}${db.branch}合，地合）`, "日支六合");
-  if (clashes(da.branch, db.branch)) add(-0.8, `日支相沖（${da.branch}${db.branch}沖）`, "日支相沖");
+  const d = { mine: [da.stem, da.stemEl], theirs: [db.stem, db.stemEl], ea: da.stemEl, eb: db.stemEl };
+  if (STEM_COMBOS.includes(da.stem + db.stem) || STEM_COMBOS.includes(db.stem + da.stem)) add(1, "日干相合（{pair}合，天合）", { pair: [da.stem, db.stem] }, "日干相合");
+  else if (CONTROLS[db.stemEl] === da.stemEl) add(-0.4, "對方的日干{theirs}約束你的日干{mine}（{eb}剋{ea}）：對方比較會管你", d, "對方的日干約束你");
+  else if (CONTROLS[da.stemEl] === db.stemEl) add(-0.2, "你的日干{mine}約束對方的日干{theirs}（{ea}剋{eb}）：你在對方面前比較有主見", d, "你的日干約束對方");
+  else if (GENERATES[db.stemEl] === da.stemEl) add(0.4, "對方的日干{theirs}生你的日干{mine}（{eb}生{ea}）：對方比較會照顧你", d, "對方的日干生你");
+  else if (GENERATES[da.stemEl] === db.stemEl) add(0.2, "你的日干{mine}生對方的日干{theirs}（{ea}生{eb}）：你比較會照顧對方", d, "你的日干生對方");
+  if (combines(da.branch, db.branch)) add(0.8, "日支六合（{pair}合，地合）", { pair: [da.branch, db.branch] }, "日支六合");
+  if (clashes(da.branch, db.branch)) add(-0.8, "日支相沖（{pair}沖）", { pair: [da.branch, db.branch] }, "日支相沖");
 
   const scores = elementScores(other.pillars);
   const strongest = ELEMENTS.slice().sort((x, y) => scores[y] - scores[x])[0];
-  if (me.analysis.useful.includes(strongest)) add(0.5, `對方命盤${strongest}最旺，正是你的喜用`, `對方${strongest}旺，是你的喜用`);
-  else if (me.analysis.avoid.includes(strongest)) add(-0.5, `對方命盤${strongest}最旺，是你比較忌的五行`, `對方${strongest}旺，是你忌的五行`);
+  if (me.analysis.useful.includes(strongest)) add(0.5, "對方命盤{el}最旺，正是你的喜用", { el: strongest }, `對方${strongest}旺，是你的喜用`);
+  else if (me.analysis.avoid.includes(strongest)) add(-0.5, "對方命盤{el}最旺，是你比較忌的五行", { el: strongest }, `對方${strongest}旺，是你忌的五行`);
 
   const complement = notes.filter(n => n.score > 0).reduce((s, n) => s + n.score, 0);
   const tension = -notes.filter(n => n.score < 0).reduce((s, n) => s + n.score, 0);
@@ -65,6 +75,14 @@ export function relate(me, other) {
   const tone = net >= 0.3 ? "互補" : net <= -0.3 ? "需要磨合" : "平穩";
   return { notes, complement, tension, net: Math.round(net * 100) / 100, tone };
 }
+
+// A relation's values: two characters (甲木, 子丑) are kept as a pair, joined as they are in Chinese and in English
+// spelt "Jia Wood", "Zi–Chou"; the other values are Chinese words the English looks up itself.
+const english = vars => Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, !Array.isArray(v) ? v
+  : readingLang() !== "en" ? v.join("") : k === "pair" ? v.map(trw).join("–") : v.map(trw).join(" ")]));
+const chinese = vars => Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, Array.isArray(v) ? v.join("") : v]));
+// The note in the readings' language (relate() above).
+export const noteText = note => note && note.text;
 
 // One relation between your chart and your partner's (a note of relate()) as a line for the story, when it explains
 // a love event: what brings you closer (sign > 0) or what takes 磨合 (sign < 0). `prefer` names a note (its
@@ -86,11 +104,12 @@ export function partnerNote(bond, sign, prefer = null) {
   if (!notes.length) return null;
   const n = notes.find(x => x.short === prefer) || notes.find(x => x.short.startsWith("日支")) || notes.slice().sort((x, y) => Math.abs(y.score) - Math.abs(x.score))[0];
   const [head, tail] = PARTNER_LINES[n.short] || [];
-  const detail = (/（([^，）]+)/.exec(n.text) || [])[1];   // 子丑合, 龍和雞
+  const zhText = n.zh || n.text;   // the story is Chinese whatever the page shows
+  const detail = (/（([^，）]+)/.exec(zhText) || [])[1];   // 子丑合, 龍和雞
   if (head) return `${head}${detail ? `（${detail}）` : ""}，${tail}`;
   // 對方的日干戊土生你的日干辛金, without the elements in brackets (they would say 剋)
-  if (STEM_LINES[n.short]) return `${n.text.split("（")[0]}，${STEM_LINES[n.short]}`;
-  return `${n.text}，${n.score > 0 ? "和對方在一起比較順" : "相處上需要多一點磨合"}`;   // the strongest element
+  if (STEM_LINES[n.short]) return `${zhText.split("（")[0]}，${STEM_LINES[n.short]}`;
+  return `${zhText}，${n.score > 0 ? "和對方在一起比較順" : "相處上需要多一點磨合"}`;   // the strongest element
 }
 
 // Everything the simulation needs from the optional family input.
@@ -127,34 +146,38 @@ export function buildFamily(input, me, place) {
 export const SAME_SEX_MARRIAGE = 2019;
 
 // `sex` is yours: with a partner of the same sex, a wedding year before SAME_SEX_MARRIAGE is turned away.
-export function checkFamily(input, birth, sex = null) {
+// `english`: the messages in the readings' language (core/tr.js; the 合婚 tab sets it first); Chinese otherwise.
+export function checkFamily(input, birth, sex = null, { english: en = false } = {}) {
   if (!input) return [];
+  const say = (t, v = {}) => (en ? tr(t, v) : fill(t, v));
+  const named = (label, name) => (en ? tr("{label}（{name}）", { label, name }) : `${label}（${name}）`);
   const key = d => d.y * 10000 + d.m * 100 + d.d;
   const me = key(birth), errors = [];
   for (const role of ["father", "mother"]) {
     const m = input[role];
     if (!m || !m.date) continue;
     const gap = birth.y - m.date.y;
-    if (gap < 12 || gap > 70) errors.push(`${RELATIONS[role]}的出生年份要比你早 12 到 70 年。`);
+    if (gap < 12 || gap > 70) errors.push(say("{who}的出生年份要比你早 12 到 70 年。", { who: RELATIONS[role] }));
   }
   for (const s of input.siblings || []) {
     if (!s || !s.date || !isSibling(s.relation)) continue;
     const label = RELATIONS[s.relation], k = key(s.date);
-    if (isOlder(s.relation) && k > me) errors.push(`${label}${s.name ? `（${s.name}）` : ""}的生日比你晚，要改成${s.relation === "olderBrother" ? "弟弟" : "妹妹"}嗎？`);
-    if (!isOlder(s.relation) && k < me) errors.push(`${label}${s.name ? `（${s.name}）` : ""}的生日比你早，要改成${s.relation === "youngerBrother" ? "哥哥" : "姊姊"}嗎？`);
-    if (Math.abs(s.date.y - birth.y) > 30) errors.push(`${label}${s.name ? `（${s.name}）` : ""}和你差了 30 年以上，請檢查出生年份。`);
+    const who = s.name ? named(label, s.name) : label;
+    if (isOlder(s.relation) && k > me) errors.push(say("{who}的生日比你晚，要改成{other}嗎？", { who, other: s.relation === "olderBrother" ? "弟弟" : "妹妹" }));
+    if (!isOlder(s.relation) && k < me) errors.push(say("{who}的生日比你早，要改成{other}嗎？", { who, other: s.relation === "youngerBrother" ? "哥哥" : "姊姊" }));
+    if (Math.abs(s.date.y - birth.y) > 30) errors.push(say("{who}和你差了 30 年以上，請檢查出生年份。", { who }));
   }
   const p = input.partner;
-  if (p && p.date && Math.abs(p.date.y - birth.y) > 30) errors.push(`${RELATIONS.partner}${p.name ? `（${p.name}）` : ""}和你差了 30 年以上，請檢查出生年份。`);
+  if (p && p.date && Math.abs(p.date.y - birth.y) > 30) errors.push(say("{who}和你差了 30 年以上，請檢查出生年份。", { who: p.name ? named(RELATIONS.partner, p.name) : RELATIONS.partner }));
   if (p && p.metYear !== undefined && p.metYear !== null) {
     const earliest = Math.max(birth.y, p.date ? p.date.y : birth.y) + 14;
-    if (!Number.isInteger(p.metYear) || p.metYear < earliest || p.metYear > birth.y + 95) errors.push(`和${RELATIONS.partner}開始交往的年份要在你們都滿 14 歲以後（${earliest} 年以後）。`);
+    if (!Number.isInteger(p.metYear) || p.metYear < earliest || p.metYear > birth.y + 95) errors.push(say("和{who}開始交往的年份要在你們都滿 14 歲以後（{earliest} 年以後）。", { who: RELATIONS.partner, earliest }));
   }
   if (p && p.marriedYear !== undefined && p.marriedYear !== null) {
     const earliest = Math.max(birth.y, p.date ? p.date.y : birth.y) + 18;
-    if (!Number.isInteger(p.marriedYear) || p.marriedYear < earliest || p.marriedYear > birth.y + 95) errors.push(`和${RELATIONS.partner}的結婚年份要在你們都滿 18 歲以後（${earliest} 年以後）。`);
-    else if (Number.isInteger(p.metYear) && p.marriedYear < p.metYear) errors.push(`結婚年份不能早於開始交往的年份。`);
-    else if (sex && p.sex === sex && p.marriedYear < SAME_SEX_MARRIAGE) errors.push(`同性婚姻在 ${SAME_SEX_MARRIAGE} 年 5 月才合法，結婚年份請填 ${SAME_SEX_MARRIAGE} 年以後，或留空。`);
+    if (!Number.isInteger(p.marriedYear) || p.marriedYear < earliest || p.marriedYear > birth.y + 95) errors.push(say("和{who}的結婚年份要在你們都滿 18 歲以後（{earliest} 年以後）。", { who: RELATIONS.partner, earliest }));
+    else if (Number.isInteger(p.metYear) && p.marriedYear < p.metYear) errors.push(say("結婚年份不能早於開始交往的年份。"));
+    else if (sex && p.sex === sex && p.marriedYear < SAME_SEX_MARRIAGE) errors.push(say("同性婚姻在 {year} 年 5 月才合法，結婚年份請填 {year} 年以後，或留空。", { year: SAME_SEX_MARRIAGE }));
   }
   return errors;
 }
@@ -186,14 +209,15 @@ export function familyTilts(family) {
 
 // Plain-language summary of the family tilts, as percentages of odds.
 export function describeFamilyTilts(t) {
+// In the readings' language (core/tr.js).
   const pct = v => `${v > 0 ? "+" : "−"}${Math.abs(Math.round((Math.exp(v) - 1) * 100))}%`;
   const lines = [];
-  if (Math.abs(t.childhood) >= 0.005) lines.push(`17 歲以前的家庭事件：好事 ${pct(t.childhood)}、壞事 ${pct(-t.childhood)}`);
-  if (Math.abs(t.study) >= 0.005) lines.push(`學業：好事 ${pct(t.study)}、壞事 ${pct(-t.study)}`);
+  if (Math.abs(t.childhood) >= 0.005) lines.push(tr("17 歲以前的家庭事件：好事 {up}、壞事 {down}", { up: pct(t.childhood), down: pct(-t.childhood) }));
+  if (Math.abs(t.study) >= 0.005) lines.push(tr("學業：好事 {up}、壞事 {down}", { up: pct(t.study), down: pct(-t.study) }));
   for (const [k, label] of [["father", "爸爸"], ["mother", "媽媽"], ["siblings", "兄弟姊妹"]]) {
-    if (Math.abs(t.bond[k]) >= 0.005) lines.push(`和${label}之間：互相幫忙 ${pct(t.bond[k])}、吵架衝突 ${pct(-t.bond[k])}`);
+    if (Math.abs(t.bond[k]) >= 0.005) lines.push(tr("和{who}之間：互相幫忙 {up}、吵架衝突 {down}", { who: label, up: pct(t.bond[k]), down: pct(-t.bond[k]) }));
   }
   const p = t.bond.partner || 0;
-  if (Math.abs(p) >= 0.005) lines.push(`和${RELATIONS.partner}之間：感情順利 ${pct(p)}、感情摩擦 ${pct(-p)}`);
+  if (Math.abs(p) >= 0.005) lines.push(tr("和{who}之間：感情順利 {up}、感情摩擦 {down}", { who: RELATIONS.partner, up: pct(p), down: pct(-p) }));
   return lines;
 }

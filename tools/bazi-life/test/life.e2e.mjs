@@ -96,8 +96,42 @@ await busy.waitForSelector("#play:not([hidden])");
 await busy.waitForSelector("#feed li");
 check("while living, the status bar and the story are English (the story's catalog came from the site)", /^Age \d+$/.test(await busy.textContent("#s-age")) && await busy.textContent("#c-skip") === "Skip to the end" && await busy.isHidden("#play-en-note") && !/[\u4e00-\u9fff]/.test(await busy.textContent("#feed")) && /^(Born|.+, born) \w+ \d+, \d{4}, in /.test(await busy.textContent("#born")), [await busy.textContent("#s-age"), await busy.textContent("#c-skip"), await busy.isVisible("#play .en-note")].join(" | "));
 await busy.click("#c-skip");
-await ended(busy, 45000);
-check("the ending's headline and facts are English", /^This time, you lived to \d+\.$/.test(await busy.textContent("#end-title")) && /Education/.test(await busy.textContent("#end-facts")) && /Happiest yearAge \d+ \(\d{4}\)/.test(await busy.textContent("#end-facts")) && await busy.isVisible("#end .en-note"));
+await busy.waitForSelector("#end:not([hidden])", { timeout: 45000 });
+await busy.waitForSelector("#story:not([hidden])", { timeout: 5000 });
+for (let k = 0; k < 10 && !(await busy.$("#story .go")); k++) await busy.click("#story .slide");
+// English text, apart from a Chinese term kept in brackets: "Day Master (日主)".
+const plainEn = t => !/[\u3400-\u9fff]/.test(String(t).replace(/\([^()]{1,12}\)/g, ""));
+const lastSlide = await busy.textContent("#story");
+check("the story recap's last slide is English", /You lived to \d+\./.test(lastSlide) && /See how this life ended/.test(lastSlide) && plainEn(lastSlide), lastSlide.slice(0, 160));
+await busy.click("#story .go");
+check("the ending's headline and facts are English", /^This time, you lived to \d+\.$/.test(await busy.textContent("#end-title")) && /Education/.test(await busy.textContent("#end-facts")) && /Happiest yearAge \d+ \(\d{4}\)/.test(await busy.textContent("#end-facts")) && await busy.isVisible("#end-en-part") && await busy.isHidden("#end-en-note"));
+// The ending of an English life (life-app.js, report.js, reading-overall.js): the 100-rerun cards, the chart card, the
+// K-line and the report's frame are English; the readings inside the report come from their own files.
+const cardsEn = await busy.textContent("#cards");
+const cardTitles = await busy.$$eval("#cards .card h3", hs => hs.map(h => h.textContent).join("|"));
+check("the English ending's 100-rerun cards are English, with Taiwan's 1925 line and a word for readers elsewhere", cardTitles === "Lifespan|Health|Marriage|Career and money" && /In \d+ of the 100 lives you married; in \d+ of those, a marriage ended in divorce/.test(cardsEn) && /Half of the 100 lives ended between \d+ and \d+/.test(cardsEn) && /1925/.test(cardsEn) && /local helpline/.test(cardsEn) && plainEn(cardsEn), cardTitles + " | " + cardsEn.slice(0, 200));
+const chartCardEn = await busy.textContent("#personal-cards .card");
+check("the chart card is English", /^Your chart in this life/.test(chartCardEn.trim()) && /Day Master \(日主\)/.test(chartCardEn) && /Your chart's best years: age \d+/.test(chartCardEn) && plainEn(chartCardEn), chartCardEn.slice(0, 200));
+const ticks = await busy.$$eval("#plot svg text", ts => ts.map(x => x.textContent));
+await busy.click("#end details.table > summary");
+const klineTable = await busy.textContent("#kline-table");
+check("the English K-line: its label, axis and table are English", /^Life candlestick chart/.test(await busy.getAttribute("#plot svg", "aria-label")) && ticks.includes("Age 0") && ticks.every(plainEn) && /Age \d+/.test(klineTable) && plainEn(klineTable), ticks.join(" "));
+const box = await (await busy.$("#plot svg")).boundingBox();
+await busy.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2);
+const tipEn = await busy.textContent("#tip");
+check("the K-line's tooltip is English", /^Age \d+/.test(tipEn) && /Mood this time: \d+|This life had ended by then/.test(tipEn) && /Median of the 100 lives: \d+/.test(tipEn), tipEn.slice(0, 120));
+await busy.mouse.move(0, 0);
+const heads = await busy.$$eval("#report-body summary", ss => ss.map(x => x.textContent));
+const rows = await busy.$$eval("#report-body .paipan tbody th", ts => ts.map(x => x.textContent).join("|"));
+const shareEn = await busy.textContent("#share");
+check("the English report's frame is English: the lede, the chart table, its own headings and the share card", plainEn(await busy.textContent("#report-lede")) && /^A chart drawn from/.test(await busy.textContent("#report-lede")) && rows === "Profile|Stem|Branch|Hidden Stems|Hidden Profiles|Life Stage|Self Stage|Void|Nayin|Stars" && ["Your Luck Pillars, decade by decade (大運)", "This life's turning points and your chart", "Overall reading"].every(h => heads.includes(h)) && heads.some(h => /^The next ten years \(\d{4}–\d{4}\)$/.test(h)) && /Luck Pillar\s*Age \/ years/.test(await busy.textContent("#report-body .luck-table thead")) && /^BaZi Life/.test(shareEn.trim()) && plainEn(shareEn), heads.join(" | "));
+// A phone: nothing on the English ending runs off the side, with every section open.
+await busy.setViewportSize({ width: 400, height: 900 });
+await busy.$$eval("#end details", ds => ds.forEach(d => (d.open = true)));
+await busy.waitForTimeout(300);
+const overflow = await busy.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+check("the English ending has no horizontal overflow at 400px", overflow <= 0, `${overflow}px`);
+await busy.setViewportSize({ width: 1100, height: 1300 });
 await busy.click("#lang-toggle");
 await busy.waitForTimeout(200);
 check("中文 swaps everything back", /^這一次，你活到 \d+ 歲。$/.test(await busy.textContent("#end-title")) && await busy.textContent("#tab-me") === "我的人生" && /^\d+ 歲$/.test(await busy.textContent("#s-age")) && await busy.getAttribute("html", "lang") === "zh-Hant-TW" && await busy.isHidden("#end .en-note") && /學歷/.test(await busy.textContent("#end-facts")));
@@ -606,6 +640,43 @@ const lifeSent = statsSent.map(b => b.life).filter(Boolean);
 check("a finished life is sent as its decade, day stem, age and three big things, with a heartbeat while it ran", lifeSent.length === 1 && lifeSent[0].decade === "80 後" && lifeSent[0].stem === "辛" && Number.isInteger(lifeSent[0].age) && typeof lifeSent[0].home === "boolean" && Object.keys(lifeSent[0]).sort().join() === "age,decade,home,kids,married,stem" && countOf("beat") >= 1, JSON.stringify(lifeSent[0]));
 await soon.close();
 
+// 合婚 in English: over http the reading comes from the site's catalog (english.js), so the whole result is English
+// (Chinese only as a term in brackets, "Spouse Palace (夫妻宮: …)") and the tab's note stays hidden; 中文 writes it
+// again in Chinese, EN in English. On a file the catalog cannot be fetched: the result stays Chinese and the note says so.
+const hhCJK = text => /[㐀-鿿]/.test(text.replace(/\(([㐀-鿿]{1,12})(?=[:,)])/g, "("));
+async function matchIn(p, where) {
+  await p.addInitScript(() => { try { localStorage.setItem("bazi-life.lang", "en"); } catch {} });
+  await p.goto(where);
+  await p.click("#tab-match");
+  await p.fill("#ma-name", "Ming");
+  await p.fill("#ma-date", "1988-02-15");
+  await p.fill("#mb-date", "1990-05-20");
+  await p.check("#mb-sex-f");
+  await p.click("#form-match button[type=submit]");
+  await p.waitForSelector("#match:not([hidden]) .hh-hero");
+}
+const hhEn = await fresh({ viewport: { width: 400, height: 900 } });
+await matchIn(hhEn, site);
+const hhEnText = await hhEn.textContent("#hh-body");
+const hhEnChecks = await hhEn.$$eval(".hh-check", els => els.map(e => [e.querySelector(".t").textContent, e.querySelector(".hh-tag").textContent]));
+check("in English the whole 合婚 result is English: type, score, nine checks, the two people, the guide and ten years", !hhCJK(hhEnText) && !/[{}]|undefined|NaN/.test(hhEnText) && /^[A-Z][a-z]/.test(await hhEn.textContent(".hh-label")) && /compatibility/.test(await hhEn.textContent(".hh-of")) && hhEnChecks.length === 9 && hhEnChecks[0][0] === "Spouse Palace (Day Branch)" && hhEnChecks.slice(0, 3).every(c => c[1] === "Main") && hhEnChecks[8][0] === "Life Gua (Lü Cai's method)" && /Nine traditional checks/.test(hhEnText) && /Ming/.test(hhEnText) && /Spouse Palace \(夫妻宮: /.test(hhEnText) && (await hhEn.$$(".hh-years li")).length === 10, hhEnText.replace(/\s+/g, " ").match(/.{0,60}[㐀-鿿].{0,60}/)?.[0] || hhEnChecks.map(c => c.join(":")).join(" "));
+check("the English 合婚 hides the tab's note that it is Chinese, and fits a phone", await hhEn.isHidden("#hh-en-note") && await hhEn.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth));
+await hhEn.click("#lang-toggle");
+await hhEn.waitForFunction(() => /型$/.test(document.querySelector(".hh-label").textContent));
+check("中文 writes the 合婚 again in Chinese", /傳統合婚九項/.test(await hhEn.textContent("#hh-body")) && await hhEn.isHidden("#hh-en-note"));
+await hhEn.click("#lang-toggle");
+await hhEn.waitForFunction(() => /Nine traditional checks/.test(document.querySelector("#hh-body").textContent));
+check("and EN in English again", !hhCJK(await hhEn.textContent("#hh-body")));
+await hhEn.fill("#hh-life-name", "Mei");
+await hhEn.fill("#hh-life-met", "1999");
+await hhEn.click("#hh-life");
+check("用這對伴侶過一生 explains its checks in English", /both 14 \(2004 or later\)/.test(await hhEn.textContent("#hh-life-error")), await hhEn.textContent("#hh-life-error"));
+await hhEn.close();
+const hhFile = await fresh({ viewport: { width: 400, height: 900 } });
+await matchIn(hhFile, url);
+check("on a file the English page keeps the 合婚 in Chinese and says so", /傳統合婚九項/.test(await hhFile.textContent("#hh-body")) && await hhFile.isVisible("#hh-en-note"));
+await hhFile.close();
+
 server.close();
 
 // 伴侶合盤: a partner with a birthday gets a bond on the family card, counts over the 100 lives and a report section.
@@ -683,6 +754,55 @@ await baby.waitForSelector("#play:not([hidden])");
 check("a name starts the baby's life", /林沐希在臺北市出生/.test(await baby.textContent("#born")) && await baby.isHidden("#baby"));
 await baby.close();
 
+// 準爸媽 in English (on the site, where the English catalog is): the comparison, the advice, the parents and the birth
+// windows are English, with the names in characters and their romanisation; the medical caution leads the windows.
+// 中文 redraws it all in Chinese without running the lives again, and EN brings the English back.
+// The local server has closed by now; the page and the catalog are served from the same bytes by routing.
+const babyEn = await fresh({ viewport: { width: 400, height: 900 } });
+await babyEn.route("**/life.html", r => r.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html }));
+await babyEn.route("**/i18n/story-en.json", r => r.fulfill({ status: 200, contentType: "application/json", body: storyEn }));
+await babyEn.goto(site);
+await babyEn.click("#lang-toggle");
+await babyEn.click("#tab-baby");
+await babyEn.fill("#b-surname", "林");
+const enGivens = await babyEn.$$(".b-given");
+await enGivens[0].fill("怡君");
+await enGivens[1].fill("沐希");
+await babyEn.fill("#b-date", "2027-03-15");
+await babyEn.click("#b-parents > summary");
+await babyEn.fill(".member[data-brole=father] .m-date", "1992-08-08");
+await babyEn.click("#b-slots > summary");
+await babyEn.fill("#b-due", "2027-03-22");
+const enSlots = await babyEn.$$("#slot-list .s-when");
+await enSlots[0].fill("2027-03-14T09:00");
+await babyEn.click("#form-baby button[type=submit]");
+await babyEn.waitForFunction(() => /short of 39 weeks/.test(document.querySelector("#error").textContent), null, { timeout: 15000 }).catch(() => {});
+check("English: a birth window before 39 weeks is refused in English", /short of 39 weeks/.test(await babyEn.textContent("#error")) && /caesarean/.test(await babyEn.textContent("#error")), await babyEn.textContent("#error"));
+await enSlots[0].fill("2027-03-16T15:00");
+await babyEn.click("#form-baby button[type=submit]");
+await babyEn.waitForSelector("#baby-advice .advice", { timeout: 60000 });
+await babyEn.waitForSelector(".slot-card .rank", { timeout: 60000 });
+// What is left once the names, the pillars' characters and the Chinese terms in brackets are taken out.
+const babyLeft = sel => babyEn.$eval(sel, el => el.textContent.replace(/\(([㐀-鿿、]{1,12})\)/g, "").replace(/[林怡君沐希]/g, "").replace(/[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]/g, "").match(/[　-〿㐀-鿿＀-￯]+/g));
+const enLeft = {};
+// (#baby-parents b: the notes under it come from family.js relate(), the family match's own English.)
+for (const sel of ["#baby-lede", "#baby-chart", "#baby-names", "#baby-advice", "#baby-parents h3", "#baby-parents b", "#baby-parents .fine", "#baby-slots", "#baby-report h3"]) enLeft[sel] = await babyLeft(sel);
+check("English: the 準爸媽 results show no Chinese but the names, the pillars and bracketed terms", Object.values(enLeft).every(x => !x), JSON.stringify(enLeft).slice(0, 300));
+const enCards = await babyEn.$$eval(".name-card", els => els.map(e => e.textContent.replace(/\s+/g, " ")));
+check("English: each name card names the baby in characters and romanisation, with its grids and its 100 lives", enCards.length === 2 && /林怡君 \(Lin Yi-chun\)/.test(enCards[0]) && enCards.every(t => /Person Grid/.test(t) && /Married ?\d+/.test(t) && /\/100/.test(t) && /Start a life with this name/.test(t)), enCards.map(t => t.slice(0, 60)).join(" | "));
+check("English: the lede, the advice and the parents read in English", /^A baby \(sex not yet known\) born 15 March 2027 \(hour not yet known\), in Taipei\./.test(await babyEn.textContent("#baby-lede")) && /differ by at most \d+ li(fe|ves)/.test(await babyEn.textContent("#baby-advice")) && /±5%/.test(await babyEn.textContent("#baby-advice")) && /With Dad/.test(await babyEn.textContent("#baby-parents")), await babyEn.textContent("#baby-lede"));
+const enNotice = await babyEn.textContent("#baby-slots .notice");
+check("English: the birth windows open with the medical caution: follow your doctor, nothing elective before 39 weeks, no lifespan or health", /^The timing of a caesarean or an induction is a medical decision: follow your doctor\./.test(enNotice) && /elective caesarean before 39 full weeks/.test(enNotice) && /lifespan and health are not compared/.test(enNotice) && /No\. 1/.test(await babyEn.textContent("#baby-slots")), enNotice.slice(0, 120));
+check("English: the results are no longer marked Chinese and the note is hidden", await babyEn.$eval("#baby-names", el => !el.hasAttribute("data-no-i18n")) && await babyEn.isHidden("#baby-en-note") && /The baby’s BaZi reading: 林怡君 \(Lin Yi-chun\)/.test(await babyEn.textContent("#baby-report h3")));
+await babyEn.click("#lang-toggle");
+await babyEn.waitForFunction(() => /差別最多/.test(document.querySelector("#baby-advice").textContent), null, { timeout: 15000 }).catch(() => {});
+const zhCards = await babyEn.$$eval(".name-card", els => els.map(e => e.textContent.replace(/\s+/g, "")));
+check("中文 redraws the comparison in Chinese, keeping the 100 lives", /差別最多 \d+ 次/.test(await babyEn.textContent("#baby-advice")) && /醫師的醫療判斷/.test(await babyEn.textContent("#baby-slots")) && zhCards.every(t => /結婚\d+次/.test(t)) && /林怡君/.test(await babyEn.textContent("#baby-report h3")) && await babyEn.$eval("#baby-names", el => el.hasAttribute("data-no-i18n")) && Number((/Married ?(\d+)/.exec(enCards[0]) || [])[1]) === Number((/結婚(\d+)次/.exec(zhCards[0]) || [])[1]), zhCards.map(t => t.slice(0, 20)).join(" | "));
+await babyEn.click("#lang-toggle");
+await babyEn.waitForFunction(() => /differ by at most/.test(document.querySelector("#baby-advice").textContent), null, { timeout: 15000 }).catch(() => {});
+check("EN brings the English comparison back", /differ by at most/.test(await babyEn.textContent("#baby-advice")) && /Lin Yi-chun/.test(await babyEn.textContent("#baby-names")));
+await babyEn.close();
+
 // 合婚分頁: two birthdays, the full 合婚 from the engine at once (no network): the type and score, six dimensions, nine
 // checks, the two people, the guide and ten years. The AI part says where it is offered; the pair can start a life
 // with the other person as the only partner before you meet.
@@ -748,6 +868,7 @@ const hhMet = hhLife.find(([age, t]) => age === 24 && /小美/.test(t));
 const hhLast = Math.max(...hhLife.map(([age]) => age));
 check("小美 comes into the story in 2012 (at 24), and nobody before", hhLast < 24 || (!!hhMet && !hhLife.some(([age, t]) => age < 24 && /開始交往|就在一起了|跟你告白/.test(t))), hhMet ? hhMet[1] : `ended at ${hhLast}`);
 await hh.close();
+
 
 // 夜子時: offered only near midnight; it keeps a 23:30 birth on that day in the 詳批, names the other school's day pillar,
 // and comes along to the 合婚 tab.

@@ -446,13 +446,13 @@ function usefulFrom(c, X, Y, scored) {
   const role = X.roles[t];
   if (t !== u && X.a.useful.includes(t)) {
     parts.push(tr("{y}命盤最旺的{t}也是{xOf}{role}，整體來說{yOf}五行對{x}有幫助", { ...v, y: isEn() ? Y.of : Y.n, role }));
-    c.facts.push({ score: scored ? 0.5 : 0.15, chip: scored ? tr("{y}旺{x}所喜", v) : null, phrase: tr("{y}命盤最旺的{t}是{xOf}{role}", { ...v, y: isEn() ? Y.of : Y.n, role }) });
+    c.facts.push({ score: scored ? 0.5 : 0.15, chip: scored ? tr("{y}旺{x}所喜", { ...v, x: isEn() ? X.of : X.n }) : null, phrase: tr("{y}命盤最旺的{t}是{xOf}{role}", { ...v, y: isEn() ? Y.of : Y.n, role }) });
   } else if (X.a.avoid.includes(t)) {
     const w = { ...v, y: isEn() ? Y.of : Y.n, role, t2: t, excess: EXCESS[t], x2: X.n };
     parts.push(scored
       ? tr("不過{y}命盤最旺的{t}是{xOf}{role}：傳統上{t2}旺的人{excess}，有時會讓{x}覺得有壓力，把感受說出來、保留各自充電的空間就好", w)
       : tr("不過{y}命盤最旺的{t}是{xOf}{role}：傳統上{t2}旺的人{excess}，{x}有時會覺得步調不合，彼此多體諒步調的差異就好", w));
-    c.facts.push({ score: scored ? -0.5 : -0.15, chip: scored ? tr("{y}旺{x}所忌", v) : null, phrase: tr("{y}命盤最旺的{t}是{xOf}{role}", w), focus: tr("相處時保留各自的空間就好"), burden: { X, Y, t } });
+    c.facts.push({ score: scored ? -0.5 : -0.15, chip: scored ? tr("{y}旺{x}所忌", { ...v, x: isEn() ? X.of : X.n }) : null, phrase: tr("{y}命盤最旺的{t}是{xOf}{role}", w), focus: tr("相處時保留各自的空間就好"), burden: { X, Y, t } });
   }
   if (X.ji && X.ji !== t && Y.share[X.ji] >= STRONG) {
     parts.push(tr("{y}命盤裡的{ji}也偏多（約 {p}），{ji2}是{xOf}忌神，兩人意見不同時，先停下來聽聽彼此的理由", { y: isEn() ? Y.of : Y.n, ji: X.ji, p: pct(Y.share[X.ji]), ji2: X.ji, xOf: X.of }));

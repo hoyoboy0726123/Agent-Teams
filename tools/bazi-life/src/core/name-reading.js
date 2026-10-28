@@ -32,6 +32,14 @@ const termList = list => andList(en() ? list.map(trw) : list);
 // The Day Master's stem: 甲 in Chinese, "Jia (甲)" in English.
 const PINYIN = { 甲: "Jia", 乙: "Yi", 丙: "Bing", 丁: "Ding", 戊: "Wu", 己: "Ji", 庚: "Geng", 辛: "Xin", 壬: "Ren", 癸: "Gui" };
 const stemShown = s => (en() && PINYIN[s] ? `${PINYIN[s]} (${s})` : s);
+// The chart's strength and structure in English, for the few that have no shared English word yet.
+const HAN = /[\u3400-\u9fff]/;
+const SPECIAL = { 從弱: "a very weak Day Master that follows the strongest element (從弱)", 專旺: "a dominant Day Master (專旺)" };
+export const chartTerm = zh => {
+  if (!en() || !zh) return zh;
+  const w = trw(zh);
+  return !HAN.test(w) ? w : SPECIAL[zh] || (/格$/.test(zh) ? `a special structure (${zh})` : `${zh}`);
+};
 // A clause as a sentence of its own.
 const sentence = t => (en() ? `${t.charAt(0).toUpperCase()}${t.slice(1)}.` : `${t}。`);
 
@@ -100,7 +108,7 @@ function gridReading(key, g, formula, alts) {
   if ((key === "人格" || key === "外格") && g.value < 2) notes.push(tr("人格和外格最小是 2，不會是這個數，請檢查筆畫。"));
   if (alts.length) {
     const level = v => LEVEL_ZH[shuli(v).level];
-    const values = trJoin(alts.map(v => (!judged ? String(v) : en() ? `${v} (${trw(level(v))})` : `${v}（${level(v)}）`)));
+    const values = trJoin(alts.map(v => (!judged ? String(v) : en() ? `${v} (${String(trw(level(v))).toLowerCase()})` : `${v}（${level(v)}）`)));
     const tail = judged && levelVaries(g) ? tr("；{readings} 種算法裡有 {good} 種是吉", { readings: g.readings, good: g.good }) : "";
     notes.push(tr("依筆畫有爭議的字的其他算法，這一格也可能是 {values}{tail}。", { values, tail }));
   }
@@ -152,7 +160,7 @@ function elementsReading(given, analysis, who) {
   const useful = named("用神") ? tr("用神{useful}{favourable}", { useful: named("用神"), favourable: named("喜神") ? tr("，喜神{elements}", { elements: named("喜神") }) : "" }) : tr("喜用神不明顯");
   const avoid = named("忌神") ? tr("忌神{unfavourable}{hostile}", { unfavourable: named("忌神"), hostile: named("仇神") ? tr("，仇神{elements}", { elements: named("仇神") }) : "" }) : tr("沒有明顯的忌神");
   const idle = named("閒神") ? tr("；{elements}是閒神", { elements: named("閒神") }) : "";
-  const intro = trAs("八字日主是{stem}{element}，{strength}。{useful}；{avoid}{idle}。", { element: dm.element, strength: analysis.strength, useful, avoid, idle }, { stem: stemShown(dm.stem) });
+  const intro = trAs("八字日主是{stem}{element}，{strength}。{useful}；{avoid}{idle}。", { element: dm.element, strength: chartTerm(analysis.strength), useful, avoid, idle }, { stem: stemShown(dm.stem) });
   const helps = chars.filter(c => c.value > 0).map(c => c.ch), hurts = chars.filter(c => c.value < 0).map(c => c.ch);
   const mixed = chars.filter(c => c.value === 0 && c.mixed).map(c => c.ch);
   const balance = chars.reduce((sum, c) => sum + c.value, 0) / chars.length;
