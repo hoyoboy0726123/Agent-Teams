@@ -315,9 +315,12 @@ export function createLife({ prep, sex = null, birthYear = null, place = null, s
     let u = null, cut = 1;
     if (s.age >= MAX_AGE || (u = fate()) < (cut = tilt(q, lnm))) {
       s.alive = false;
-      // The illness is named as the cause when the draw falls in its part of the year's risk (ill out of q), so the
-      // causes follow the cause-of-death statistics; otherwise the death is told as any other. Same draws.
-      s.health.diedOf = s.health.serious && (u === null || u < cut * ill / q) ? s.health.serious.type : null;
+      // The illness is named as the cause when the draw falls in its part of the year's risk (ill out of q); any
+      // other death may still be a heart attack, a stroke or a cancer found too late (rates.js suddenCause), so the
+      // causes follow the cause-of-death statistics at every age. The same draw decides both.
+      const v = u === null ? null : u / cut, part = q > 0 ? ill / q : 0;
+      s.health.diedOf = s.health.serious && (v === null || v < part) ? s.health.serious.type
+        : v !== null && typeof R.suddenCause === "function" ? R.suddenCause(s.age, s.sex, s.year, (v - part) / (1 - part)) : null;
       closeSpell(s, "death");
       record(deathEvent, deathEvent.apply(s, ctx), l, lnm);
     }

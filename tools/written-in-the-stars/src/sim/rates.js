@@ -152,7 +152,8 @@ function incidenceTable(type, sex, year) {
   let out = incidences.get(key);
   if (!out) {
     out = new Float64Array(MAX + 1);
-    for (let x = 0; x <= MAX; x++) out[x] = deathRaw(x + 1, sex, year) * causeShare(type, x + 1, sex, year) / caseFatality(type, x, sex);
+    // From age 1, as in story/core.js (`serious`, ages 1–110).
+    for (let x = 1; x <= MAX; x++) out[x] = deathRaw(x + 1, sex, year) * causeShare(type, x + 1, sex, year) / caseFatality(type, x, sex);
     incidences.set(key, out);
   }
   return out;
@@ -193,61 +194,75 @@ export const chronic = (age, sex) => ONSET[sex][Math.min(MAX, Math.max(0, Math.r
 export const CHRONIC_HR = 1.3;
 
 // The life table already includes deaths from serious illness and the extra risk of chronic disease, so the healthy
-// baseline is the table minus those. A small Markov chain over the states the simulation uses (healthy, or k years
-// after a diagnosis; with or without chronic disease) solves, age by age, for the baseline that makes the
-// population's expected death probability equal the table.
-const fatalities = new Map();
-function fatalityTable(sex, year) {
-  const key = `${sex}:${year}`;
-  let out = fatalities.get(key);
-  if (!out) {
-    out = [];
-    for (let a = 0; a <= MAX; a++) {
-      const w = SERIOUS_TYPES.map(t => incidence(t, a, sex, year)), total = w.reduce((x, y) => x + y, 0);
-      out.push([0, 1, 2, 3, 4].map(k => (total ? SERIOUS_TYPES.reduce((s, t, i) => s + w[i] / total * fatality(t, k, a, sex, null), 0) : 0)));
-    }
-    fatalities.set(key, out);
-  }
-  return out;
-}
-const fatalityAt = (table, diagnosedAt, k) => (diagnosedAt < 0 ? 0 : table[Math.min(MAX, diagnosedAt)][k]);
-const baselines = new Map();
-function baseline(sex, year) {
+// baseline is the table minus those. A small Markov chain over the states the simulation uses solves, age by age, for
+// the baseline that makes the population's expected death probability equal the table. The states follow
+// story/core.js: healthy (can be diagnosed), in year k = 0..4 after a diagnosis (the illness's fatality on top), and
+// the fifth year after it (the "recovered" event: no longer at risk from the illness, not yet diagnosable again); each
+// with or without chronic disease.
+//   The same chain gives the deaths each illness causes at each age. A death the illness did not cause (most deaths
+// in old age) is told with a cause too, so that every cause's share of all deaths is the official one: `suddenCause`
+// draws it from what is left of each cause's deaths (a heart attack or a stroke without a diagnosis before it, a
+// cancer found too late).
+const solved = new Map();
+function solve(sex, year) {
   const key = `${sex}:${Math.round(year)}`;
-  if (baselines.has(key)) return baselines.get(key);
-  const q = lifeTable(sex, year), out = new Array(q.length), fat = fatalityTable(sex, Math.round(year));
-  // fractions of the living population: [chronic? 0/1][state], state 0 = not ill, 1..5 = ill in year k = state-1
-  let pop = [[1, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
-  for (let x = 0; x < q.length; x++) {
-    const inc = serious(x, sex, Math.round(year)), chr = chronic(x, sex);
-    const next = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
+  if (solved.has(key)) return solved.get(key);
+  const Y = Math.round(year), q = lifeTable(sex, Y), n = q.length, T = SERIOUS_TYPES.length;
+  const base = new Float64Array(n), sudden = Array.from({ length: n }, () => new Float64Array(T));
+  // Per diagnosis age: the type mix of diagnoses and the yearly fatality k years on, by type.
+  const mix = [], fat = [];
+  // pop[c][st]: c chronic 0/1; st 0 healthy, 1..5 ill in year st − 1 after the diagnosis, 6 the fifth year after it
+  let pop = [[1, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]];
+  for (let x = 0; x < n; x++) {
+    const w = SERIOUS_TYPES.map(t => incidence(t, x, sex, Y)), total = w.reduce((a, v) => a + v, 0), inc = Math.min(1, total);
+    mix.push(w.map(v => (total ? v / total : 0)));
+    fat.push(SERIOUS_TYPES.map(t => [0, 1, 2, 3, 4].map(k => fatality(t, k, x, sex, null))));
+    const chr = chronic(x, sex);
+    const next = [[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]];
     for (const c of [0, 1]) {
-      const healthy = pop[c][0] + pop[c][5];               // state 5 = ill for 5 years → recovered this year
-      next[c][1] += healthy * inc; next[c][0] += healthy * (1 - inc);
-      for (let k = 1; k < 5; k++) next[c][k + 1] += pop[c][k];
+      next[c][0] += pop[c][0] * (1 - inc) + pop[c][6]; next[c][1] += pop[c][0] * inc;
+      for (let st = 1; st <= 5; st++) next[c][st + 1] += pop[c][st];
     }
-    for (let st = 0; st < 6; st++) { const move = next[0][st] * chr; next[0][st] -= move; next[1][st] += move; }
-    let illDeaths = 0, weight = 0;
-    for (const c of [0, 1]) for (let st = 0; st < 6; st++) {
+    for (let st = 0; st < 7; st++) { const move = next[0][st] * chr; next[0][st] -= move; next[1][st] += move; }
+    // the illnesses' own deaths this year, by type
+    const ill = new Float64Array(T);
+    const illOf = st => { const d = x - (st - 1); if (st < 1 || st > 5 || d < 0) return null; return SERIOUS_TYPES.map((t, i) => mix[d][i] * fat[d][i][st - 1]); };
+    let weight = 0, illTotal = 0;
+    for (const c of [0, 1]) for (let st = 0; st < 7; st++) {
       const share = next[c][st]; if (!share) continue;
       weight += share * (c ? CHRONIC_HR : 1);
-      if (st >= 1 && st <= 5) illDeaths += share * fatalityAt(fat, x - (st - 1), st - 1);
+      const f = illOf(st);
+      if (f) f.forEach((v, i) => { ill[i] += share * v; illTotal += share * v; });
     }
-    const total = next[0].reduce((a, b) => a + b, 0) + next[1].reduce((a, b) => a + b, 0);
-    const b = Math.max(0.25 * q[x], (q[x] * total - illDeaths) / weight);
-    out[x] = b;
-    for (const c of [0, 1]) for (let st = 0; st < 6; st++) {
-      const die = Math.min(1, b * (c ? CHRONIC_HR : 1) + (st >= 1 && st <= 5 ? fatalityAt(fat, x - (st - 1), st - 1) : 0));
-      next[c][st] *= 1 - die;
+    const alive0 = next[0].reduce((a, v) => a + v, 0) + next[1].reduce((a, v) => a + v, 0);
+    const b = Math.max(0.25 * q[x], (q[x] * alive0 - illTotal) / weight);
+    base[x] = b;
+    // what is left of each cause's deaths, among the deaths the illnesses did not cause
+    const rest = SERIOUS_TYPES.map((t, i) => Math.max(0, q[x] * alive0 * causeShare(t, x, sex, Y) - ill[i]));
+    const other = Math.max(1e-12, q[x] * alive0 - illTotal);
+    rest.forEach((v, i) => { sudden[x][i] = Math.min(1, v / other); });
+    for (const c of [0, 1]) for (let st = 0; st < 7; st++) {
+      const f = illOf(st), extra = f ? f.reduce((a, v) => a + v, 0) : 0;
+      next[c][st] *= 1 - Math.min(1, b * (c ? CHRONIC_HR : 1) + extra);
     }
-    const alive = next[0].reduce((a, b) => a + b, 0) + next[1].reduce((a, b) => a + b, 0);
-    pop = next.map(row => row.map(v => v / alive));
+    const alive = next[0].reduce((a, v) => a + v, 0) + next[1].reduce((a, v) => a + v, 0);
+    pop = alive > 0 ? next.map(row => row.map(v => v / alive)) : next;
   }
-  baselines.set(key, out);
+  const out = { base, sudden };
+  solved.set(key, out);
   return out;
 }
+const ageIndex = age => Math.min(MAX, Math.max(0, Math.round(age)));
 // The healthy baseline: what life.js uses each year, raised by chronic disease (CHRONIC_HR) and a serious illness.
-export const death = (age, sex, year) => baseline(sex, year)[Math.min(MAX, Math.max(0, Math.round(age)))];
+export const death = (age, sex, year) => solve(sex, year).base[ageIndex(age)];
+// The cause of a death the illness did not cause (or of anyone's death without one): a serious type, or null for
+// any other cause. `u` is uniform in 0..1 (life.js passes the death's own draw, rescaled).
+export function suddenCause(age, sex, year, u) {
+  const p = solve(sex, year).sudden[ageIndex(age)];
+  let x = u;
+  for (let i = 0; i < p.length; i++) { x -= p[i]; if (x < 0) return SERIOUS_TYPES[i]; }
+  return null;
+}
 
 // ---------- births ----------
 // Total fertility rate by year (us-rates.js TFR, NCHS: 3.09 in 1950, 3.65 in 1960, 2.48 in 1970, the low of 1.74 in
@@ -316,38 +331,38 @@ const EXPOSURE_YEARS = [1965, 1970, 1975, 1980, 1985, 1990, 1995, 2000, 2005, 20
 // BEGIN EXPOSURE (fitted)
 const EXPOSURE = {
   married: [
-    [0.0354, 0.7, 1.1, 1, 0.75, 0.5, 0.3],
-    [0.1069, 0.5348, 1.05, 1, 0.75, 0.5, 0.3],
-    [0.1057, 0.5344, 0.4521, 1, 0.75, 0.5, 0.3],
-    [0.0894, 0.5129, 0.4529, 0.2394, 0.75, 0.5, 0.3],
-    [0.06, 0.4479, 0.4351, 0.2322, 0.1186, 0.5, 0.3],
-    [0.0454, 0.3734, 0.4162, 0.2396, 0.1153, 0.0751, 0.3],
-    [0.0351, 0.3304, 0.3949, 0.2367, 0.1175, 0.0714, 0.0667],
-    [0.0271, 0.2916, 0.3697, 0.2428, 0.1224, 0.0688, 0.0724],
-    [0.0251, 0.263, 0.344, 0.2233, 0.1202, 0.0724, 0.0746],
-    [0.0164, 0.2364, 0.3415, 0.2334, 0.1147, 0.0659, 0.0685],
-    [0.0106, 0.1866, 0.3506, 0.2565, 0.1196, 0.0729, 0.0714],
-    [0.0065, 0.156, 0.3401, 0.2839, 0.1417, 0.0835, 0.0881],
-    [0.0054, 0.1272, 0.3428, 0.3061, 0.1769, 0.0952, 0.0965],
-    [0.0063, 0.1273, 0.3353, 0.3173, 0.2035, 0.1102, 0.1055],
-    [0.0052, 0.1284, 0.3365, 0.3373, 0.2171, 0.1372, 0.1365],
+    [0.111, 0.529, 0.445, 0.236, 0.115, 0.0723, 0.0724],
+    [0.111, 0.529, 0.445, 0.236, 0.115, 0.0723, 0.0724],
+    [0.11, 0.529, 0.445, 0.236, 0.115, 0.0723, 0.0724],
+    [0.0886, 0.509, 0.445, 0.236, 0.115, 0.0723, 0.0724],
+    [0.0622, 0.447, 0.436, 0.236, 0.115, 0.0723, 0.0724],
+    [0.0486, 0.375, 0.416, 0.248, 0.115, 0.0723, 0.0724],
+    [0.0389, 0.331, 0.389, 0.247, 0.124, 0.0723, 0.0724],
+    [0.0291, 0.293, 0.37, 0.247, 0.13, 0.074, 0.0724],
+    [0.0228, 0.257, 0.346, 0.229, 0.127, 0.0774, 0.0751],
+    [0.0145, 0.228, 0.335, 0.233, 0.118, 0.0729, 0.0719],
+    [0.0093, 0.184, 0.349, 0.252, 0.126, 0.0764, 0.078],
+    [0.0057, 0.15, 0.345, 0.279, 0.146, 0.0868, 0.0868],
+    [0.0052, 0.127, 0.333, 0.311, 0.177, 0.0996, 0.0949],
+    [0.0058, 0.123, 0.332, 0.322, 0.196, 0.107, 0.106],
+    [0.0055, 0.131, 0.336, 0.331, 0.216, 0.135, 0.135],
   ],
   partnered: [
-    [0.0263, 0.2, 0.15, 0.1, 0.08, 0.06, 0.05],
-    [0.0799, 0.1592, 0.15, 0.1, 0.08, 0.06, 0.05],
-    [0.0864, 0.1528, 0.1009, 0.11, 0.08, 0.06, 0.05],
-    [0.0878, 0.152, 0.1043, 0.0941, 0.09, 0.06, 0.05],
-    [0.0803, 0.1417, 0.1158, 0.1003, 0.0916, 0.07, 0.05],
-    [0.0766, 0.1518, 0.1137, 0.1094, 0.0906, 0.0747, 0.05],
-    [0.077, 0.1673, 0.1121, 0.1064, 0.0948, 0.0872, 0.0852],
-    [0.079, 0.1806, 0.1315, 0.1068, 0.0991, 0.1026, 0.0919],
-    [0.0761, 0.189, 0.1449, 0.1204, 0.1007, 0.0906, 0.0954],
-    [0.0671, 0.2008, 0.1467, 0.1274, 0.1081, 0.0891, 0.0833],
-    [0.0635, 0.2136, 0.1504, 0.1174, 0.1087, 0.097, 0.0895],
-    [0.0494, 0.2119, 0.1585, 0.12, 0.0988, 0.0983, 0.0939],
-    [0.0442, 0.2063, 0.156, 0.1351, 0.1006, 0.0932, 0.0877],
-    [0.0477, 0.2077, 0.1633, 0.1458, 0.1111, 0.0922, 0.0764],
-    [0.055, 0.2063, 0.1621, 0.1377, 0.1174, 0.106, 0.0971],
+    [0.0793, 0.155, 0.106, 0.103, 0.0992, 0.0937, 0.0885],
+    [0.0793, 0.155, 0.106, 0.103, 0.0992, 0.0937, 0.0885],
+    [0.0848, 0.155, 0.106, 0.103, 0.0992, 0.0937, 0.0885],
+    [0.0826, 0.148, 0.106, 0.103, 0.0992, 0.0937, 0.0885],
+    [0.0787, 0.143, 0.113, 0.103, 0.0992, 0.0937, 0.0885],
+    [0.0764, 0.152, 0.113, 0.11, 0.0992, 0.0937, 0.0885],
+    [0.079, 0.166, 0.117, 0.111, 0.101, 0.0937, 0.0885],
+    [0.0815, 0.179, 0.132, 0.109, 0.103, 0.0975, 0.0885],
+    [0.0771, 0.189, 0.139, 0.112, 0.0995, 0.0861, 0.091],
+    [0.0709, 0.206, 0.148, 0.127, 0.106, 0.0889, 0.0834],
+    [0.0633, 0.209, 0.148, 0.118, 0.108, 0.0928, 0.0905],
+    [0.0548, 0.219, 0.161, 0.122, 0.1, 0.0939, 0.0899],
+    [0.0462, 0.212, 0.163, 0.128, 0.1, 0.0927, 0.0861],
+    [0.0475, 0.206, 0.167, 0.144, 0.109, 0.0914, 0.0795],
+    [0.0519, 0.201, 0.165, 0.14, 0.12, 0.107, 0.0994],
   ],
 };
 // END EXPOSURE

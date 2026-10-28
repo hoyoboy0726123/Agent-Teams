@@ -233,8 +233,9 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     const entry = { age: s.age, year: s.year, id: ev.id, domain: ev.domain, channel: ev.channel, text: shown(out.text), mood: out.mood || 0, reason: why && why.text, reasonFrom: why && why.from, big: !!(out.big || ev.big), choice: shown(choice), asked, free, picked };
     s.happiness = Math.max(0, Math.min(100, s.happiness + (out.mood || 0)));
     log.push(entry);
-    // Big moments are remembered, so later years can look back on them.
-    if (entry.big && ev.id !== "death" && ev.id !== "birth") s.memory.push({ kind: ev.id, text: entry.text, age: s.age, year: s.year, mood: out.mood || 0 });
+    // Big moments are remembered, so later years can look back on them; `gist` is the moment in a few words, for the
+    // English (story/core.js memoryLane), so nothing has to be cut out of the sentence.
+    if (entry.big && ev.id !== "death" && ev.id !== "birth") s.memory.push({ kind: ev.id, text: entry.text, age: s.age, year: s.year, mood: out.mood || 0, gist: out.gist });
     return entry;
   }
 
@@ -396,9 +397,9 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
     let out;
     if (own) out = applyOption(own, list);
     // "own": the player kept their own words (照我寫的就好): the story says what they did, and nothing else changes.
-    else if (ACTIONS[action] || action === OWN) out = act(action, s, ctx, { situation: ev.id, domain: ev.domain, about: ev.about, summary, topic: topicOf(c) });
-    else return { infeasible: "看不出要怎麼做，換個說法試試看。", entries: [] };
-    if (out && out.infeasible) return { infeasible: out.infeasible, entries: [] };
+    else if (ACTIONS[action] || action === OWN) out = act(action, s, ctx, { situation: ev.id, domain: ev.domain, about: ev.about, summary, topic: topicOf(c, lang) });
+    else return { infeasible: shown("看不出要怎麼做，換個說法試試看。"), entries: [] };
+    if (out && out.infeasible) return { infeasible: shown(out.infeasible), entries: [] };
     // A storyline choice says how a written answer moves it on (work.js: the startup's second year, the exam).
     if (!own && c.onFree) c.onFree(action, s, ctx);
     pending = null;
@@ -429,9 +430,12 @@ export function createLife({ chart, analysis, luck, sex = chart.input.sex, seed 
 }
 
 // What a choice is about, to open the story line of an answer the player wrote: the choice's own `topic`, else the
-// first sentence of its question when it has one before the question itself ("公司裁員，你被列在名單上").
-export function topicOf(c) {
+// first sentence of its question when it has one before the question itself ("公司裁員，你被列在名單上"). In English
+// only the `topic` is used: an English question is not cut into sentences (a choice without one opens with the
+// player's words alone).
+export function topicOf(c, lang = "zh") {
   if (c.topic) return c.topic;
+  if (lang !== "zh") return "";
   const m = /^([^。？?！!]+)[。！!]/.exec(String(c.prompt || ""));
   return m ? m[1].trim() : "";
 }

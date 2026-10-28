@@ -35,6 +35,9 @@ const working = s => s.employed && s.job && s.job.field !== "military" && !s.ret
 const spend = (s, x) => { const paid = Math.min(s.savings, x); s.savings -= paid; return paid; };
 const stress = (s, x) => { s.health.stress = Math.max(0, Math.min(1, (s.health.stress ?? 0.3) + x)); };
 const loseJob = s => { s.employed = false; s.unemployedFor = 1; };
+const NUM = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+const numWord = n => NUM[n] || String(n);
+const ORDINAL = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"];
 // A friend from the story, or someone the story can name without having met them.
 function pal(s, ctx, fallback) {
   const f = bestFriend(s) || ctx.rng.pick(s.friends.filter(x => x && x.alive !== false && x.call).concat([null]));
@@ -96,7 +99,7 @@ function startupScenes(s, ctx) {
       stayEnd: `{You took ${co.call} out for a goodbye lunch.|You inherited half of ${co.call}'s clients at work, which was its own kind of promotion.}`,
     },
     {
-      kind: shop, title: `owner of the ${shop}`, who, w: 0.8,
+      kind: shop, title: `owner of the ${shop}`, who, w: 0.8, goWhat: `the ${shop} on Main Street`,
       lead: `The ${shop} on Main Street, open for ${ctx.rng.pick(["thirty", "forty", "fifty"])} years, is for sale: the owner is retiring and would rather sell to someone local, and ${who} wants to buy it with you`,
       goEnd: "{The old owner stayed a month to teach you everything, including which customers to give credit to.|The regulars said it felt exactly the same, which was the highest praise.}", side: `helping ${who} run the ${shop} on Saturdays`, stake: `You put money into the ${shop} with ${who} and kept your job; ${who} ran the place.`, ask: `buy the ${shop}`,
       stayEnd: `{The ${shop} sold to a couple from out of town, and you still shop there.|You bought one last thing from the old owner and wished them well.}`,
@@ -117,11 +120,11 @@ export const WORK = [
     choice: (s, ctx) => {
       const sc = ctx.rng.weighted(startupScenes(s, ctx).filter(Boolean).map(x => [x, x.w ?? 1]));
       const { kind, title } = sc, job = s.job.title;
-      const own = sc.who === "you";
+      const own = sc.who === "you", what = sc.goWhat || `${an(kind)} of your own`;
       return {
         prompt: `${sc.lead}. You have some savings to fall back on. Do you go for it?`,
         options: [
-          { id: "startupOffer.go", label: "Quit and go all in", hint: "your savings on the line", act: "startup", style: "risk", weight: 0.22, apply: (s2, c) => { const put = spend(s2, 1); if (put < 0.6) s2.debt += 0.5; loseJob(s2); s2.unemployedFor = 0; c.arc.start("startup", { kind, title, from: s2.age, who: sc.who, tech: !!sc.tech }, 1); return { text: c.w(`You quit your job as ${an(job)} ${own ? "and" : `and went in with ${sc.who}:`} ${own ? `turned the side project into ${an(kind)}.` : `${an(kind)} of your own.`} ${sc.goEnd}`), mood: 4, big: true }; } },
+          { id: "startupOffer.go", label: "Quit and go all in", hint: "your savings on the line", act: "startup", style: "risk", weight: 0.22, apply: (s2, c) => { const put = spend(s2, 1); if (put < 0.6) s2.debt += 0.5; loseJob(s2); s2.unemployedFor = 0; c.arc.start("startup", { kind, title, from: s2.age, who: sc.who, tech: !!sc.tech }, 1); return { text: c.w(`You quit your job as ${an(job)} and ${own ? `turned the side project into ${an(kind)}.` : `went in with ${sc.who} on ${what}.`} ${sc.goEnd}`), mood: 4, big: true }; } },
           { id: "startupOffer.side", label: "Start it on nights and weekends", hint: "keep the paycheck", act: "sideJob", style: "safe", weight: 0.2, apply: (s2, c) => { spend(s2, 0.3); stress(s2, 0.05); c.arc.start("startup", { kind, title, from: s2.age, who: sc.who, side: true, tech: !!sc.tech }, 1); return { text: c.w(`You kept your job and started ${own ? `your ${kind}` : `the ${kind}`} on the side, ${sc.side}, {and slept about five hours a night.|and your lunch breaks disappeared.}`), mood: 2 }; } },
           { id: "startupOffer.invest", label: own ? "Pay someone else to run it" : "Put in money, keep your job", hint: "a stake, not a second job", act: "invest", style: "safe", weight: 0.1, apply: s2 => { spend(s2, 0.5); s2.flags.stake = { kind, at: s2.age, who: own ? "a friend" : sc.who }; return { text: sc.stake || (own ? `You put money into the ${kind} and hired a friend to run it, and went back to your day job.` : `You put money into ${sc.who}'s ${kind} as a silent partner and kept your job.`), mood: 1 }; } },
           { id: "startupOffer.learn", label: "Take a small-business class first", hint: "learn the numbers", act: "study", style: "learn", weight: 0.05, when: s2 => !s2.arcs.study, apply: (s2, c) => { c.arc.start("study", { kind: "a small-business class at the community college", from: s2.age, biz: kind }, 1); return { text: `You wanted to learn the numbers first, so you signed up for a small-business class at the community college, writing a plan for ${an(kind)} as your class project.`, mood: 1 }; } },
@@ -204,7 +207,7 @@ export const WORK = [
         prompt: `${lead} Do you pick up a side hustle?`,
         options: [
           { id: "w_sideHustle.gig", label: gig[0], hint: "your own hours, your own car", act: "sideJob", style: "safe", weight: 0.3, apply: (s2, c) => start(s2, c, "gig", gig[1], false, `You started ${gig[1]}, {learning every shortcut in town,|with a phone mount and a bag of mints for passengers,|listening to audiobooks between runs,} and the extra money covered the bills that kept you up at night.`) },
-          { id: "w_sideHustle.make", label: make[0], hint: "the thing you're good at", act: "startup", style: "learn", weight: 0.2, apply: (s2, c) => start(s2, c, "make", make[1], false, `You started ${make[1]}: {candles, then soap, then a waiting list|refurbished furniture you found on the curb|vintage clothes you hunted down on weekends}, {and your living room became a shipping department.|and the first sale to a stranger felt like magic.}`) },
+          { id: "w_sideHustle.make", label: make[0], hint: "the thing you're good at", act: "startup", style: "learn", weight: 0.2, apply: (s2, c) => start(s2, c, "make", make[1], false, y >= 1997 ? `You started ${make[1]}: {candles, then soap, then a waiting list|refurbished furniture you found on the curb|vintage clothes you hunted down on weekends}, {and your living room became a shipping department.|and the first sale to a stranger felt like magic.}` : `You started ${make[1]}: {quilts and baby blankets|birdhouses you built in the garage|pottery you fired at the community center}, {and spent Saturdays behind a folding table with a cash box.|and the first sale to a stranger felt like magic.}`) },
           { id: "w_sideHustle.skill", label: skill[0], hint: s.job ? `be ${an(s.job.title)} for yourself` : "sell your skills", act: "sideJob", style: "learn", weight: 0.2, apply: (s2, c) => start(s2, c, "skill", skill[1], false, `You started ${skill[1]}, {doing for clients at night what you did all day at work,|tutoring, bookkeeping, a little of everything,} {and your rates went up twice the first year.|and found out you liked being your own boss.}`) },
           { id: "w_sideHustle.party", label: party[0], hint: party[2] ? "your friend swears it works" : "money from what you already have", act: party[2] ? "invest" : "sideJob", style: "risk", weight: 0.1, apply: (s2, c) => { if (party[2]) spend(s2, 0.05); return start(s2, c, "party", party[1], party[2], party[2] ? `You started ${party[1]}, {buying a starter kit and a stack of brochures,|calling everyone in your phone, including your dentist,} and {your aunt bought something out of pity.|your garage filled up with inventory.}` : `You started ${party[1]}, {and met people from all over the world at your kitchen table.|and learned more about strangers' habits than you ever wanted to know.}`); } },
           { id: "w_sideHustle.no", label: "No. Your evenings are yours", hint: "rest is worth something", act: "rest", style: "self", weight: 0.2, apply: () => ({ text: "You decided not to pick up a side hustle. Your evenings were for dinner, a walk and the people you loved, and you made the budget work another way.", mood: 1 }) },
@@ -294,7 +297,7 @@ export const WORK = [
       raiseEdu(s, "bachelor");
       if (s.employed) { s.income *= 1.08; if (ctx.roll("career", "good", 0.5)) s.career = Math.min(5, s.career + 1); }
       const crowd = (s.kids || []).length ? "your kids in the bleachers holding a sign" : s.rel === "married" && s.partner ? `${s.partner.call} cheering from the bleachers` : "your family yelling your name";
-      return { text: ctx.w([`After ${years} years of ${online ? "late nights at the laptop" : "night classes"}, you walked across the stage at ${s.age} to get your bachelor's degree, with ${crowd}.`, `You finished your bachelor's degree at ${s.age}, ${years} years after you started, {and hung the diploma where you'd see it every morning.|and your mother framed a copy of her own.|and took the whole family out for pancakes in your cap and gown.}`, `{The registrar's letter came on a Tuesday:|At ${s.age}, finally:} a bachelor's degree, earned ${online ? "online, one late night at a time" : "at night, one class at a time"}. {You cried in the car.|Your coworkers decorated your desk.}`]), mood: 9, big: true };
+      return { text: ctx.w([`After ${numWord(years)} years of ${online ? "late nights at the laptop" : "night classes"}, you walked across the stage at ${s.age} to get your bachelor's degree, with ${crowd}.`, `You finished your bachelor's degree at ${s.age}, ${numWord(years)} years after you started, {and hung the diploma where you'd see it every morning.|and your mother framed a copy of her own.|and took the whole family out for pancakes in your cap and gown.}`, `{The registrar's letter came on a Tuesday:|At ${s.age}, finally:} a bachelor's degree, earned ${online ? "online, one late night at a time" : "at night, one class at a time"}. {You cried in the car.|Your coworkers decorated your desk.}`]), mood: 9, big: true };
     },
   },
   {
@@ -331,7 +334,7 @@ export const WORK = [
         options: [
           { id: "w_civilOffer.study", label: "Sign up and study at night", hint: "keep your job meanwhile", act: "civilService", style: "safe", weight: 0.35, apply: (s2, c) => start(s2, c, { quit: false }, "You signed up for the civil service exam and {studied a practice book every night after dinner.|took the practice tests on your lunch break.}") },
           { id: "w_civilOffer.quit", label: "Quit and study full-time", hint: "all in", act: "civilService", style: "risk", weight: 0.1, when: s2 => s2.employed, apply: (s2, c) => { loseJob(s2); s2.unemployedFor = 0; return start(s2, c, { quit: true }, "You quit your job to study full-time for the civil service exam, {at the library from nine to five, like a job.|with flash cards taped all over the bathroom mirror.}"); } },
-          { id: "w_civilOffer.prep", label: "Take a prep course", hint: "a classroom and a coach", act: "study", style: "learn", weight: 0.15, apply: (s2, c) => { spend(s2, 0.05); return start(s2, c, { prep: true }, "You paid for a prep course for the civil service exam, {in a strip-mall classroom on Tuesday nights,|with an instructor who had taken it nine times and knew every trick.}"); } },
+          { id: "w_civilOffer.prep", label: "Take a prep course", hint: "a classroom and a coach", act: "study", style: "learn", weight: 0.15, apply: (s2, c) => { spend(s2, 0.05); return start(s2, c, { prep: true }, "You paid for a prep course for the civil service exam, {in a strip-mall classroom on Tuesday nights.|with an instructor who had taken it nine times and knew every trick.}"); } },
           { id: "w_civilOffer.ask", label: "Ask someone who works there first", hint: "what's it really like?", act: "talk", style: "social", weight: 0.15, apply: (s2, c) => (c.rng() < 0.55 ? start(s2, c, { quit: false }, `You asked ${f.name} what the job was really like, heard "boring and steady and good," and signed up for the exam.`) : { text: `You asked ${f.name} what the job was really like, and decided the paperwork and the pace weren't for you.`, mood: 0 }) },
           { id: "w_civilOffer.no", label: "Not for you", hint: "you'd rather stay where you are", act: "wait", style: "self", weight: 0.25, apply: () => ({ text: "You thought about the government job, the pension and the exam, and decided you'd rather stay on the path you were on.", mood: 0 }) },
         ],
@@ -345,7 +348,7 @@ export const WORK = [
       const a = s.arcs.civil.data;
       a.tries = (a.tries || 0) + 1;
       const pass = ctx.roll("career", "good", Math.min(0.75, 0.25 + 0.1 * a.tries + (a.prep ? 0.1 : 0)));
-      const tryWord = a.tries > 1 ? ` on try number ${a.tries}` : "";
+      const tryWord = a.tries > 1 ? ` on your ${ORDINAL[a.tries] || "latest"} try` : "";
       if (pass) {
         const take = (job, text) => s2 => { ctx.arc.end("civil", "passed"); startJob(s2, ctx, job); s2.studying = false; return { text: ctx.w(text), mood: 8, big: true }; };
         const mail = s.year < 1971 ? "the Post Office" : "the Postal Service";

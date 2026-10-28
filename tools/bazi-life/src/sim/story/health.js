@@ -1450,7 +1450,8 @@ export const HEALTH = [
     // 換手機：大哥大、B.B.Call、掀蓋機、智慧型手機
     id: "m_phone", domain: "wealth", channel: "change", ages: [18, 80], cooldown: 8, max: 2, when: s => s.year >= 1990 && !s.abroad, p: () => 0.035,
     choice: (s, ctx) => {
-      const y = s.year, pw = parentWord(s), day = s.studying ? "放學" : s.employed ? "下班" : "晚上";
+      // {battery}: the battery dies before the end of the day (放學, 下班 or 晚上), as a whole phrase
+      const y = s.year, pw = parentWord(s), battery = s.studying ? "電池撐不到放學" : s.employed ? "電池撐不到下班" : "電池撐不到晚上";
       const cost = y < 1997 ? 0.15 : y < 2008 ? 0.03 : 0.06;   // years of median pay
       const prompt = y < 1997
         ? ctx.w(["{同事|朋友}拿出一支大哥大，{講話的聲音整個餐廳都聽得到。|你羨慕得不得了。}一支要好幾萬塊。要買嗎？", "身邊的人腰上都掛著一台 B.B.Call，{一響就要找公用電話回電。|你覺得自己好像跟不上了。}要跟著買嗎？"])
@@ -1461,9 +1462,9 @@ export const HEALTH = [
             : y < 2014
               ? ctx.w(["大家都在換智慧型手機，{滑來滑去的觸控螢幕|可以裝 App}，你的舊手機{連上網都慢|被笑是古董}。要換嗎？"])
               : y === 2018
-                ? ctx.w(["電信公司推出 499 吃到飽，{門市外大排長龍，|網路上吵翻天，}{friend}約你一起去排隊換約。要怎麼辦？", "新手機{發表了|開賣了}，你的手機{電池撐不到{day}|摔到螢幕裂了一條線}，剛好電信公司在推 499 吃到飽。要換嗎？"], { day })
+                ? ctx.w(["電信公司推出 499 吃到飽，{門市外大排長龍，|網路上吵翻天，}{friend}約你一起去排隊換約。要怎麼辦？", "新手機{發表了|開賣了}，你的手機{{battery}|摔到螢幕裂了一條線}，剛好電信公司在推 499 吃到飽。要換嗎？"], { battery })
                 : y < 2030
-                  ? ctx.w(["新手機{發表了|開賣了}，{相機又更強了|螢幕更大了}，你的手機{電池撐不到{day}|摔到螢幕裂了一條線}。要換嗎？"], { day })
+                  ? ctx.w(["新手機{發表了|開賣了}，{相機又更強了|螢幕更大了}，你的手機{{battery}|摔到螢幕裂了一條線}。要換嗎？"], { battery })
                   : ctx.w(["新一代的手機{又輕又快|多了好幾個新功能}，你的手機已經用了好幾年，{反應越來越慢。|電池也不太行了。}要換嗎？"]);
       return {
         prompt,

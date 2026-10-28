@@ -48,6 +48,9 @@ const rhythmClash = (s, ctx) => {
 // 哥哥志明, or just 哥哥 (words.js siblingCall), as a template so the English has the name too.
 const siblingOf = (ctx, x) => (x.name ? ctx.f("{rel}{name}", { rel: x.label, name: callName(x.name) }) : x.label);
 
+// A string shown as a button or hint that the story also writes inside a sentence: the same Chinese, and in English
+// the sentence's words with a capital letter.
+const asLabel = (ctx, x) => ctx.f("{asLabel}", { asLabel: x });
 // ctx.w over a list of templates that were `…${x}…` literals before the English edition. ctx.w passes over the
 // templates this life has already told (s.used); a literal was a different string for each x, so whether a template
 // was told is asked of what its literal read, fill(t, vars), and the Chinese reads as it did. `more`: the story's own
@@ -348,7 +351,7 @@ function managerScenes(s, ctx, { f, title, boss, always }) {
 function insuranceScenes(s, ctx) {
   const kid = youngest(s), pw = parentsWord(s), infant = !!kid && kid.age <= 1;
   const seller = ctx.rng.pick([UNI.includes(s.edu) ? "大學同學" : "高中同學", "表姊", "以前的同事", "鄰居阿姨"]);
-  const full = s.year >= 2000 ? "壽險、醫療險、長照險" : "壽險、醫療險、意外險";
+  const full = s.year >= 2000 ? "壽險、醫療險、長照險" : "壽險、醫療險、意外險", fullHint = asLabel(ctx, full);
   const kw = kidsWord(s);
   const v = {
     seller, pw, full, kn: kid ? kid.call : null,
@@ -364,7 +367,7 @@ function insuranceScenes(s, ctx) {
     {
       key: "seller", lead: s.year >= 2000 ? "{seller}{在當保險經紀人|在做保險業務}，約你喝咖啡，拿出一整本建議書" : "{seller}在做保險業務，約你喝咖啡，拿出一整本建議書",
       basic: ["只買醫療險和意外險", "基本保障就好", "{lead}。你只挑了{medical}和意外險，{每個月的保費不多，|{seller}有點失望，還是幫你辦好了，}{心裡踏實了一點。|就當以防萬一。}"],
-      full: ["一次買齊", full, "{lead}。你{一口氣|聽完說明就}把{full}都買齊了，{每年的保費不便宜，|{seller}開心地請你吃了一頓飯，}{但你覺得家人有了保障。|你把保單收進抽屜最裡面。}"],
+      full: ["一次買齊", fullHint, "{lead}。你{一口氣|聽完說明就}把{full}都買齊了，{每年的保費不便宜，|{seller}開心地請你吃了一頓飯，}{但你覺得家人有了保障。|你把保單收進抽屜最裡面。}"],
       saving,
       ask: ["先問懂保險的朋友", "比清楚再買", "{lead}。你沒有當場簽，{請另一位懂保險的朋友幫你看建議書，|{compare}}{最後只買了真正需要的。|刪掉了一半用不到的附約。}"],
       no: ["不買，自己存錢", "保費拿去存", "{lead}。你婉拒了，{說會再考慮看看。|說自己想先把錢存起來。}{{seller}笑笑說沒關係，下次再約。|那天的咖啡是你請的。}"],
@@ -373,7 +376,7 @@ function insuranceScenes(s, ctx) {
       // {friend} is the same friend from the question to the answer.
       key: "accident", lead: s.year >= 1995 ? "{friend}騎機車{摔車|被擦撞}，{腳骨折|鎖骨裂了}住院一個星期，健保不給付的骨材和病房差額都靠保險理賠才付得出來" : "{friend}騎機車{摔車|被擦撞}，{腳骨折|鎖骨裂了}住院一個星期，住院和開刀的錢都靠保險理賠才付得出來",
       basic: ["買醫療險和意外險", "基本保障就好", "{lead}。你只挑了{medical}和意外險，{每個月的保費不多，|保單上「意外住院」那一欄你看了兩次，}{心裡踏實了一點。|就當以防萬一。}"],
-      full: ["一次買齊", full, "{lead}。你找了{friend}的業務員，把{full}都買齊了，{保單厚得像一本書。|每年的保費不便宜，但你覺得家人有了保障。}"],
+      full: ["一次買齊", fullHint, "{lead}。你找了{friend}的業務員，把{full}都買齊了，{保單厚得像一本書。|每年的保費不便宜，但你覺得家人有了保障。}"],
       saving: ["買儲蓄險當存錢", "萬一有事，至少有一筆錢", "{lead}。你想了想，買了{一張六年期的儲蓄險，|一張儲蓄型的保單，}{說萬一有事，至少有一筆錢。|每年繳一筆，像是在幫未來的自己存錢。}"],
       ask: ["先看朋友的保單怎麼買", "比清楚再買", "{lead}。你去醫院看{friend}的時候，{借了對方的保單回家研究，|問清楚對方買的是哪幾種，}{最後只買了真正需要的。|刪掉了一半用不到的附約。}"],
       no: ["不買，自己存錢", "存款就是保險", "{lead}。你覺得保費不如自己存，{每個月固定存一筆當緊急預備金，|把保險的錢拿去定存，}{就當自己替自己保險。|{friend}出院那天，你去接對方回家。}"],
@@ -381,7 +384,7 @@ function insuranceScenes(s, ctx) {
     pw && {
       key: "elders", w: infant ? 3 : 1, lead: infant ? (kid.age === 0 ? "{kn}才剛滿月，{pw}一直提醒你要買保險，還把熟識的業務員電話抄給你" : "{kn}剛滿一歲，{pw}一直提醒你要買保險，還把熟識的業務員電話抄給你") : "你成家以後，{pw}一直提醒你要買保險，還把熟識的業務員電話抄給你",
       basic: [infant ? "先買醫療險和意外險" : "只買醫療險和意外險", infant ? "孩子和自己都有基本保障" : "基本保障就好", "{lead}。你打給那位業務員，只挑了{medical}和意外險，{每個月的保費不多，|{pw}說這樣也好，}{心裡踏實了一點。|就當以防萬一。}"],
-      full: ["全家一次買齊", full, "{lead}。你{一口氣|聽完說明就}把全家的{full}都買齊了，{{pw}聽了很放心。|每年的保費不便宜，但你覺得家人有了保障。}"],
+      full: ["全家一次買齊", fullHint, "{lead}。你{一口氣|聽完說明就}把全家的{full}都買齊了，{{pw}聽了很放心。|每年的保費不便宜，但你覺得家人有了保障。}"],
       saving: infant ? ["買儲蓄險，幫孩子存錢", "強迫自己存錢", "{lead}。你買了{一張六年期的儲蓄險，|一張儲蓄型的保單，}{說是要幫{kn}存一筆長大以後的錢。|每年繳一筆，像是在幫{kn}存錢。}"] : saving,
       ask,
       no: ["先不買，自己存錢", "保費拿去存", "{lead}。你跟{pw}說會再考慮，{把保費的錢拿去存，|每個月固定存一筆緊急預備金，}{{pw}念了你好幾次。|那張抄著電話的紙條，一直貼在冰箱上。}"],
@@ -389,7 +392,7 @@ function insuranceScenes(s, ctx) {
     s.year >= 2000 && {
       key: "bank", lead: "去銀行{存錢|辦事}時，理專把你請進小房間，推薦一張{利率比定存高的儲蓄險|六年期的儲蓄險}",
       basic: ["改問醫療險和意外險", "保障比儲蓄重要", "{lead}。你說自己比較需要保障，請理專改介紹{medical}和意外險，{每個月的保費不多，|理專有點失望，還是幫你辦好了，}{心裡踏實了一點。|就當以防萬一。}"],
-      full: ["保障型的一次買齊", full, "{lead}。你請理專把{full}都規劃進去，{一口氣全部簽了。|每年的保費不便宜，但你覺得家人有了保障。}"],
+      full: ["保障型的一次買齊", fullHint, "{lead}。你請理專把{full}都規劃進去，{一口氣全部簽了。|每年的保費不便宜，但你覺得家人有了保障。}"],
       saving: ["照理專說的買儲蓄險", "強迫自己存錢", "{lead}。你照理專說的買了{一張六年期的儲蓄險，|一張儲蓄型的保單，}{當作強迫自己存錢。|每年繳一筆，像是在幫未來的自己存錢。}"],
       ask: ["拿回家比一比", "比清楚再買", "{lead}。你沒有當場簽，{把建議書帶回家，上網比較了好幾家，|請懂保險的朋友幫你看，}{最後只買了一張真正需要的醫療險。|才發現儲蓄險的利率沒有說得那麼好，最後只買了一張醫療險。}"],
       no: ["不買，錢放定存", "保費拿去存", "{lead}。你說要再想想，{把錢放回定存，|拿著一疊傳單走出銀行，}{理專說隨時歡迎再來。|你覺得錢放在自己看得到的地方比較安心。}"],
@@ -404,14 +407,14 @@ function insuranceScenes(s, ctx) {
     s.year >= 2000 && corp(s) && !["公部門", "教育"].includes(s.job.field) && {
       key: "group", lead: s.job.field === "醫療" ? "醫院的團保說明會上，人資提醒大家：團保只保在職的時候，離職或退休就沒了" : "公司的團保說明會上，人資提醒大家：團保只保在職的時候，離職或退休就沒了",
       basic: ["自己加買醫療險和意外險", "補上團保的缺口", "{lead}。你自己加買了{medical}和意外險，{每個月的保費不多，|就算換工作也不怕斷掉，}{心裡踏實了一點。|就當以防萬一。}"],
-      full: ["一次買齊", full, "{lead}。你找了業務員，把{full}都買齊了，{每年的保費不便宜，但你覺得家人有了保障。|你把保單收進抽屜最裡面。}"],
+      full: ["一次買齊", fullHint, "{lead}。你找了業務員，把{full}都買齊了，{每年的保費不便宜，但你覺得家人有了保障。|你把保單收進抽屜最裡面。}"],
       saving, ask,
       no: ["有團保就夠了", "保費拿去存", "{lead}。你覺得公司的團保就夠了，{把保費的錢存了起來，|說等換工作再說，}{那份說明會的講義被你拿去墊便當。|人資的提醒，你聽聽就算了。}"],
     },
     s.year >= 2015 && {
       key: "online", lead: "手機跳出網路投保的廣告，意外險和醫療險在網路上按幾下就能買，保費還比較便宜",
       basic: ["上網買醫療險和意外險", "便宜，基本保障就好", "{lead}。你在網路上比了幾家，買了{medical}和意外險，{十分鐘就投保完成，|保費比你想的便宜，}{心裡踏實了一點。|就當以防萬一。}"],
-      full: ["找業務員一次買齊", full, "{lead}。你覺得網路上的不夠，找了業務員把{full}都買齊了，{業務員來家裡講了一整個晚上。|每年的保費不便宜，但你覺得家人有了保障。}"],
+      full: ["找業務員一次買齊", fullHint, "{lead}。你覺得網路上的不夠，找了業務員把{full}都買齊了，{業務員來家裡講了一整個晚上。|每年的保費不便宜，但你覺得家人有了保障。}"],
       saving, ask,
       no: ["不買，自己存錢", "保費拿去存", "{lead}。你把廣告滑掉了，{決定把保費的錢存起來，|說自己身體還很好，}{每個月固定轉一筆到另一個帳戶。|手機之後還是一直跳出保險廣告。}"],
     },
@@ -503,9 +506,6 @@ function loanScenes(s, ctx, { who, ta, elder, younger }) {
   return scenes.map(x => x && { ...x, v });
 }
 
-// A string shown as a button or hint that the story also writes inside a sentence: the same Chinese, and in English
-// the sentence's words with a capital letter.
-const asLabel = (ctx, x) => ctx.f("{asLabel}", { asLabel: x });
 
 export const ADULT = [
   // ---------- married life ----------
@@ -637,7 +637,7 @@ export const ADULT = [
         prompt: ctx.f("{lead}。接下來想怎麼過？", { lead }),
         options: [
           { id: "a_midlife.run", label: "開始運動", hint: asLabel(ctx, sport), act: "exercise", style: "health", weight: 0.25, apply: (s2, c) => { s2.health.fitness = Math.min(1, s2.health.fitness + 0.1); s2.health.hr = Math.max(0.8, s2.health.hr * 0.98); c.nudge("health", 0.03); c.remember("a_midlife", sportMemory, { mood: 2 }); return { text: c.w(early ? "{lead}。你決定{sport}，{每天早上五點半出門，|{when}換上球鞋就出門，}{三個月後|半年後}，你可以一口氣跑完{goal}。" : "{lead}。你決定{sport}，{每天早上五點半出門，|{when}換上球鞋就出門，}{goal}。", { lead, sport, goal, when: s2.employed ? "下班後" : "每天傍晚" }), mood: 3 }; } },
-          { id: "a_midlife.study", label: "回學校讀書", hint: school, act: "study", style: "learn", weight: 0.15, when: s2 => !s2.arcs.study, apply: (s2, c) => { spend(s2, 0.2); c.arc.start("study", { kind: school, from: s2.age }, 2); return { text: c.w("{lead}。你報名了{school}，{{evenings}背著書包走進教室，同學都和你差不多年紀。|第一堂課坐在第一排，抄了滿滿三頁筆記。|週末在圖書館讀到閉館，好像回到二十歲。}", { lead, school, evenings: s2.employed ? "下班後" : "每週三個晚上" }), mood: 2 }; } },
+          { id: "a_midlife.study", label: "回學校讀書", hint: asLabel(ctx, school), act: "study", style: "learn", weight: 0.15, when: s2 => !s2.arcs.study, apply: (s2, c) => { spend(s2, 0.2); c.arc.start("study", { kind: school, from: s2.age }, 2); return { text: c.w("{lead}。你報名了{school}，{{evenings}背著書包走進教室，同學都和你差不多年紀。|第一堂課坐在第一排，抄了滿滿三頁筆記。|週末在圖書館讀到閉館，好像回到二十歲。}", { lead, school, evenings: s2.employed ? "下班後" : "每週三個晚上" }), mood: 2 }; } },
           { id: "a_midlife.hobby", label: ctx.f("學{craft}", { craft }), hint: "一直想學卻沒時間的事", act: "hobby", style: "learn", weight: 0.2, apply: (s2, c) => { spend(s2, 0.05); c.nudge("curiosity", 0.03); return { text: c.w("{lead}。你報名了{craft}課，{第一堂課就被老師稱讚有天分。|班上最年輕的同學才二十歲，你們變成了朋友。|每週最期待的就是那兩個小時。}", { lead, craft }), mood: 3 }; } },
           { id: "a_midlife.trip", label: "一個人去旅行", hint: "離開幾天，想清楚", act: "travel", style: "self", weight: 0.15, apply: (s2, c) => { spend(s2, 0.1); return { text: c.w("{lead}。你{week}，一個人去{trip}，{在陌生的街上走了一整天，|坐在海邊看了一下午的浪，}{回來時，覺得自己可以再出發了。|想通了一些事。}", { lead, week: s2.employed ? "請了一週假" : "給自己放了一週假" }), mood: 3 }; } },
           { id: "a_midlife.talk", label: p ? ctx.f("跟{p}聊聊", { p }) : "找老朋友聊聊", hint: "說出來就輕了一半", act: "talk", style: "social", weight: 0.2, apply: (s2, c) => { if (p) return { text: c.w("{lead}。那天晚上你跟{p}說了，{p}{沒有笑你，只說：「那我們一起想想看。」|說{pta}也有一樣的感覺。}{你們開始每個週末去一個沒去過的地方。|你才發現，原來不是只有你在撐。}", { lead, p, pta: pronoun(s2.partner) }), mood: 2 }; const { f } = friendOf(s2, c); return { text: c.w("{lead}。你約老朋友{fc}出來喝一杯，{兩個人聊到店家打烊。|{fc}說：「我們這個年紀，大家都一樣。」}{回家的路上，你覺得輕鬆多了。|你們約好每個月見一次面。}", { lead, fc: f.call }), mood: 2 }; } },
@@ -782,12 +782,11 @@ export const ADULT = [
         check: s.year >= 1995 ? "拿著耳溫槍量體溫，" : ctx.f("一直摸{kta}的額頭，", { kta }),
         both: married(s) ? ctx.f("你和{pc}輪流", { pc: s.partner.call }) : "你一個人",
         next: s.employed ? "隔天你頂著黑眼圈去上班。" : "隔天你整個人昏昏沉沉。",
-        home: s.employed ? "請假" : "整天",
       };
       const t = [
         "{kn}半夜發燒到三十九度，你{card}，衝去掛急診，{等到天亮才回家。|醫生說是病毒感染，多喝水、多休息就好。}",
         "{kn}半夜咳個不停，{both}{抱著{kta}坐在客廳，|{check}}{一夜沒睡。|天亮{kn}才睡著。}{next}",
-        "{kn}燒了兩天，你{{home}在家顧{kta}，|把冰枕換了一顆又一顆，}{第三天早上{kn}退燒了，吵著要吃布丁。|燒一退，{kn}又在床上跳來跳去。}",
+        s.employed ? "{kn}燒了兩天，你{請假在家顧{kta}，|把冰枕換了一顆又一顆，}{第三天早上{kn}退燒了，吵著要吃布丁。|燒一退，{kn}又在床上跳來跳去。}" : "{kn}燒了兩天，你{整天在家顧{kta}，|把冰枕換了一顆又一顆，}{第三天早上{kn}退燒了，吵著要吃布丁。|燒一退，{kn}又在床上跳來跳去。}",
       ];
       if (k.age <= 2) t.push("{kn}燒了三天，退燒後身上冒出紅疹，醫生說是玫瑰疹，{你這才鬆了一口氣。|你抱著{kta}在診間外坐了好一會兒。}");
       return { text: wordsAs(s, ctx, t, v), mood: -2 };

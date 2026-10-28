@@ -58,7 +58,8 @@ export function rerun({ chart, analysis, luck, sex = chart.input.sex, runs = 100
     kids: [0, 1, 2, 3].map(n => ({ n, runs: count(l => (n === 3 ? l.state.kids.length >= 3 : l.state.kids.length === n)) })),
     university: count(l => ["大學", "科大", "碩士", "博士"].includes(l.state.edu)),
     homeOwner: count(l => l.state.home === "own"),
-    abroad: count(l => l.log.some(e => e.id === "abroad" && /到.+工作/.test(e.text))),
+    // Went to work abroad when the chance came (story/core.js abroad marks it), not read out of the sentence.
+    abroad: count(l => !!l.state.flags.workedAbroad),
     family: {
       fatherClash: count(l => l.log.some(e => e.id === "fatherClash")),
       motherClash: count(l => l.log.some(e => e.id === "motherClash")),
