@@ -51,6 +51,8 @@ export function normalizeLuck(luck, maxAge = MAX_AGE) {
     out.push(normalizeYear(e, age));
     if (byAge.has(age)) last = byAge.get(age);
   }
+  // Marked, so the engine does not normalise it again for every one of the 100 lives.
+  Object.defineProperty(out, "normalized", { value: true });
   return out;
 }
 

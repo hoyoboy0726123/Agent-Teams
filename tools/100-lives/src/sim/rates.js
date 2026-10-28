@@ -1,7 +1,7 @@
 // US base rates: the chance of each thing in the simulation happening within one year.
 //
 // The big official tables (life tables, causes of death, chronic disease) come from src/data/us-rates.js, which has
-// the same export names and shapes as 命盤人生's official-data.js: LIFE_TABLES, CAUSE_AGES, CAUSE_SHARES,
+// the same export names and shapes as bazi-life's official-data.js: LIFE_TABLES, CAUSE_AGES, CAUSE_SHARES,
 // CHRONIC_AGES, CHRONIC_RATES (and POPULATION_* for checks). How an illness unfolds after its diagnosis is a stated
 // design (FATALITY). The smaller figures below (fertility, marriage, divorce, schooling, pay, homes, moves) carry
 // their source next to them; where no statistic exists at all (dating, breakups, promotions), the value is a design
@@ -32,7 +32,7 @@ const yr = year => (frozenYear === null ? year : frozenYear);
 
 // ---------- mortality ----------
 // LIFE_TABLES rows: [year, male q(x) × 1e6, female q(x) × 1e6, [male e0, female e0], [male eΩ, female eΩ]] for the
-// single ages 0..Ω−1 of the table (Ω = 85 in 命盤人生's data; any open age works) and the remaining life expectancy at
+// single ages 0..Ω−1 of the table (Ω = 85 in bazi-life's data; any open age works) and the remaining life expectancy at
 // the open age Ω. A year between two tables takes q(x) log-linearly between them; years before the first table use it.
 // From the open age on, a Kannisto curve (the old-age model of the Human Mortality Database) continues each table, its
 // slope from the last ten single ages and its level set so that the remaining life expectancy at Ω is the table's.
@@ -113,7 +113,7 @@ export const deathRaw = (age, sex, year) => lifeTable(sex, year)[Math.min(MAX, M
 // Cancer's fatality is FATALITY.cancer × e^(α + β·(age at diagnosis − 65)/10) for each sex (CANCER_FATALITY): younger
 // patients survive far more often, and a regular health check lowers the fatality by a quarter (design). α and β are
 // to be solved so the simulated diagnoses reproduce the US cancer registry (us-rates.js CANCER_FATALITY when it has
-// them); until then they are 命盤人生's values for Taiwan, which give a five-year survival a little below the US one.
+// them); until then they are bazi-life's values for Taiwan, which give a five-year survival a little below the US one.
 export const WHO_STANDARD = [[0, 8.86], [5, 8.69], [10, 8.60], [15, 8.47], [20, 8.22], [25, 7.93], [30, 7.61], [35, 7.15], [40, 6.59], [45, 6.04], [50, 5.37], [55, 4.55], [60, 3.72], [65, 2.96], [70, 2.21], [75, 1.52], [80, 0.91], [85, 0.63]];
 export const CANCER_REFERENCE = D.CANCER_REFERENCE || null;
 const FATALITY = { cancer: [0.15, 0.1, 0.07, 0.05, 0.04], stroke: [0.17, 0.06, 0.05, 0.04, 0.04], "heart disease": [0.14, 0.05, 0.04, 0.04, 0.03] };
@@ -263,7 +263,7 @@ const MARITAL_SHARE = [[17, 0.1], [22, 0.33], [27, 0.6], [32, 0.77], [37, 0.79],
 const MARRIED_SHARE = [[18, 0.02], [22, 0.11], [27, 0.33], [32, 0.5], [37, 0.58], [42, 0.6], [50, 0.6]];
 const DATING_SHARE = [[18, 0.3], [22, 0.4], [27, 0.35], [32, 0.25], [37, 0.2], [45, 0.15]];
 // Births by how many children came before (design, to be tuned by the calibration test: in the simulation births come
-// to couples, and the order matters as the US has more third children than 命盤人生's Taiwan).
+// to couples, and the order matters as the US has more third children than bazi-life's Taiwan).
 const PARITY = [1.55, 1.45, 0.95, 0.6, 0.3];
 // The chance of a birth this year for a woman of `motherAge` with `parity` children, married (or, with
 // married = false, dating or living with a partner).
@@ -283,7 +283,7 @@ export function siblings(birthYear, rng) {
 // ---------- marriage ----------
 // Median age at first marriage (Census Bureau, Current Population Survey, table MS-2): men 22.8 and women 20.3 in 1950,
 // 23.2 and 20.8 in 1970, 26.1 and 23.9 in 1990, 26.8 and 25.1 in 2000, 28.2 and 26.1 in 2010, 30.5 and 28.1 in 2020,
-// 30.2 and 28.6 in 2024. The age curves below have their shape from 命盤人生 (fitted there) and are moved by the
+// 30.2 and 28.6 in 2024. The age curves below have their shape from bazi-life (fitted there) and are moved by the
 // difference between the year's median and 2024's, so that the timing follows the era. Dating, breakups and
 // proposals have no official statistic: design parameters, to be tuned to these medians and to the share never
 // married at 40–44 (Census ACS 2023: about a quarter of men and a fifth of women).
@@ -292,7 +292,7 @@ export const MEDIAN_FIRST_MARRIAGE = D.MEDIAN_FIRST_MARRIAGE || {
   female: [[1950, 20.3], [1960, 20.3], [1970, 20.8], [1980, 22.0], [1990, 23.9], [2000, 25.1], [2010, 26.1], [2020, 28.1], [2024, 28.6]],
 };
 const marriageShift = (sex, year) => interp(MEDIAN_FIRST_MARRIAGE[sex === "female" ? "female" : "male"], yr(year)) - interp(MEDIAN_FIRST_MARRIAGE[sex === "female" ? "female" : "male"], 2024);
-// The year 2024 sits 1.5 (women) and 1.9 (men) years younger than the curves' own centre (命盤人生's Taiwan, mean ages
+// The year 2024 sits 1.5 (women) and 1.9 (men) years younger than the curves' own centre (bazi-life's Taiwan, mean ages
 // at first marriage 31.1 and 33.1), so the curves are read that much older.
 const CENTRE = { female: 1.5, male: 1.9 };
 const atAge = (age, sex, year) => age + CENTRE[sex === "female" ? "female" : "male"] - marriageShift(sex, year);
@@ -309,7 +309,7 @@ export const proposal = (age, sex, year, marriages) => interp(sex === "female"
 // The refined divorce rate, divorces per 1,000 married women a year (CDC/NCHS and the National Center for Family &
 // Marriage Research, approximately): 10.3 in 1950, 9.2 in 1960, 14.9 in 1970, 22.6 in 1980, 20.9 in 1990, about 19.5
 // in 2000, 19.8 in 2010, 15.5 in 2019, 14.6 in 2022, 14.4 in 2023. The duration curve (by years married, from the
-// first year after the wedding) is 命盤人生's, fitted there with the crisis choices to a rate of 10.5 per 1,000, so it
+// first year after the wedding) is bazi-life's, fitted there with the crisis choices to a rate of 10.5 per 1,000, so it
 // is scaled by the US rate over 10.5. Lifetime: roughly 40 % of first marriages end in divorce.
 export const REFINED_DIVORCE = D.REFINED_DIVORCE || [[1950, 10.3], [1960, 9.2], [1970, 14.9], [1975, 20.3], [1980, 22.6], [1990, 20.9], [2000, 19.5], [2008, 20.5], [2010, 19.8], [2015, 16.9], [2019, 15.5], [2020, 14.0], [2022, 14.6], [2023, 14.4]];
 const DIVORCE_BY_YEARS = [[1, 0.032], [2, 0.036], [5, 0.024], [9, 0.014], [15, 0.0085], [25, 0.005], [40, 0.003]];
@@ -328,9 +328,9 @@ export const juniorHigh = () => 1;
 // 2000, 89 % in 2010, 95 % in 2020). About 4 points of that is a GED taken later.
 export const HIGH_SCHOOL = D.HIGH_SCHOOL || [[1950, 0.6], [1962, 0.75], [1972, 0.85], [1982, 0.86], [1992, 0.87], [2002, 0.89], [2012, 0.92], [2020, 0.95]];
 export const highSchoolGrad = year => interp(HIGH_SCHOOL, yr(year));
-// The yearly chance of dropping out at 16 or 17 (legal from 16 in most states), so that the diploma share on time is
-// the completion share less the GEDs; a dropout earns a GED with GED_RATE a year from 17 to 30 (design).
-export const hsDropout = (age, year) => (age < 16 || age > 17 ? 0 : 1 - Math.sqrt(Math.max(0.3, highSchoolGrad(year) - 0.04)));
+// The chance of dropping out in each of the years at 16 and 17 (legal from 16 in most states), so that the diploma
+// share on time is the completion share less the GEDs; a dropout earns a GED with GED_RATE a year from 17 to 30 (design).
+export const hsDropout = year => 1 - Math.sqrt(Math.max(0.3, highSchoolGrad(year) - 0.04));
 export const GED_RATE = 0.035;
 export const ged = age => (age >= 17 && age <= 30 ? GED_RATE : 0);
 // College right after high school: the share of new graduates enrolled that fall (NCES Digest table 302.10: 45 % in
@@ -349,7 +349,7 @@ export function afterHighSchool(year, sex = "male", birthYear = year - 18) {
 // Finishing: about 62–64 % of four-year starters finish a bachelor's within six years (NCES), about a third of
 // community-college starters finish an associate degree and a third transfer to a four-year school (design from
 // National Student Clearinghouse figures). Yearly dropout rates that give those shares (design).
-export const collegeDropout = (kind = "college") => (kind === "community" ? 0.2 : 0.11);
+export const collegeDropout = (year, track = "college") => (track === "community" ? 0.2 : 0.11);
 export const transfer = () => 0.33;
 // Graduate school straight after a bachelor's (design, from NCES: about 14 % of adults hold an advanced degree, about
 // 37 % of bachelor's holders, many of them years later): a master's or MBA, law or medicine, or a PhD.
@@ -367,6 +367,9 @@ export function military(birthYear, year = birthYear + 18, sex = "male") {
   const draft = birthYear <= 1953 && y <= 1972;
   return { p: draft ? 0.3 : interp([[1973, 0.14], [1990, 0.12], [1995, 0.08], [2005, 0.075], [2020, 0.07]], y), draft, years: draft ? 2 : 4 };
 }
+
+// The chance that someone finishing high school in `year` enlists (the choice after graduation; story/core.js).
+export const enlist = (sex, year) => military(year - 18, year, sex).p;
 
 // ---------- work ----------
 // One unit of pay is the median annual earnings of a full-time worker (BLS, usual weekly earnings, 2023: $1,117 a week,
@@ -410,6 +413,7 @@ export const homeBuy = age => interp([[22, 0.03], [25, 0.07], [30, 0.11], [35, 0
 export const DOWN_PAYMENT = 0.8;
 // Moving to another state (Census Bureau, CPS mobility: about 3 % of people a year through the 1950s–80s, 2.5 % around
 // 2000, 1.5 % from the 2010s; most for young adults): yearly chances by age and era (design, to those figures).
-export const move = (age, year = 2024) => interp([[18, 0.035], [25, 0.05], [35, 0.03], [50, 0.015], [70, 0.01]], age) * interp([[1950, 1.25], [1985, 1.15], [2000, 1.0], [2015, 0.7], [2024, 0.65]], yr(year));
+// Without a year, the era factor is left out (1).
+export const move = (age, year = null) => interp([[18, 0.035], [25, 0.05], [35, 0.03], [50, 0.015], [70, 0.01]], age) * (year === null ? 1 : interp([[1950, 1.25], [1985, 1.15], [2000, 1.0], [2015, 0.7], [2024, 0.65]], yr(year)));
 // Working abroad: about 3 million Americans live abroad (State Department estimates), a small yearly chance (design).
 export const abroad = age => interp([[22, 0.004], [30, 0.006], [40, 0.004], [50, 0.002]], age);

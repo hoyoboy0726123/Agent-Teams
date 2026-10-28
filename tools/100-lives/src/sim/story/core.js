@@ -13,7 +13,7 @@ import { jobsFor, startJob, otherJob, moveTo, jobFit } from "../world.js";
 import { newKid, meetPlace, realPartnerDue, realPartnerAhead, realPartnerEngaged, realPartnerWeddingDue, realPartnerPlan, realPartner, realPartnerWaiting, keptForPartner, realPartnerSteady, surnameIn, sameSexCouple, canMarry, datingSex } from "../people.js";
 import { marry, endRelationship, closeSpell, ownHome } from "../act.js";
 import {
-  scene, cap, an, they, them, their, kidWord, RELATIONS, sibName, isBrother, bornSibs, listWords, grandWord, parentWord, isAre,
+  scene, cap, an, they, them, their, kidWord, kidNoun, RELATIONS, sibName, isBrother, bornSibs, listWords, grandWord, parentWord, isAre,
   leaveSchool, WORK_ACTIONS, middleName, inHigh, fullRetirementAge, stateOf, stateCode, stateName, regionOf, inStates,
   rate, illnessWord, isCancer, chatOf,
 } from "./common.js";
@@ -100,12 +100,12 @@ export const CORE = [
   {
     id: "birth", once: true, ages: [0, 0], big: true, p: () => 1,
     apply: (s, ctx) => {
-      const lb = 5 + ctx.rng.int(5), oz = ctx.rng.int(16), intro = introOf(ctx);
+      const lb = 5 + ctx.rng.int(5), oz0 = ctx.rng.int(16), oz = `${oz0} ounce${oz0 === 1 ? "" : "s"}`, intro = introOf(ctx);
       const dad = s.year < 1972 ? "{Your father paced the waiting room with a pack of cigars in his pocket, as fathers did then.|Your father got the news from a nurse in the waiting room and called everyone he knew from the pay phone.}" : "{Your dad was in the delivery room, a little green, holding the camera.|Your mom said later that you came out yelling and never really stopped.}";
       const text = ctx.w([
-        `You were born in ${here(s)} in ${s.year}, ${lb} pounds ${oz} ounces. ${dad}`,
-        `You arrived in ${s.year} in ${here(s)}, ${lb} pounds ${oz} ounces, with {a full head of dark hair|no hair at all|the family nose}. ${dad}`,
-        `${s.year}, ${here(s)}: you were born {just before dawn|in the middle of a thunderstorm|on a quiet Sunday afternoon|an hour after the nurses changed shifts}, ${lb} pounds ${oz} ounces.`,
+        `You were born in ${here(s)} in ${s.year}, ${lb} pounds ${oz}. ${dad}`,
+        `You arrived in ${s.year} in ${here(s)}, ${lb} pounds ${oz}, with {a full head of dark hair|no hair at all|the family nose}. ${dad}`,
+        `${s.year}, ${here(s)}: you were born {just before dawn|in the middle of a thunderstorm|on a quiet Sunday afternoon|an hour after the nurses changed shifts}, ${lb} pounds ${oz}.`,
       ]);
       return { text: intro ? `${text} The sky that hour: ${intro}.` : text, mood: 0, big: true };
     },
@@ -516,7 +516,7 @@ export const CORE = [
           { id: "layoff.own", label: "Use the severance to start a business", hint: "be your own boss", act: "startup", style: "risk", weight: 0.05, when: s2 => s2.age >= 25 && s2.age <= 60, apply: (s2, c) => {
             const kind = c.rng.pick(s2.year >= 2005 ? ["food truck", "online store", "consulting business", "landscaping company"] : ["diner", "hardware store", "consulting business", "landscaping company"]);
             startJob(s2, c, [`owner of a small ${kind}`, c.roll("career", "good", 0.5) ? 1.1 : 0.75, "self-employed", null]);
-            return { text: `${then}, you put everything into opening a ${kind}. The first year was terrifying and yours.`, mood: -1, big: true };
+            return { text: `${then}, you put everything into opening ${an(kind)}. The first year was terrifying and yours.`, mood: -1, big: true };
           } },
         ],
       };
@@ -572,5 +572,502 @@ export const CORE = [
       };
     },
   },
-// ---------- more of the core follows ----------
+  // ---------- love ----------
+  {
+    id: "crush", domain: "love", channel: "good", ages: [11, 18], cooldown: 3, p: () => 0.15,
+    apply: (s, ctx) => {
+      const chat = chatOf(s.year);
+      return { text: ctx.w(s.year < 1990 ? ["You had a crush on someone in {homeroom|band|the grade above you} and {doodled their initials in every notebook.|walked the long way home past their house.}", "Someone slipped you a note that said “Do you like me? Check yes or no.” {You checked yes.|You checked “maybe” and regretted it for a week.}", `You talked to your crush on ${chat} for two hours, {stretching the cord into the pantry for privacy.|until your dad picked up the other line.}`] : s.year < 2010 ? ["You had a crush on someone in {homeroom|band|your lab group} and {wrote their name in your notebook margins.|saved their away message in a file.}", `You stayed up talking to your crush on ${chat}, {and rewrote every message three times.|and were exhausted for first period.}`, "You slow-danced with your crush at the school dance, {at arm's length, to a song that lasted forever.|and your friends would not stop talking about it.}"] : ["You had a crush on someone in {homeroom|band|your lab group} and {checked whether they had liked your post.|made a playlist you never sent.}", `You and your crush talked in ${chat} until midnight, {and you screenshotted the good parts.|and a single “haha” kept you up thinking.}`, "Your crush asked you to the school dance {with a poster and a box of donuts.|by text, which still counted.}"]), mood: 2 };
+    },
+  },
+  {
+    // The partner from the family input, when there is one, is the first partner once you are both adults
+    // (people.js realPartnerDue); everyone else is drawn at random.
+    id: "dating", domain: "love", channel: "good", tags: ["spouse"], ages: [17, 80], when: (s, ctx) => (s.rel === "single" || s.rel === "divorced" || s.rel === "widowed") && !realPartnerWaiting(s, ctx),
+    p: (s, ctx) => rate(ctx, "dating", s.age, s.rel, s.year) * (s.flags.pursueUntil >= s.age ? 1.8 : 1) * (keptForPartner(s, ctx) ? 2 : 1),
+    apply: (s, ctx) => {
+      s.prevRel = s.rel; s.rel = "dating"; s.datingSince = s.age;
+      const real = realPartnerDue(s, ctx);
+      let p;
+      if (real) { p = realPartner(s, ctx, real); s.flags.realPartnerMet = s.age; }
+      else {
+        const partnerAge = Math.max(17, s.age + Math.round(ctx.rng.between(-3, 4)) * (s.sex === "male" ? -1 : 1));
+        p = ctx.person({ role: "partner", sex: datingSex(s, ctx), birthYear: s.year - partnerAge, how: meetPlace(s, ctx) });
+        p.age = partnerAge;
+      }
+      s.partner = p;
+      const met = metLead(p), word = p.nature && p.nature.word ? p.nature.word : "kind";
+      const again = s.prevRel === "divorced" || s.prevRel === "widowed";
+      return { text: ctx.w([`${met} {name}, ${an(word)} person, and {you started seeing each other.|it was serious within a month.}`, `${met} {name}, and {you talked until the restaurant stacked the chairs.|the first date lasted nine hours.|you both laughed at the same wrong moment in the movie.}`, `${met} {name}. {Your first impression: ${word}.|You went home and told ${again ? "a friend" : "your roommate"} you had met someone.} {Soon you were a couple.|A few months later you were official.}`], { name: p.call }), mood: 6, big: !!p.real };
+    },
+  },
+  {
+    // The year given for getting together with the family input's partner: they come into the story that year.
+    id: "realPartnerMeet", domain: "love", channel: "good", tags: ["spouse"], rare: true, once: true, ages: [14, 95],
+    when: (s, ctx) => { const m = realPartnerDue(s, ctx); return !!m && realPartnerPlan(m).meet !== null && s.rel !== "married"; },
+    p: () => 1,
+    apply: (s, ctx) => {
+      let before = "";
+      if (s.rel === "dating" && s.partner) { before = `After you and ${s.partner.call} broke up, `; endRelationship(s, ctx); }
+      const m = realPartnerDue(s, ctx);
+      s.prevRel = s.rel; s.rel = "dating"; s.datingSince = s.age;
+      const p = realPartner(s, ctx, m);
+      s.flags.realPartnerMet = s.age; s.partner = p;
+      const met = before ? metLead(p).replace(/^./, ch => ch.toLowerCase()) : metLead(p);
+      return { text: ctx.w(`${before}${met} {name}, {and you were together almost right away.|and something just clicked.|and that was that.}`, { name: p.call }), mood: 6, big: true };
+    },
+  },
+  {
+    // The wedding year given for the family input's partner: you marry that year.
+    id: "realPartnerWedding", domain: "love", channel: "good", tags: ["spouse"], about: "partner", rare: true, once: true, ages: [16, 95],
+    when: (s, ctx) => realPartnerWeddingDue(s, ctx) && canMarry(s),
+    p: () => 1,
+    apply: (s, ctx) => {
+      const name = s.partner.call;
+      marry(s);
+      return { text: ctx.w(`You married ${name}! {${s.father.alive || s.mother.alive ? "Your parents cried harder than you did." : "You felt your parents there anyway."}|Both families squeezed into one reception hall, and everyone danced.|You signed the license at the courthouse and laughed the whole way home.}`), mood: 10, big: true };
+    },
+  },
+  {
+    id: "breakup", domain: "love", channel: "bad", tags: ["spouse"], about: "partner", cooldown: 1, when: (s, ctx) => s.rel === "dating" && s.age > s.datingSince && !realPartnerEngaged(s, ctx) && !realPartnerSteady(s, ctx),
+    p: (s, ctx) => rate(ctx, "breakup", s.age) * (s.guard > 0 ? 0.6 : 1) * (s.crisis > 0 ? 1.5 : 1),
+    apply: (s, ctx) => {
+      const name = s.partner ? s.partner.call : "them";
+      endRelationship(s, ctx);
+      return { text: ctx.w(["You and {name} broke up, and it hurt for a long time.", "You and {name} wanted different lives, and you ended it kindly.", "{name} said they needed space, and the space got bigger until it was the whole thing.", "The night you and {name} broke up, you {drove around for an hour with the radio off.|put the photos in a shoebox on the top shelf.|ate a whole pint of ice cream standing up.}"], { name }), mood: -6 };
+    },
+  },
+  {
+    id: "proposal", calibrated: true, domain: "love", channel: "good", tags: ["spouse"], about: "partner",
+    when: (s, ctx) => s.rel === "dating" && s.age > s.datingSince && !realPartnerAhead(s, ctx) && !realPartnerEngaged(s, ctx) && !realPartnerWeddingDue(s, ctx) && canMarry(s),
+    p: (s, ctx) => { const q = rate(ctx, "proposal", s.age, s.sex, s.year, s.marriages); return sameSexCouple(s) && s.year <= SAME_SEX_MARRIAGE + 1 ? Math.max(0.5, q) : q; },
+    choice: (s, ctx) => {
+      const name = s.partner ? s.partner.call : "your partner", P = s.partner;
+      const again = s.marriages > 0, years = Math.max(1, s.age - s.datingSince);
+      const wed = (s2, text) => { marry(s2); return { text: again ? ctx.w([`You married ${name}, and this time you both knew what you were promising.`, `After one marriage behind you, you married ${name}, more carefully and more gladly.`]) : text, mood: 10, big: true }; };
+      const lead = scene(ctx, [
+        `You and ${name} have been together ${years === 1 ? "a year" : `${years} years`}, and the question of marriage is on the table.`,
+        `${name} got down on one knee ${ctx.rng.pick(["at the overlook where you had your first date", "in the middle of the kitchen", "on the beach at sunset", "on Christmas morning, next to the tree"])}.`,
+        s.year >= 1990 ? `Your names lit up on the Jumbotron at a ballgame: ${name} was proposing.` : null,
+        `You and ${name} started looking at apartments together, and ${they(P)} asked what you thought about forever.`,
+        `Your friends are all getting married. ${name} looked at the stack of wedding invitations on the fridge and said, “What about us?”`,
+        sameSexCouple(s) && s.year >= 2015 && s.year <= 2016 ? `When the Supreme Court ruled in June 2015, ${name} turned to you on the couch and said, “So. Should we?”` : null,
+        s.year < 1975 && s.sex === "female" && P && P.sex === "male" && s.father.alive ? `${name} asked your father's blessing first, the way people did then, and then asked you.` : null,
+        s.year >= 2020 && s.year <= 2021 ? `The pandemic canceled half the weddings you were invited to, and ${name} asked if you wanted to get married anyway.` : null,
+      ]);
+      const L = {
+        big: s.year < 1990 ? ctx.rng.pick([["A church wedding with everyone", "the whole family, the whole town"], ["A big wedding and a reception hall", "Mom has a list"]]) : ctx.rng.pick([["A big wedding with everyone", "a DJ, a dance floor, all the cousins"], ["A wedding at a barn venue", "string lights and mason jars"]]),
+        small: ctx.rng.pick([["City hall, then a nice dinner", "simple and official"], ["A small backyard wedding", "only the people you love most"]]),
+        elope: ["Elope to Las Vegas", "a chapel, an Elvis, no fuss"],
+        wait: ctx.rng.pick([["Not yet", "you're not ready"], ["Wait until you've saved some money", "get on solid ground first"], ["Wait until work settles down", "the timing is wrong"]]),
+        no: ctx.rng.pick([["Break up", "you want different futures"], ["Tell the truth and part ways", "better now than later"]]),
+      };
+      const bigText = L.big[0].includes("barn") ? `You married ${name} in a barn strung with lights, {and your uncle gave a toast nobody will forget.|and the DJ played your song twice.}` : `You married ${name}! {${s.father.alive || s.mother.alive ? "Your parents cried harder than you did." : "You wished your parents could have seen it."}|The reception ran until the hall turned the lights on.|Every cousin you have was on the dance floor.}`;
+      const smallText = L.small[0].startsWith("City hall") ? `You and ${name} got married at city hall {with two friends as witnesses,|on a Tuesday lunch break,} then {had the best steak dinner of your lives.|went out for pancakes.}` : `You married ${name} in a backyard full of folding chairs, {and the neighbor's dog crashed the vows.|and your best friend officiated.}`;
+      const waitText = L.wait[0].startsWith("Wait until you've saved") ? `${name} was ready to get married. You wanted some money in the bank first, so you waited.` : L.wait[0].startsWith("Wait until work") ? `${name} was ready to get married. You wanted work to settle down first, so you waited.` : `${name} was ready to get married. You weren't, not yet, and you said so.`;
+      return {
+        prompt: `${lead} ${ctx.rng.pick(["Do you get married?", "What's your answer?", "Is this it?"])}`,
+        options: [
+          { id: "proposal.big", label: L.big[0], hint: L.big[1], act: "marry", style: "family", weight: 0.42, apply: s2 => { s2.savings = Math.max(0, s2.savings - 0.2); return wed(s2, ctx.w(bigText)); } },
+          { id: "proposal.small", label: L.small[0], hint: L.small[1], act: "marry", style: "safe", weight: 0.35, apply: s2 => wed(s2, ctx.w(smallText)) },
+          { id: "proposal.elope", label: L.elope[0], hint: L.elope[1], act: "marry", style: "risk", weight: 0.08, apply: s2 => wed(s2, ctx.w(`You and ${name} flew to Las Vegas and got married in a little chapel{, with an Elvis impersonator as a witness.|, and called your parents from the hotel.|, still in your travel clothes.}`)) },
+          { id: "proposal.wait", label: L.wait[0], hint: L.wait[1], act: "wait", style: "safe", weight: 0.11, apply: () => ({ text: waitText, mood: -1 }) },
+          { id: "proposal.no", label: L.no[0], hint: L.no[1], act: "separate", style: "self", weight: 0.04, apply: (s2, c) => { endRelationship(s2, c); return { text: c.w(`When marriage came up, you and ${name} realized you wanted different futures, {and you broke up.|and after a long talk, you let each other go.}`), mood: -6 }; } },
+        ],
+      };
+    },
+  },
+  {
+    id: "crisis", calibrated: true, domain: "love", channel: "bad", tags: ["spouse"], about: "partner", cooldown: 4, when: s => s.rel === "married",
+    p: (s, ctx) => rate(ctx, "crisis", yearsMarried(s)) * (s.partner && s.partner.nature && s.partner.nature.crisis ? s.partner.nature.crisis : 1),
+    choice: (s, ctx) => {
+      const name = s.partner ? s.partner.call : "your spouse", P = s.partner;
+      const topic = ctx.rng.pick(s.kids.length ? ["money", "the kids", "who does the dishes", "whose family gets Thanksgiving", "work eating every evening"] : ["money", "whether to have kids", "who does the dishes", "whose family gets Thanksgiving", "work eating every evening"]);
+      const little = s.kids.find(k => k.age >= 4 && k.age <= 15);
+      const lead = scene(ctx, [
+        `You and ${name} keep fighting about ${topic}, and the marriage feels shaky.`,
+        `Another fight about ${topic}: ${name} grabbed the car keys and didn't come home until after midnight.`,
+        `You and ${name} have barely spoken in days over ${topic}. Dinner is just forks on plates.`,
+        little ? `During the last fight about ${topic}, you saw ${little.call} listening from the top of the stairs.` : null,
+      ]);
+      return {
+        prompt: `${lead} ${ctx.rng.pick(["What do you do?", "How do you face it?", "Where does the marriage go from here?"])}`,
+        options: [
+          { id: "crisis.talk", label: ctx.rng.pick(["Really talk it through", "Sit down, phones off, and talk"]), hint: "say the hard things kindly", act: "talk", style: "social", weight: 0.37, apply: s2 => { s2.guard = 3; return { text: ctx.w(`After months of fighting about ${topic}, you and ${name} {finally sat down and talked it all out,|took a long drive and said the hard things,} and slowly things warmed up again.`), mood: -2 }; } },
+          { id: "crisis.counsel", label: ctx.rng.pick(["Go to couples counseling", "Find a marriage counselor"]), hint: "a third person helps", act: "counsel", style: "health", weight: 0.17, apply: s2 => { s2.guard = 5; return { text: `After months of fighting about ${topic}, you and ${name} started seeing a counselor every Thursday and learned to fight fair.`, mood: -1 }; } },
+          { id: "crisis.trip", label: ctx.w("Take a trip together to {trip}"), hint: "remember why", act: "travel", style: "family", weight: 0.08, apply: (s2, c) => { s2.guard = 2; s2.savings = Math.max(0, s2.savings - 0.1); return { text: c.w(`After months of fighting about ${topic}, ${s2.kids.length ? "you left the kids with family and " : "you and " + name + " "}went to {trip} for a few days, and came back {laughing again.|with a standing date night.}`), mood: 1 }; } },
+          { id: "crisis.cold", label: ctx.rng.pick(["Let it go cold", "Give it space"]), hint: "maybe it passes", act: "avoid", style: "self", weight: 0.3, apply: s2 => { s2.crisis = 3; return { text: `After months of fighting about ${topic}, neither of you would go first, and the house got quieter and quieter.`, mood: -6 }; } },
+          { id: "crisis.split", label: ctx.rng.pick(["Ask for a divorce", "Say the word “divorce”"]), hint: "you're tired", act: "separate", style: "self", weight: 0.08, apply: s2 => { s2.crisis = 6; s2.flags.askedDivorce = s2.age; return { text: `After months of fighting about ${topic}, you said it: “I want a divorce.” ${name} went very still and said ${they(P)} needed to think.`, mood: -8 }; } },
+        ],
+      };
+    },
+  },
+  {
+    // Not in the wedding year itself: a wedding and a divorce in the same year read as a slip.
+    id: "divorce", domain: "love", channel: "bad", tags: ["spouse"], about: "partner", when: s => s.rel === "married" && yearsMarried(s) >= 1,
+    p: (s, ctx) => rate(ctx, "divorce", yearsMarried(s), s.year) * (s.guard > 0 ? 0.4 : 1) * (s.crisis > 0 ? 2.5 : 1) * (s.flags.askedDivorce >= s.age - 1 ? 3 : 1),
+    apply: (s, ctx) => {
+      const name = s.partner ? s.partner.call : "your spouse", n = Math.max(1, yearsMarried(s));
+      const kids = s.kids.some(k => k.alive !== false && k.age < 18);
+      endRelationship(s, ctx);
+      return { text: ctx.w(["You and {name} divorced. At the lawyer's office you were both strangely calm.", "After {n} years, you and {name} decided to end the marriage.", kids ? "You and {name} divorced, and {you explained it to the kids at the kitchen table, as gently as two people can.|the kids started splitting their weeks between two houses.}" : "You and {name} divorced. {On moving day you left your key on the counter.|You split the books and the dishes and, somehow, the friends.}"], { name, n }), mood: -12, big: true };
+    },
+  },
+  {
+    id: "widowed", domain: "family", channel: "bad", tags: ["spouse"], grave: true, when: s => s.rel === "married" && s.partner,
+    p: (s, ctx) => rate(ctx, "deathRaw", s.partner.age, s.partner.sex, s.year),
+    apply: (s, ctx) => {
+      const name = s.partner.call, P = s.partner;
+      P.alive = false; s.exes.push(P); s.partner = null; s.rel = "widowed"; s.since = null; closeSpell(s, "widowed");
+      return { text: ctx.w([`${name} died, and the house became very quiet. You kept ${their(P)} coffee mug on the hook.`, `After all those years, you let go of ${name}'s hand. You are learning to live alone, one breakfast at a time.`, `${name} died {on a gray morning in late fall.|with you holding ${their(P)} hand.} {For months you still bought two of everything.|You slept on your own side of the bed for a long time.}`]), mood: -16, big: true };
+    },
+  },
+
+  // ---------- family ----------
+  {
+    // Births within a marriage, for a woman and a man (as in bazi-life; same-sex couples have familyPlan below).
+    id: "baby", domain: "family", channel: "good", tags: ["children"], when: s => s.rel === "married" && !s.flags.noMoreKids && !sameSexCouple(s),
+    p: (s, ctx) => Math.min(0.9, rate(ctx, "birth", motherAge(s), s.kids.length, s.year) * (s.flags.tryUntil >= s.age ? 1.8 : 1)),
+    apply: (s, ctx) => {
+      const kid = newKid(s, ctx);
+      s.kids.push(kid);
+      const first = s.kids.length === 1, w = kidNoun(kid);
+      const dad = s.year < 1972 ? "{The father paced the waiting room, as fathers did then.|The nurses brought the baby out to the window for the family to see.}" : "{You cried. Everyone cried.|The car seat took forty minutes to install.}";
+      return { text: first ? ctx.w([`You became a parent! {name} was born, a ${w}, tiny and furious and perfect. ${dad}`, "Your first child was born: a {w} named {name}. {You did not sleep for about four months.|You counted the fingers and toes twice.}", "{name} was born. {You held your baby and forgot how to talk.|You drove home from the hospital at twenty miles an hour.}"], { name: kid.call, w }) : ctx.w(["Baby number {n}, {name}, was born, a {w}.", "{name} was born, a {w}, and the older {kids} fought over who got to hold the baby."], { n: s.kids.length, name: kid.call, w, kids: s.kids.length > 2 ? "kids" : "one" }), mood: 9, big: first };
+    },
+  },
+  {
+    // A married same-sex couple and children: adoption, fostering, IVF or surrogacy, or a family of two. Not calibrated
+    // to a statistic (the numbers are small); about a third of same-sex married couples raise children.
+    id: "familyPlan", domain: "family", channel: "good", tags: ["children"], cooldown: 3, max: 3, ages: [24, 48],
+    when: s => s.rel === "married" && sameSexCouple(s) && !s.flags.noMoreKids && s.kids.length < 3, p: () => 0.12,
+    choice: (s, ctx) => {
+      const name = s.partner ? s.partner.call : "your spouse", two = s.sex === "female";
+      const lead = scene(ctx, [
+        s.kids.length ? `${s.kids[s.kids.length - 1].call} is growing up fast, and you and ${name} are talking about another child.` : `You and ${name} keep coming back to the same question: do you want to raise a kid?`,
+        `Your friends just adopted a baby, and ${name} has been looking at the photos for a long time.`,
+        `At Thanksgiving, ${parentWord(s, ctx)} asked, carefully, whether you two had thought about kids.`,
+      ]);
+      const join = (s2, c, age, how) => { const k = newKid(s2, c); k.age = age; k.birthYear = s2.year - age; s2.kids.push(k); return k; };
+      return {
+        prompt: `${lead} ${ctx.rng.pick(["What do you decide?", "What do you two do?"])}`,
+        options: [
+          { id: "familyPlan.adopt", label: "Adopt", hint: "a long process, a lot of paperwork", act: "haveChild", style: "family", weight: 0.3, apply: (s2, c) => { if (!c.roll("family", "good", 0.6)) return { text: `You and ${name} started the adoption process: home studies, background checks, a profile book. The wait went on into next year.`, mood: 0 }; const k = join(s2, c, c.rng.int(4)); return { text: c.w(`You and ${name} adopted ${k.call}, ${k.age ? `${k.age} years old` : "a baby"}. {The first night home, nobody slept.|The judge let ${k.call} bang the gavel.}`), mood: 9, big: true }; } },
+          { id: "familyPlan.foster", label: "Become foster parents", hint: "kids who need a home now", act: "care", style: "social", weight: 0.15, apply: (s2, c) => { if (!c.roll("family", "good", 0.5)) return { text: `You and ${name} became foster parents. Two kids came and went home to their families, and you missed them both.`, mood: 1 }; const k = join(s2, c, 3 + c.rng.int(7)); return { text: c.w(`You and ${name} fostered ${k.call}, and a year later the adoption was final. {${k.call} picked the cake.|There were balloons at the courthouse.}`), mood: 9, big: true }; } },
+          { id: "familyPlan.ivf", label: two ? "Try IVF with a donor" : "Work with a surrogate", hint: "expensive, hopeful", act: "haveChild", style: "risk", weight: 0.2, apply: (s2, c) => { s2.savings = Math.max(0, s2.savings - (two ? 0.3 : 0.8)); if (!c.roll("family", "good", 0.55)) return { text: `You and ${name} started ${two ? "IVF" : "the surrogacy process"}. The first round did not take, and you held each other in the parking lot.`, mood: -4 }; const k = join(s2, c, 0); return { text: c.w(`After ${two ? "two rounds of IVF" : "a year with a wonderful surrogate"}, ${k.call} was born. {You and ${name} took turns crying.|The nurses said ${k.call} had the loudest lungs on the floor.}`), mood: 9, big: true }; } },
+          { id: "familyPlan.later", label: "Not yet", hint: "the timing isn't right", act: "wait", style: "safe", weight: 0.15, apply: () => ({ text: `You and ${name} decided to wait a little longer before thinking about kids.`, mood: 0 }) },
+          { id: "familyPlan.none", label: s.kids.length ? "Our family is complete" : "Happy as two", hint: "a full life as it is", act: "noChild", style: "self", weight: 0.2, apply: s2 => { s2.flags.noMoreKids = true; return { text: s2.kids.length ? `You and ${name} decided your family was complete.` : `You and ${name} decided your family was the two of you, and the dog, and that was plenty.`, mood: 1 }; } },
+        ],
+      };
+    },
+  },
+  {
+    id: "moreKids", calibrated: true, domain: "family", channel: "change", tags: ["children"], cooldown: 3, when: s => s.rel === "married" && !sameSexCouple(s) && s.kids.length >= 1 && !s.flags.noMoreKids && motherAge(s) <= 42 && s.kids[s.kids.length - 1].age >= 1,
+    p: () => 0.35,
+    choice: (s, ctx) => {
+      const one = s.kids.length === 1, name = s.partner ? s.partner.call : "your spouse", k0 = s.kids[0];
+      return {
+        prompt: `${scene(ctx, [
+          `${one ? k0.call : "The kids"} ${one ? "is" : "are"} growing up, and you and ${name} are talking about having another.`,
+          "At the family reunion, an aunt asked, loudly, when the next one was coming.",
+          one && k0.age >= 3 ? `${k0.call} has been begging for a little brother or sister.` : null,
+          `A friend just had a baby, and ${name} held it for a long time.`,
+        ])} ${ctx.rng.pick(["Do you want another child?", "What do you think?", "Another one?"])}`,
+        options: [
+          { id: "moreKids.more", label: one ? ctx.rng.pick(["Have another", `Give ${k0.call} a sibling`]) : ctx.rng.pick(["Have another", "One more"]), hint: ctx.rng.pick(["a fuller house", "they'd have each other"]), act: "haveChild", style: "family", weight: one ? 0.4 : 0.13, apply: () => ({ text: `You and ${name} decided to try for another baby.`, mood: 1 }) },
+          { id: "moreKids.ask", label: "Ask the kids what they think", hint: "a little brother or sister?", act: "talk", style: "social", weight: one ? 0.1 : 0.04, when: s2 => s2.kids[0].age >= 4, apply: (s2, c) => { const yes = c.rng() < 0.5, k = s2.kids[0].call; if (!yes) s2.flags.noMoreKids = true; return { text: c.w(yes ? `You asked ${k} about a little brother or sister, and ${k} {jumped up and down.|offered to share a room.} You decided to try for another.` : `You asked ${k} about a little brother or sister, and ${k} said “No thank you.” You laughed and decided the family was just right.`), mood: 2 }; } },
+          { id: "moreKids.enough", label: ctx.rng.pick(["We're good", one ? "One is perfect" : "This is the right size"]), hint: "focus on the kids you have", act: "noChild", style: "safe", weight: one ? 0.35 : 0.68, apply: s2 => { s2.flags.noMoreKids = true; return { text: `You and ${name} decided your family was complete.`, mood: 1 }; } },
+          { id: "moreKids.later", label: ctx.rng.pick(["Maybe in a few years", "When money is better"]), hint: "not now", act: "wait", style: "safe", weight: 0.08, apply: (s2, c) => ({ text: c.w("You decided to wait a few years, until {the mortgage|work|everyone's sleep} was under control."), mood: 0 }) },
+          { id: "moreKids.fund", label: s.year >= 1997 ? "Start a 529 college fund first" : "Start a college savings account first", hint: "get ready first", act: "save", style: "safe", weight: 0.07, apply: s2 => { s2.flags.frugalUntil = s2.age + 2; return { text: "You decided to start saving for college before thinking about another baby.", mood: 0 }; } },
+        ],
+      };
+    },
+  },
+  {
+    id: "kidMilestone", ages: [22, 100], cooldown: 3, when: s => s.kids.some(k => [5, 11, 16, 18, 22].includes(k.age)), p: () => 0.6,
+    apply: (s, ctx) => {
+      const k = s.kids.find(x => [5, 11, 16, 18, 22].includes(x.age));
+      const t = {
+        5: ["{name} started kindergarten and did not look back once. You did.", "You walked {name} to kindergarten and stood at the fence long after the bell."],
+        11: [`{name} started ${middleName(s.year)} and suddenly needed you to drop them off a block away.`, "{name} finished elementary school, and the class walked through the halls while the little kids cheered."],
+        16: ["{name} got a driver's license, and you aged a year every time the car left the driveway.", "You taught {name} to drive in the church parking lot, gripping the dashboard."],
+        18: ["{name} graduated from high school, and you yelled loudest in the bleachers.", "{name} moved into a dorm, and the house went quiet in a way you were not ready for."],
+        22: ["{name} graduated from college, and you took about four hundred photos.", "{name} got a first real job and called to tell you before anyone else."],
+      }[k.age];
+      return { text: ctx.w(t, { name: k.call }), mood: 4 };
+    },
+  },
+  parentClash("father"),
+  parentClash("mother"),
+  {
+    id: "parentCare", domain: "family", channel: "bad", tags: ["father", "mother"], cooldown: 6, when: s => s.age >= 25 && ((s.father.alive && s.father.age >= 72) || (s.mother.alive && s.mother.age >= 72)), p: () => 0.05,
+    choice: (s, ctx) => {
+      const who = s.father.alive && s.father.age >= 72 ? "Dad" : "Mom", pr = who === "Dad" ? "him" : "her";
+      const adults = bornSibs(s, 18), with_ = adults.length === 1 ? sibName(adults[0]) : "your siblings";
+      const why = ctx.rng.pick([`${who} fell and can't manage the stairs anymore`, `${who} has been forgetting things: the stove, the bills, your name once`, `${who} lives alone and you worry every night`, `${who} came home from the hospital needing daily help`, `a neighbor found ${who} lost in the grocery store parking lot`, `${who}'s doctor said ${pr} shouldn't drive anymore`]);
+      return {
+        prompt: `${cap(why)}. ${ctx.rng.pick(["How do you take care of things?", "What do you do?"])}`,
+        options: [
+          { id: "parentCare.self", label: ctx.rng.pick(["Cut back at work and care for them yourself", "Take care of them yourself"]), hint: "exhausting, but you're there", act: "care", style: "family", weight: 0.27, apply: s2 => { s2.income *= 0.92; return { text: `${cap(why)}, so you cut back your hours and took care of ${pr} yourself. It was exhausting, and you were there.`, mood: -4 }; } },
+          { id: "parentCare.move", label: `Move ${who} in with you`, hint: "rearrange the house", act: "care", style: "family", weight: 0.13, apply: (s2, c) => ({ text: c.w(`${cap(why)}, so ${who} moved into your spare room. {The kids got a live-in storyteller.|There were adjustments, and also a lot of card games.}`), mood: -2 }) },
+          { id: "parentCare.aide", label: "Hire a home health aide", hint: "costly, but professional", act: "hireCare", style: "safe", weight: 0.2, apply: s2 => { s2.savings = Math.max(0, s2.savings - 0.5); return { text: `${cap(why)}, so you hired a home health aide and visited every weekend.`, mood: -2 }; } },
+          { id: "parentCare.facility", label: s.year >= 1990 ? "Find a good assisted living place" : "Find a good nursing home", hint: "people who know how", act: "hireCare", style: "safe", weight: 0.18, apply: s2 => { s2.savings = Math.max(0, s2.savings - 0.4); return { text: `${cap(why)}. You toured six places and found one with a garden; ${who} complained for a month, then made friends.`, mood: -2 }; } },
+          { id: "parentCare.share", label: `Split it with ${with_}`, hint: "a schedule, a group text", act: "shareCare", style: "social", weight: 0.22, when: () => adults.length > 0, apply: () => ({ text: `${cap(why)}. You and ${with_} made a schedule and took turns.`, mood: -2 }) },
+        ],
+      };
+    },
+  },
+  {
+    id: "fatherDeath", domain: "family", channel: "bad", tags: ["father"], grave: true, when: s => s.father.alive, p: (s, ctx) => rate(ctx, "deathRaw", s.father.age, "male", s.year),
+    apply: (s, ctx) => {
+      s.father.alive = false; s.savings += s.age >= 25 ? ctx.rng.between(0, 1) : 0;
+      return { text: ctx.w(["Your father died at {a}. There were so many things you had meant to ask him.", "Dad died at {a}. {Going through his things, you found every report card you ever brought home.|At the funeral you kept thinking about him running behind your bike, holding the seat.}", "Your father died at {a}. {His old flannel shirt still smelled like him.|The neighbors brought casseroles for two weeks.|You kept his last voicemail and played it more than once.}"], { a: s.father.age }), mood: -14, big: true };
+    },
+  },
+  {
+    id: "motherDeath", domain: "family", channel: "bad", tags: ["mother"], grave: true, when: s => s.mother.alive, p: (s, ctx) => rate(ctx, "deathRaw", s.mother.age, "female", s.year),
+    apply: (s, ctx) => {
+      s.mother.alive = false; s.savings += s.age >= 25 ? ctx.rng.between(0, 1) : 0;
+      return { text: ctx.w(["Your mother died at {a}. Nobody will ever make that pot roast again.", "Mom died at {a}. {You found her recipe cards in her handwriting and could not throw out a single one.|There was a casserole of hers still in the freezer.}", "Your mother died at {a}. {You kept paying her phone bill for a while, just to have her number.|At the funeral, people you had never met told you how she had helped them.}"], { a: s.mother.age }), mood: -15, big: true };
+    },
+  },
+  {
+    id: "inheritance", once: true, domain: "family", channel: "bad", tags: ["siblings"], about: "siblings",
+    when: s => !s.father.alive && !s.mother.alive && s.age >= 25 && Math.max(s.last.fatherDeath ?? -9, s.last.motherDeath ?? -9) >= s.age - 1 && bornSibs(s, 18).length > 0,
+    p: () => 0.25,
+    choice: (s, ctx) => {
+      const sibs = bornSibs(s, 18), x = sibs.length <= 3 ? listWords(sibs.map(sibName)) : "your siblings";
+      const asset = ctx.rng.pick(["the house you grew up in", "the house you grew up in", "the family farm", "the cabin on the lake", "Dad's old shop"]);
+      const lead = scene(ctx, [
+        `Your parents are both gone, and they left ${asset}. You and ${x} don't agree on what to do with it.`,
+        `After the funeral, you and ${x} sat in the old kitchen and started talking about ${asset}.`,
+        `${sibs.length === 1 ? cap(x) : "One of your siblings"} called to talk about ${asset}, and the conversation got tense fast.`,
+      ]);
+      return {
+        prompt: `${lead} ${ctx.rng.pick(["What do you do?", "How do you divide it?"])}`,
+        options: [
+          { id: "inheritance.split", label: "Split it evenly, as the will says", hint: "fair is fair", act: "negotiate", style: "safe", weight: 0.4, apply: s2 => { s2.savings += 0.5; return { text: `You and ${x} split ${asset} evenly, as the will said. It was sad, and nobody fought.`, mood: -1 }; } },
+          { id: "inheritance.sell", label: "Sell it and divide the money", hint: "clean and simple", act: "sellAsset", style: "safe", weight: 0.15, apply: s2 => { s2.savings += 0.6; return { text: `You and ${x} sold ${asset} and divided the money. At the closing, you took one last walk through the empty rooms.`, mood: -2 }; } },
+          { id: "inheritance.keep", label: "Keep it in the family for now", hint: "a place to come home to", act: "wait", style: "family", weight: 0.1, apply: () => ({ text: `You and ${x} agreed to keep ${asset} for now, so there would still be a place to gather for the holidays.`, mood: 1 }) },
+          { id: "inheritance.give", label: sibs.length === 1 ? `Let ${x} have it` : "Let the others have it", hint: "less money, more family", act: "reconcile", style: "family", weight: 0.15, apply: () => ({ text: `You let ${x} have ${asset}. You all promised to keep coming home for Thanksgiving.`, mood: 1 }) },
+          { id: "inheritance.insist", label: ctx.rng.pick(["Fight for your share", "Get a lawyer"]), hint: "it could cost the relationship", act: "insist", style: "self", weight: 0.2, apply: s2 => { s2.savings += 1; s2.flags.estranged = true; return { text: `You fought for your share of ${asset}, and you got it. You and ${x} barely speak now.`, mood: -7 }; } },
+        ],
+      };
+    },
+  },
+  {
+    id: "siblingHelp", domain: "family", channel: "good", tags: ["siblings"], about: "siblings", ages: [18, 95], cooldown: 5,
+    when: s => !s.flags.estranged && bornSibs(s, 18).length > 0, p: s => (s.unemployedFor || s.health.serious ? 0.25 : 0.04),
+    apply: (s, ctx) => {
+      const sib = ctx.rng.pick(bornSibs(s, 18)), x = sibName(sib);
+      if (s.health.serious) return { text: `While you were sick, ${x} drove you to appointments and kept your fridge full.`, mood: 4 };
+      if (s.unemployedFor) return { text: `When you were out of work, ${x} lent you money without being asked and sent you every job posting ${isBrother(sib) ? "he" : "she"} saw.`, mood: 4 };
+      return { text: ctx.w(["At Thanksgiving you and {x} told the old stories and laughed until you cried.", "You and {x} took a road trip together, just the two of you, for the first time since you were kids.", "{x} took a day off to help you move, and complained about every box.", "When you were low, {x} stayed on the phone with you past midnight."], { x }), mood: 3 };
+    },
+  },
+  {
+    // A grandchild is born to a son or daughter of 24–45.
+    id: "grandchild", ages: [42, 105], cooldown: 4, when: s => s.kids.some(k => k.age >= 24 && k.age <= 45), p: () => 0.11,
+    apply: (s, ctx) => {
+      s.flags.grandkids = (s.flags.grandkids || 0) + 1;
+      const k = ctx.rng.pick(s.kids.filter(x => x.age >= 24 && x.age <= 45));
+      const sex = ctx.rng() < 0.512 ? "male" : "female";
+      const g = ctx.person({ role: "grandkid", sex, birthYear: s.year, surname: k.sex === "male" ? surnameIn(k.name) : null });
+      g.parent = k.call; (s.grandkids = s.grandkids || []).push(g);
+      const w = sex === "male" ? "grandson" : "granddaughter";
+      return { text: s.flags.grandkids === 1 ? ctx.w(`${k.call}'s baby, {g}, was born, and you became ${grandWord(s)}. {Your hands shook the first time you held {w}.|You made the baby's picture your phone background within the hour.|You bought a ridiculous number of tiny socks.}`, { g: g.call, w: sex === "male" ? "him" : "her" }) : ctx.w(`${k.call} had another baby, {g}, and you have a new ${w}.`, { g: g.call }), mood: 7 };
+    },
+  },
+  {
+    id: "siblingDeath", domain: "family", channel: "bad", tags: ["siblings"], grave: true, when: s => bornSibs(s).some(x => s.age - x.bornAt >= 40),
+    p: (s, ctx) => 1 - bornSibs(s).filter(x => s.age - x.bornAt >= 40).reduce((q, x) => q * (1 - rate(ctx, "deathRaw", s.age - x.bornAt, isBrother(x) ? "male" : "female", s.year)), 1),
+    apply: (s, ctx) => {
+      const list = bornSibs(s).filter(x => s.age - x.bornAt >= 40);
+      const x = ctx.rng.weighted(list.map(y => [y, rate(ctx, "deathRaw", s.age - y.bornAt, isBrother(y) ? "male" : "female", s.year) + 1e-6]));
+      x.alive = false;
+      return { text: ctx.w(["{who} died at {a}. {You kept thinking about the two of you fighting over the front seat.|At the service you told the story about the tree house, and everyone laughed and cried.}", "{who} died at {a}. {You found an old photo of the two of you in matching Halloween costumes and looked at it for a long time.|The family is smaller now, and the holidays feel it.}"], { who: cap(sibName(x)), a: s.age - x.bornAt }), mood: -10, big: true };
+    },
+  },
+
+  // ---------- money and home ----------
+  {
+    id: "buyHome", calibrated: true, domain: "wealth", channel: "good", tags: ["home"], ages: [22, 70], cooldown: 2, when: (s, ctx) => s.home !== "own" && s.savings >= rate(ctx, "DOWN_PAYMENT") && s.employed,
+    p: (s, ctx) => rate(ctx, "homeBuy", s.age),
+    choice: (s, ctx) => {
+      const buy = (s2, kind) => { ownHome(s2); s2.savings -= rate(ctx, "DOWN_PAYMENT"); return { text: ctx.w(`You bought ${kind} in ${here(s2)}. {The night you got the keys, you sat on the bare floor and ate pizza out of the box.|Thirty years of mortgage, and you had never felt steadier.|You carried each other over the threshold as a joke, and it was not a joke.}`), mood: 8, big: true }; };
+      const rateWord = s.year >= 1979 && s.year <= 1985 ? "Mortgage rates are near 18 percent, but" : s.year >= 2020 && s.year <= 2021 ? "Mortgage rates are under 3 percent, and" : s.year >= 2004 && s.year <= 2006 ? "Every bank is handing out mortgages, and" : null;
+      const lead = scene(ctx, [
+        "You've saved enough for a down payment.",
+        rateWord ? `${rateWord} you finally have a down payment saved.` : null,
+        s.kids.length ? "The kids are outgrowing the rental, and the down payment fund is finally full." : null,
+        s.rel === "married" && s.partner ? `You and ${s.partner.call} have spent every Sunday at open houses, and the savings account says you can do it.` : null,
+        s.home === "rent" ? "Your landlord is raising the rent again, and you ran the numbers: you could buy." : null,
+        s.flags.vet ? "As a veteran you qualify for a VA loan, and you have enough saved for closing costs." : null,
+      ]);
+      return {
+        prompt: `${lead} ${ctx.rng.pick(["Do you buy a home?", "Is it time to buy?", "Do you make an offer?"])}`,
+        options: [
+          { id: "buyHome.starter", label: ctx.rng.pick(["Buy a starter home", "Buy a little ranch house"]), hint: "small yard, room to grow", act: "buyHome", style: "family", weight: 0.32, apply: s2 => buy(s2, ctx.rng.pick(["a little starter home", "a three-bedroom ranch with a carport", "a brick bungalow with a big maple out front"])) },
+          { id: "buyHome.suburb", label: s.year < 1975 ? "Buy a new house in the suburbs" : "Buy new construction in the suburbs", hint: "a cul-de-sac and a commute", act: "buyHome", style: "safe", weight: 0.2, apply: s2 => buy(s2, ctx.rng.pick(["a brand-new house on a cul-de-sac", "a split-level in a new subdivision", "a house in the suburbs with a two-car garage"])) },
+          { id: "buyHome.condo", label: "Buy a condo", hint: "no lawn to mow", act: "buyHome", style: "safe", weight: 0.15, apply: s2 => buy(s2, ctx.rng.pick(["a condo with a balcony", "a townhouse near the train", "a two-bedroom condo downtown"])) },
+          { id: "buyHome.fixer", label: "Buy a fixer-upper", hint: "cheap, and a lot of weekends", act: "buyHome", style: "risk", weight: 0.15, apply: s2 => buy(s2, ctx.rng.pick(["a fixer-upper with good bones and terrible carpet", "an old farmhouse that needed everything", "a foreclosure with a roof you would replace yourself"])) },
+          { id: "buyHome.rent", label: ctx.rng.pick(["Keep renting", "Not yet"]), hint: "stay flexible", act: "wait", style: "self", weight: 0.12, apply: () => ({ text: "You had the down payment, but you decided to keep renting and stay flexible for now.", mood: 0 }) },
+          { id: "buyHome.parents", label: "Move back in with your parents and save more", hint: "free rent, less privacy", act: "moveHome", style: "family", weight: 0.06, when: s2 => (s2.father.alive || s2.mother.alive) && s2.age <= 35, apply: s2 => { s2.home = "parents"; return { text: "You had a down payment saved, but you moved back in with your parents to save even more. Your old bedroom still had the posters.", mood: 0 }; } },
+        ],
+      };
+    },
+  },
+  {
+    id: "windfall", domain: "wealth", channel: "good", ages: [20, 95], cooldown: 3, p: () => 0.03,
+    apply: (s, ctx) => {
+      const x = ctx.rng.between(0.3, 2); s.savings += x;
+      const y = s.year;
+      return { text: ctx.w([
+        "{An investment you had forgotten about|Some stock you bought years ago} paid off, and {you put it toward the mortgage.|you took everyone out to dinner.|you, wisely, left it alone.}",
+        "Your year-end bonus was {much|a lot} bigger than you expected, and {you looked at the deposit twice.|you finally took the family on a real vacation.}",
+        y >= 1985 ? "A {scratch-off|lottery} ticket from the gas station hit for a few thousand dollars, {and you checked the numbers four times.|and you split it with the friend who lent you the dollar.}" : "You found a savings bond your grandparents bought when you were born, worth more than you ever guessed.",
+        y >= 1997 && y <= 2000 ? "Your tech stocks doubled in the bubble, and you sold some just in time." : y >= 2017 ? "The crypto your coworker talked you into actually went up, and you cashed out before it came back down." : "A great-aunt you barely knew left you a little money in her will.",
+        "You sold {the old car|some furniture from the garage|a box of baseball cards} for far more than you expected.",
+      ]), mood: 6 };
+    },
+  },
+  {
+    id: "loss", domain: "wealth", channel: "bad", ages: [20, 95], cooldown: 3, p: () => 0.03,
+    apply: (s, ctx) => {
+      s.savings = Math.max(0, s.savings - ctx.rng.between(0.3, 1.5));
+      const y = s.year;
+      const scam = y >= 2018 ? "A stranger who texted you about crypto investing turned out to be a scammer" : y >= 2012 ? "A caller claiming to be from the IRS scared you into sending gift cards" : y >= 1998 ? "An email from a “prince” who needed help moving money cost you real money" : "A smooth-talking salesman sold you shares in a company that did not exist";
+      return { text: ctx.w([
+        "An investment {went bad|tanked|turned out to be a terrible idea}, and {a big chunk of your savings disappeared.|you lost a few years of saving.|you did not sleep for a week.}",
+        "You lent money to {a friend|an old classmate|a cousin}, and {never saw it again.|they stopped answering your calls.|you lost the money and the friendship.}",
+        `${scam}. {You were embarrassed, then angry.|The police said there was little they could do.|You warned everyone you know.}`,
+        y >= 1985 ? "A hospital bill showed up that insurance would not cover, and it took a long time to pay down." : "The car's transmission died, and so did a good part of your savings.",
+      ]), mood: -7 };
+    },
+  },
+
+  // ---------- health ----------
+  {
+    id: "chronic", domain: "health", channel: "bad", ages: [30, 100], when: s => !s.health.chronic, p: (s, ctx) => rate(ctx, "chronic", s.age, s.sex),
+    apply: (s, ctx) => { s.health.chronic = true; s.health.hr *= 1.3; return { text: ctx.w(["At a checkup your blood pressure was high, and {you started a pill every morning.|the doctor told you to watch the salt.|you bought a cuff to check it at home.}", "You were diagnosed with type 2 diabetes and {learned to read every nutrition label.|started checking your blood sugar every day.|said a long goodbye to soda.}", "Your {cholesterol|blood sugar|blood pressure} numbers came back high, and your doctor wants you to {cut back on fried food|walk thirty minutes a day|come back every three months}."]), mood: -3 }; },
+  },
+  {
+    id: "checkups", calibrated: true, once: true, ages: [40, 40], p: () => 1,
+    choice: (s, ctx) => {
+      const lead = scene(ctx, [
+        "You turned 40, and your doctor's office sent a reminder about a full physical.",
+        `Forty, and ${s.year >= 2014 ? "your insurance now covers a free preventive checkup" : "your company offers a free checkup"}.`,
+        `A coworker's ${ctx.rng.pick(["blood sugar", "blood pressure", "cholesterol"])} came back alarming at a routine checkup, and you got your own reminder letter.`,
+        s.father.alive || s.mother.alive ? "Your parents have more pill bottles every time you visit, and you are holding a checkup reminder." : null,
+      ]);
+      return {
+        prompt: `${lead} ${ctx.rng.pick(["Do you start getting regular checkups?", "Do you go?", "What do you do?"])}`,
+        options: [
+          { id: "checkups.yearly", label: ctx.rng.pick(["Get a physical every year", "Put a checkup on the calendar every year"]), hint: "catch things early", act: "seeDoctor", style: "health", weight: 0.32, apply: (s2, c) => { s2.health.checkups = true; return { text: c.w("You started getting a physical every year, {and still hated the needle.|and the numbers got a little better each time.|and your doctor started saying “keep it up.”}"), mood: 0 }; } },
+          { id: "checkups.full", label: "Get the full workup", hint: "every test, out of pocket", act: "seeDoctor", style: "health", weight: 0.08, apply: s2 => { s2.health.checkups = true; s2.savings = Math.max(0, s2.savings - 0.05); return { text: "You paid for the full workup, every scan and blood test, and kept going every year after.", mood: 0 }; } },
+          { id: "checkups.basic", label: s.year >= 2014 ? "Do the free preventive visit" : "Do the basic checkup", hint: "the essentials", act: "seeDoctor", style: "safe", weight: 0.15, apply: s2 => { s2.health.checkups = true; return { text: "You did the basic checkup: blood pressure, blood work, a talk about your habits. You went back every few years.", mood: 0 }; } },
+          { id: "checkups.habits", label: ctx.rng.pick(["Start with better habits", "Walk more, snack less"]), hint: "checkup next year", act: "quitHabit", style: "health", weight: 0.12, apply: (s2, c) => { s2.health.hr = Math.max(0.8, s2.health.hr * 0.98); return { text: c.w("You decided to start with habits first: {no more late-night snacks,|ten thousand steps a day,|bed before eleven,} and a checkup next year."), mood: 1 }; } },
+          { id: "checkups.later", label: ctx.rng.pick(["Skip it for now", "When things calm down"]), hint: "you feel fine", act: "wait", style: "risk", weight: 0.33, apply: (s2, c) => ({ text: c.w("You felt fine, so {the reminder went into a drawer.|you meant to call the doctor and then forgot.|you put it off until after the busy season, which never ended.}"), mood: 0 }) },
+        ],
+      };
+    },
+  },
+  {
+    id: "serious", domain: "health", channel: "bad", grave: true, ages: [1, 110], when: s => !s.health.serious, p: (s, ctx) => rate(ctx, "serious", s.age, s.sex, s.year),
+    apply: (s, ctx) => {
+      const type = rate(ctx, "seriousType", s.age, s.sex, s.year, ctx.rng), words = illnessWord(type);
+      s.health.serious = { type, since: s.age }; s.health.everSerious = (s.health.everSerious || 0) + 1;
+      const found = s.health.checkups && isCancer(type) ? " Your yearly checkup caught it early." : "";
+      const text = ctx.w([`You were diagnosed with ${words}, and treatment started right away. Your family took turns driving you.`, `${cap(words)} came out of nowhere, and you were admitted to the hospital.`, `The doctor came in with the test results: ${words}. {You sat in your car in the parking lot for a long time.|You didn't say a word on the drive home.}`]);
+      return { text: text + found, mood: -15, big: true };
+    },
+  },
+  {
+    id: "recovered", when: s => s.health.serious && s.age - s.health.serious.since >= 5, p: () => 1,
+    apply: (s, ctx) => {
+      const t = illnessWord(s.health.serious.type); s.health.serious = null;
+      return { text: ctx.w(`Five years after ${t}, {your doctor said the words you had been waiting for: you're in the clear.|you filed away the last follow-up appointment card.|you rang the bell at the clinic one more time, just for luck.}`), mood: 8 };
+    },
+  },
+  {
+    id: "accident", domain: "health", channel: "bad", ages: [5, 90], cooldown: 5, p: () => 0.008,
+    apply: (s, ctx) => ({ text: ctx.w([s.age >= 16 ? "Someone ran a red light and hit your car, and {your arm was in a cast for two months.|you spent six weeks in physical therapy.}" : "You fell off your bike and broke your arm, and {everyone signed the cast.|you learned to write left-handed.}", "You {tore a ligament playing pickup basketball|broke your ankle skiing|threw out your back moving a couch}, and {spent weeks on crutches.|went to physical therapy twice a week.}", "You {slipped on the ice in the driveway|fell off a ladder cleaning the gutters|tripped on the stairs in the dark}, {broke a wrist,|cracked a rib,} and took it easy for a month."]), mood: -5 }),
+  },
+
+  // ---------- moving ----------
+  {
+    id: "move", domain: "move", channel: "change", ages: [18, 85], cooldown: 3, when: s => !s.abroad && !s.studying && !inService(s), p: (s, ctx) => rate(ctx, "move", s.age),
+    apply: (s, ctx) => {
+      const c = placeWords(moveTo(s, ctx));
+      return { text: ctx.w(["You moved to {c} and started over.", "{A new job|A fresh start|A cheaper rent} took you to {c}.", "You packed everything into a {U-Haul|rented truck|car with a mattress on the roof} and moved to {c}. {The first neighbor you met brought cookies.|It took a year to find a good pizza place.}"], { c }), mood: 1 };
+    },
+  },
+  {
+    id: "abroad", calibrated: true, domain: "move", channel: "change", ages: [22, 55], cooldown: 5, when: s => !s.abroad && !s.studying && !inService(s), p: (s, ctx) => rate(ctx, "abroad", s.age),
+    choice: (s, ctx) => {
+      const where = ctx.rng.weighted([["London", 3], ["Tokyo", 2], ["Germany", 2], ["Toronto", 1.5], ["Mexico City", 1.2], ["Singapore", 1], ["Dubai", 0.6], ["Sydney", 0.8], ["Hong Kong", 0.8]]);
+      s.flags.offerAbroad = where;
+      const family = s.rel === "married";
+      return {
+        prompt: `${scene(ctx, [
+          `You've been offered a job in ${where}.`,
+          s.employed ? `Your company is opening an office in ${where}, and your boss asked if you'd go for a few years.` : null,
+          `An old college friend in ${where} says their company is hiring, and they gave your name.`,
+          s.year >= 1995 ? `A recruiter called about a role in ${where} that pays a lot more than you make now.` : null,
+        ])} ${ctx.rng.pick(["Do you go?", "What do you decide?", "Do you take it?"])}`,
+        options: [
+          { id: "abroad.go", label: family ? "Go first, alone" : ctx.rng.pick(["Go", "Take the job", "Pack your bags"]), hint: ctx.rng.pick(["see the world", "now or never"]), act: "workAbroad", style: "risk", weight: 0.32, apply: s2 => { s2.abroad = where; s2.leftAt = s2.age; s2.income *= 1.2; return { text: ctx.w(`You moved to ${where} for work{ and started over from scratch.| and got lost on the subway the first week.}${family ? " Your family stayed home, and you video-called every night." : ""}`), mood: 4, big: true }; } },
+          { id: "abroad.family", label: "Move the whole family", hint: "new schools for the kids", act: "workAbroad", style: "family", weight: 0.08, when: () => family, apply: s2 => { s2.abroad = where; s2.leftAt = s2.age; s2.income *= 1.15; return { text: `The whole family moved to ${where}, and the kids started at an international school.`, mood: 3, big: true }; } },
+          { id: "abroad.negotiate", label: "Negotiate first", hint: "more money, or a shorter stint", act: "negotiate", style: "social", weight: 0.05, apply: (s2, c) => { if (!c.roll("career", "good", 0.5)) return { text: `You tried to negotiate the move to ${where}, the company wouldn't budge, and you stayed home.`, mood: -1 }; s2.abroad = where; s2.leftAt = s2.age; s2.income *= 1.3; return { text: `You negotiated a raise and a flight home every quarter, and moved to ${where}.`, mood: 4, big: true }; } },
+          { id: "abroad.partner", label: "Ask your partner to come", hint: "a decision for two", act: "talk", style: "social", weight: 0.05, when: s2 => s2.rel === "dating" && s2.partner, apply: (s2, c) => { const P = s2.partner; if (c.rng() < 0.5) { s2.abroad = where; s2.leftAt = s2.age; s2.income *= 1.2; return { text: `You asked ${P.call} to come to ${where} with you, and ${they(P)} said yes. You moved together.`, mood: 5, big: true }; } return { text: `You asked ${P.call} to come to ${where} with you, but ${they(P)} couldn't leave. You stayed.`, mood: -1 }; } },
+          { id: "abroad.visit", label: "Visit first and decide", hint: "see it for yourself", act: "wait", style: "safe", weight: 0.06, apply: (s2, c) => ({ text: c.w(`You spent two weeks in ${where} on a work trip {and realized the pace wasn't for you.|and missed home more than you expected.|and decided the timing was wrong.} You stayed.`), mood: 0 }) },
+          { id: "abroad.stay", label: ctx.rng.pick(["Stay home", "Turn it down"]), hint: ctx.rng.pick(["your people are here", "you've got a good thing here"]), act: "wait", style: "family", weight: 0.44, apply: () => ({ text: `You thought hard about the job in ${where} and decided to stay home.`, mood: 0 }) },
+        ],
+      };
+    },
+  },
+  {
+    id: "returnHome", when: s => s.abroad && !s.flags.emigrated && s.age - (s.leftAt ?? s.age) >= 2, p: s => (s.flags.backAt !== undefined && s.age >= s.flags.backAt ? 1 : 0.2),
+    apply: (s, ctx) => {
+      const was = s.abroad; s.abroad = null; delete s.flags.backAt;
+      return { text: ctx.w(`After your years in ${was}, you moved back to the States{, and the first thing you did was get a cheeseburger.|, and the grocery stores looked enormous.|, with a suitcase of souvenirs and a slightly different accent.}`), mood: 3 };
+    },
+  },
+
+  // ---------- later life ----------
+  {
+    id: "hobby", ages: [60, 100], cooldown: 8, when: s => s.retired || s.age >= 66, p: () => 0.12,
+    apply: (s, ctx) => ({ text: ctx.w([s.year >= 2012 ? "You took up pickleball and {now play four mornings a week.|are, frankly, a menace at the net.}" : "You took up golf and {played every Tuesday with the same three friends.|bought far more clubs than you needed.}", "You joined a {bowling league|church choir|book club|quilting circle|woodworking club}, {and never missed a week.|and made more friends than you had in years.}", "You started volunteering at {the library|the hospital gift shop|the food bank|an elementary school reading program}, {two mornings a week.|and the regulars all know your name.}", s.year >= 1996 ? "You got into genealogy and traced the family back {to a farm in Ireland|to a village in Italy|through five generations}, {calling every cousin with updates.|filling three binders.}" : "You started a vegetable garden and {grew enough tomatoes to feed the street.|fought a long war with the rabbits.}"]), mood: 4 }),
+  },
+  {
+    // Looking back on a big moment from at least twenty years ago.
+    id: "memoryLane", ages: [55, 105], cooldown: 7, when: s => s.memory.some(m => s.age - m.age >= 20 && m.kind !== "memoryLane" && m.text), p: () => 0.1,
+    apply: (s, ctx) => {
+      const m = ctx.rng.pick(s.memory.filter(x => s.age - x.age >= 20 && x.kind !== "memoryLane" && x.text));
+      const gist = m.text.split(/(?<=[.!?])\s/)[0].replace(/^You /, "you ").replace(/[.!?]$/, "");
+      const end = m.mood < 0 ? "{You said a few quiet words to yourself.|Your eyes got a little wet.|You can still feel exactly how that felt.}" : "{It feels like last week.|You smiled.|Where did the time go?}";
+      return { text: ctx.w([`{Going through old photos|Cleaning out a closet|Over coffee with an old friend|When a grandkid asked about the old days}, you remembered being {a}: {gist}. ${end}`, `You told the story again of being {a}, when {gist}. {The family knows it by heart.|It gets better every time.}`], { a: m.age, gist }), mood: m.mood < 0 ? -1 : 2 };
+    },
+  },
+  {
+    id: "milestoneAge", ages: [80, 110], when: s => s.age === 80 || s.age === 90 || s.age === 100, p: () => 1,
+    apply: (s, ctx) => ({ text: s.age === 100 ? "You turned 100! A card arrived from the White House, and the local paper sent a photographer." : ctx.w(`For your ${s.age}th birthday, ${s.kids.length > 1 ? "your kids" : s.kids.length ? `your ${kidWord(s.kids[0])}` : "your friends"} threw you a party{ with a sheet cake the size of a door.| in the church basement.| at your favorite diner.} {You made a wish and didn't tell anyone.|Everybody lined up for a photo with you.}`), mood: 4 }),
+  },
 ];
+
+// Every core event draws from the separate fate stream in life.js.
+for (const ev of CORE) ev.core = true;
+
+// Not in the yearly list: life.js checks death at the end of each year.
+export const deathEvent = {
+  id: "death", domain: "health", channel: "bad", grave: true, big: true,
+  apply: (s, ctx) => {
+    const age = s.age;
+    let text;
+    if (s.health.diedOf) text = ctx.w([`You died of ${illnessWord(s.health.diedOf)} at ${age}, with your family close.`, `At ${age}, after a long fight with ${illnessWord(s.health.diedOf)}, you died.`]);
+    else if (age >= 85) text = ctx.w([`You died peacefully at ${age}, in your sleep.`, `At ${age}, with your family around you, you quietly reached the end of a long life.`]);
+    else if (age < 40) text = `An accident on an ordinary day ended your life at ${age}.`;
+    else text = ctx.w([`You died at ${age} after an illness.`, `At ${age}, your body finally gave out, and you died.`]);
+    return { text, mood: 0, big: true };
+  },
+};

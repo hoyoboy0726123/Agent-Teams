@@ -36,7 +36,7 @@ const rowOf = x => (x ? BY_CODE.get(String(x).toUpperCase()) || BY_NAME.get(Stri
 // A state as its name ("Ohio") from a postal code or a name; null when it is not a US state.
 export const stateName = x => (rowOf(x) ? rowOf(x)[1] : null);
 export const stateCode = x => (rowOf(x) ? rowOf(x)[0] : null);
-// [[state name, weight], …], the weighted-list shape 命盤人生's events use for moving.
+// [[state name, weight], …], the weighted-list shape bazi-life's events use for moving.
 export const COUNTIES = STATES.map(([, name, w]) => [name, w]);
 // Census regions.
 const REGIONS = {
@@ -72,7 +72,8 @@ export const collegeTest = year => (year < 1959 ? "the SAT" : "the SAT or ACT");
 export const exam18Name = collegeTest;
 
 // ---------- jobs ----------
-// Each job: { title, factor, field, edu, house, houses, weight, minAge, from, until }
+// Each job is a list [title, factor, field, house], the shape bazi-life's events destructure, that also carries the
+// same fields by name, plus a few more: { title, factor, field, house, houses, signs, elements, weight, minAge, from, until }
 //   factor  pay relative to the median full-time earnings (rates.js PAY_BY_AGE): the BLS Occupational Employment and
 //           Wage Statistics median for the occupation (May 2023, approximately) over about $58,000
 //   field   the sector          edu   the job list (tier) it is on, from the schooling it needs
@@ -81,6 +82,7 @@ export const exam18Name = collegeTest;
 //           errands, 4 real estate, home and land, 5 arts, entertainment and children, 6 health and service, 7 consulting
 //           and sales, 8 insurance and research, 9 academia, law and travel, 10 executive and public roles, 11 tech and
 //           community, 12 hospitals, prisons and charities
+//   signs, elements  the style of the work, from its sector (FIELD_TAGS) unless the job names its own
 //   weight  how common it is within its list (design, from employment counts); a function of the year when the job
 //           grows or fades     minAge  the youngest age (default 14; 18 for driving, building sites, security…)
 //   from, until  the years the job exists under that title
@@ -89,13 +91,36 @@ export const HOUSE_THEMES = {
   5: "arts, entertainment and children", 6: "health and service", 7: "consulting and sales", 8: "insurance and research",
   9: "academia, law and travel", 10: "executive and public roles", 11: "tech and community", 12: "hospitals and charities",
 };
-const J = (title, factor, field, house, more = {}) => ({ title, factor, field, house, houses: more.houses || [house], weight: 1, minAge: 14, ...more });
+// The signs and elements whose style a sector has (src/astro jobFit reads `signs` and `elements` beside `house`);
+// a job can name its own instead.
+const FIELD_TAGS = {
+  retail: [["Taurus", "Gemini"], ["earth", "air"]], "food service": [["Cancer", "Taurus"], ["water", "earth"]],
+  agriculture: [["Taurus", "Virgo", "Capricorn"], ["earth"]], service: [["Virgo"], ["earth"]], logistics: [["Gemini", "Capricorn"], ["air", "earth"]],
+  construction: [["Taurus", "Capricorn", "Aries"], ["earth", "fire"]], manufacturing: [["Capricorn", "Virgo", "Aries"], ["earth", "fire"]],
+  "health care": [["Virgo", "Cancer", "Pisces"], ["water", "earth"]], office: [["Virgo", "Gemini"], ["earth", "air"]], communications: [["Gemini"], ["air"]],
+  finance: [["Taurus", "Virgo", "Capricorn"], ["earth"]], repair: [["Virgo", "Aries"], ["earth", "fire"]], beauty: [["Libra", "Taurus"], ["air", "earth"]],
+  "child care": [["Cancer", "Leo"], ["water", "fire"]], fitness: [["Aries", "Leo"], ["fire"]], security: [["Scorpio", "Capricorn"], ["water", "earth"]],
+  "public safety": [["Aries", "Scorpio", "Capricorn"], ["fire", "water"]], government: [["Capricorn", "Libra"], ["earth", "air"]],
+  "real estate": [["Taurus", "Cancer"], ["earth", "water"]], insurance: [["Scorpio", "Capricorn"], ["water", "earth"]], travel: [["Sagittarius", "Gemini"], ["fire", "air"]],
+  arts: [["Leo", "Libra", "Pisces"], ["fire", "water"]], sports: [["Aries", "Leo", "Sagittarius"], ["fire"]], law: [["Libra", "Sagittarius"], ["air", "fire"]],
+  tech: [["Aquarius", "Gemini", "Virgo"], ["air"]], education: [["Gemini", "Sagittarius", "Virgo"], ["air", "fire"]], marketing: [["Gemini", "Libra", "Leo"], ["air", "fire"]],
+  engineering: [["Aquarius", "Virgo", "Capricorn"], ["air", "earth"]], design: [["Libra", "Taurus", "Leo"], ["air", "earth"]], media: [["Gemini", "Sagittarius"], ["air", "fire"]],
+  "social services": [["Pisces", "Cancer", "Aquarius"], ["water", "air"]], sales: [["Gemini", "Libra", "Sagittarius"], ["air", "fire"]],
+  consulting: [["Libra", "Gemini", "Virgo"], ["air"]], hospitality: [["Leo", "Libra"], ["fire", "air"]], management: [["Capricorn", "Leo"], ["earth", "fire"]],
+  nonprofit: [["Aquarius", "Pisces"], ["air", "water"]], language: [["Gemini", "Sagittarius"], ["air", "fire"]], academia: [["Sagittarius", "Aquarius"], ["fire", "air"]],
+  research: [["Scorpio", "Virgo", "Aquarius"], ["water", "earth", "air"]], family: [["Cancer", "Taurus"], ["water", "earth"]],
+  "self-employed": [["Aries", "Leo"], ["fire"]], military: [["Aries", "Scorpio", "Capricorn"], ["fire", "earth"]],
+};
+const J = (title, factor, field, house, more = {}) => {
+  const [signs, elements] = FIELD_TAGS[field] || [[], []];
+  return Object.assign([title, factor, field, house], { title, factor, field, house, houses: more.houses || (house ? [house] : []), signs, elements, weight: 1, minAge: 14, ...more });
+};
 const fading = (until, before, after = 0.3) => year => (year < until ? before : after);
 const growing = (from, before, after) => year => interp([[from, before], [from + 15, after]], year);
 const LISTS = {
   basic: [
     J("cashier", 0.51, "retail", 6, { houses: [6, 2], weight: 2 }), J("fast-food worker", 0.49, "food service", 6, { weight: 2 }),
-    J("dishwasher", 0.53, "food service", 6), J("line cook", 0.62, "food service", 6, { houses: [6, 5] }),
+    J("dishwasher", 0.53, "food service", 6), J("line cook", 0.62, "food service", 6, { houses: [6, 5], elements: ["fire", "water"] }),
     J("farmworker", 0.59, "agriculture", 4, { houses: [4, 6], weight: fading(1975, 2, 0.6), minAge: 14 }),
     J("janitor", 0.6, "service", 6, { houses: [6, 12] }), J("housekeeper", 0.55, "service", 6, { houses: [6, 4] }),
     J("warehouse worker", 0.64, "logistics", 6, { houses: [6, 3], minAge: 18, weight: growing(1990, 0.6, 1.6) }),
@@ -118,12 +143,12 @@ const LISTS = {
     J("hairstylist", 0.6, "beauty", 5, { houses: [5, 6] }), J("bartender", 0.6, "food service", 5, { houses: [5, 6], minAge: 21 }),
     J("childcare worker", 0.52, "child care", 5, { houses: [5, 6], minAge: 16 }), J("personal trainer", 0.79, "fitness", 1, { houses: [1, 6], minAge: 18, from: 1975 }),
     J("security guard", 0.62, "security", 12, { houses: [12, 6], minAge: 18 }), J("correctional officer", 0.91, "public safety", 12, { houses: [12, 10], minAge: 18 }),
-    J("police officer", 1.29, "public safety", 10, { houses: [10, 6], minAge: 21 }), J("firefighter", 0.98, "public safety", 1, { houses: [1, 10], minAge: 18 }),
+    J("police officer", 1.29, "public safety", 10, { houses: [10, 6], minAge: 21 }), J("firefighter", 0.98, "public safety", 1, { houses: [1, 10], minAge: 18, signs: ["Aries", "Scorpio"] }),
     J("mail carrier", 0.97, "government", 3, { houses: [3, 10], minAge: 18 }), J("EMT", 0.67, "health care", 6, { houses: [6, 12], minAge: 18, from: 1970 }),
     J("real estate agent", 0.93, "real estate", 4, { houses: [4, 7], minAge: 18 }), J("insurance agent", 1.02, "insurance", 8, { houses: [8, 7], minAge: 18 }),
     J("store manager", 0.83, "retail", 10, { houses: [10, 7], minAge: 18, weight: 0.8 }), J("medical assistant", 0.72, "health care", 6, { minAge: 18 }),
     J("flight attendant", 1.17, "travel", 9, { houses: [9, 6], minAge: 18, weight: 0.4 }),
-    J("musician", 0.7, "arts", 5, { weight: 0.15 }), J("professional athlete", 1.4, "sports", 1, { houses: [1, 5], weight: 0.03, minAge: 18 }),
+    J("musician", 0.7, "arts", 5, { weight: 0.15, signs: ["Pisces", "Leo", "Libra"] }), J("professional athlete", 1.4, "sports", 1, { houses: [1, 5], weight: 0.03, minAge: 18 }),
   ],
   trade: [
     J("electrician", 1.06, "construction", 4, { houses: [4, 11], minAge: 18 }), J("HVAC technician", 0.98, "construction", 4, { houses: [4, 6], minAge: 18, from: 1960 }),
@@ -132,7 +157,7 @@ const LISTS = {
     J("plumber", 1.06, "construction", 4, { houses: [4, 6], minAge: 18 }), J("dental assistant", 0.79, "health care", 6, { minAge: 18 }),
   ],
   associate: [
-    J("registered nurse", 1.48, "health care", 6, { houses: [6, 12], weight: 2 }), J("dental hygienist", 1.51, "health care", 6),
+    J("registered nurse", 1.48, "health care", 6, { houses: [6, 12], weight: 2, signs: ["Virgo", "Cancer", "Pisces"] }), J("dental hygienist", 1.51, "health care", 6),
     J("paralegal", 1.03, "law", 9, { houses: [9, 6], from: 1970 }), J("radiologic technologist", 1.26, "health care", 6, { houses: [6, 8] }),
     J("computer support specialist", 1.03, "tech", 11, { houses: [11, 6], from: 1980 }), J("web developer", 1.45, "tech", 11, { houses: [11, 5], from: 1996 }),
     J("respiratory therapist", 1.33, "health care", 6), J("preschool teacher", 0.64, "education", 5, { houses: [5, 3] }),
@@ -140,8 +165,8 @@ const LISTS = {
     J("drafter", 1.07, "engineering", 4, { houses: [4, 11] }), J("funeral director", 1.05, "service", 8, { houses: [8, 12], weight: 0.3 }),
   ],
   college: [
-    J("software developer", 2.28, "tech", 11, { from: 1985, weight: growing(1985, 0.5, 2.5) }), J("computer programmer", 1.7, "tech", 11, { from: 1960, until: 1990 }),
-    J("accountant", 1.38, "finance", 2, { houses: [2, 6], weight: 1.5 }), J("elementary school teacher", 1.1, "education", 3, { houses: [3, 5], weight: 2 }),
+    J("software developer", 2.28, "tech", 11, { from: 1985, weight: growing(1985, 0.5, 2.5), elements: ["air", "earth"] }), J("computer programmer", 1.7, "tech", 11, { from: 1960, until: 1990 }),
+    J("accountant", 1.38, "finance", 2, { houses: [2, 6], weight: 1.5, signs: ["Virgo", "Capricorn"] }), J("elementary school teacher", 1.1, "education", 3, { houses: [3, 5], weight: 2 }),
     J("high school teacher", 1.12, "education", 3, { houses: [3, 9], weight: 1.5 }), J("marketing specialist", 1.17, "marketing", 7, { houses: [7, 3] }),
     J("financial analyst", 1.71, "finance", 2, { houses: [2, 8] }), J("civil engineer", 1.65, "engineering", 11, { houses: [11, 4] }),
     J("mechanical engineer", 1.72, "engineering", 11, { houses: [11, 6] }), J("graphic designer", 1.02, "design", 5, { houses: [5, 11] }),
@@ -157,7 +182,7 @@ const LISTS = {
     J("actor", 0.9, "arts", 5, { weight: 0.1 }),
   ],
   graduate: [
-    J("lawyer", 2.51, "law", 9, { houses: [9, 7], weight: 1.5 }), J("physician", 4.12, "health care", 6, { houses: [6, 10], minAge: 26 }),
+    J("lawyer", 2.51, "law", 9, { houses: [9, 7], weight: 1.5, signs: ["Libra", "Sagittarius", "Scorpio"] }), J("physician", 4.12, "health care", 6, { houses: [6, 10], minAge: 26, signs: ["Virgo", "Scorpio"] }),
     J("pharmacist", 2.34, "health care", 6, { houses: [6, 12] }), J("professor", 1.45, "academia", 9, { houses: [9, 3] }),
     J("medical scientist", 1.72, "research", 8, { houses: [8, 12] }), J("clinical psychologist", 1.66, "health care", 8, { houses: [8, 12] }),
     J("architect", 1.6, "design", 4, { houses: [4, 10] }), J("physical therapist", 1.72, "health care", 6),
@@ -173,7 +198,7 @@ export const JOBS = LISTS;
 export const SPECIAL_JOBS = {
   government: J("government clerk", 0.9, "government", 10, { houses: [10, 6] }),
   federal: J("federal program analyst", 1.4, "government", 10, { houses: [10, 11] }),
-  familyBusiness: J("the family business", 0.8, "family business", 4, { houses: [4, 2] }),
+  familyBusiness: J("the family business", 0.8, "family", 4, { houses: [4, 2] }),
   ownBusiness: J("small-business owner", 1.0, "self-employed", 1, { houses: [1, 10] }),
   military: J("soldier", 0.7, "military", 6, { houses: [6, 1], minAge: 17 }),
 };
@@ -182,7 +207,7 @@ export const BRANCHES = year => [["the Army", 4], ["the Navy", 2.5], ["the Air F
 export function militaryJob(rng, year) {
   const branch = rng.weighted(BRANCHES(year));
   const title = { "the Army": "soldier", "the Navy": "sailor", "the Air Force": "airman", "the Marine Corps": "Marine", "the Coast Guard": "Coast Guardsman", "the Space Force": "guardian" }[branch];
-  return { ...SPECIAL_JOBS.military, title, branch };
+  return J(title, SPECIAL_JOBS.military.factor, "military", SPECIAL_JOBS.military.house, { houses: SPECIAL_JOBS.military.houses, minAge: 17, branch });
 }
 
 const exists = (j, year) => (j.from === undefined || year >= j.from) && (j.until === undefined || year < j.until);
@@ -199,6 +224,14 @@ export function jobsFor(s, list = JOBS[tier(s.edu)]) {
 // half and twice as likely, the same bound as a year's tilt.
 export const fitOf = (ctx, job) => (ctx && typeof ctx.jobFit === "function" ? ctx.jobFit(job) : 0);
 export const fitWeight = fit => Math.pow(2, Math.max(-1, Math.min(1, fit || 0)));
+// bazi-life's jobFit(analysis, job, name), kept for events written against it: the same fit as a weight, about 1 for
+// no fit (2^fit). `source` is anything with the chart's fit: prep.jobFit itself, a prep, or a ctx.
+export function jobFit(source, job) {
+  const fn = typeof source === "function" ? source : source && typeof source.jobFit === "function" ? source.jobFit : null;
+  let fit = 0;
+  try { fit = fn ? Number(fn(job)) || 0 : 0; } catch { fit = 0; }
+  return fitWeight(fit);
+}
 // A job for this person: likelier when it is common and when it fits the chart.
 export function pickJob(s, ctx, list = JOBS[tier(s.edu)]) {
   const year = s.year ?? 2024;
@@ -215,8 +248,8 @@ export function jobHint(ctx, job) {
 // Pay relative to the median: job, age (BLS medians by age), career level, and luck of the draw.
 export const wage = (s, factor, ctx) => Math.max(0.3, factor * interp(ctx.R.PAY_BY_AGE, s.age) * (1 + 0.12 * s.career) * Math.exp(0.15 * ctx.rng.normal()));
 
-// A job in the engine's shape, from a job entry (or an old-style [title, factor, field, house] list).
-const asJob = j => (Array.isArray(j) ? J(j[0], j[1], j[2], j[3] || 6) : j);
+// Sets the job, from a job entry or a plain [title, factor, field, house] list (house may be null).
+const asJob = j => (j.title !== undefined ? j : J(j[0], j[1], j[2], Number.isInteger(j[3]) ? j[3] : null));
 export function setJob(s, ctx, job, { pay = 1 } = {}) {
   const j = asJob(job);
   s.employed = true; s.unemployedFor = 0;
