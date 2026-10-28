@@ -826,7 +826,7 @@ await draft.click("#tab-me");
 check("after a reload the family's 時辰 and exact times come back", await draft.inputValue(".member[data-role=father] .m-hour") === "wu" && await draft.inputValue("#sibling-list .member:last-child .m-hour") === "clock" && await draft.inputValue("#sibling-list .member:last-child .m-time") === "06:15" && await draft.isVisible("#sibling-list .member:last-child .m-time") && await draft.isHidden(".member[data-role=father] .m-time"));
 check("after a reload the birth form, the partner and the siblings come back", await draft.inputValue("#f-name") === "陳志明" && await draft.inputValue(".member[data-role=partner] .m-name") === "王小美" && await draft.inputValue("#f-wed") === "2016" && await draft.inputValue("#sibling-list .member:last-child .m-name") === "陳小華" && await draft.evaluate(() => document.querySelector("#family").open));
 const stores = await draft.evaluate(() => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) }));
-check("the half-filled forms are kept in this tab only, with nothing personal in long-term storage", stores.local.every(k => ["bazi-life.welcomed", "bazi-life.majorOnly", "bazi-life.aiAuto", "bazi-life.aiPreview", "bazi-life.lastVisit", "bazi-life.lang", "bazi-life.pinStatus"].includes(k)) && stores.session.includes("bazi-life.form"), JSON.stringify(stores));
+check("the half-filled forms are kept in this tab only, with nothing personal in long-term storage", stores.local.every(k => ["bazi-life.welcomed", "bazi-life.majorOnly", "bazi-life.aiAuto", "bazi-life.aiPreview", "bazi-life.lastVisit", "bazi-life.lang"].includes(k)) && stores.session.includes("bazi-life.form"), JSON.stringify(stores));
 draft.once("dialog", d => d.accept());
 await draft.click("#me-clear");
 await draft.reload();
@@ -891,16 +891,17 @@ await phone.click("#form-me button[type=submit]");
 await phone.waitForSelector("#play:not([hidden])");
 const statusHeight = await phone.$eval(".status", el => el.getBoundingClientRect().height);
 check("on a phone the scene and the status bar take under 40% of the screen", statusHeight < 360, `${Math.round(statusHeight)}px of 900`);
-// The status bar scrolls with the page unless 固定在上方 pins it; after a choice, what it led to comes into view.
-check("the status bar scrolls with the page until it is pinned", await phone.$eval(".status", el => getComputedStyle(el).position) === "static" && await phone.getAttribute("#c-pin", "aria-pressed") === "false");
+// The scene stays on screen: the story scrolls in its own box under it. After a choice, the next event comes into view.
+check("while a life plays, the scene fills the top and the story scrolls in its own box", await phone.$eval("#play-log", el => getComputedStyle(el).overflowY) === "auto" && await phone.$eval("#play", el => Math.round(el.getBoundingClientRect().top)) === 0);
 await firstChoice(phone);
+await phone.waitForTimeout(700);
+const inBox = await phone.evaluate(() => { const log = document.querySelector("#play-log"), s = document.querySelector(".status").getBoundingClientRect(), c = document.querySelector("#choice").getBoundingClientRect(), l = log.getBoundingClientRect(); return { scrolled: log.scrollTop > 0, scene: Math.abs(s.top) < 5, choice: c.top >= l.top - 1 && c.top < l.bottom, st: Math.round(s.top), y: Math.round(scrollY), play: Math.round(document.querySelector("#play").getBoundingClientRect().top), active: document.activeElement.tagName + "." + document.activeElement.className }; });
+check("with years behind it, the story has scrolled, the scene is still at the top and the question is in view", inBox.scrolled && inBox.scene && inBox.choice, JSON.stringify(inBox));
 await phone.click("#choice [data-option]");
 await phone.waitForTimeout(900);
 // The next thing is either the year the choice led to, or at once the next question.
-const after = await phone.evaluate(() => { const a = document.activeElement, r = a.getBoundingClientRect(); return { li: a.matches("#feed li") && a === document.querySelector("#feed").lastElementChild, q: !!a.closest("#choice:not([hidden])"), top: Math.round(r.top), bottom: Math.round(r.bottom) }; });
-check("after a choice, the next event has the focus and is on screen (a year at the top)", (after.li && after.top >= 0 && after.top < 120) || (after.q && after.top >= 0 && after.bottom <= 900), JSON.stringify(after));
-await phone.click("#c-pin");
-check("固定在上方 pins the status bar and is remembered", await phone.$eval(".status", el => getComputedStyle(el).position) === "sticky" && await phone.getAttribute("#c-pin", "aria-pressed") === "true" && await phone.evaluate(() => localStorage.getItem("bazi-life.pinStatus")) === "1");
+const after = await phone.evaluate(() => { const a = document.activeElement, r = a.getBoundingClientRect(), l = document.querySelector("#play-log").getBoundingClientRect(); return { li: a.matches("#feed li"), q: !!a.closest("#choice:not([hidden])"), top: Math.round(r.top - l.top), inView: r.top >= l.top - 1 && r.top < l.bottom, scene: Math.round(document.querySelector(".status").getBoundingClientRect().top) }; });
+check("after a choice, the next event has the focus and is in view under the scene", (after.li || after.q) && after.inView && after.scene === 0, JSON.stringify(after));
 await phone.click("#c-skip");
 await ended(phone, 45000);
 const width = await phone.evaluate(() => document.documentElement.scrollWidth);

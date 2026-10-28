@@ -62,7 +62,6 @@ const aiOff = () => !READING_URL || !/^https?:$/.test(location.protocol);
 // 結局自動 AI 解讀 is offered only while the AI reading is open (ai-mode.js) and on the site.
 const noAutoBox = () => aiSoon() || aiOff() || aiOutToday();
 const AI_AUTO = "bazi-life.aiAuto";
-const PIN_KEY = "bazi-life.pinStatus";
 let remoteOff = !INTERPRET_URL || !/^https?:$/.test(location.protocol);
 
 function setup() {
@@ -87,16 +86,6 @@ function setup() {
   addEventListener("pagehide", () => saveFormSoon.flush());
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveFormSoon.flush(); });
   initPixels();
-  // The status bar (with the pixel scene) scrolls with the page; 固定在上方 pins it (remembered in this browser). While
-  // pinned, scrolling to a line or a choice leaves room for it (--sticky).
-  const status = $(".status");
-  const sticky = () => document.documentElement.style.setProperty("--sticky", status.classList.contains("pinned") ? `${Math.ceil(status.getBoundingClientRect().height) + 8}px` : "12px");
-  const pin = on => { status.classList.toggle("pinned", on); $("#c-pin").setAttribute("aria-pressed", String(on)); sticky(); };
-  let pinned = false;
-  try { pinned = localStorage.getItem(PIN_KEY) === "1"; } catch {}
-  pin(pinned);
-  $("#c-pin").addEventListener("click", () => { const on = !status.classList.contains("pinned"); pin(on); try { localStorage.setItem(PIN_KEY, on ? "1" : "0"); } catch {} });
-  if (typeof ResizeObserver === "function") new ResizeObserver(sticky).observe(status);
   const partnerSex = $(".member[data-role=partner] .m-sex");
   partnerSex.addEventListener("change", () => { partnerSex.dataset.picked = "1"; });
   for (const r of document.querySelectorAll('input[name="sex"]')) r.addEventListener("change", () => { if (!partnerSex.dataset.picked) partnerSex.value = $("#sex-f").checked ? "male" : "female"; });
@@ -327,7 +316,8 @@ function begin(input, born, extra = {}) {
   heartbeat(() => !!run && !run.life.done && !$("#play").hidden);
   paused = false; $("#c-pause").textContent = "暫停";
   updateStatus();
-  window.scrollTo({ top: 0 });
+  $("#play-log").scrollTop = 0;
+  $("#play").scrollIntoView({ block: "start" });
   schedule();
 }
 
@@ -417,8 +407,24 @@ function render(entries, { focus = false } = {}) {
   }
   const last = feed.lastElementChild;
   if (!last || $("#play").hidden) return;
-  if (focus) { last.tabIndex = -1; last.scrollIntoView({ block: "start", behavior: "smooth" }); last.focus({ preventScroll: true }); }
-  else last.scrollIntoView({ block: "nearest", behavior: speed === 10 ? "auto" : "smooth" });
+  if (focus) { last.tabIndex = -1; reveal(last, "start"); last.focus({ preventScroll: true }); }
+  else reveal(last, "end", speed === 10 ? "auto" : "smooth");
+}
+
+// Brings a line or the choice box into view in the story's own scroll box (#play-log), which keeps the scene above it on
+// screen; on a short window, where the page scrolls instead, in the page. "start": its top at the top; "end": its
+// bottom in view (nothing moves while it already is); "fit": all of it, or its top first when it is taller.
+function reveal(el, where, behavior = "smooth") {
+  const log = $("#play-log");
+  if (getComputedStyle(log).overflowY !== "auto") {
+    const r = el.getBoundingClientRect();
+    if (where === "start" || (where === "fit" && r.height > innerHeight - 24)) el.scrollIntoView({ block: "start", behavior });
+    else if (r.top < 0 || r.bottom > innerHeight) el.scrollIntoView({ block: where === "fit" ? "end" : "nearest", behavior });
+    return;
+  }
+  const pad = 8, top = el.offsetTop - pad, bottom = el.offsetTop + el.offsetHeight - log.clientHeight + pad;
+  const to = where === "start" || (where === "fit" && el.offsetHeight > log.clientHeight - 2 * pad) ? top : Math.max(log.scrollTop, bottom);
+  if (Math.abs(to - log.scrollTop) > 1) log.scrollTo({ top: to, behavior });
 }
 
 function updateStatus() {
@@ -452,8 +458,7 @@ function showChoice() {
       <div class="free-out" id="free-out" aria-live="polite"></div>
     </form>` : "");
   box.hidden = false;
-  const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sticky")) || 12, r = box.getBoundingClientRect();
-  if (r.top < top || r.bottom > innerHeight) box.scrollIntoView({ block: r.height > innerHeight - top ? "start" : "end", behavior: "smooth" });
+  reveal(box, "fit");
   box.querySelector("button").focus({ preventScroll: true });
 }
 
