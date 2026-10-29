@@ -26,12 +26,13 @@ rewrites in `public/_redirects`, and the headers the Worker used to set (`no-cac
 fonts and `robots.txt`) are in `public/_headers`. `npm run build` writes both from `scripts/static-site.mjs`, and
 copies `assets/og.png` and `assets/fonts/` in (`public/` is not in git).
 
-**When the day's Worker requests run out**, Cloudflare answers `/api/*` with its own error 1027 (a 429 or a 5xx, with
-an HTML page) until 00:00 UTC, but the site still loads and the game plays to the end. Any `/api/live` answer that is
-not the JSON is a failure; after a first one the page asks again 5 seconds later, and two in a row hide the live
-numbers and show "So many lives today that the live numbers are paused until {time} your time. The game still works."
-(`src/ui/live-pause.js`; `{time}` is the next 00:00 UTC in the viewer's own time, with the weekday when it is not
-today). One blip shows nothing. The counts simply fail silently.
+**When the day's Worker requests run out** (100,000 a day on the Free plan, shared with bazi-life; back at 00:00 UTC),
+new visitors get Cloudflare's own error page (1027), which cannot be customised, because the Worker also serves the
+pages. A page that is already open keeps playing; when two `/api/live` calls in a row fail (the second 5 seconds after
+the first), the live numbers give way to "We've hit today's traffic limit. Please come back tomorrow (from about {time}
+your time) 🙏" (`src/ui/live-pause.js`; `{time}` is the next 00:00 UTC in the viewer's own time). One blip shows
+nothing. The counts simply fail silently. To keep the site up past the quota, serve `public/` as Workers Static Assets
+(deployed from a computer or CI, not a cloud session) or move to Workers Paid.
 
 Everything about the player runs in the browser: the chart, the life, the 100 reruns (in a Web Worker made from the
 page's own script) and the "write your own decision" matcher (`src/sim/intent.js`). The Worker keeps only daily event
@@ -52,7 +53,7 @@ only `wits.theme` and `wits.majorOnly`.
 - `scripts/build.mjs`: builds `public/index.html`, `public/privacy.html`, `public/terms.html`, copies `og.png` and the
   fonts in, and writes `public/_redirects`, `_headers`, `robots.txt` and `404.html` (`scripts/static-site.mjs`).
 - `worker/`: `index.js` (entry), `app.js` (routes), `stats.js`, `stats-store.js` (the `StatsStore` Durable Object),
-  `admin.js`. `wrangler.jsonc` deploys it as the Worker `written-in-the-stars`, with `public/` as its static assets; the
+  `admin.js`. `wrangler.jsonc` deploys it as the Worker `written-in-the-stars`, which serves the built pages itself (imported as modules: Text for `.html`, Data for `.png` and `.woff2`; static assets were tried and reverted, because their upload fails from a cloud session); the
   Worker runs only for `/api/*` and `/admin` (`run_worker_first`).
 - `src/ui/stats.js` sends one post a minute: the time on screen, plus the milestones and, while a life is played, the
   `beat` that counts it as playing now (no separate heartbeat request).

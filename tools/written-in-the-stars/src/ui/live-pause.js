@@ -41,4 +41,4 @@ export function resumeTime(now = new Date(), { locale, timeZone } = {}) {
 }
 
 // The notice.
-export const pausedText = time => `So many lives today that the live numbers are paused until ${time} your time. The game still works.`;
+export const pausedText = time => `We've hit today's traffic limit. Please come back tomorrow (from about ${time} your time) 🙏`;

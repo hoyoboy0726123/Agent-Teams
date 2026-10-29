@@ -1,7 +1,6 @@
-// 命盤人生的 Cloudflare Worker：在 /api/interpret 用 Workers AI 判讀玩家自己寫的選擇，並在 /api/reading 寫結局頁的
-// 「AI 命理師解讀」和「AI 合婚」，另有 /api/stats、/api/live 和 /admin。網頁本身（public/）是 Workers Static Assets，
-// 不經過這個 Worker（wrangler.jsonc 的 assets，run_worker_first 只有 /api/* 和 /admin）。這個檔案不讀檔案，測試可以直接
-// 載入（test/worker.test.js）。
+// 命盤人生的 Cloudflare Worker：放網頁，在 /api/interpret 用 Workers AI 判讀玩家自己寫的選擇，並在 /api/reading 寫
+// 結局頁的「AI 命理師解讀」和「AI 合婚」。worker/index.js 把 public/ 的兩個網頁交給 makeApp()；這個檔案不讀檔案，測試可以直接載入
+// （test/worker.test.js）。
 //
 // /api/interpret: the page (src/life-app.js) posts { situation, context, options: [{ id, label }], text } for the
 // choice in front of the player. The prompt is built here, from src/sim/interpret.js, and the reply is checked the same
@@ -222,13 +221,29 @@ const ADMIN_HEADERS = {
   "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", "x-frame-options": "DENY",
 };
 
-// The pages, og.png and /i18n/story-en.json are Workers Static Assets (public/, wrangler.jsonc "assets"): Cloudflare
-// serves them itself, with the clean URLs, headers and 404 page of scripts/static-site.mjs, and they do not count
-// against the Free plan's 100,000 Worker requests a day, so the game keeps working when those run out (Cloudflare then
-// answers the Worker's own routes with its error 1027, and the page pauses the live numbers). The Worker runs only for
-// run_worker_first: /api/* and /admin. Anything else that reaches it goes to the assets binding (the file or the 404
-// page); without the binding, as in the unit tests, it answers a plain 404.
-export function makeApp() {
+// The pages are part of the Worker itself rather than static assets: an asset upload is authorised by a token of its
+// own, which the cloud environment's proxy would replace with the account's API token.
+// no-cache: the browser asks each time, so a new deploy shows at once (with max-age=600 a phone kept showing the old page
+// for ten minutes after a fix). The ETag lets an unchanged page be a 304, but on workers.dev Cloudflare removes ETags
+// from HTML (Email Obfuscation and the like are on there), so for now each visit downloads the page (~560 KB zstd).
+const PAGE_HEADERS = {
+  "content-type": "text/html; charset=utf-8", "cache-control": "no-cache",
+  "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin",
+};
+const ETAGS = new Map();
+async function etagOf(html) {
+  if (!ETAGS.has(html)) {
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(html)));
+    ETAGS.set(html, `"${[...digest.slice(0, 12)].map(b => b.toString(16).padStart(2, "0")).join("")}"`);
+  }
+  return ETAGS.get(html);
+}
+// If-None-Match: a list of tags, or *.
+const matches = (header, etag) => !!header && (header.trim() === "*" || header.split(",").some(t => t.trim().replace(/^W\//, "") === etag));
+
+// The Worker for the given pages ({ path: html }) and files ({ path: { body, type } }, such as the share image): the
+// pages, the files, and the API.
+export function makeApp(pages, files = {}) {
   return {
     async fetch(request, env, ctx) {
       const { pathname } = new URL(request.url);
@@ -237,9 +252,17 @@ export function makeApp() {
       if (pathname === "/api/stats") return stats(request, env, ctx);
       if (pathname === "/api/live") return live(request, env);
       if (pathname === "/admin") return new Response(request.method === "HEAD" ? null : ADMIN_HTML, { headers: ADMIN_HEADERS });
+      if (Object.hasOwn(files, pathname)) {
+        if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405, headers: { allow: "GET, HEAD" } });
+        return new Response(request.method === "HEAD" ? null : files[pathname].body, { headers: { "content-type": files[pathname].type, "cache-control": "public, max-age=86400", "x-content-type-options": "nosniff" } });
+      }
       if (pathname.startsWith("/api/")) return answer(404, { error: "not found" });
-      if (env && env.ASSETS) return env.ASSETS.fetch(request);
-      return new Response("找不到這個頁面。", { status: 404, headers: { "content-type": "text/plain; charset=utf-8", "x-content-type-options": "nosniff" } });
+      const html = Object.hasOwn(pages, pathname) ? pages[pathname] : null;
+      if (html === null) return new Response("找不到這個頁面。", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
+      if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405, headers: { allow: "GET, HEAD" } });
+      const etag = await etagOf(html), headers = { ...PAGE_HEADERS, etag };
+      if (matches(request.headers.get("if-none-match"), etag)) return new Response(null, { status: 304, headers });
+      return new Response(request.method === "HEAD" ? null : html, { headers });
     },
   };
 }

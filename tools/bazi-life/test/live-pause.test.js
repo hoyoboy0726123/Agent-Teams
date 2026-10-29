@@ -40,6 +40,6 @@ test("the numbers come back at the next 00:00 UTC, in the viewer's time, with th
 });
 
 test("the notice has its English, with the same {time}", () => {
-  assert.equal(EN[PAUSED_ZH], "So many lives today that the live numbers are paused until {time} your time. The game still works.");
+  assert.equal(EN[PAUSED_ZH], "We've hit today's traffic limit. Please come back tomorrow (from about {time} your time) 🙏");
   assert.match(PAUSED_ZH, /\{time\}/);
 });

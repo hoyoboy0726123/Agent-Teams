@@ -31,5 +31,5 @@ test("the notice gives the next 00:00 UTC in the viewer's time, with the weekday
   // Kolkata: 20:30 on Thursday, and 00:00 UTC is 05:30 on Friday; Tokyo is already Friday, so no weekday.
   assert.equal(resumeTime(now, { locale: "en-US", timeZone: "Asia/Kolkata" }), "Friday 5:30 AM");
   assert.equal(resumeTime(now, { locale: "en-US", timeZone: "Asia/Tokyo" }), "9:00 AM");
-  assert.equal(pausedText("8:00 PM"), "So many lives today that the live numbers are paused until 8:00 PM your time. The game still works.");
+  assert.equal(pausedText("8:00 PM"), "We've hit today's traffic limit. Please come back tomorrow (from about 8:00 PM your time) 🙏");
 });

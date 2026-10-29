@@ -738,7 +738,7 @@ for (const [how, answer] of [["429 (error 1027)", r => r.fulfill({ status: 429, 
     await q.goto(site);
     await q.waitForSelector("#live-paused:not([hidden])", { timeout: 12000 }).catch(() => {});
     const note = await q.isVisible("#live-paused") ? await q.textContent("#live-paused") : "";
-    const text = L === "en" ? /^So many lives today that the live numbers are paused until .*\d{1,2}:\d{2}.* your time\. The game still works\.$/ : /^今天玩的人太多了，即時數字暫停更新，將在你的時間 .*\d{1,2}:\d{2}.* 恢復。遊戲照常可以玩 😊$/;
+    const text = L === "en" ? /^We've hit today's traffic limit\. Please come back tomorrow \(from about .*\d{1,2}:\d{2}.* your time\) 🙏$/ : /^今天流量爆了，請明天再來 🙏（大約你的時間 .*\d{1,2}:\d{2}.* 恢復）$/;
     check(`quota out, /api/* ${how} (${L}): the welcome page hides the live numbers and says when they come back, in the viewer's time`, text.test(note) && await q.isHidden("#live-strip") && await q.isHidden("#live-recent") && await q.isHidden("#live-day") && await q.isVisible("#live-now-chart") && hits.filter(h => h === "/api/live").length === 2, note);
     await q.click('.welcome-go [data-goto="me"]');
     await q.click("#form-me button[type=submit]");

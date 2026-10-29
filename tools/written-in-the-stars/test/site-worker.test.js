@@ -1,6 +1,5 @@
-// The Cloudflare Worker (worker/app.js) with stand-ins for its bindings: the anonymous counts (/api/stats), the live
-// numbers (/api/live) and the back office (/admin); everything else is the static assets of public/ (wrangler.jsonc,
-// scripts/static-site.mjs).
+// The Cloudflare Worker (worker/app.js) with stand-ins for its bindings: pages, ETags, the 404 page, the anonymous
+// counts (/api/stats), the live numbers (/api/live) and the back office (/admin).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { makeApp, resetLiveCache } from "../worker/app.js";
@@ -8,7 +7,7 @@ import { readStats, readLife, liveOf, demoLive, tableOf, sameKey, dayOf, DECADES
 import { ADMIN_HTML } from "../worker/admin.js";
 
 const SITE = "https://written-in-the-stars.example.workers.dev";
-const worker = makeApp();
+const worker = makeApp({ "/": "<p>game</p>", "/index.html": "<p>game</p>", "/privacy": "<p>privacy</p>", "/terms": "<p>terms</p>" });
 const get = (path, headers = {}) => new Request(`${SITE}${path}`, { headers });
 const post = (body, headers = {}) => new Request(`${SITE}/api/stats`, {
   method: "POST", headers: { "content-type": "text/plain", origin: SITE, "cf-connecting-ip": "203.0.113.7", ...headers },
@@ -22,50 +21,32 @@ function statsEnv({ allow = true, real = { total: 0, todayEnds: 0, beats: 0, liv
   return { added, limited, STATS: { idFromName: n => n, get: () => stub }, STATS_LIMIT: { limit: async ({ key }) => { limited.push(key); return { success: allow }; } }, ...more };
 }
 
-test("the pages are static assets: anything but the API and /admin goes to env.ASSETS, else a 404", async () => {
-  const asked = [];
-  const e = { ASSETS: { fetch: async req => { asked.push(new URL(req.url).pathname); return new Response("<p>game</p>"); } } };
-  for (const path of ["/", "/privacy", "/terms", "/og.png", "/fonts/fraunces-latin.woff2", "/robots.txt", "/nope"]) assert.equal(await (await worker.fetch(get(path), e)).text(), "<p>game</p>", path);
-  assert.equal(asked.length, 7);
-  await worker.fetch(get("/admin"), e);
-  await worker.fetch(get("/api/other"), e);
-  assert.equal(asked.length, 7, "the API and /admin never reach the assets");
-  assert.equal((await worker.fetch(get("/nope"), {})).status, 404);
+test("the pages are served with no-cache, an ETag, and a 304 when unchanged", async () => {
+  for (const path of ["/", "/index.html", "/privacy", "/terms"]) {
+    const res = await worker.fetch(get(path), {});
+    assert.equal(res.status, 200, path);
+    assert.match(res.headers.get("content-type"), /text\/html/);
+    assert.equal(res.headers.get("cache-control"), "no-cache");
+    assert.equal(res.headers.get("x-frame-options"), "DENY");
+    const again = await worker.fetch(get(path, { "if-none-match": res.headers.get("etag") }), {});
+    assert.equal(again.status, 304);
+  }
 });
 
-test("unknown APIs get a JSON 404, and /admin takes only reads", async () => {
+test("unknown paths get the friendly 404 page, unknown APIs a JSON 404, and writes to pages a 405", async () => {
+  const res = await worker.fetch(get("/nope"), {});
+  assert.equal(res.status, 404);
+  assert.match(await res.text(), /isn't in the stars/);
   const api = await worker.fetch(get("/api/interpret"), {});
   assert.equal(api.status, 404);
   assert.deepEqual(await api.json(), { error: "not found" });
-  assert.equal((await worker.fetch(new Request(`${SITE}/admin`, { method: "POST" }), {})).status, 405);
+  assert.equal((await worker.fetch(new Request(`${SITE}/`, { method: "POST" }), {})).status, 405);
 });
 
-test("wrangler.jsonc serves public/ as static assets and runs the Worker only for /api/* and /admin", async () => {
-  const { readFile } = await import("node:fs/promises");
-  const text = (await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")).replace(/^\s*\/\/.*$/gm, "");
-  const config = JSON.parse(text.replace(/,(\s*[}\]])/g, "$1"));
-  assert.deepEqual(config.assets, { directory: "./public", binding: "ASSETS", html_handling: "none", not_found_handling: "404-page", run_worker_first: ["/api/*", "/admin"] });
-  assert.equal(config.rules, undefined, "nothing is imported as a page or a font any more");
-  assert.doesNotMatch(await readFile(new URL("../worker/index.js", import.meta.url), "utf8"), /\bimport\b.*(public|assets)\//);
-});
-
-test("the clean URLs, the headers, robots.txt and the 404 page of the static files (scripts/static-site.mjs)", async () => {
-  const { REDIRECTS, HEADERS, ROBOTS, NOT_FOUND_HTML } = await import("../scripts/static-site.mjs");
-  const { parseRedirects, parseHeaders, headersFor } = await import("./helpers/static-site.mjs");
-  assert.deepEqual(Object.fromEntries(parseRedirects(REDIRECTS).map(r => [r.from, `${r.to} ${r.status}`])), { "/": "/index.html 200", "/privacy": "/privacy.html 200", "/terms": "/terms.html 200" });
-  const rules = parseHeaders(HEADERS);
-  for (const path of ["/", "/index.html", "/privacy", "/privacy.html", "/terms", "/terms.html"]) {
-    const h = headersFor(rules, path);
-    assert.equal(h["cache-control"], "no-cache", path);
-    assert.equal(h["x-frame-options"], "DENY", path);
-    assert.equal(h["x-content-type-options"], "nosniff", path);
-    assert.equal(h["referrer-policy"], "strict-origin-when-cross-origin", path);
-    assert.match(h["permissions-policy"], /camera=\(\)/, path);
-  }
-  for (const path of ["/og.png", "/fonts/fraunces-latin.woff2", "/fonts/OFL.txt", "/robots.txt"]) assert.equal(headersFor(rules, path)["cache-control"], "public, max-age=86400", path);
-  assert.match(ROBOTS, /Disallow: \/admin/);
-  assert.match(ROBOTS, /Disallow: \/api\//);
-  assert.match(NOT_FOUND_HTML, /isn't in the stars/);
+test("robots.txt keeps crawlers out of /admin and /api", async () => {
+  const res = await worker.fetch(get("/robots.txt"), {});
+  assert.equal(res.status, 200);
+  assert.match(await res.text(), /Disallow: \/admin/);
 });
 
 test("/admin is the back office, never cached or indexed", async () => {

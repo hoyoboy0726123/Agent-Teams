@@ -342,7 +342,7 @@ for (const [how, answer] of [["429 (error 1027)", r => r.fulfill({ status: 429, 
   await p.goto(`${SITE}/`);
   await p.waitForSelector("#live-paused:not([hidden])", { timeout: 12000 }).catch(() => {});
   const note = await p.isVisible("#live-paused") ? await p.textContent("#live-paused") : "";
-  check(`quota out, /api/* ${how}: the welcome page hides the live numbers and says when they come back, in the viewer's time`, /^So many lives today that the live numbers are paused until .*\d{1,2}:\d{2}.* your time\. The game still works\.$/.test(note) && await p.isHidden("#live") && await p.isHidden("#live-recent") && await p.isHidden("#live-day") && hits.filter(h => h === "/api/live").length === 2 && !(await overflow(p)).length, note);
+  check(`quota out, /api/* ${how}: the welcome page hides the live numbers and says when they come back, in the viewer's time`, /^We've hit today's traffic limit\. Please come back tomorrow \(from about .*\d{1,2}:\d{2}.* your time\) 🙏$/.test(note) && await p.isHidden("#live") && await p.isHidden("#live-recent") && await p.isHidden("#live-day") && hits.filter(h => h === "/api/live").length === 2 && !(await overflow(p)).length, note);
   await p.click("#welcome .cta [data-random]");
   await p.waitForSelector("#play:not([hidden])");
   await p.click('[data-speed="10"]');

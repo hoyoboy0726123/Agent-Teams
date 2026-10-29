@@ -40,4 +40,4 @@ export function resumeTime(now = new Date(), { locale, timeZone } = {}) {
 }
 
 // The notice, Chinese as the page writes it; i18n's t() gives the English (src/i18n/en.json).
-export const PAUSED_ZH = "今天玩的人太多了，即時數字暫停更新，將在你的時間 {time} 恢復。遊戲照常可以玩 😊";
+export const PAUSED_ZH = "今天流量爆了，請明天再來 🙏（大約你的時間 {time} 恢復）";

@@ -1,21 +1,11 @@
-// 命盤人生 on Cloudflare: public/ (the pages, og.png, the English story) is served as Workers Static Assets, and one
-// Worker (worker/index.js) answers only /api/* and /admin. Deploy from this folder, on your own computer: npm run deploy
-// (builds public/, then npx wrangler deploy, which uploads the changed files of public/ too).
+// 命盤人生 on Cloudflare: one Worker (worker/index.js) serves the two pages in public/, built into it as text, and
+// /api/interpret. Deploy from this folder: npm run deploy (builds the pages, then npx wrangler deploy).
 {
   "name": "bazi-life",
   "main": "worker/index.js",
   "compatibility_date": "2026-10-01",
-  // Static assets are free and do not count against the Free plan's 100,000 Worker requests a day, so the pages keep
-  // loading when those run out (the page then pauses its live numbers). Only run_worker_first runs the Worker. The clean
-  // URLs (/ and /life → life.html, /chart → index.html, /privacy, /terms) are rewrites in public/_redirects, the headers
-  // are in public/_headers, both written by npm run build (scripts/static-site.mjs); any other path gets public/404.html.
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS",
-    "html_handling": "none",
-    "not_found_handling": "404-page",
-    "run_worker_first": ["/api/*", "/admin"]
-  },
+  // The built pages are imported as text modules.
+  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }, { "type": "Data", "globs": ["**/*.png"], "fallthrough": true }],
   // Workers AI (Gemma 4 26B). The free plan has 10,000 neurons a day: about 950 written choices, or about 28 full AI
   // readings (110 合婚); past that a call fails (the page reads written choices itself, and offers to try a reading later).
   "ai": { "binding": "AI" },
