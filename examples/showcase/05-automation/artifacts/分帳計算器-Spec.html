@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>分帳計算器 Spec</title><style>
+:root{--bg:#fff;--fg:#1f2330;--muted:#667085;--line:#e6e8ee;--accent:#6366f1;--card:#f7f8fb}
+@media (prefers-color-scheme:dark){:root{--bg:#12141a;--fg:#e8eaf0;--muted:#98a2b3;--line:#2a2e39;--card:#1a1d25}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC",sans-serif}
+a{color:var(--accent)}code{background:var(--card);padding:.1em .35em;border-radius:4px;font-size:.9em}
+pre{background:var(--card);padding:14px;border-radius:8px;overflow:auto}pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%}th,td{border:1px solid var(--line);padding:6px 10px;text-align:left}th{background:var(--card)}
+.table-wrap{overflow-x:auto}blockquote{border-left:3px solid var(--accent);margin:0;padding:2px 14px;color:var(--muted)}img{max-width:100%}
+</style></head><body><article style="max-width:820px;margin:0 auto;padding:40px 24px 80px"><h1>朋友出遊分帳計算器 — 產品規格</h1>
+<h2>1. 問題陳述</h2>
+<p>朋友出遊時常有多筆花費由不同人代墊、不同人分攤，手動計算「誰該轉錢給誰」容易出錯且轉帳次數多。<br>本工具讓使用者快速建立成員與支出紀錄，自動算出<strong>最少轉帳次數</strong>的結算方案，支援手機瀏覽與列印。</p>
+<h2>2. 目標使用者</h2>
+<ul><li>主要：規劃出遊/聚餐的發起人，用手機臨時建立分帳</li><li>次要：旅行結束後回顧結算、需要列印/截圖給群組看的人</li><li>使用情境：多為 2–10 人小團體，單次使用（不需帳號登入）</li></ul>
+<h2>3. 使用者故事與驗收標準</h2>
+<h3>US1：新增/管理成員</h3>
+<p>作為使用者，我要新增出遊成員名單，以便後續指定付款人與分攤人。</p>
+<ul><li>AC：可新增、編輯、刪除成員（姓名文字輸入）</li><li>AC：成員名稱不可為空、不可重複</li><li>AC：刪除已被支出引用的成員時要提示（該支出會受影響）</li></ul>
+<h3>US2：新增/管理支出</h3>
+<p>作為使用者，我要記錄每筆花費（項目、金額、誰付的、誰分攤），以便計算結算。</p>
+<ul><li>AC：欄位：項目名稱（選填）、金額（必填，NTD 整數，&gt;0）、付款人（單選，必填）、分攤人（多選，必填，預設全選）</li><li>AC：分攤方式支援「均分」；可選填自訂分攤比例/金額（v1 可先做均分，比例分攤列為 nice-to-have）</li><li>AC：可編輯、刪除已新增的支出</li><li>AC：支出列表顯示總金額加總</li></ul>
+<h3>US3：自動結算（最少轉帳次數）</h3>
+<p>作為使用者，我要看到系統算好「誰該付給誰多少錢」，且轉帳筆數最少。</p>
+<ul><li>AC：計算每人淨額（已付 − 應分攤），正值代表應收、負值代表應付</li><li>AC：使用貪婪演算法（最大應收 vs 最大應付互抵）產生轉帳建議，逼近最少交易數</li><li>AC：金額四捨五入到整數元（NTD 無小數常態），並處理因四捨五入產生的 ±1 元誤差不遺漏、總和仍平衡</li><li>AC：結果顯示每筆「A 付給 B：NT$ 金額」</li></ul>
+<h3>US4：手機好用</h3>
+<ul><li>AC：單欄式版面，觸控友善（按鈕/輸入框最小點擊區 44px）</li><li>AC：金額輸入使用數字鍵盤（inputmode=&quot;numeric&quot;）</li><li>AC：支出多的情況可捲動瀏覽，不需切頁</li></ul>
+<h3>US5：列印結果</h3>
+<ul><li>AC：提供「列印」按鈕，產出乾淨版面：成員清單、支出明細、結算結果（隱藏輸入框/按鈕等操作元件）</li><li>AC：使用瀏覽器列印（CSS <code>@media print</code>），支援 A4</li></ul>
+<h2>4. 版面配置（單頁式，由上而下）</h2>
+<ol><li><strong>標題列</strong>：分帳計算器（NT$）</li><li><strong>成員區塊</strong>：輸入框 + 新增按鈕；已新增成員以標籤(chip)列出，可刪除</li><li><strong>支出區塊</strong>：<ul><li>新增支出表單（項目、金額、付款人下拉、分攤人核取方塊群）</li><li>支出列表（卡片式，顯示金額/付款人/分攤人，含編輯/刪除）</li></ul></li><li><strong>結算結果區塊</strong>：<ul><li>每人淨額摘要（應收/應付）</li><li>建議轉帳清單</li><li>「列印結果」按鈕</li></ul></li><li>Sticky 底部或浮動按鈕：新增支出（手機上方便操作）</li></ol>
+<h2>5. Edge Cases</h2>
+<ul><li>成員少於 2 人：無法計算分帳，顯示提示訊息</li><li>尚未新增任何支出：結算區顯示「目前尚無支出」</li><li>支出的分攤人清單中包含已被刪除的成員：需同步移除或提示</li><li>金額含小數：NTD 一般不用分，強制整數；若需支援分再列為未來需求</li><li>四捨五入誤差：確保結算後總轉入=總轉出（尾差分配給金額最大或第一位應付者）</li><li>單一成員同時是所有支出付款人（沒人欠他/她之外）：應顯示「不需轉帳」</li><li>已結清（淨額為0）：不出現在轉帳建議中</li><li>支出金額為 0 或負數：輸入驗證擋掉</li><li>使用者重新整理頁面：v1 可先用 localStorage 暫存，避免資料遺失（不需登入/雲端）</li><li>列印時內容過長：確保分頁不切斷單一支出卡片（CSS page-break）</li></ul>
+<h2>6. 非目標（v1 不做）</h2>
+<ul><li>帳號系統、雲端同步、多裝置共享</li><li>多幣別（僅新台幣）</li><li>比例式/加權分攤（先做均分，列為 Fast Follow）</li><li>匯出 Excel/CSV（先用列印/截圖取代）</li></ul>
+<h2>7. 成功指標</h2>
+<ul><li>完成一次「新增成員→新增支出→看到結算結果」的任務完成率 &gt; 90%</li><li>從開啟頁面到取得結算結果的平均時間 &lt; 3 分鐘</li><li>手機裝置使用佔比與跳出率（若手機跳出率明顯高於桌面，需檢視版面）</li></ul></article></body></html>

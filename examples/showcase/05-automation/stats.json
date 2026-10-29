@@ -1,0 +1,35 @@
+{
+  "key": "automation",
+  "dir": "05-automation",
+  "title": "⚡ 自動化範本：「建立網頁／工具」→ 旅行分帳計算器",
+  "ok": true,
+  "wallSeconds": 255,
+  "agentReplies": 3,
+  "agents": 3,
+  "toolCalls": 3,
+  "artifacts": [
+    {
+      "id": "art_vPzvSRq62GUi",
+      "title": "分帳計算器 Spec",
+      "type": "document",
+      "versions": 1,
+      "file": "分帳計算器-Spec",
+      "author": "📋 產品經理 Product Manager (@pm)"
+    },
+    {
+      "id": "art_ThLu1hqHqmte",
+      "title": "分帳計算器 Prototype",
+      "type": "website",
+      "versions": 1,
+      "file": "分帳計算器-Prototype",
+      "author": "🖥️ 前端工程師 Frontend Developer (@frontend)"
+    }
+  ],
+  "genSeconds": 232,
+  "extra": {
+    "run": {
+      "status": "done",
+      "steps": 3
+    }
+  }
+}

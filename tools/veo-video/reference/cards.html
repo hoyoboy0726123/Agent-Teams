@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8">
+<style>
+  @font-face { font-family: "NST"; font-weight: 500; src: url("fonts/NotoSansTC-1.ttf"); }
+  @font-face { font-family: "NST"; font-weight: 900; src: url("fonts/NotoSansTC-2.ttf"); }
+  :root {
+    --paper: #FBF7EE; --paper2: #F3ECDC; --ink: #2B2118; --ink2: #6B5B4B; --outline: #3B2A1D;
+    --coral: #E9724C; --coral-l: #FDE4DA; --sky: #4A97DD; --sky-l: #E3F0FA; --honey: #F5B81C;
+    --honey-l: #FFF1C4; --forest: #2E9A57; --forest-l: #E4F5EA; --line-green: #06A33A;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: "NST", sans-serif; background: transparent; }
+  .card { width: 720px; height: 1280px; position: relative; overflow: hidden; background: var(--paper);
+    background-image: radial-gradient(var(--paper2) 2.2px, transparent 2.2px); background-size: 26px 26px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; padding: 0 56px; color: var(--ink); }
+  .brand { position: absolute; top: 70px; left: 0; right: 0; display: flex; justify-content: center; }
+  .stamp { font-weight: 900; font-size: 30px; padding: 10px 26px; border: 4px solid var(--outline); border-radius: 999px;
+    background: #fff; box-shadow: 5px 5px 0 var(--outline); letter-spacing: 2px; }
+  .stamp small { font-weight: 500; font-size: 22px; color: var(--ink2); margin-left: 10px; letter-spacing: 0; }
+  .bubble { position: relative; white-space: nowrap; font-weight: 900; font-size: 52px; line-height: 1.3; padding: 30px 40px; border: 5px solid var(--outline);
+    border-radius: 34px; box-shadow: 7px 7px 0 var(--outline); text-align: center; }
+  .bubble.q { background: #fff; align-self: flex-start; transform: rotate(-2deg); }
+  .bubble.a { background: var(--coral-l); align-self: flex-end; transform: rotate(2deg); color: var(--ink2); }
+  .who { font-size: 26px; font-weight: 500; color: var(--ink2); display: block; margin-bottom: 6px; }
+  .big { font-weight: 900; font-size: 84px; line-height: 1.2; text-align: center; }
+  .big em { font-style: normal; color: var(--coral); }
+  .sub { font-size: 34px; font-weight: 500; color: var(--ink2); text-align: center; line-height: 1.5; }
+  .pills { display: flex; flex-direction: column; gap: 22px; width: 100%; }
+  .pill { display: flex; align-items: center; gap: 20px; font-weight: 900; font-size: 46px; padding: 18px 28px; border: 4px solid var(--outline);
+    border-radius: 26px; box-shadow: 5px 5px 0 var(--outline); }
+  .pill span { font-weight: 500; font-size: 30px; color: var(--ink2); }
+  .n { width: 62px; height: 62px; flex: none; border-radius: 50%; border: 4px solid var(--outline); display: grid; place-items: center; background: #fff; font-size: 34px; }
+  .c1 { background: var(--honey-l); } .c2 { background: var(--sky-l); } .c3 { background: var(--coral-l); }
+  .info { width: 100%; background: #fff; border: 5px solid var(--outline); border-radius: 30px; box-shadow: 7px 7px 0 var(--outline); padding: 34px 38px; display: grid; gap: 16px; }
+  .row { display: flex; gap: 18px; white-space: nowrap; font-size: 33px; font-weight: 500; align-items: baseline; }
+  .row b { font-weight: 900; min-width: 112px; color: var(--coral); }
+  .line { display: flex; align-items: center; gap: 18px; background: var(--line-green); color: #fff; font-weight: 900; font-size: 42px;
+    padding: 20px 34px; border-radius: 999px; border: 5px solid var(--outline); box-shadow: 6px 6px 0 var(--outline); }
+  .line small { font-weight: 500; font-size: 30px; opacity: .95; }
+  .chip { display: inline-flex; align-items: center; gap: 16px; padding: 14px 26px 14px 16px; border: 4px solid var(--outline); border-radius: 999px;
+    box-shadow: 5px 5px 0 var(--outline); font-weight: 900; font-size: 40px; color: var(--ink); }
+  .chip .n { width: 54px; height: 54px; font-size: 30px; }
+  .chip span { font-weight: 500; font-size: 26px; color: var(--ink2); }
+  .chipwrap { width: 720px; padding: 30px 28px; display: flex; justify-content: center; }
+</style></head>
+<body>
+  <div class="card" id="open">
+    <div class="brand"><div class="stamp">啟思創客<small>Think Maker</small></div></div>
+    <div class="bubble q"><span class="who">爸媽問</span>「今天學了什麼？」</div>
+    <div class="bubble a"><span class="who">孩子說</span>「不知道，玩電腦。」</div>
+  </div>
+
+  <div class="card" id="brand">
+    <div class="brand"><div class="stamp">啟思創客<small>Think Maker</small></div></div>
+    <div class="big">AI 會做，<br><em>孩子要會驗收</em></div>
+    <div class="pills">
+      <div class="pill c1"><div class="n">1</div>會建造<span>親手寫程式</span></div>
+      <div class="pill c2"><div class="n">2</div>能指揮<span>說清楚需求</span></div>
+      <div class="pill c3"><div class="n">3</div>敢驗收<span>抓出 AI 的錯</span></div>
+    </div>
+  </div>
+
+  <div class="card" id="end">
+    <div class="brand"><div class="stamp">啟思創客<small>Think Maker</small></div></div>
+    <div class="big" style="font-size:70px">2026 首期班<br><em>招生中</em></div>
+    <div class="info">
+      <div class="row"><b>開課</b>11/28（六）每週六上課</div>
+      <div class="row"><b>對象</b>國小 4–6 年級（零基礎可）</div>
+      <div class="row"><b>課程</b>11 堂，每堂 2 小時</div>
+      <div class="row"><b>地點</b>橘光會議中心</div>
+      <div class="row"><b>名額</b>一班 15 人</div>
+    </div>
+    <div class="line">LINE 搜尋 <span>@601uejgq</span></div>
+    <div class="sub">會建造，才敢驗收。</div>
+  </div>
+
+  <div class="chipwrap" id="chip1"><div class="chip c1"><div class="n">1</div>會建造<span>親手寫程式</span></div></div>
+  <div class="chipwrap" id="chip2"><div class="chip c2"><div class="n">2</div>能指揮<span>說清楚需求</span></div></div>
+  <div class="chipwrap" id="chip3"><div class="chip c3"><div class="n">3</div>敢驗收<span>抓出 AI 的錯</span></div></div>
+  <div class="chipwrap" id="chip4"><div class="chip" style="background:#fff">11 堂課，帶走 <span style="font-weight:900;font-size:40px;color:#E9724C">11 件作品</span></div></div>
+</body></html>

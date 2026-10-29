@@ -1,0 +1,29 @@
+// Written in the Stars on Cloudflare: one Worker (worker/index.js) serves the pages in public/, built into it as text,
+// plus /api/stats, /api/live and /admin. Deploy from this folder: npm run build && npx wrangler deploy.
+// Once, after the first deploy: npx wrangler secret put ADMIN_KEY (opens /admin#key=…; the same key as bazi-life's).
+{
+  "name": "written-in-the-stars",
+  "account_id": "a535bb4f35cdac784e0806f0c58b4944",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  // The built pages are imported as text modules (static HTML, no asset upload).
+  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }, { "type": "Data", "globs": ["**/*.png", "**/*.woff2"], "fallthrough": true }],
+  // The anonymous counts (/api/stats): a page sends a few a minute. namespace_id must be unique in the account (bazi-life
+  // uses 4721–4723).
+  "ratelimits": [
+    { "name": "STATS_LIMIT", "namespace_id": "4731", "simple": { "limit": 60, "period": 60 } }
+  ],
+  // The daily totals for /admin and the welcome page's live numbers, in one SQLite-backed Durable Object
+  // (worker/stats-store.js).
+  "durable_objects": { "bindings": [{ "name": "STATS", "class_name": "StatsStore" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StatsStore"] }],
+  "vars": {
+    // LIVE_DEMO "1" would show made-up live numbers on the welcome page; it is off for good (made-up activity reads as
+    // fake social proof under consumer law). Only real numbers show, once there are enough of them (worker/stats.js SHOW).
+    // The one other origin that may read GET /api/stats (with the ADMIN_KEY) by CORS: the combined back office of both
+    // sites. The same ADMIN_KEY secret has to be set on bazi-life too.
+    "ADMIN_ORIGIN": "https://bazi-life.mingpan.workers.dev"
+  },
+  "observability": { "enabled": true }
+}

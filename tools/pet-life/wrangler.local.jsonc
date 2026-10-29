@@ -1,0 +1,12 @@
+// Local testing without a Cloudflare login: no AI binding, letters come from a template (MOCK_AI).
+// Run with `npm run dev`, then open http://localhost:8787
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pet-life-local",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-15",
+  "assets": { "directory": "./public", "binding": "ASSETS" },
+  "durable_objects": { "bindings": [{ "name": "LIMITER", "class_name": "Limiter" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Limiter"] }],
+  "vars": { "MOCK_AI": "1", "NEURON_BUDGET": "8000", "NEURONS_PER_LETTER": "25", "IP_DAILY": "5" }
+}

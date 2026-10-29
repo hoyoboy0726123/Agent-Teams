@@ -1,0 +1,32 @@
+{
+ "_": "English for core/family.js: the family match notes (relate(), shown through noteText), the tilts and the form's checks.",
+ "story": {
+  "生肖六合（{za}和{zb}）": "Zodiac Six Harmony (the {za} and the {zb})",
+  "生肖三合（{za}和{zb}）": "Zodiac Three Harmony (the {za} and the {zb})",
+  "生肖相沖（{za}和{zb}）": "Zodiac clash (the {za} and the {zb})",
+  "生肖相害（{za}和{zb}）": "Zodiac harm (the {za} and the {zb})",
+  "生肖相刑（{za}和{zb}）": "Zodiac punishment (the {za} and the {zb})",
+  "日干相合（{pair}合，天合）": "Day Stems combine ({pair}, the Heaven Combination)",
+  "對方的日干{theirs}約束你的日干{mine}（{eb}剋{ea}）：對方比較會管你": "Their Day Stem, {theirs}, restrains yours, {mine} ({eb} restrains {ea}): they will tend to keep you in line",
+  "你的日干{mine}約束對方的日干{theirs}（{ea}剋{eb}）：你在對方面前比較有主見": "Your Day Stem, {mine}, restrains theirs, {theirs} ({ea} restrains {eb}): with them you tend to have the firmer views",
+  "對方的日干{theirs}生你的日干{mine}（{eb}生{ea}）：對方比較會照顧你": "Their Day Stem, {theirs}, feeds yours, {mine} ({eb} feeds {ea}): they will tend to look after you",
+  "你的日干{mine}生對方的日干{theirs}（{ea}生{eb}）：你比較會照顧對方": "Your Day Stem, {mine}, feeds theirs, {theirs} ({ea} feeds {eb}): you tend to look after them",
+  "日支六合（{pair}合，地合）": "Day Branches in Six Harmony ({pair}, the Earth Combination)",
+  "日支相沖（{pair}沖）": "Day Branch clash ({pair})",
+  "對方命盤{el}最旺，正是你的喜用": "{el} is strongest in their chart, and it is one of your favourable elements",
+  "對方命盤{el}最旺，是你比較忌的五行": "{el} is strongest in their chart, and it is an element you rather dislike",
+  "{who}的出生年份要比你早 12 到 70 年。": "{who:cap} must be born 12 to 70 years before you.",
+  "{label}（{name}）": "{label} ({name})",
+  "{who}的生日比你晚，要改成{other}嗎？": "{who:cap} has a later birthday than you. Make them your {other}?",
+  "{who}的生日比你早，要改成{other}嗎？": "{who:cap} has an earlier birthday than you. Make them your {other}?",
+  "{who}和你差了 30 年以上，請檢查出生年份。": "{who:cap} is more than 30 years apart from you in age; please check the year of birth.",
+  "和{who}開始交往的年份要在你們都滿 14 歲以後（{earliest} 年以後）。": "The year you started going out with your {who} must be after you were both 14 ({earliest} or later).",
+  "和{who}的結婚年份要在你們都滿 18 歲以後（{earliest} 年以後）。": "The year you married your {who} must be after you were both 18 ({earliest} or later).",
+  "結婚年份不能早於開始交往的年份。": "The wedding year can't be before the year you started going out.",
+  "同性婚姻在 {year} 年 5 月才合法，結婚年份請填 {year} 年以後，或留空。": "Same-sex marriage became legal in Taiwan only in May {year}: please give a wedding year from {year} on, or leave it blank.",
+  "17 歲以前的家庭事件：好事 {up}、壞事 {down}": "Family events before 17: good ones {up}, bad ones {down}",
+  "學業：好事 {up}、壞事 {down}": "Studies: good events {up}, bad ones {down}",
+  "和{who}之間：互相幫忙 {up}、吵架衝突 {down}": "With {who}: helping each other {up}, quarrels {down}",
+  "和{who}之間：感情順利 {up}、感情摩擦 {down}": "With your {who}: smooth times {up}, friction {down}"
+ }
+}

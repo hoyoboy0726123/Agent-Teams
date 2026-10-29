@@ -1,0 +1,369 @@
+// AI 命理師解讀與 AI 合婚 (src/ai-reading.js): what the page sends, what the Worker accepts, the parts a reading is
+// written in, their fact sheets and prompts, and the checker that keeps the text to the engine's facts.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { findPlace } from "../src/core/places.js";
+import {
+  readingRequest, readReadingRequest, readingPart, partPrompt, partTokens, checkPart, finishPart, parseSections,
+  yearPillar, soften, agesOf, partsFor, toneWord, PARTS, SECTIONS, READING_VERSION,
+} from "../src/ai-reading.js";
+
+const NOW = 2026;
+const input = { date: { y: 1990, m: 6, d: 21 }, time: { h: 12, mi: 0, branch: "午" }, place: findPlace("臺北市"), sex: "female" };
+const partner = { date: { y: 1992, m: 3, d: 8 }, time: { h: 7, mi: 45 }, sex: "male" };
+const ask = (kind, part, p = null, from = input) => readReadingRequest(JSON.parse(JSON.stringify(readingRequest(from, kind, { part, partner: p }))));
+const partOf = (kind, id, p = null, from = input) => readingPart(ask(kind, id, p, from), { now: NOW });
+const BANNED = /過世|去世|壽命|死亡|血光|大凶|手術|開刀|安太歲|點燈|模擬|這一局|遊戲/;
+
+test("the page sends only births: no name, no game, one part at a time", () => {
+  const body = readingRequest(input, "full", { part: "years2" });
+  assert.deepEqual(body, { v: READING_VERSION, kind: "full", part: "years2", birth: { y: 1990, m: 6, d: 21, time: { shichen: "wu" }, place: "臺北市", sex: "female" } });
+  assert.equal(readingRequest(input, "short").part, "short");
+  const match = readingRequest(input, "match", { part: "myears", partner });
+  assert.deepEqual(match.partner, { y: 1992, m: 3, d: 8, time: { h: 7, mi: 45 }, sex: "male" }, "the partner is sent without a place");
+  assert.ok(JSON.stringify(match).length < 300);
+  assert.equal(readingRequest({ ...input, time: null }, "full").birth.time, null);
+  // From the 合婚 tab the other person has a birthplace of their own.
+  const own = readingRequest(input, "match", { part: "m1", partner: { ...partner, place: findPlace("高雄市鳳山") } });
+  assert.equal(own.partner.place, "高雄市鳳山");
+});
+
+test("the other person's birthplace: their own when sent, else yours; an unknown one is turned away", () => {
+  const body = readingRequest(input, "match", { part: "m1", partner: { ...partner, place: findPlace("高雄市鳳山") } });
+  assert.equal(readReadingRequest(body).partner.place.name, "高雄市鳳山");
+  assert.equal(readReadingRequest(readingRequest(input, "match", { part: "m1", partner })).partner.place.name, "臺北市");
+  assert.equal(readReadingRequest({ ...body, partner: { ...body.partner, place: "月球" } }), null);
+  assert.equal(readReadingRequest({ ...body, partner: { ...body.partner, place: 7 } }), null);
+});
+
+test("the Worker accepts only what the page could send", () => {
+  const ok = ask("full", "decades");
+  assert.equal(ok.part, "decades");
+  assert.equal(ok.birth.place.name, "臺北市");
+  assert.deepEqual(ok.birth.time, { h: 12, mi: 0, branch: "午" });
+  assert.equal(readReadingRequest({ ...readingRequest(input, "full"), part: undefined }).part, "a", "a missing part is the first");
+  const m = ask("match", "m1", partner);
+  assert.equal(m.partner.place.name, "臺北市", "the partner is born where you were");
+  const body = readingRequest(input, "full"), mb = readingRequest(input, "match", { partner });
+  const bad = [
+    null, "x", { ...body, v: 1 }, { ...body, kind: "poem" }, { ...body, part: "years9" }, { ...body, part: "m1" },
+    { ...body, birth: { ...body.birth, m: 2, d: 30 } }, { ...body, birth: { ...body.birth, y: 1800 } },
+    { ...body, birth: { ...body.birth, place: "月球" } }, { ...body, birth: { ...body.birth, sex: "x" } },
+    { ...body, birth: { ...body.birth, time: { shichen: "noon" } } }, { ...body, birth: { ...body.birth, time: { h: 25, mi: 0 } } },
+    { ...mb, partner: undefined }, { ...mb, partner: { ...mb.partner, d: 31, m: 4 } }, { ...mb, partner: { ...mb.partner, sex: "" } },
+  ];
+  for (const b of bad) assert.equal(readReadingRequest(b), null, JSON.stringify(b && (b.part || b.birth || b)).slice(0, 80));
+});
+
+test("ages: from now to 85, at most fifty; ten past 75; from birth for the unborn", () => {
+  const P = (by, now = NOW) => ({ age: Math.max(0, now - by) });
+  assert.deepEqual(agesOf(P(1990)).slice(0, 2), [36, 37]);
+  assert.equal(agesOf(P(1990)).at(-1), 85);
+  assert.equal(agesOf(P(2015)).length, 50);
+  assert.deepEqual([agesOf(P(1946))[0], agesOf(P(1946)).length], [80, 10]);
+  assert.deepEqual(agesOf(P(2030)).slice(0, 2), [0, 1]);
+  // The page asks only for the years parts that have ages in them, and those are the parts that are not empty.
+  const years = by => partsFor("full", by, NOW).filter(p => p.startsWith("years"));
+  assert.deepEqual(years(1990), ["years0", "years1", "years2", "years3", "years4"]);
+  assert.deepEqual(years(1959), ["years0", "years1"]);
+  assert.deepEqual(years(1940), ["years0"]);
+  assert.deepEqual(years(2030), PARTS.full.filter(p => p.startsWith("years")));
+  for (const by of [1940, 1959, 1971, 1990, 2026]) {
+    const from = { ...input, date: { ...input.date, y: by } };
+    for (const id of PARTS.full.filter(p => p.startsWith("years"))) assert.equal(partOf("full", id, null, from).items.length > 0, years(by).includes(id), `${by} ${id}`);
+  }
+  assert.deepEqual(partsFor("match", 1940, NOW), PARTS.match);
+  assert.deepEqual(partsFor("short", 1940, NOW), PARTS.short);
+});
+
+test("a full reading is eight parts, each with the engine's facts and nothing of the game", () => {
+  assert.deepEqual(PARTS.full, ["a", "b", "decades", "years0", "years1", "years2", "years3", "years4"]);
+  const a = partOf("full", "a"), b = partOf("full", "b");
+  assert.deepEqual(a.titles, ["命格一句話", "命盤總論", "性格與天賦", "事業與財運"]);
+  assert.deepEqual(b.titles, ["感情與婚姻", "六親與人際", "健康與作息", "開運建議", "給你的三句話"]);
+  for (const p of ["庚午", "壬午", "丁巳", "丙午"]) assert.ok(a.facts.includes(p), p);
+  for (const w of ["用神水", "建祿格", "【詳批・性格】", "【詳批・事業】", "【大運】", "目前在這一步"]) assert.ok(a.facts.includes(w), w);
+  for (const w of ["【詳批・六親】", "【詳批・婚姻感情】", "【開運（用神水）】", "【健康（傳統說法）】"]) assert.ok(b.facts.includes(w), w);
+  const decades = partOf("full", "decades");
+  assert.equal(decades.items[0].key, "戊寅大運", "from the 大運 you are in");
+  assert.deepEqual(decades.items[0].head, { name: "戊寅", startAge: 36, endAge: 45, startYear: 2025, endYear: 2034, tone: decades.items[0].head.tone, current: true });
+  assert.deepEqual(decades.items[0].fields, ["重點", "好事", "要注意"]);
+  const y0 = partOf("full", "years0"), y4 = partOf("full", "years4");
+  assert.deepEqual(y0.items.map(i => i.key).slice(0, 3), ["36 歲", "37 歲", "38 歲"]);
+  assert.deepEqual(y0.items[0].head, { age: 36, year: 2026, pillar: "丙午", tone: y0.items[0].head.tone, decade: "戊寅" });
+  assert.equal(y0.items.length, 10);
+  assert.deepEqual([y4.items[0].key, y4.items.at(-1).key], ["76 歲", "85 歲"]);
+  assert.match(y0.facts, /36 歲（2026 年 丙午年，/);
+  for (const p of [a, b, decades, y0, y4]) {
+    assert.doesNotMatch(p.facts, BANNED, `${p.id}: ${(p.facts.match(BANNED) || [])[0]}`);
+    for (const it of p.items || []) for (const f of it.fields) assert.ok(it.fallback[f] && it.fallback[f].length >= 6, `${it.key} ${f}`);
+  }
+  // Someone of 75 has no fourth and fifth tens.
+  const old = { ...input, date: { y: 1951, m: 4, d: 2 } };
+  assert.equal(partOf("full", "years1", null, old).items.length, 1);
+  assert.equal(partOf("full", "years2", null, old).items.length, 0);
+});
+
+test("a short reading and the parts of 合婚", () => {
+  const s = partOf("short", "short");
+  assert.deepEqual(s.titles, ["命格一句話", "總評"]);
+  assert.match(s.facts, /【接下來五年】/);
+  const m1 = partOf("match", "m1", partner), m2 = partOf("match", "m2", partner), my = partOf("match", "myears", partner);
+  assert.deepEqual(m1.titles, ["合婚一句話", "合婚總評", "兩個人的個性"]);
+  assert.deepEqual(m2.titles, ["相處的優點", "容易摩擦的地方", "給你們的建議"]);
+  for (const w of ["【你】", "【對方】", "【你的日主】丁火", "【對方的日主】", "【合婚結果】"]) assert.ok(m1.facts.includes(w), w);
+  assert.ok(["互補", "平穩", "需要磨合"].includes(m1.meta.tone));
+  assert.ok(Array.isArray(m1.meta.highlights));
+  assert.equal(my.items.length, 10);
+  assert.deepEqual(my.items[0].head.ages, [36, 34]);
+  assert.equal(my.items[0].key, "2026 年");
+  assert.match(my.facts, /2026 年 丙午年：你 36 歲/);
+  for (const p of [s, m1, m2, my]) assert.doesNotMatch(p.facts, BANNED);
+});
+
+test("the prompt: rules, the part's sections or entries, what other parts cover, and the facts", () => {
+  const a = partOf("full", "a"), y0 = partOf("full", "years0"), m1 = partOf("match", "m1", partner);
+  const pa = partPrompt(a);
+  for (const t of a.titles) assert.ok(pa.includes(`【${t}】${SECTIONS[t]}`), t);
+  for (const rule of ["只能使用下面「命盤資料」", "不談死亡、壽命", "不建議任何改運商品", "繁體中文和臺灣用語", "稱呼讀者「你」"]) assert.ok(pa.includes(rule), rule);
+  assert.match(pa, /感情與婚姻、六親與人際、健康與作息、開運建議、每一步大運、每一歲的流年由別人寫/);
+  assert.ok(pa.endsWith(a.facts));
+  const py = partPrompt(y0);
+  assert.match(py, /流年逐歲/);
+  assert.ok(py.includes(y0.items.map(i => `【${i.key}】`).join("")));
+  assert.match(py, /一行「好事：」.*一行「要注意：」/);
+  const pm = partPrompt(m1);
+  assert.match(pm, /AI 合婚/);
+  assert.match(pm, /不說誰剋誰，不預言分手、離婚或外遇/);
+  // A list asked again names only the entries it missed.
+  const last = { bad: [{ key: "37 歲", why: "沒有寫" }], problems: ["【37 歲】沒有寫"], items: new Map() };
+  const again = partPrompt(y0, last);
+  assert.match(again, /標題依序是：【37 歲】\n/);
+  assert.match(again, /上一次有這些問題，這次一定要避免：【37 歲】沒有寫/);
+  assert.ok(partTokens(y0, last) < partTokens(y0));
+});
+
+// Text for a sections part that keeps to the facts, with `extra` in its second section.
+const FILL = "命理上看，這是你的傾向和時機，不是注定；路怎麼走，選擇一直在你自己手上，慢慢來也沒關係。";
+const sectionsText = (part, extra = "", drop = null) => part.titles.filter(t => t !== drop).map((t, i) => `【${t}】\n${i === 1 ? extra : ""}${FILL}${FILL}`).join("\n\n");
+const listText = (part, fill = it => ({ 重點: "這十年以學習與貴人為主軸。", 好事: "工作上容易遇到合作與貴人。", 要注意: "理財宜保守，合夥借貸要小心。" })) =>
+  part.items.map(it => `【${it.key}】\n${it.fields.map(f => `${f}：${fill(it)[f]}`).join("\n")}`).join("\n\n");
+
+test("a sections part that keeps to the facts passes; the checker catches what a model gets wrong", () => {
+  const a = partOf("full", "a"), C = a.check;
+  const d = C.decades.find(x => x.name === "戊寅");
+  const fine = `你是丁火日主，用神水，忌火，格局是建祿格，身強。2026 年 36 歲是丙午年；戊寅大運（虛歲 ${d.startAge}–${d.endAge}）、戊寅大運（${d.startYear}–${d.endYear}）。`;
+  const ok = checkPart(sectionsText(a, fine), a);
+  assert.deepEqual(ok.problems, []);
+  assert.equal(ok.sections.length, 4);
+  const marked = a.titles.map((t, i) => `${i % 2 ? `**【${t}】**` : `${i + 1}. 【${t}】：`}\n${FILL}${FILL}`).join("\n");
+  assert.equal(checkPart(marked, a).ok, true, "Markdown and numbering around a title do not matter");
+  const cases = [
+    ["你在甲子年轉運。", /沒有的干支/], ["2030 年丙午年要小心。", /2030 年不是丙午年/], ["你是甲木日主。", /日主是丁/],
+    ["庚木的性格很直。", /庚屬金，不是木/], ["你喜火。", /火不是喜用/], ["你最忌水。", /水不是忌神/], ["你的命中缺火。", /命中不缺火/],
+    ["你是身弱的命。", /不是身弱/], ["你是七殺格。", /格局是建祿格/], ["2030 年 33 歲那年。", /2030 年不是 33 歲/],
+    [`戊寅大運（虛歲 ${d.startAge + 2}–${d.endAge + 2}）。`, /大運是虛歲/], ["你會活到 85 歲。", /死亡或壽命/],
+    ["這幾年有血光之災。", /恐嚇/], ["要小心糖尿病。", /疾病/], ["可能需要動手術。", /手術/], ["記得去檢查肝功能。", /檢查項目/],
+    ["可以去廟裡點燈化解。", /改運商品或儀式/], ["这几年你们会很顺。", /簡體字/],
+  ];
+  for (const [extra, why] of cases) {
+    const c = checkPart(sectionsText(a, extra), a);
+    assert.equal(c.ok, false, extra);
+    assert.ok(c.problems.some(p => why.test(p)), `${extra} → ${c.problems.join("；")}`);
+  }
+  assert.ok(checkPart(sectionsText(a, "", "事業與財運"), a).problems.some(p => p.includes("少了段落：事業與財運")));
+});
+
+test("a list part: entries are matched by their titles, a second try keeps the good ones, and the engine fills the rest", () => {
+  const y0 = partOf("full", "years0");
+  assert.equal(checkPart(listText(y0), y0).ok, true);
+  // Titles with spaces dropped or a year after them, and 【好事】 written as titles, still count.
+  const loose = y0.items.map(it => `【${it.key.replace(" ", "")}（${it.head.year}）】\n【好事】工作上容易遇到合作與貴人。\n【要注意】理財宜保守，合夥借貸要小心。`).join("\n");
+  assert.equal(checkPart(loose, y0).ok, true);
+  // One left out, one without 要注意, one with a banned word.
+  const [first, second, third] = y0.items;
+  const broken = listText(y0).replace(new RegExp(`【${first.key}】[^【]*`), "").replace(new RegExp(`(【${second.key}】\\n好事：[^\\n]*)\\n要注意：[^\\n]*`), "$1").replace(new RegExp(`(【${third.key}】\\n好事：)`), "$1可能要動手術。");
+  const c1 = checkPart(broken, y0);
+  assert.equal(c1.ok, false);
+  assert.deepEqual(c1.bad.map(b => b.key), [first.key, second.key, third.key]);
+  assert.match(c1.bad[1].why, /少了「要注意」/);
+  assert.match(c1.bad[2].why, /手術/);
+  assert.equal(c1.items.size, y0.items.length - 3);
+  // The second try answers only those three; the third is still wrong and gets the engine's words.
+  const retry = `【${first.key}】\n好事：適合學習新東西，報名課程。\n要注意：作息要規律，少熬夜。\n【${second.key}】\n好事：容易遇到貴人，多參加聚會。\n要注意：說話記得留三分餘地。`;
+  const c2 = checkPart(retry, y0, c1);
+  assert.deepEqual(c2.bad.map(b => b.key), [third.key]);
+  const out = finishPart(y0, c2);
+  assert.equal(out.items.length, y0.items.length);
+  const filled = out.items.find(x => x.key === third.key);
+  assert.equal(filled.fallback, true);
+  assert.deepEqual(filled.fields, third.fallback);
+  const kept = out.items.find(x => x.key === first.key);
+  assert.deepEqual(kept.fields, { 好事: "適合學習新東西，報名課程。", 要注意: "作息要規律，少熬夜。" });
+  assert.deepEqual([kept.age, kept.year, kept.pillar, kept.decade], [36, 2026, "丙午", "戊寅"]);
+  assert.equal(kept.fallback, undefined);
+});
+
+test("合婚 text is held to both charts, and does not foretell a breakup", () => {
+  const m1 = partOf("match", "m1", partner), C = m1.check;
+  assert.equal(C.dayStems.length, 2);
+  const both = `你是丁火日主，對方是${C.dayStems[1]}日主。2026 年你 36 歲，2026 年對方 34 歲。`;
+  assert.deepEqual(checkPart(sectionsText(m1, both), m1).problems, []);
+  for (const [extra, why] of [["你們兩個注定分開。", /外遇或分手/], ["要小心對方外遇。", /外遇或分手/], ["2026 年 50 歲。", /不是 50 歲/]]) {
+    assert.ok(checkPart(sectionsText(m1, extra), m1).problems.some(p => why.test(p)), extra);
+  }
+  const my = partOf("match", "myears", partner);
+  assert.equal(checkPart(listText(my), my).ok, true);
+  const out = finishPart(my, checkPart(listText(my), my));
+  assert.deepEqual(out.meta, my.meta);
+  assert.deepEqual(out.items[0].ages, [36, 34]);
+});
+
+test("the engine's words about surgery and blood are said gently before the model sees them", () => {
+  assert.equal(soften("流年逢白虎：傳統上要防血光與開刀，開車、運動多小心"), "流年逢白虎：傳統上要多注意安全、避免受傷，開車、運動多小心");
+  assert.equal(soften("逢羊刃：衝勁強、敢做決定，但也要防衝動、受傷、開刀與破財"), "逢羊刃：衝勁強、敢做決定，但也要防衝動、受傷與破財");
+  assert.equal(soften("巳申刑：刑也主小傷與手術，身體要多留意"), "巳申刑：刑也主小傷，身體要多留意");
+  assert.equal(soften("逢天乙貴人，家中遇事容易有人幫忙；值太歲，傳統上會安太歲，祈求闔家平安。"), "逢天乙貴人，家中遇事容易有人幫忙；值太歲。");
+  assert.equal(toneWord("吉") + toneWord("平") + toneWord("凶"), "順勢平穩宜守");
+});
+
+test("titles and years", () => {
+  assert.deepEqual(parseSections("## 【總評】：一句話\n第二行\n\n【命格一句話】\n比喻").map(s => [s.title, s.body]), [["總評", "一句話\n第二行"], ["命格一句話", "比喻"]]);
+  assert.equal(yearPillar(1984), "甲子");
+  assert.equal(yearPillar(2026), "丙午");
+  assert.equal(yearPillar(1990), "庚午");
+});
+
+test("a failed part says what happened, and only a used-up day says come back tomorrow", async () => {
+  const { readingError } = await import("../src/ai-reading.js");
+  assert.match(readingError(503, { error: "quota" }), /今天的額度用完了/);
+  for (const data of [{ error: "unavailable" }, null]) {
+    assert.doesNotMatch(readingError(503, data), /額度|明天/);
+    assert.match(readingError(503, data), /重寫這一段/);
+  }
+  assert.match(readingError(429, {}), /有點忙/);
+  assert.match(readingError(502, {}), /自動檢查/);
+  assert.match(readingError(500, null), /連不上/);
+});
+
+test("the fact sheet gives only the 成格／破格 that hold for this chart, and the text may only repeat its 神煞, books and quotes", async () => {
+  const { contentProblems } = await import("../src/ai-reading.js");
+  const a = partOf("full", "a");
+  assert.match(a.facts, /【格局成敗】/);
+  assert.doesNotMatch(a.facts, /破格怕/, "no generic list of what could break the structure");
+  const C = a.check, problems = t => contentProblems(t, C);
+  const absent = ["天乙貴人", "文昌貴人", "華蓋", "羊刃", "魁罡", "金神"].find(n => !a.facts.includes(n));
+  assert.ok(absent);
+  assert.ok(problems(`命理上看，你命帶${absent}，做事有人幫。`).problems.some(p => p.includes(absent)));
+  assert.ok(problems("《三命通會》說你的命格很好。").problems.some(p => p.includes("三命通會")));
+  assert.ok(problems("《滴天髓》說「一盞明燈照九州」。").problems.some(p => /引文|書/.test(p)));
+  const breaks = ["傷官見官", "官殺混雜", "梟神奪食"].find(b => !a.facts.includes(b));
+  assert.ok(problems(`命理上看，你的命盤有${breaks}的情形。`).problems.some(p => p.includes(breaks)));
+  // 桃花 is an everyday word as well: only a warning.
+  if (!a.facts.includes("桃花")) {
+    const r = problems("命理上看，這幾年桃花不少。");
+    assert.ok(!r.problems.some(p => p.includes("桃花")) && r.warnings.some(w => w.includes("桃花")));
+  }
+  // What the facts do contain may be repeated.
+  const quote = (a.facts.match(/《滴天髓》[^「]{0,12}「([^」]+)」/) || [])[1];
+  if (quote) assert.deepEqual(problems(`《滴天髓》說「${quote}」，命理上看很貼切。`).problems, []);
+});
+
+test("the checker does not take everyday words for 神煞 or a denied 破格 for a claim, and holds each year to its own line", async () => {
+  const { contentProblems } = await import("../src/ai-reading.js");
+  const { STARS } = await import("../src/core/detail.js");
+  const a = partOf("full", "a"), problems = t => contentProblems(t, a.check).problems;
+  for (const t of ["你們每天喜歡一起散步。", "夏天喜歡運動。", "大家歡天喜地。", "你的才華蓋世。"]) assert.deepEqual(problems(t), [], t);
+  if (!a.facts.includes("陰差陽錯")) assert.deepEqual(problems("感情上偶爾陰差陽錯，多溝通就好。"), []);
+  if (!a.facts.includes("天喜")) assert.ok(problems("你命帶天喜。").some(p => p.includes("天喜")));
+  if (!a.facts.includes("華蓋")) assert.ok(problems("你命帶華蓋。").some(p => p.includes("華蓋")));
+  assert.ok(problems("明年又逢白虎、喪門。").some(p => p.includes("白虎") && !a.facts.includes("白虎")));
+  if (!a.facts.includes("文昌貴人")) assert.ok(problems("你命帶文昌，讀書順利。").some(p => p.includes("文昌貴人")));
+  // A break that is denied or explained is fine; one that is claimed is not.
+  const breaks = ["傷官見官", "官殺混雜", "梟神奪食"].filter(b => !a.facts.includes(b));
+  assert.deepEqual(problems(`好在你的命盤沒有${breaks.join("、")}這類破格。`), []);
+  assert.ok(problems(`你的命盤有${breaks[0]}的情形。`).length);
+  // Quotes after 古訣 are held to the facts too; a copy with 。 inside 」 or 、 for ， still counts as a copy.
+  assert.ok(problems("古訣說「土多水塞，貴在順勢」。").some(p => p.includes("引文")));
+  const quote = (a.facts.match(/《滴天髓》[^「]{0,12}「([^」]+)」/) || [])[1];
+  assert.ok(quote, "the facts quote 《滴天髓》");
+  assert.deepEqual(problems(`《滴天髓》說「${quote}。」`), []);
+  assert.deepEqual(problems(`《滴天髓》說「${quote.replace("，", "、")}」`), []);
+
+  // 「正官格忌傷官見官（格局）」 among the 喜忌 reasons says what the structure fears, not that this chart has it.
+  const zg = partOf("full", "a", null, { ...input, date: { y: 1989, m: 2, d: 28 }, time: { h: 14, mi: 43 }, sex: "male" });
+  assert.match(zg.facts, /格忌傷官見官（格局）/);
+  assert.ok(contentProblems("你的命盤有傷官見官的情形，這是格局的破損之處。", zg.check).problems.some(p => p.includes("傷官見官")));
+  assert.deepEqual(contentProblems("正官格忌傷官見官，所以金不宜太多。", zg.check).problems, []);
+  // The three breaks worded without their usual names now carry them.
+  const bj = partOf("full", "a", null, { ...input, date: { y: 1950, m: 6, d: 7 }, time: { h: 3, mi: 30 }, sex: "male" });
+  assert.match(bj.facts, /有奪財之憂（比劫奪財）/);
+  assert.deepEqual(contentProblems("比劫透出，也就是比劫奪財，錢財要守。", bj.check).problems, []);
+
+  // Denials and warnings in other words, the break names inside the strength words, and the hedges that still claim.
+  for (const t of ["格局清純，無傷官見官之病。", "命中不見梟神奪食，做事能有始有終。", "這張命盤不犯官殺混雜，方向清楚。", "合夥時要避免比劫奪財的情況。", "傷官見官的情形在你的命盤裡並沒有出現。", "好在你的命盤沒有財多身弱的問題。"]) assert.deepEqual(problems(t), [], t);
+  for (const t of ["你的命盤恐怕有傷官見官的問題。", "可怕的是梟神奪食。", "這不是小事而是官殺混雜的格局。"]) assert.ok(problems(t).some(p => p.includes("破格")), t);
+  // More everyday words; proverbs are not citations; a quote must keep the source the facts give it.
+  for (const t of ["這張命盤先天喜水。", "你天天喜氣洋洋。", "風華蓋世的才情。", "居家擺設可參考左青龍右白虎。", "這也是古人常講的道理，人生要懂得「進退有度」。"]) assert.deepEqual(problems(t), [], t);
+  assert.ok(problems("逢天喜好事多。").some(p => p.includes("天喜")) || a.facts.includes("天喜"));
+  const old = (a.facts.match(/古訣「([^」]+)」/) || [])[1];
+  if (old) {
+    assert.deepEqual(problems(`古訣說「${old.replace("，", " ")}」。`), [], "a space for the comma");
+    assert.ok(problems(`《滴天髓》說「${old}」。`).some(p => p.includes("出自古訣")), "古訣 is not 《滴天髓》");
+  }
+  assert.ok(problems("滴天髓說「丁火柔中，能化金水」。").some(p => p.includes("引文")), "a book named without 《》");
+  const m2 = partOf("match", "m2", partner);
+  assert.deepEqual(contentProblems("古語說「家和萬事興」，兩個人把家照顧好。", m2.check).problems, []);
+  // 從強 is a kind of 從格.
+  const cq = partOf("full", "a", null, { ...input, date: { y: 2002, m: 1, d: 5 }, time: { h: 16, mi: 36 } });
+  assert.deepEqual(contentProblems("你的命盤屬於從格裡的從強格，印星與比劫成勢。", cq.check).problems, []);
+  // What one school likes is not the chart's 喜用, and another school's 格局 named by the facts may be repeated.
+  const views = a.facts.split("\n").find(l => l.includes("各派看法"));
+  assert.deepEqual(contentProblems(views.replace(/^【[^】]+】/, ""), a.check).problems, []);
+  // A break on one year's line holds in a sentence about that year, not for the whole chart.
+  const sh = partOf("short", "short", null, { ...input, date: { y: 2017, m: 5, d: 21 }, time: { h: 8, mi: 48 } });
+  const yl = sh.facts.split("\n").find(l => l.startsWith("- ") && l.includes("梟神奪食"));
+  if (yl) {
+    assert.ok(contentProblems("你的命盤梟神奪食，格局有破損。", sh.check).problems.some(p => p.includes("梟神奪食")));
+    assert.deepEqual(contentProblems(`${yl.match(/(\d{4}) 年/)[1]} 年要留意梟神奪食，飲食睡眠宜顧。`, sh.check).problems, []);
+  }
+
+  // A list entry is held to its own year: a 神煞 of one year does not pass on another.
+  const y0 = partOf("full", "years0");
+  const pick = Object.keys(STARS).map(st => [st, y0.items.find(it => it.line.includes(st)), y0.items.find(it => !it.line.includes(st))])
+    .find(([st, has, lacks]) => has && lacks && !y0.shared.includes(st) && st.length > 2);
+  assert.ok(pick, "a 神煞 that only some years have");
+  const [star, has, lacks] = pick;
+  const text = listText(y0, it => ({ 好事: `這一年逢${star}，${"工作上容易遇到合作與貴人。"}`, 要注意: "理財宜保守，合夥借貸要小心。" }));
+  const c = checkPart(text, y0);
+  assert.ok(c.bad.some(b => b.key === lacks.key && b.why.includes(star)), `${star} on ${lacks.key}`);
+  assert.ok(!c.bad.some(b => b.key === has.key), `${star} on ${has.key} is its own`);
+  // The engine writes 流年逢文昌 with the short name, so the model may too.
+  const wen = y0.items.find(it => it.line.includes("逢文昌"));
+  if (wen) assert.ok(!checkPart(listText(y0, it => ({ 好事: it === wen ? "流年逢文昌，利讀書、考試與證照，適合進修。" : "工作上容易遇到合作與貴人。", 要注意: "理財宜保守，合夥借貸要小心。" })), y0).bad.some(b => b.key === wen.key));
+});
+
+test("health in the AI reading follows the 詳批's rule: the strongest element only when it holds 30 % or more", () => {
+  for (const y of [1960, 1975, 1988, 1990, 2001]) {
+    const b = partOf("full", "b", null, { ...input, date: { y, m: 6, d: 21 } });
+    const line = b.facts.split("\n").find(l => l.startsWith("【健康"));
+    assert.ok(line, `${y}`);
+    const scores = b.facts.match(/【五行力量】([^；]+)/);
+    if (!scores) continue;
+    const vals = Object.fromEntries([...scores[1].matchAll(/([木火土金水]) ([\d.]+)/g)].map(m => [m[1], Number(m[2])]));
+    const total = Object.values(vals).reduce((t, v) => t + v, 0), top = Object.entries(vals).sort((x, y) => y[1] - x[1])[0];
+    assert.equal(line.includes("最旺的"), top[1] / total >= 0.3, `${y}: ${line}`);
+  }
+});
+
+test("夜子時 goes with the request only when chosen, the Worker accepts only early or late, and the chart follows it", () => {
+  const late = { ...input, date: { y: 1988, m: 2, d: 15 }, time: { h: 23, mi: 30 }, zi: "late" };
+  assert.equal(readingRequest(late, "full").birth.zi, "late");
+  assert.equal(readingRequest({ ...late, zi: "early" }, "full").birth.zi, undefined, "the default is not sent");
+  assert.equal(readingRequest({ ...late, time: null }, "full").birth.zi, undefined, "no hour, no 子時 rule");
+  const body = readingRequest(late, "full", { part: "a" });
+  assert.equal(readReadingRequest({ ...body, birth: { ...body.birth, zi: "noon" } }), null);
+  const day = from => partOf("full", "a", null, from).facts.match(/【四柱】[^；]*；月柱[^；]*；日柱(..)/)[1];
+  assert.equal(day({ ...late, zi: "early" }), "辛丑");
+  assert.equal(day(late), "庚子");
+});
