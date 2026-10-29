@@ -27,7 +27,7 @@
     "壽命": "Lifespan",
     "100 次人生裡，一半落在 <em>{p25}–{p75} 歲</em>之間": "Half of the 100 lives ended <em>between {p25} and {p75}</em>",
     "中位數 {median} 歲。活過 90 歲有 {over90} 次，不到 60 歲有 {under60} 次。這一次活到 {thisAge} 歲，只是其中一種可能。": "The median is {median}. In {over90} of the lives you lived past 90, and in {under60} the life ended before 60. This time you lived to {thisAge}: just one of the possibilities.",
-    "如果這個結果讓你心裡不舒服，可以打 1925 安心專線（24 小時）。": "If this result upsets you, please talk to someone. In Taiwan, call the 1925 Mental Health Support Line (24 hours); anywhere else, call your local helpline.",
+    "如果這個結果讓你心裡不舒服，可以打 1925 安心專線（24 小時）。": "If this result upsets you, please talk to someone. Taiwan: 1925 Mental Health Support Line (24 hours). US: call or text 988. Singapore: Samaritans of Singapore (SOS), 1767. Malaysia: Befrienders Kuala Lumpur, 03-7627 2929. Philippines: NCMH Crisis Hotline, 1553. Elsewhere: findahelpline.com.",
     "壽命以內政部生命表為基準，命盤只讓機率傾斜，不是預言。": "Lifespans follow Taiwan's official life tables (Ministry of the Interior). The chart only tilts the odds; it is not a prediction.",
     "健康": "Health",
     "100 次裡，有 <em>{seriousBefore60} 次</em>在 60 歲前生過重病": "In <em>{seriousBefore60} of the 100 lives</em>, you had a serious illness before 60",

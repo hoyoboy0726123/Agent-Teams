@@ -11,14 +11,18 @@ The plan is in `PLAN.md`, the legal notes in `docs/COMPLIANCE.md`, the engine in
 | Route | What |
 | --- | --- |
 | `/` | The game: welcome (live numbers) → birth form with the Big Three → play → ending (life chart, fate vs luck over 100 lives, your sky, share card) |
-| `/privacy`, `/terms` | Static policy pages (`src/legal.js`; the contact address is a TODO placeholder) |
+| `/privacy`, `/terms` | Static policy pages (`src/legal.js`). The contact address is `CONTACT` at the top of that file, still the placeholder `TODO@example.com`, so the pages say “(contact address coming soon)” |
+| `/fonts/*.woff2`, `/fonts/OFL.txt` | The display face, Fraunces (OFL), served by the Worker itself: no Google Fonts (`src/fonts.js`, `assets/fonts/`) |
 | `/api/stats` | POST anonymous event counts from the page; GET the totals with the `ADMIN_KEY` secret |
 | `/api/live` | The welcome page's live numbers (demo numbers while `LIVE_DEMO = "1"`) |
 | `/admin` | The back office (open it once as `/admin#key=…`); both sites together: https://bazi-life.mingpan.workers.dev/admin |
 
 Everything about the player runs in the browser: the chart, the life, the 100 reruns (in a Web Worker made from the
 page's own script) and the "write your own decision" matcher (`src/sim/intent.js`). The Worker keeps only daily event
-totals and an anonymous summary of finished lives (decade, Sun sign, age, married, home, kids). No cookies, no IDs.
+totals and an anonymous summary of finished lives (decade, Sun sign, age, married, home, kids). No cookies, no IDs, and
+nothing stored in the browser for the counts: a visit is one `view` (the old `wits.lastVisit` date and the `visitor` and
+`return` events it drove are gone, since analytics storage needs consent under the EU ePrivacy rules). The browser keeps
+only `wits.theme` and `wits.majorOnly`.
 
 ### Files
 
@@ -26,7 +30,9 @@ totals and an anonymous summary of finished lives (decade, Sun sign, age, marrie
 - `src/ui/`: `pixel.js` / `pixel-app.js` (pixel scenes, recap dialog, welcome slideshow; adapted from bazi-life),
   `kline.js` (life chart), `share.js` (9:16 share card on a canvas), `words.js` (sign words, labels, fate vs luck),
   `stats.js` (anonymous counts).
-- `src/legal.js`: `/privacy` and `/terms`.
+- `src/legal.js`: `/privacy` and `/terms`; `src/fonts.js`: the `@font-face` rules for the self-hosted Fraunces (the
+  build fills them into `src/index.html` and the policy pages). The woff2 files are Google Fonts' own latin and
+  latin-ext subsets (upright 400–600 and italic 500), with `assets/fonts/OFL.txt`.
 - `scripts/build.mjs`: builds `public/index.html`, `public/privacy.html`, `public/terms.html`.
 - `worker/`: `index.js` (entry), `app.js` (routes), `stats.js`, `stats-store.js` (the `StatsStore` Durable Object),
   `admin.js`. `wrangler.jsonc` deploys it as the Worker `written-in-the-stars`.
@@ -50,7 +56,8 @@ typical chart:
 - `src/ui/reading-view.js` renders the chapters; `src/ui/wheel.js` draws the chart wheel (SVG, `role="img"` with a
   description, and the planet table as its text alternative).
 
-Below it, the **AI Astrology Report** card has a real “Get my AI report” button. AI reports are not open yet: a press
+Below it, the **AI Astrology Report** card has a real “Get my AI report” button, under a future-tense description (“We're
+building an AI astrologer that will read your whole chart…”). AI reports are not open yet: a press
 shows “Coming soon!” and counts `ai_report` (each press) and `ai_report_u` (once per page load), like bazi-life's
 `ai_life`. Nothing about the chart is sent. `/admin` shows both, with the click rate per finished life
 (`ai_report_u / end_u`).
@@ -74,8 +81,9 @@ Chinese). That page reads this Worker's `GET /api/stats` across origins:
 npm run build                      # → public/
 node --test test/site-*.test.js    # Worker and page unit tests (npm test runs everything)
 PLAYWRIGHT=/opt/node22/lib/node_modules/playwright CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome \
-  node test/site.e2e.mjs           # browser test of public/ (SHOTS=<dir> saves screenshots, FONTS=<dir> a local font copy)
+  node test/site.e2e.mjs           # browser test of public/ (SHOTS=<dir> saves screenshots); fails on any Google Fonts request
 npm run build && npx wrangler deploy
+# wrangler.jsonc must load the fonts as Data modules: "**/*.woff2" in the Data rule next to "**/*.png"
 npx wrangler secret put ADMIN_KEY  # once, for /admin: the same key as bazi-life's
 ```
 

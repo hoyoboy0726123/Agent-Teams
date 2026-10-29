@@ -2,8 +2,7 @@
 // screen, and which buttons were pressed. Only event names from a fixed list and a number of seconds are sent, to
 // /api/stats on the site's own Worker; never a birth date, a name, an id or a cookie. The Worker adds them to daily
 // totals and keeps nothing else (worker/stats.js). Without the Worker (a file:// page) nothing is sent.
-// The one thing kept in the browser is the date of the last visit (no id), to count a visitor once a day.
-const LAST = "wits.lastVisit";
+// Nothing is kept in the browser for the counts (no date of the last visit, no id).
 const MILESTONES = [[30, "t30"], [60, "t60"], [180, "t180"], [600, "t600"]];
 let URL_ = "", on = false;
 let page = "life", queue = [], seconds = 0, since = null, flushTimer = null, life = null, shown = 0;
@@ -20,14 +19,9 @@ export function initStats(p) {
   URL_ = (document.querySelector('meta[name="stats-endpoint"]') || {}).content || "";
   on = !!URL_ && /^https?:$/.test(location.protocol);
   if (!on) return;
+  // A visit is one "view"; there is no "visitor" or "return" event any more (they needed the date of the last visit in
+  // the browser). The Worker still accepts those names, from older pages.
   track("view");
-  let last = null;
-  try { last = localStorage.getItem(LAST); } catch {}
-  if (last !== dayKey()) {
-    track("visitor");
-    if (last) track("return");
-    try { localStorage.setItem(LAST, dayKey()); } catch {}
-  }
   if (document.visibilityState !== "hidden") since = Date.now();
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") { pause(); flush(); } else if (!since) since = Date.now();

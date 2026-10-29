@@ -276,7 +276,7 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 
 ### AI 命理師解讀與 AI 合婚（測試版）
 
-> **目前是「敬請期待」**（2026-10-24 起，先公開試水溫）：結局頁只顯示排盤引擎的結果（人生 K 線、同盤重跑、八字命理詳批），AI 那一格換成「AI 命理分析報告」和一個「AI 分析報告」按鈕，按之前看不出還沒開放（這樣才量得到有多少人想按），按下去才顯示「敬請期待」；合婚分頁的「AI 深度合婚」也一樣。頁面上沒有任何收費字樣。開關在 `src/ai-mode.js`（`aiSoon()`）和 `wrangler.jsonc` 的 `AI_READING: "soon"`（Worker 的 `/api/reading` 回 503 `soon`）。要開放時，刪掉 `AI_READING` 並讓 `aiSoon()` 回 `false`。在自己的手機上試真正的解讀：瀏覽器的 `localStorage` 設 `bazi-life.aiPreview` = `1`（Worker 那邊也要開著才寫得出來）；瀏覽器測試也是這樣打開它。按鈕被按了幾次，記在後台（見「後台統計」）。下面說的是開放之後的樣子。
+> **目前是「敬請期待」**（2026-10-24 起，先公開試水溫）：結局頁只顯示排盤引擎的結果（人生 K 線、同盤重跑、八字命理詳批），AI 那一格換成「AI 命理分析報告」和一個「AI 分析報告」按鈕。按鈕本身不變（這樣才量得到有多少人想按），上面的說明用未來式寫，不會讓人以為報告已經有了（「我們正在準備 AI 命理師：它會讀你的八字命盤……」）；按下去才顯示「敬請期待」，並記一次點擊。合婚分頁的「AI 深度合婚」也一樣（「我們正在準備 AI 深度合婚：……」）。頁面上沒有任何收費字樣。開關在 `src/ai-mode.js`（`aiSoon()`）和 `wrangler.jsonc` 的 `AI_READING: "soon"`（Worker 的 `/api/reading` 回 503 `soon`）。要開放時，刪掉 `AI_READING` 並讓 `aiSoon()` 回 `false`。在自己的手機上試真正的解讀：瀏覽器的 `localStorage` 設 `bazi-life.aiPreview` = `1`（Worker 那邊也要開著才寫得出來）；瀏覽器測試也是這樣打開它。按鈕被按了幾次，記在後台（見「後台統計」）。下面說的是開放之後的樣子。
 
 結局頁在八字命理詳批前面有一張「AI 命理師解讀」：結局頁一打開就自動開始寫完整解讀，由 Workers AI 的 Gemma 4 直接讀你的八字命盤，用白話寫一份解讀，玩家可以先讀完 AI 的整理，有興趣再往下看詳批的大運流年排法；下面的「AI 合婚（免費）」填另一半的生日，寫兩個人的合婚解讀。AI 讀的是真正的命盤，不是這一局遊戲的人生。收費的評估（實測、範例、定價、金流、稅與消保法）在「[AI 命理師收費評估](https://claude.ai/artifact/Ay7xfnc5m6CvCkF44jQp9q)」。
 
@@ -371,9 +371,17 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
   - 「寫下你自己的決定」那一句，連同這個抉擇的題目、按鈕和年齡、工作、感情狀態這些情境（見「自己寫選項」）。送出前，玩家輸入的名字都換成稱呼（`src/sim/privacy.js`，`test/privacy.test.js`）；Worker 不記錄句子。
   - 「AI 命理師解讀」和「AI 合婚」（結局頁，或合婚分頁的「AI 深度合婚」）：出生日期、時間、出生地和性別；合婚另外送對方的出生日期、時間、性別，以及合婚分頁填的出生地。不含姓名、暱稱、家人和這一局的內容（見「AI 命理師解讀與 AI 合婚」）。結局頁的完整解讀預設自動送出，歡迎頁、遊戲畫面上方「結局自動 AI 解讀」下面那一行和卡片上方，都寫著會送出什麼、怎麼關掉；AI 合婚和 AI 深度合婚要自己按。
 - 後台只收匿名的次數（`src/stats.js`，見「後台統計」）：事件名稱、停留的秒數，以及走完一生時的那筆摘要（年代、日主、歲數、結婚次數、買房、孩子數），不含生日、姓名、IP，也沒有 cookie 或編號。歡迎頁和頁尾都寫著這一點。
-- `localStorage` 只存這些：「只問人生大事」、「結局自動 AI 解讀」（改過才存）、最後一次來的日期（`bazi-life.lastVisit`，只為了一天只算一次訪客），選過的語言（`bazi-life.lang`），以及測試用的 `bazi-life.aiPreview`。
+- `localStorage` 只存這些：「只問人生大事」（`bazi-life.majorOnly`）、「結局自動 AI 解讀」（`bazi-life.aiAuto`，改過才存）、選過的語言（`bazi-life.lang`），以及測試用的 `bazi-life.aiPreview`。統計不在瀏覽器裡存任何東西：以前為了一天只算一次訪客而存的最後一次來的日期（`bazi-life.lastVisit`）已經拿掉（依歐盟 ePrivacy，分析用的儲存要先取得同意），`visitor`、`return` 也不再送。
 - 填到一半的表單（我的人生、準爸媽、合婚、排盤頁，連同開著的分頁）邊打邊存在這個分頁的 `sessionStorage`（`src/draft.js`）：重新整理會回來，關掉分頁就清掉；「清空重填」會馬上刪掉。AI 額度用完的那一天，這裡也記一個日期（`bazi-life.aiOut`，見「額度用完時先收起來」）。
-- 網頁的字型從 Google Fonts 載入。
+- 網頁的字型從 Google Fonts 載入（中文字型很大，先不自己放）：瀏覽器會直接向 Google 下載，Google 看得到 IP。隱私權政策裡有寫。
+
+### 隱私權政策與使用條款
+
+`/privacy`（隱私權政策）和 `/terms`（使用條款）是 `src/legal.js` 產生的兩頁（`npm run build` 寫到 `public/privacy.html`、`public/terms.html`，`worker/index.js` 提供），「我的人生」頁和排盤頁的頁尾都有連結，英文模式下連結也是英文。每一頁上面是繁體中文、下面是完整的英文；頁面依遊戲頁選過的語言（只讀 `localStorage` 的 `bazi-life.lang`）或網址的 `#zh`／`#en` 只顯示一種，右上角可以切換，沒有 JavaScript 時兩種都顯示。Claude Artifact 版的連結指向網站上的這兩頁。
+
+- 隱私權政策照程式寫：誰經營、哪些資料只在手機裡算、會送出什麼（匿名次數、走完一生的摘要、「寫下你自己的決定」那一句交給 Cloudflare Workers AI 判讀且名字先換成稱呼、不保存；AI 解讀開放後會送的出生日期、時間、地點和性別，並寫明還沒開放）、Cloudflare 主機與最多 7 天的請求記錄、Google Fonts、瀏覽器裡每一個 `localStorage`／`sessionStorage` 名稱和用途、沒有 cookie、不賣不分享、13 歲以上、權利與聯絡方式、日期。改了送出的資料或儲存的名稱，要一起改這一頁（`test/life.e2e.mjs` 會檢查）。
+- 使用條款：僅供娛樂與自我反思，不是醫療、法律、財務或心理建議；免費；不提供保證；網頁裡第三方程式和文字的授權全文（tyme4ts、shunshi-naming-core、shunshi-kangxi-core 的 MIT，Unihan 的 Unicode License V3）。
+- **聯絡信箱**：`src/legal.js` 最上面的 `CONTACT`，兩頁共用。還是預設的 `TODO@example.com` 時，頁面寫「（聯絡信箱即將公布）」，不顯示信箱；改成真的信箱後重新 build 就會出現。
 
 ### 中／英切換
 
@@ -520,7 +528,7 @@ node scripts/romanise.mjs                        # 重新產生人名字表
 研究文件「研究六」有完整評估。做法：
 
 1. 玩家寫下自己的決定。
-2. 本機先檢查安全：想傷害自己時不模擬，顯示 1925 安心專線、1995 生命線、1980 張老師；想傷害別人或違法時，請玩家換一個選擇（`src/sim/intent.js`）。
+2. 本機先檢查安全：想傷害自己時不模擬，顯示 1925 安心專線、1995 生命線、1980 張老師，再加一行新加坡（SOS 1767）、馬來西亞（Befrienders 03-7627 2929）和其他地方（findahelpline.com）；英文結局頁的壽命卡列臺灣 1925、美國 988、新加坡 SOS 1767、馬來西亞 Befrienders KL 03-7627 2929、菲律賓 NCMH 1553 和 findahelpline.com（`src/i18n/en/ending.json`）；想傷害別人或違法時，請玩家換一個選擇（`src/sim/intent.js`）。
 3. 網站部署在 Cloudflare 時，句子送到同一個網站的 Worker（`worker/index.js`），由 Workers AI 的 Gemma 4 判讀成一個行動。只送這個抉擇的題目、按鈕和年齡、工作、感情狀態這些情境，不送生日；玩家輸入的名字（自己、家人、伴侶）在題目、按鈕和句子裡都會先換成「你」「爸爸」「伴侶」這樣的稱呼再送出（`src/sim/privacy.js`）；Worker 在伺服器端組提示詞（`src/sim/interpret.js`），回覆也在伺服器端檢查過，只能是已經允許的行動。
 4. 沒有 Worker（直接開檔案、放在其他靜態網站、Claude Artifact 預覽），或 Worker 沒有回應（免費額度用完、限速、逾時 7 秒、斷線）時，在瀏覽器裡比對最接近的三個行動給玩家點選；都不像的話，可以按「照我寫的就好」。兩種情況都在同一個選擇框裡確認，不會出現錯誤訊息，也沒有「交給誰判讀」的說明，玩家感覺不到差別。
 5. 套用前讓玩家確認：「就這樣」、「照我寫的就好」或「改一下」。判讀員只有在玩家要的結果和某個按鈕一樣時才選按鈕（提示詞也附上按鈕的小字說明），玩家打算的和每個按鈕都不同時選最接近的一般行動，不硬套按鈕。不想套用任何規則時按「照我寫的就好」：故事原樣寫下玩家的話，結果不加分也不扣分（行動 `own`）。其他結果由模擬規則決定（`src/sim/act.js`，約 50 種行動），所以寫的選擇不會比按鈕更厲害。現在做不到的事會說明原因，讓玩家重選：沒有對象卻要結婚、存款不夠卻要買房，或是小孩子寫了大人的事（工作從 15 歲起；結婚、借錢、買彩券、移民要滿 18 歲）。小孩寫「進修」就是更用功、去補習，不是在職專班。
@@ -559,7 +567,7 @@ node scripts/romanise.mjs                        # 重新產生人名字表
 - **一把金鑰讀兩站**：頁面帶同一把金鑰，GET 本站的 `/api/stats`，以及 `https://written-in-the-stars.mingpan.workers.dev/api/stats`（`WITS_STATS`）。那邊的 Worker 只對 `ADMIN_ORIGIN`（它的 `wrangler.jsonc`，就是本站網址）開放 CORS，金鑰照樣檢查。所以**兩個 Worker 的 `ADMIN_KEY` 要設成同一串**。那邊讀不到（連不上、金鑰不對、還沒設金鑰）時，它的分頁和總覽會寫出原因，命盤人生的分頁照常。本站的 `/api/stats` 不給任何其他網站 CORS。
 - **部署**：先部署 Written in the Stars（帶 `ADMIN_ORIGIN`），再部署本站；兩邊各跑一次 `npx wrangler secret put ADMIN_KEY`，貼上同一串。
 
-- **收什麼**（`src/stats.js`）：瀏覽（`view`）、當天第一次來的瀏覽器（`visitor`，以前來過另記 `return`）、畫面真的在看的秒數（切到別的 App 不算；每分鐘或離開時送一次）和停留滿 30 秒、1、3、10 分鐘、開始人生、走到結局、按「AI 分析報告」、做了合婚、按「AI 深度合婚」。名稱帶 `_u` 的是「同一次瀏覽只算一次」，用來算點擊率。只送事件名稱和秒數，用 `sendBeacon` 送到 `/api/stats`；檔案或 Claude Artifact 預覽不送。
+- **收什麼**（`src/stats.js`）：瀏覽（`view`；不再送 `visitor`、`return`，因為那要在瀏覽器裡存上次來的日期，所以後台的「訪客」只剩舊頁面送來的，請看瀏覽）、畫面真的在看的秒數（切到別的 App 不算；每分鐘或離開時送一次）和停留滿 30 秒、1、3、10 分鐘、開始人生、走到結局、按「AI 分析報告」、做了合婚、按「AI 深度合婚」。名稱帶 `_u` 的是「同一次瀏覽只算一次」，用來算點擊率。只送事件名稱和秒數，用 `sendBeacon` 送到 `/api/stats`；檔案或 Claude Artifact 預覽不送。
 - **存什麼**（`worker/stats.js`、`worker/stats-store.js`）：每天（臺灣時間）、每個網頁（命盤人生、排盤）、每種事件一個總數，加上最近 10 分鐘的心跳時間和最近 500 筆走完的人生摘要（給歡迎頁的即時數據），放在 Worker 自己的 Durable Object（SQLite）裡，跟著 Worker 一起部署，不必另外建資料庫。不記 IP 或任何個人資料。只接受自己網站送來、名單上的事件，每個 IP 每分鐘最多 60 次（`STATS_LIMIT`），一次最多 20 個事件、900 秒。
 - **命盤人生分頁看什麼**：今天、近 7、30、90 天的瀏覽、訪客、平均停留、完成人生、按 AI 分析報告的訪次和點擊率（按的訪次 ÷ 完成人生的訪次）、合婚和 AI 深度合婚；從進站到按下 AI 報告的漏斗、停留分布、每天的長條圖和明細。`/admin` 不讓搜尋引擎收錄。
 - **換金鑰**：在兩個網站的資料夾各跑一次 `npx wrangler secret put ADMIN_KEY`，貼上同一串新的，舊連結就失效。
@@ -642,6 +650,7 @@ CLOUDFLARE_API_TOKEN=proxy-injected CLOUDFLARE_ACCOUNT_ID=a535bb4f35cdac784e0806
 | `src/life.html`、`src/life-app.js` | 人生模擬網頁 |
 | `src/pixel.js`、`src/pixel-app.js` | 像素場景：畫面、人物和天氣；遊戲上方的場景、人生回顧、歡迎頁和準爸媽的動畫 |
 | `src/sim/privacy.js` | 自己寫的決定送出前，把玩家輸入的名字換成稱呼 |
+| `src/legal.js` | `/privacy` 隱私權政策和 `/terms` 使用條款（中文加英文；聯絡信箱是這裡的 `CONTACT`，見「隱私權政策與使用條款」） |
 | `public/life.html` | 產生出來的網頁 |
 | `test/life.e2e.mjs` | 人生模擬頁的瀏覽器測試（包括姓名、家人、自己寫選項；Worker 的回答、503 和斷線都用替身測；AI 解讀與合婚由真的 Worker 配替身模型回答，包括結局自動解讀、同一張命盤不重送、關掉後不送和額度用完；合婚分頁的表單、結果和 AI 深度合婚，以及「用這對伴侶過一生」的名字、年份和故事） |
 | `test/worker.test.js` | Cloudflare Worker 的單元測試（Workers AI 用替身） |

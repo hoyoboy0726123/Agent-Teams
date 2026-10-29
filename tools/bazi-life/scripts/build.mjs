@@ -11,12 +11,15 @@
 // /api/reading for the AI 命理師解讀; the fragment has no Worker behind it, so it leaves both addresses empty: the page
 // reads the words itself and says the AI reading is on the site. Both pages send anonymous counts to /api/stats
 // (src/stats.js); the fragments send none.
+//   public/privacy.html, public/terms.html   隱私權政策 and 使用條款 (src/legal.js, Chinese with the English below;
+//                               the contact address is CONTACT there), served at /privacy and /terms
 //   public/i18n/story-en.json   the English of the story (scripts/story-bundle.mjs, from src/i18n/en/), fetched by
 //                               the page only in English, so the Chinese page does not grow (README「英文版（翻譯層）」)
 import { build } from "esbuild";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { storyBundle } from "./story-bundle.mjs";
 import { fileURLToPath } from "node:url";
+import { PRIVACY_HTML, TERMS_HTML, SITE } from "../src/legal.js";
 
 const TYME4TS_CDN = "https://unpkg.com/tyme4ts@1.5.2/dist/lib/index.mjs";
 const at = p => fileURLToPath(new URL(`../${p}`, import.meta.url));
@@ -47,12 +50,20 @@ async function page({ html, js, out, fragment, links }) {
   }
 }
 
-await page({ html: "src/page.html", js: "src/app.js", out: "public/index.html", fragment: arg("--fragment"), links: { standalone: { __STATS_URL__: "/api/stats" }, artifact: { __STATS_URL__: "" } } });
+// The footers link to /privacy and /terms; the artifact copies, which have no Worker, link to the site's.
+const LEGAL = {
+  standalone: { __PRIVACY_URL__: "/privacy", __TERMS_URL__: "/terms" },
+  artifact: { __PRIVACY_URL__: `${SITE}/privacy`, __TERMS_URL__: `${SITE}/terms` },
+};
+await writeFile(at("public/privacy.html"), PRIVACY_HTML);
+await writeFile(at("public/terms.html"), TERMS_HTML);
+console.log(`public/privacy.html ${(PRIVACY_HTML.length / 1024).toFixed(0)} KB, public/terms.html ${(TERMS_HTML.length / 1024).toFixed(0)} KB`);
+await page({ html: "src/page.html", js: "src/app.js", out: "public/index.html", fragment: arg("--fragment"), links: { standalone: { __STATS_URL__: "/api/stats", ...LEGAL.standalone }, artifact: { __STATS_URL__: "", ...LEGAL.artifact } } });
 await page({
   html: "src/life.html", js: "src/life-app.js", out: "public/life.html", fragment: arg("--life-fragment"),
   links: {
-    standalone: { __CHART_URL__: "index.html", __INTERPRET_URL__: "/api/interpret", __READING_URL__: "/api/reading", __STATS_URL__: "/api/stats" },
-    artifact: { __CHART_URL__: arg("--chart-url") || "https://claude.ai/artifact/3a3ezBHmLKeKBxGaNveAV2", __INTERPRET_URL__: "", __READING_URL__: "", __STATS_URL__: "" },
+    standalone: { __CHART_URL__: "index.html", __INTERPRET_URL__: "/api/interpret", __READING_URL__: "/api/reading", __STATS_URL__: "/api/stats", ...LEGAL.standalone },
+    artifact: { __CHART_URL__: arg("--chart-url") || "https://claude.ai/artifact/3a3ezBHmLKeKBxGaNveAV2", __INTERPRET_URL__: "", __READING_URL__: "", __STATS_URL__: "", ...LEGAL.artifact },
   },
 });
 

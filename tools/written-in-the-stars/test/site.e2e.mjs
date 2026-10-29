@@ -2,8 +2,8 @@
 // /api/live is mocked and /api/stats is caught (and checked to carry no birth data).
 //   PLAYWRIGHT=/path/to/playwright CHROMIUM=/path/to/chrome node test/site.e2e.mjs
 //   SHOTS=<dir> also saves phone and desktop screenshots of the welcome page, the Big Three, play, the ending and
-//   the share card. FONTS=<dir> serves Google Fonts from a local copy (fonts.css + the .woff2 files it names), so the
-//   screenshots show the real typeface; without it the font requests are cut and the fallback serif shows.
+//   the share card. The typeface (Fraunces) is the site's own (assets/fonts/, src/fonts.js), served here at /fonts/ as
+//   the Worker does; every request to Google Fonts is recorded and fails the run.
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -14,12 +14,14 @@ import { dayOf } from "../worker/stats.js";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT || "playwright");
-const SHOTS = process.env.SHOTS || "", FONTS = process.env.FONTS || "";
+const SHOTS = process.env.SHOTS || "";
 const results = [];
 const check = (name, ok, extra = "") => { results.push(!!ok); console.log(`${ok ? "PASS" : "FAIL"}  ${name}${extra ? `  — ${extra}` : ""}`); };
 
 // ---------- the server ----------
 const PUBLIC = fileURLToPath(new URL("../public/", import.meta.url));
+const FONT_DIR = fileURLToPath(new URL("../assets/fonts/", import.meta.url));
+const fontsServed = [];
 const beacons = [];
 const ROUTES = { "/": "index.html", "/index.html": "index.html", "/privacy": "privacy.html", "/terms": "terms.html" };
 // The back office reads GET /api/stats with the admin key: a day of counts with AI report clicks.
@@ -40,6 +42,13 @@ const server = createServer(async (req, res) => {
     req.on("end", () => { beacons.push(body); res.writeHead(204); res.end(); });
     return;
   }
+  const font = path.match(/^\/fonts\/([a-z-]+\.woff2|OFL\.txt)$/);
+  if (font) {
+    fontsServed.push(font[1]);
+    res.writeHead(200, { "content-type": font[1].endsWith(".txt") ? "text/plain; charset=utf-8" : "font/woff2" });
+    res.end(await readFile(join(FONT_DIR, font[1])));
+    return;
+  }
   if (!ROUTES[path]) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
   res.end(await readFile(join(PUBLIC, ROUTES[path])));
@@ -54,17 +63,13 @@ const LIVE = {
 };
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined, args: ["--no-proxy-server"] });
-const errors = [];
+const errors = [], googleFonts = [];
 async function fresh(viewport, { colorScheme = "light", live = LIVE } = {}) {
   const ctx = await browser.newContext({ viewport, colorScheme, acceptDownloads: true, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
   p.on("pageerror", e => errors.push(`${viewport.width}: ${e.message}`));
-  if (FONTS) await p.route(/fonts\.(googleapis|gstatic)\.com/, async r => {
-    const u = new URL(r.request().url());
-    if (u.hostname === "fonts.googleapis.com") return r.fulfill({ status: 200, contentType: "text/css", body: await readFile(join(FONTS, "fonts.css")) });
-    return r.fulfill({ status: 200, contentType: "font/woff2", body: await readFile(join(FONTS, u.pathname.split("/").pop())).catch(() => Buffer.alloc(0)) });
-  });
-  else await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+  p.on("request", r => { if (/^https?:\/\/fonts\.(googleapis|gstatic)\.com\//.test(r.url())) googleFonts.push(r.url()); });
+  await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   await p.route("**/api/live", r => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(live) }));
   return p;
 }
@@ -147,7 +152,7 @@ async function closeStory(p) {
   check("written decision: the local matcher offers its closest guesses", (await p.$$("#free-out [data-free-action]")).length >= 2 && /closest|Not sure/.test(await p.textContent("#free-out")));
   await p.fill("#free-text", "honestly I want to kill myself");
   await p.click("#free-go");
-  check("safety phrases show the 988 line instead of playing it out", /988/.test(await p.textContent("#free-out")) && await p.$eval('#free-out a[href="tel:988"]', a => !!a));
+  check("safety phrases show the 988 line (and findahelpline.com outside the US) instead of playing it out", /988/.test(await p.textContent("#free-out")) && await p.$eval('#free-out a[href="tel:988"]', a => !!a) && await p.$eval('#free-out a[href="https://findahelpline.com"]', a => !!a));
   const ageBefore = await p.textContent("#s-age");
   await p.click("#choice [data-option='0']");
   await p.waitForTimeout(200);
@@ -186,7 +191,7 @@ async function closeStory(p) {
   if (SHOTS) await (await p.$("#reading")).screenshot({ path: join(SHOTS, "desktop-reading.png") });
   // The AI report hook: a real-looking button, a friendly message, and the click counted.
   const aiLabel = (await p.textContent("#ai-btn")).trim();
-  check("AI card: an “AI Astrology Report” pitch with a “Get my AI report” button (no “soon” on it) and the AI note", aiLabel === "Get my AI report" && !/soon/i.test(await p.textContent("#ai-card h3") + aiLabel) && /An AI astrologer reads your whole chart/.test(await p.textContent("#ai-card")) && /For entertainment and self-reflection\. AI-written\./.test(await p.textContent("#ai-card")) && await p.isHidden("#ai-msg"));
+  check("AI card: an “AI Astrology Report” pitch in the future tense with a “Get my AI report” button (no “soon” on it) and the AI note", aiLabel === "Get my AI report" && !/soon/i.test(await p.textContent("#ai-card h3") + aiLabel) && /We're building an AI astrologer that will read your whole chart/.test(await p.textContent("#ai-card")) && /For entertainment and self-reflection\. AI-written\./.test(await p.textContent("#ai-card")) && await p.isHidden("#ai-msg"));
   const sentBefore = beacons.length;
   await p.click("#ai-btn");
   check("AI button: shows “Coming soon!” and points at the reading", /^Coming soon! We're putting the finishing touches on AI reports\. Your full chart reading above is ready now\.$/.test((await p.textContent("#ai-msg")).trim()) && await p.isVisible("#ai-msg"));
@@ -316,11 +321,12 @@ for (const width of [430, 768, 1024, 1440]) {
   const p = await fresh({ width: 390, height: 844 });
   await p.goto(`${SITE}/privacy`);
   const privacy = await p.textContent("body");
-  check("/privacy: what is collected, what stays on the device, processors, no sale, children, rights, contact, date", ["What stays on your device", "What we collect", "Service providers", "No sale or sharing", "Children", "Your rights", "Contact", "Last updated"].every(h => privacy.includes(h)) && /Cloudflare/.test(privacy) && /hello@/.test(privacy));
+  check("/privacy: what is collected, what stays on the device, processors, no sale, children, rights, contact, date", ["What stays on your device", "What we collect", "Service providers", "No sale or sharing", "Children", "Your rights", "Contact", "Last updated"].every(h => privacy.includes(h)) && /Cloudflare/.test(privacy) && /up to 7 days/.test(privacy) && /\(contact address coming soon\)/.test(privacy) && !/Google|last visit/i.test(privacy) && /wits\.theme/.test(privacy));
   check("/privacy fits a phone", !(await overflow(p)).length, (await overflow(p)).join("; "));
   await p.goto(`${SITE}/terms`);
   const terms = await p.textContent("body");
-  check("/terms: entertainment only, 988, the astronomy-engine MIT notice", /entertainment and self-reflection only/.test(terms) && /988/.test(terms) && /Don Cross/.test(terms) && /MIT License/.test(terms));
+  check("/terms: entertainment only, 988, the astronomy-engine MIT notice", /entertainment and self-reflection only/.test(terms) && /988/.test(terms) && /Don Cross/.test(terms) && /MIT License/.test(terms) && /findahelpline\.com/.test(terms) && /Fraunces Project Authors/.test(terms) && await p.$eval('a[href="/fonts/OFL.txt"]', a => !!a));
+  check("/terms uses the site's own Fraunces", await p.evaluate(async () => { await document.fonts.ready; return [...document.fonts].some(f => f.family.replace(/"/g, "") === "Fraunces" && f.status === "loaded"); }));
   await p.context().close();
 }
 
@@ -339,6 +345,10 @@ for (const width of [1280, 360]) {
 
 // ---------- the counts carry no birth data ----------
 check("anonymous counts only: no birth date, place, name or typed text was sent", beacons.length > 0 && beacons.every(b => !/1995|Austin|Jordan|Chicago|1988|travel|kill/.test(b) && JSON.parse(b).p === "life") && beacons.some(b => /"life":\{/.test(b)), `${beacons.length} posts`);
+check("no request went to Google Fonts (fonts.googleapis.com, fonts.gstatic.com)", googleFonts.length === 0, googleFonts.slice(0, 2).join(" "));
+check("the site's own Fraunces files were served (upright and italic)", fontsServed.includes("fraunces-latin.woff2") && fontsServed.includes("fraunces-italic-latin.woff2"), [...new Set(fontsServed)].join(", "));
+const sentEvents = beacons.flatMap(b => JSON.parse(b).e || []);
+check("no visitor or return events (nothing about past visits is kept in the browser)", sentEvents.includes("view") && !sentEvents.includes("visitor") && !sentEvents.includes("return"), [...new Set(sentEvents)].join(","));
 check("no page errors", !errors.length, errors.slice(0, 3).join(" | "));
 
 await browser.close();

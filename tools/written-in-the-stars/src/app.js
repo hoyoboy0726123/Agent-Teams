@@ -389,7 +389,7 @@ function showChoice() {
 }
 
 const freeOut = html => { const out = $("#free-out"); if (out) out.innerHTML = html; };
-const HELP = `<div class="help" role="alert"><p><b>It sounds like things might be really hard right now.</b> This game won't play that out, but you don't have to go through it alone.</p><p>Call or text <a href="tel:988">988</a> (the Suicide &amp; Crisis Lifeline, any time), or chat at <a href="https://988lifeline.org" target="_blank" rel="noopener">988lifeline.org</a>. If you're in danger right now, call <a href="tel:911">911</a>.</p><p>In the story, could you choose something else?</p></div>`;
+const HELP = `<div class="help" role="alert"><p><b>It sounds like things might be really hard right now.</b> This game won't play that out, but you don't have to go through it alone.</p><p>Call or text <a href="tel:988">988</a> (the Suicide &amp; Crisis Lifeline, any time), or chat at <a href="https://988lifeline.org" target="_blank" rel="noopener">988lifeline.org</a>. If you're in danger right now, call <a href="tel:911">911</a>. Outside the US: <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a>.</p><p>In the story, could you choose something else?</p></div>`;
 
 // What the player wrote → an action, read here on the device. Safety words first (never simulated), then the closest
 // guesses for the player to pick. Nothing applies until the player confirms.

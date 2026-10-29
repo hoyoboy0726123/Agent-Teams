@@ -8,8 +8,10 @@ Research, not legal advice; consult a US lawyer before charging. Points marked â
    > A game for entertainment and self-reflection only. Astrology has no proven scientific validity. Nothing here
    > predicts your future or is medical, legal, financial or psychological advice.
 3. AI decision box: label the output as AI-generated, name the AI provider in the privacy policy, and on self-harm
-   phrases show 988 (call or text 988, chat at 988lifeline.org) without simulating it.
-4. Analytics without cookies, localStorage IDs, fingerprinting or IP logging (then no EU consent banner and no COPPA trigger).
+   phrases show 988 (call or text 988, chat at 988lifeline.org), and findahelpline.com for players outside the US, without simulating it.
+4. Analytics without cookies, localStorage IDs or dates, fingerprinting or IP logging (then no EU consent banner and no COPPA
+   trigger). Done: the counts store nothing in the browser (the old `wits.lastVisit` is gone), and Fraunces is self-hosted,
+   so no request goes to Google Fonts.
 5. Swiss Ephemeris only in test fixtures, never shipped; include the astronomy-engine MIT notice.
 6. **Name clearance: "100 Lives" is already a life-sim roguelike (Gamebook Entertainment / Tycoon Publishing, PC/Mac,
    https://nodal.gg/game/100-lives-3864430).** Renamed to **Written in the Stars**; still search USPTO classes 9 and 41 before charging.

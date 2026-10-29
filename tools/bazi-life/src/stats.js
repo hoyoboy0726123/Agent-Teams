@@ -1,31 +1,22 @@
 // Anonymous counts for the site's back office (/admin): how many visits, how long the page was looked at, and which
 // buttons were pressed. Only event names from a fixed list and a number of seconds are sent, to /api/stats on the
-// site's own Worker; never a birthday, a name, an id or a cookie. The Worker adds them to daily totals and keeps
-// nothing else (worker/stats.js). Without the Worker (a file, or the Claude artifact) nothing is sent.
+// site's own Worker; never a birthday, a name, an id or a cookie, and nothing is stored in the browser for it. The
+// Worker adds them to daily totals and keeps nothing else (worker/stats.js). Without the Worker (a file, or the Claude
+// artifact) nothing is sent.
 const URL_ = (document.querySelector('meta[name="stats-endpoint"]') || {}).content || "";
 const on = !!URL_ && /^https?:$/.test(location.protocol);
 // The welcome page's numbers come from /api/live next to it (worker/app.js live).
 export const LIVE_URL = on ? URL_.replace(/\/api\/stats$/, "/api/live") : "";
-const LAST = "bazi-life.lastVisit";
 const MILESTONES = [[30, "t30"], [60, "t60"], [180, "t180"], [600, "t600"]];
 let page = "life", queue = [], seconds = 0, since = null, flushTimer = null, life = null;
 const once = new Set();
 
-// Taiwan's date, the day the totals are kept by.
-const today = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
-
 export function initStats(p) {
   page = p;
   if (!on) return;
+  // Nothing is kept in the browser for the counts (no date of the last visit, no id), so there is no "visitor" or
+  // "return" event any more: a visit is one "view". (The Worker still accepts those names, from older pages.)
   track("view");
-  // A browser counts once a day as a visitor, and as returning when it came on an earlier day (only the date is kept).
-  let last = null;
-  try { last = localStorage.getItem(LAST); } catch {}
-  if (last !== today()) {
-    track("visitor");
-    if (last) track("return");
-    try { localStorage.setItem(LAST, today()); } catch {}
-  }
   if (document.visibilityState !== "hidden") since = Date.now();
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") { pause(); flush(); } else if (!since) since = Date.now();

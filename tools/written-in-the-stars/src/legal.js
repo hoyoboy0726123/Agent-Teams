@@ -1,8 +1,14 @@
 // The static /privacy and /terms pages (docs/COMPLIANCE.md "Privacy policy contents"), built into public/ by
 // scripts/build.mjs. Plain documents with the site's colors, in light and dark.
-// TODO(owner): replace CONTACT with the real address before launch.
-export const CONTACT = "hello@example.com";
-export const UPDATED = "October 28, 2026";
+import { FONT_CSS } from "./fonts.js";
+
+// ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+// │ TODO(owner): the contact address, used by /privacy and /terms. While it is the placeholder the │
+// │ pages say "(contact address coming soon)" instead of showing it.                               │
+// └──────────────────────────────────────────────────────────────────────────────────────────────┘
+export const CONTACT = "TODO@example.com";
+export const CONTACT_READY = !/^TODO@|@example\.(com|org|net)$/i.test(CONTACT);
+export const UPDATED = "October 29, 2026";
 export const SITE_NAME = "Written in the Stars";
 
 const STYLE = `
@@ -23,7 +29,7 @@ p, li { overflow-wrap: break-word; }
 a { color: var(--lav); }
 .updated { color: var(--muted); margin: 0 0 20px; }
 .box { background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; padding: 14px 18px; }
-.todo { border-left: 3px solid var(--gold); padding-left: 10px; }
+.soon { color: var(--muted); font-style: italic; }
 code { font-size: 14px; }
 footer { border-top: 1px solid var(--rule); padding: 20px 0 32px; color: var(--muted); font-size: 14px; }
 footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 18px; }
@@ -37,9 +43,8 @@ const shell = (title, body) => `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title} · ${SITE_NAME}</title>
 <meta name="description" content="${title} for ${SITE_NAME}, a free life-simulation game.">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500&display=swap">
-<style>${STYLE}</style>
+<style>${FONT_CSS}
+${STYLE}</style>
 </head>
 <body>
 <header><div class="wrap"><a href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2 6.5L20.5 11 14 13.5 12 20l-2-6.5L3.5 11 10 8.5z" fill="currentColor"/></svg>${SITE_NAME}</a></div></header>
@@ -51,7 +56,7 @@ ${body}
 </html>
 `;
 
-const contact = `<a href="mailto:${CONTACT}">${CONTACT}</a>`;
+const contact = CONTACT_READY ? `<a href="mailto:${CONTACT}">${CONTACT}</a>` : `<span class="soon">(contact address coming soon)</span>`;
 
 export const PRIVACY_HTML = shell("Privacy Policy", `
 <h1>Privacy Policy</h1>
@@ -60,7 +65,7 @@ export const PRIVACY_HTML = shell("Privacy Policy", `
 
 <h2>What stays on your device</h2>
 <p>Everything you type in: your name, birth date, birth time, birthplace and sex, and every choice you make in the game. Your chart and your lives are calculated in your browser. None of it is sent to us or stored by us.</p>
-<p>Your browser keeps a few small settings for you in its local storage: light or dark mode, whether to "only ask the big decisions", and the date of your last visit (so a visit is counted once a day). These hold no identifier and never leave your device except as described below. You can clear them at any time by clearing this site's data in your browser.</p>
+<p>Your browser keeps two small settings for you in its local storage: light or dark mode (<code>wits.theme</code>) and whether to "only ask the big decisions" (<code>wits.majorOnly</code>). They hold no identifier and are never sent. Nothing is stored in your browser for counting visits. You can clear these settings at any time by clearing this site's data in your browser.</p>
 
 <h2>What we collect</h2>
 <p>Anonymous counts only. When you use the site, your browser sends us the names of events from a fixed list (for example "page viewed", "life started", "life finished", "share card downloaded") and the number of seconds the page was on screen. We add them to daily totals.</p>
@@ -68,12 +73,12 @@ export const PRIVACY_HTML = shell("Privacy Policy", `
 <p>We do not use cookies, advertising IDs, device fingerprinting or tracking pixels, and our code does not log your IP address. Like any website, our hosting provider handles your IP address to deliver the page and to stop abuse (see below).</p>
 
 <h2>AI features</h2>
-<p>This version of the site has no AI features. The "write your own decision" box is read by code running in your browser; what you write is not sent anywhere. If we add an AI feature later, we will label its output as AI-generated, name the provider here, and say exactly what is sent before you send it.</p>
+<p>This version of the site has no AI features. The "write your own decision" box is read by code running in your browser; what you write is not sent anywhere. The AI Astrology Report is not built yet: its button only counts an anonymous press and sends nothing about your chart. If we add an AI feature later, we will label its output as AI-generated, name the provider here, and say exactly what is sent before you send it.</p>
 
 <h2>Service providers</h2>
 <ul>
-<li><b>Cloudflare, Inc.</b> hosts the site and stores the anonymous daily totals. Cloudflare processes technical data such as IP addresses to deliver pages and protect the site from abuse, under its own <a href="https://www.cloudflare.com/privacypolicy/" rel="noopener">privacy policy</a>.</li>
-<li><b>Google Fonts</b> serves the site's typeface; your browser requests the font files directly from Google.</li>
+<li><b>Cloudflare, Inc.</b> hosts the site and stores the anonymous daily totals. Cloudflare processes technical data such as IP addresses to deliver pages and protect the site from abuse, under its own <a href="https://www.cloudflare.com/privacypolicy/" rel="noopener">privacy policy</a>. Cloudflare keeps request logs (such as the time, address, status code and technical connection data) for up to 7 days, for debugging and abuse prevention.</li>
+<li>The site's typeface is served from this site itself; no font or other third-party service sees your visit.</li>
 <li>There is no payment provider and no AI provider at this time.</li>
 </ul>
 
@@ -90,7 +95,7 @@ export const PRIVACY_HTML = shell("Privacy Policy", `
 <p>If this policy changes, we will update the date at the top. Material changes will be noted on the site.</p>
 
 <h2>Contact</h2>
-<p class="todo">Questions or requests: ${contact} <!-- TODO(owner): set the real contact address in src/legal.js --></p>
+<p>Questions or requests: ${contact}</p>
 `);
 
 export const TERMS_HTML = shell("Terms of Use", `
@@ -99,7 +104,7 @@ export const TERMS_HTML = shell("Terms of Use", `
 
 <h2>A game, for entertainment</h2>
 <p class="box">Written in the Stars is a game for entertainment and self-reflection only. Astrology has no proven scientific validity. Nothing here predicts your future or is medical, legal, financial or psychological advice.</p>
-<p>The lives you play are fiction. Events such as illness, loss, money trouble or death are simulated from public statistics and chance; they are not predictions about you or anyone you know. Do not make real decisions based on the game. If something in it is hard to read, step away; if you are struggling, call or text <a href="tel:988">988</a> (the Suicide &amp; Crisis Lifeline) any time, or chat at <a href="https://988lifeline.org" rel="noopener">988lifeline.org</a>.</p>
+<p>The lives you play are fiction. Events such as illness, loss, money trouble or death are simulated from public statistics and chance; they are not predictions about you or anyone you know. Do not make real decisions based on the game. If something in it is hard to read, step away; if you are struggling, call or text <a href="tel:988">988</a> (the Suicide &amp; Crisis Lifeline) any time, or chat at <a href="https://988lifeline.org" rel="noopener">988lifeline.org</a>. Outside the US, find a local helpline at <a href="https://findahelpline.com" rel="noopener">findahelpline.com</a>.</p>
 
 <h2>Using the site</h2>
 <ul>
@@ -117,7 +122,7 @@ export const TERMS_HTML = shell("Terms of Use", `
 <h2>Credits and licenses</h2>
 <p>Planet positions are computed with <a href="https://github.com/cosinekitty/astronomy" rel="noopener">astronomy-engine</a> by Don Cross, used under the MIT License:</p>
 <p class="box"><small>MIT License. Copyright (c) 2019-2023 Don Cross. Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</small></p>
-<p>The typeface is Fraunces, under the SIL Open Font License.</p>
+<p>The display typeface is Fraunces, Copyright 2018 The Fraunces Project Authors, used under the SIL Open Font License, Version 1.1 (<a href="/fonts/OFL.txt">full licence</a>).</p>
 
 <h2>Privacy</h2>
 <p>See the <a href="/privacy">Privacy Policy</a>. In short: your birth data stays on your device.</p>
@@ -126,5 +131,5 @@ export const TERMS_HTML = shell("Terms of Use", `
 <p>We may update these terms; the date at the top says when. Continuing to use the site means you accept the current terms.</p>
 
 <h2>Contact</h2>
-<p class="todo">${contact} <!-- TODO(owner): set the real contact address in src/legal.js --></p>
+<p>${contact}</p>
 `);

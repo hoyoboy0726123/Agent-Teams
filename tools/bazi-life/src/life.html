@@ -23,8 +23,8 @@
 :root {
   --paper: #eef1f0; --sheet: #fbfcfc; --ink: #1c2330; --muted: #5b6774; --rule: #c8d0d3; --wash: #e3e8e9;
   --indigo: #284a80; --indigo-wash: #dfe6f2; --seal: #b5332a; --seal-wash: #f6e1de;
-  --up: #c0412c; --down: #2c7a4b; --band: rgba(28, 35, 48, 0.1);
-  --wood: #2c7a4b; --fire: #c0412c; --earth: #8a5d33; --metal: #a6801a; --water: #2a61a5;
+  --up: #c0412c; --down: #2c7a4b; --band: rgba(28, 35, 48, 0.1); --on-seal: #fff; --on-el: #fff;
+  --wood: #2c7a4b; --fire: #c0412c; --earth: #8a5d33; --metal: #806210; --water: #2a61a5;
   --display: "LXGW WenKai TC", "Kaiti TC", "BiauKai", "DFKai-SB", "STKaiti", serif;
   --body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -32,13 +32,13 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --paper: #11151b; --sheet: #181e26; --ink: #e5e9ed; --muted: #9ba7b3; --rule: #2d3742; --wash: #222a34;
   --indigo: #93b2ea; --indigo-wash: #1f2c42; --seal: #ec6a57; --seal-wash: #3a2220;
-  --up: #d9583f; --down: #4b9a6c; --band: rgba(229, 233, 237, 0.12);
+  --up: #d9583f; --down: #4b9a6c; --band: rgba(229, 233, 237, 0.12); --on-seal: #11151b; --on-el: #11151b;
   --wood: #6cc28c; --fire: #f2806a; --earth: #cf9f6b; --metal: #e2c35c; --water: #7eabea; color-scheme: dark;
 } }
 :root[data-theme="dark"] {
   --paper: #11151b; --sheet: #181e26; --ink: #e5e9ed; --muted: #9ba7b3; --rule: #2d3742; --wash: #222a34;
   --indigo: #93b2ea; --indigo-wash: #1f2c42; --seal: #ec6a57; --seal-wash: #3a2220;
-  --up: #d9583f; --down: #4b9a6c; --band: rgba(229, 233, 237, 0.12);
+  --up: #d9583f; --down: #4b9a6c; --band: rgba(229, 233, 237, 0.12); --on-seal: #11151b; --on-el: #11151b;
   --wood: #6cc28c; --fire: #f2806a; --earth: #cf9f6b; --metal: #e2c35c; --water: #7eabea; color-scheme: dark;
 }
 body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.7; }
@@ -115,7 +115,7 @@ fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; min-width:
 .inline { display: flex; flex-wrap: wrap; gap: 0 16px; align-items: center; min-height: 44px; }
 .inline label, .check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; min-height: 36px; }
 .inline label { white-space: nowrap; }
-.primary { justify-self: start; background: var(--seal); color: #fff; border: 0; border-radius: 8px; padding: 10px 22px; font-size: 16px; font-weight: 500; }
+.primary { justify-self: start; background: var(--seal); color: var(--on-seal); border: 0; border-radius: 8px; padding: 10px 22px; font-size: 16px; font-weight: 500; }
 .primary:hover { filter: brightness(1.08); }
 .secondary { background: transparent; border: 1px solid var(--rule); border-radius: 8px; padding: 9px 18px; }
 .secondary:hover { border-color: var(--indigo); color: var(--indigo); }
@@ -204,7 +204,7 @@ body.story-open { overflow: hidden; }
 .welcome h3 small { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 6px; }
 .recent { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .recent li { background: var(--sheet); border: 1px solid var(--rule); border-radius: 12px; padding: 10px 12px; display: flex; gap: 12px; align-items: center; font-size: 14px; }
-.recent .stem { width: 40px; height: 40px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center; font-family: var(--display); font-size: 20px; font-weight: 700; color: #fff; }
+.recent .stem { width: 40px; height: 40px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center; font-family: var(--display); font-size: 20px; font-weight: 700; color: var(--on-el); }
 .recent small { display: block; font-size: 12px; color: var(--muted); }
 .day-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
 .tile.elements { gap: 8px; }
@@ -414,7 +414,7 @@ input[type="number"] { width: 100%; box-sizing: border-box; background: var(--sh
 .paipan thead th { background: var(--wash); font-weight: 600; }
 .paipan tbody th { width: 3.6em; color: var(--muted); font-weight: 500; text-align: left; padding-left: 8px; }
 .paipan .big { font-family: var(--display); font-size: 24px; font-weight: 700; line-height: 1.1; }
-.paipan .el-木 { color: #2f7d4f; } .paipan .el-火 { color: #c0392b; } .paipan .el-土 { color: #8a6d3b; } .paipan .el-金 { color: #a07800; } .paipan .el-水 { color: #2c6aa0; }
+.paipan .el-木 { color: #2f7d4f; } .paipan .el-火 { color: #c0392b; } .paipan .el-土 { color: #8a6d3b; } .paipan .el-金 { color: #806210; } .paipan .el-水 { color: #2c6aa0; }
 .paipan .stack { display: grid; gap: 2px; }
 .paipan .stack small { color: var(--muted); }
 /* The English table (report.js adds .en): longer words wrap between words, the row names get room. */
@@ -540,6 +540,7 @@ input[type="number"] { width: 100%; box-sizing: border-box; background: var(--sh
 footer { display: grid; gap: 8px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
 footer p { max-width: 70ch; }
 footer a { color: var(--indigo); }
+footer .legal-links { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 @media (prefers-reduced-motion: reduce) { .mood .track i { transition: none; } }
 /* 合婚: the two people side by side, then a result read top-down like a 合婚書: the type and the score, the six parts,
    the nine traditional checks, the two people, the guide, the ten years. */
@@ -951,7 +952,7 @@ footer a { color: var(--indigo); }
     <p class="en-note en-note-story" id="hh-en-note" hidden>合婚的解說目前是中文，英文版正在準備中。</p>
     <div id="hh-body" data-no-i18n></div>
     <div class="report ai" id="hh-soon" hidden>
-      <div class="report-head"><h3>AI 深度合婚</h3><p class="lede">AI 命理師讀你們兩個人的命盤，寫成白話長文：合婚總評、兩個人的個性、相處的優點、容易摩擦的地方、給你們的建議，以及接下來十年每一年的感情。</p></div>
+      <div class="report-head"><h3>AI 深度合婚</h3><p class="lede">我們正在準備 AI 深度合婚：AI 命理師會讀你們兩個人的命盤，寫一篇白話長文，包括合婚總評、兩個人的個性、相處的優點、容易摩擦的地方、給你們的建議，以及接下來十年每一年的感情。</p></div>
       <div class="ai-go"><button type="button" class="primary" id="hh-soon-btn">AI 深度合婚</button></div>
       <p class="soon-msg" id="hh-soon-msg" role="status" hidden><b>敬請期待！</b>AI 深度合婚正在準備中，很快就會在這裡開放。上面的合婚結果現在就能看。</p>
     </div>
@@ -1042,7 +1043,7 @@ footer a { color: var(--indigo); }
     </div>
 
     <div class="report ai" id="ai-soon" hidden>
-      <div class="report-head"><h3>AI 命理分析報告</h3><p class="lede">AI 命理師依你的八字命盤（不是這一局遊戲）寫一份白話的完整分析：命格、性格、事業財運、感情、六親、健康，每一步大運和每一年的重點。</p></div>
+      <div class="report-head"><h3>AI 命理分析報告</h3><p class="lede">我們正在準備 AI 命理師：它會讀你的八字命盤（不是這一局遊戲），寫一份白話的完整分析，包括命格、性格、事業財運、感情、六親、健康，每一步大運和每一年的重點。</p></div>
       <div class="ai-go"><button type="button" class="primary" id="ai-soon-btn">AI 分析報告</button></div>
       <p class="soon-msg" id="ai-soon-msg" role="status" hidden><b>敬請期待！</b>AI 分析報告正在準備中，很快就會在這裡開放。下面的八字命理詳批現在就能看。</p>
     </div>
@@ -1085,6 +1086,7 @@ footer a { color: var(--indigo); }
     <p>年柱、月柱用出生的精確時刻比對節氣，日柱、時柱用出生地的真太陽時。每一年，大運和流年會讓各領域事件的機率傾斜，倍率限制在 0.5 到 2 倍之間；扶抑、調候、格局三派的看法分開計算後再合併。</p>
     <p>壽命用內政部歷年的簡易生命表（每一歲的死亡機率，1956 到 2025 年；之後依國發會人口推估）；癌症、中風、心臟病在各年齡的死亡人數用衛福部的死因統計，癌症再對齊國健署癌症登記的發生率；三高用健保的年齡別就醫統計。所有計算都在你的瀏覽器裡完成，網站不保存你的資料。只有「寫下你自己的決定」那一句會交給 AI 判讀（名字會先換成稱呼），用完不保存。合婚分頁的合婚結果在手機上算，不會上傳。網站只統計匿名的瀏覽次數、停留時間和按鈕點擊，不含生日、姓名或 IP。</p>
     <p><a id="chart-link" href="__CHART_URL__">看完整命盤（排盤引擎）</a></p>
+    <p class="legal-links"><a id="privacy-link" href="__PRIVACY_URL__">隱私權政策</a><a id="terms-link" href="__TERMS_URL__">使用條款</a></p>
   </footer>
 </div>
 <div class="story" id="story" hidden role="dialog" aria-modal="true" aria-label="人生回顧" tabindex="-1"></div>

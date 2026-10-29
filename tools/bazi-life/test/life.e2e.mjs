@@ -33,8 +33,12 @@ async function fresh(opts, { welcomed = true, soon = false } = {}) {
 // busy or out of quota (503), or a request that fails, leaves the player with the local options, with no message.
 const html = await readFile(fileURLToPath(new URL("../public/life.html", import.meta.url)));
 const storyEn = await readFile(fileURLToPath(new URL("../public/i18n/story-en.json", import.meta.url)));
+// 隱私權政策 and 使用條款 (src/legal.js), at /privacy and /terms as the Worker serves them.
+const legal = { "/privacy": await readFile(fileURLToPath(new URL("../public/privacy.html", import.meta.url))), "/terms": await readFile(fileURLToPath(new URL("../public/terms.html", import.meta.url))) };
 const server = createServer((req, res) => {
+  const path = req.url.split(/[?#]/)[0];
   if (req.url === "/life.html") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(html); }
+  else if (Object.hasOwn(legal, path)) { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(legal[path]); }
   else if (req.url === "/i18n/story-en.json") { res.writeHead(200, { "content-type": "application/json" }); res.end(storyEn); }
   else { res.writeHead(404); res.end(); }
 });
@@ -110,7 +114,7 @@ check("the ending's headline and facts are English", /^This time, you lived to \
 // K-line and the report's frame are English; the readings inside the report come from their own files.
 const cardsEn = await busy.textContent("#cards");
 const cardTitles = await busy.$$eval("#cards .card h3", hs => hs.map(h => h.textContent).join("|"));
-check("the English ending's 100-rerun cards are English, with Taiwan's 1925 line and a word for readers elsewhere", cardTitles === "Lifespan|Health|Marriage|Career and money" && /In \d+ of the 100 lives you married; in \d+ of those, a marriage ended in divorce/.test(cardsEn) && /Half of the 100 lives ended between \d+ and \d+/.test(cardsEn) && /1925/.test(cardsEn) && /local helpline/.test(cardsEn) && plainEn(cardsEn), cardTitles + " | " + cardsEn.slice(0, 200));
+check("the English ending's 100-rerun cards are English, with Taiwan's 1925 line and the helplines for the US, Singapore, Malaysia, the Philippines and elsewhere", cardTitles === "Lifespan|Health|Marriage|Career and money" && /In \d+ of the 100 lives you married; in \d+ of those, a marriage ended in divorce/.test(cardsEn) && /Half of the 100 lives ended between \d+ and \d+/.test(cardsEn) && /1925/.test(cardsEn) && /988/.test(cardsEn) && /SOS\), 1767/.test(cardsEn) && /03-7627 2929/.test(cardsEn) && /1553/.test(cardsEn) && /findahelpline\.com/.test(cardsEn) && plainEn(cardsEn), cardTitles + " | " + cardsEn.slice(0, 200));
 const chartCardEn = await busy.textContent("#personal-cards .card");
 check("the chart card is English", /^Your chart in this life/.test(chartCardEn.trim()) && /Day Master \(日主\)/.test(chartCardEn) && /Your chart's best years: age \d+/.test(chartCardEn) && plainEn(chartCardEn), chartCardEn.slice(0, 200));
 const ticks = await busy.$$eval("#plot svg text", ts => ts.map(x => x.textContent));
@@ -157,7 +161,7 @@ check("a choice offers at least three options and a box to write your own", (awa
 await page.fill("#free-text", "我不想活了");
 await page.click("#free-go");
 await page.waitForSelector("#free-out .help");
-check("writing about self-harm shows help lines and keeps the choice open", /1925/.test(await page.textContent("#free-out")) && await page.isVisible("#choice"));
+check("writing about self-harm shows help lines (Taiwan, Singapore, Malaysia, findahelpline.com) and keeps the choice open", /1925 安心專線（24 小時）、1995 生命線、1980 張老師。/.test(await page.textContent("#free-out")) && /SOS 1767/.test(await page.textContent("#free-out")) && /Befrienders 03-7627 2929/.test(await page.textContent("#free-out")) && await page.$eval('#free-out a[href="https://findahelpline.com"]', a => !!a) && await page.isVisible("#choice"));
 await page.fill("#free-text", "先跟家人好好商量看看");
 await page.click("#free-go");
 await page.waitForSelector("#free-out [data-free-action]");
@@ -623,6 +627,7 @@ const soonBefore = await soon.isHidden("#ai-soon-msg");
 await soon.click("#ai-soon-btn");
 await soon.click("#ai-soon-btn");
 check("the end page shows the results and one AI 分析報告 button, which says 敬請期待 and sends no reading", await soon.isHidden("#ai") && await soon.isVisible("#ai-soon") && soonBefore && /敬請期待/.test(await soon.textContent("#ai-soon-msg")) && await soon.isVisible("#report") && !/付費|收費|NT\\$|元|即將推出|敬請期待/.test(await soon.$eval("#ai-soon", el => el.textContent.replace(el.querySelector("#ai-soon-msg").textContent, ""))) && soonReading.length === 0);
+check("the AI 分析報告 card says the reading is still being built (future tense), not that it exists", /我們正在準備 AI 命理師：它會讀你的八字命盤/.test(await soon.textContent("#ai-soon .lede")));
 await soon.click("#again-new");
 await soon.click("#tab-match");
 await soon.fill("#ma-date", "1988-02-15");
@@ -630,13 +635,16 @@ await soon.fill("#mb-date", "1990-05-20");
 await soon.click("#form-match button[type=submit]");
 await soon.waitForSelector("#match:not([hidden]) .hh-hero");
 await soon.click("#hh-soon-btn");
-check("the 合婚 tab shows its result and an AI 深度合婚 button that says 敬請期待", await soon.isHidden("#hh-ai") && /敬請期待/.test(await soon.textContent("#hh-soon-msg")) && soonReading.length === 0);
+check("the 合婚 tab shows its result and an AI 深度合婚 button that says 敬請期待, under a future-tense description", await soon.isHidden("#hh-ai") && /我們正在準備 AI 深度合婚/.test(await soon.textContent("#hh-soon .lede")) && /敬請期待/.test(await soon.textContent("#hh-soon-msg")) && soonReading.length === 0);
 await soon.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
 await soon.evaluate(() => { Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true }); document.dispatchEvent(new Event("visibilitychange")); });
 await soon.waitForTimeout(500);
 const statsEvents = statsSent.flatMap(b => b.e || []), statsText = JSON.stringify(statsSent);
 const countOf = e => statsEvents.filter(x => x === e).length;
-check("the visit, the life, the ending and the presses are counted as event names only", countOf("view") === 1 && countOf("visitor") === 1 && countOf("start") >= 1 && countOf("end_u") === 1 && countOf("ai_life") === 2 && countOf("ai_life_u") === 1 && countOf("hehun_u") === 1 && countOf("ai_match_u") === 1 && statsSent.every(b => b.p === "life") && statsSent.some(b => b.s >= 1) && !/1988|1990|陳|志明|臺北/.test(statsText), statsText.slice(0, 160));
+check("the visit, the life, the ending and the presses are counted as event names only", countOf("view") === 1 && countOf("visitor") === 0 && countOf("return") === 0 && countOf("start") >= 1 && countOf("end_u") === 1 && countOf("ai_life") === 2 && countOf("ai_life_u") === 1 && countOf("hehun_u") === 1 && countOf("ai_match_u") === 1 && statsSent.every(b => b.p === "life") && statsSent.some(b => b.s >= 1) && !/1988|1990|陳|志明|臺北/.test(statsText), statsText.slice(0, 160));
+// The counts keep nothing in the browser: no date of the last visit (EU ePrivacy: analytics storage needs consent).
+const soonLocal = await soon.evaluate(() => Object.keys(localStorage));
+check("the counts store nothing in the browser (no bazi-life.lastVisit)", !soonLocal.some(k => /lastVisit/.test(k)), JSON.stringify(soonLocal));
 const lifeSent = statsSent.map(b => b.life).filter(Boolean);
 check("a finished life is sent as its decade, day stem, age and three big things, with a heartbeat while it ran", lifeSent.length === 1 && lifeSent[0].decade === "80 後" && lifeSent[0].stem === "辛" && Number.isInteger(lifeSent[0].age) && typeof lifeSent[0].home === "boolean" && Object.keys(lifeSent[0]).sort().join() === "age,decade,home,kids,married,stem" && countOf("beat") >= 1, JSON.stringify(lifeSent[0]));
 await soon.close();
@@ -678,6 +686,50 @@ await matchIn(hhFile, url);
 check("on a file the English page keeps the 合婚 in Chinese and says so", /傳統合婚九項/.test(await hhFile.textContent("#hh-body")) && await hhFile.isVisible("#hh-en-note"));
 await hhFile.close();
 
+// ---------- 隱私權政策 and 使用條款: linked from the footer, in Chinese and in English ----------
+{
+  const lp = await fresh({ viewport: { width: 390, height: 844 } }, { welcomed: false });
+  const sideways = () => lp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  await lp.goto(site);
+  const zhLinks = await lp.$$eval("footer .legal-links a", as => as.map(a => `${a.getAttribute("href")} ${a.textContent}`).join("|"));
+  check("the footer links to 隱私權政策 (/privacy) and 使用條款 (/terms)", zhLinks === "/privacy 隱私權政策|/terms 使用條款", zhLinks);
+  await lp.click("#privacy-link");
+  await lp.waitForURL(/\/privacy$/);
+  const pz = await lp.textContent("#zh-doc");
+  check("/privacy opens in Chinese: who runs it, what stays on the phone, what is sent, hosting, fonts, storage, no sale, 13+, rights, date", await lp.isVisible("#zh-doc") && await lp.isHidden("#en-doc") && await lp.getAttribute("html", "lang") === "zh-Hant-TW" && await lp.title() === "隱私權政策｜命盤人生"
+    && ["誰經營這個網站", "在你的裝置上計算的資料", "會送出的資料", "主機與記錄", "字型（Google Fonts）", "瀏覽器裡存的東西", "不賣、不分享", "年齡", "你的權利", "最後更新：2026 年 10 月 29 日"].every(h => pz.includes(h))
+    && /出生年代.+日柱天干.+活到幾歲.+結婚幾次.+買房.+幾個孩子/.test(pz) && /Cloudflare Workers AI/.test(pz) && /「你」「爸爸」「伴侶」/.test(pz) && /尚未開放/.test(pz) && /最多 7 天/.test(pz) && /13 歲以上/.test(pz)
+    && ["bazi-life.lang", "bazi-life.majorOnly", "bazi-life.form", "bazi-life.seen", "bazi-life.aiOut"].every(k => pz.includes(k)) && !/lastVisit/.test(pz) && !/cookie[^，。]*存/.test(pz) && /（聯絡信箱即將公布）/.test(pz), pz.slice(0, 120));
+  check("/privacy fits a phone", await sideways() <= 0, `${await sideways()}px`);
+  await lp.goBack();
+  await lp.click("#terms-link");
+  await lp.waitForURL(/\/terms$/);
+  const tz = await lp.textContent("#zh-doc");
+  check("/terms in Chinese: entertainment only, not advice, free, no warranty, and the full MIT and Unicode licence texts", /僅供娛樂與自我反思/.test(tz) && /不是醫療、法律、財務或心理方面的建議/.test(tz) && /網站免費/.test(tz) && /不提供保證/.test(tz) && /1925/.test(tz)
+    && /Copyright \(c\) 2024 6tail/.test(tz) && /Copyright \(c\) 2026 Shunshi\.AI/.test(tz) && (tz.match(/Permission is hereby granted, free of charge/g) || []).length === 4 && (tz.match(/THE SOFTWARE IS PROVIDED "AS IS"/g) || []).length === 3 && /UNICODE LICENSE V3/.test(tz));
+  check("/terms fits a phone, with every licence open", await lp.$$eval("details", ds => ds.forEach(d => (d.open = true))).then(sideways) <= 0);
+  // English: the game page's language is the one the policy pages open in.
+  await lp.goto(site);
+  await lp.click("#lang-toggle");
+  await lp.waitForTimeout(200);
+  const enLinks = await lp.$$eval("footer .legal-links a", as => as.map(a => `${a.getAttribute("href")} ${a.textContent}`).join("|"));
+  check("in English the footer links read Privacy policy and Terms of use", enLinks === "/privacy Privacy policy|/terms Terms of use", enLinks);
+  await lp.click("#privacy-link");
+  await lp.waitForURL(/\/privacy$/);
+  const pe = await lp.textContent("#en-doc");
+  check("/privacy follows English: the full English policy, the Chinese hidden", await lp.isVisible("#en-doc") && await lp.isHidden("#zh-doc") && await lp.getAttribute("html", "lang") === "en" && await lp.title() === "Privacy Policy | BaZi Life"
+    && ["Who runs this site", "What is computed on your device", "What is sent", "Hosting and logs", "Fonts (Google Fonts)", "What your browser keeps", "No sale or sharing", "Age", "Your rights", "Last updated: October 29, 2026"].every(h => pe.includes(h))
+    && /Cloudflare Workers AI/.test(pe) && /not open yet/.test(pe) && /up to 7 days/.test(pe) && /13 and older/.test(pe) && /\(contact address coming soon\)/.test(pe) && !/[\u4e00-\u9fff]{3}/.test(pe.replace(/命盤人生|繁中/g, "")), pe.slice(0, 120));
+  await lp.goBack();
+  await lp.click("#terms-link");
+  await lp.waitForURL(/\/terms$/);
+  const te = await lp.textContent("#en-doc");
+  check("/terms follows English: entertainment and reflection only, the helplines, and the licences", await lp.isVisible("#en-doc") && await lp.isHidden("#zh-doc") && /entertainment and self-reflection only/.test(te) && /not medical|is medical, legal, financial or psychological advice/.test(te) && /findahelpline\.com/.test(te) && /Copyright \(c\) 2024 6tail/.test(te) && /UNICODE LICENSE V3/.test(te));
+  await lp.click('.langs a[href="#zh"]');
+  await lp.waitForFunction(() => document.documentElement.lang === "zh-Hant-TW", null, { timeout: 2000 }).catch(() => {});
+  check("繁中 on the policy page switches it back to Chinese", await lp.isVisible("#zh-doc") && await lp.isHidden("#en-doc") && await lp.getAttribute("html", "lang") === "zh-Hant-TW");
+  await lp.close();
+}
 server.close();
 
 // 伴侶合盤: a partner with a birthday gets a bond on the family card, counts over the 100 lives and a report section.
@@ -950,7 +1002,7 @@ await draft.click("#tab-me");
 check("after a reload the family's 時辰 and exact times come back", await draft.inputValue(".member[data-role=father] .m-hour") === "wu" && await draft.inputValue("#sibling-list .member:last-child .m-hour") === "clock" && await draft.inputValue("#sibling-list .member:last-child .m-time") === "06:15" && await draft.isVisible("#sibling-list .member:last-child .m-time") && await draft.isHidden(".member[data-role=father] .m-time"));
 check("after a reload the birth form, the partner and the siblings come back", await draft.inputValue("#f-name") === "陳志明" && await draft.inputValue(".member[data-role=partner] .m-name") === "王小美" && await draft.inputValue("#f-wed") === "2016" && await draft.inputValue("#sibling-list .member:last-child .m-name") === "陳小華" && await draft.evaluate(() => document.querySelector("#family").open));
 const stores = await draft.evaluate(() => ({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) }));
-check("the half-filled forms are kept in this tab only, with nothing personal in long-term storage", stores.local.every(k => ["bazi-life.welcomed", "bazi-life.majorOnly", "bazi-life.aiAuto", "bazi-life.aiPreview", "bazi-life.lastVisit", "bazi-life.lang"].includes(k)) && stores.session.includes("bazi-life.form"), JSON.stringify(stores));
+check("the half-filled forms are kept in this tab only, with nothing personal in long-term storage", stores.local.every(k => ["bazi-life.welcomed", "bazi-life.majorOnly", "bazi-life.aiAuto", "bazi-life.aiPreview", "bazi-life.lang"].includes(k)) && stores.session.includes("bazi-life.form"), JSON.stringify(stores));
 draft.once("dialog", d => d.accept());
 await draft.click("#me-clear");
 await draft.reload();

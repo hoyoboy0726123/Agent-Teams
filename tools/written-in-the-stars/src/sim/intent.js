@@ -38,7 +38,7 @@ export function safetyCheck(text) {
 
 // What the page shows instead of simulating. 988 is the US Suicide & Crisis Lifeline (call or text, any time).
 export const SAFETY_MESSAGES = {
-  self_harm: "It sounds like things might be really hard right now, and this game won't play that out. If you're thinking about suicide or hurting yourself, you can call or text 988 any time to reach the Suicide & Crisis Lifeline (or chat at 988lifeline.org). If you're in danger right now, call 911. You don't have to go through this alone.",
+  self_harm: "It sounds like things might be really hard right now, and this game won't play that out. If you're thinking about suicide or hurting yourself, you can call or text 988 any time to reach the Suicide & Crisis Lifeline (or chat at 988lifeline.org). If you're in danger right now, call 911. Outside the US, find a helpline at findahelpline.com. You don't have to go through this alone.",
   harm: "This game won't play out hurting someone or breaking the law. Try another choice.",
 };
 

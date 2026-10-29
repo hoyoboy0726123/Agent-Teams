@@ -111,6 +111,8 @@ await page.selectOption("#f-shichen", "zi-pm");
 await page.reload();
 await page.waitForSelector("#result:not([hidden])");
 check("a reload keeps a chosen 時辰", await page.isChecked("#f-tmode-shichen") && await page.inputValue("#f-shichen") === "zi-pm" && (await pillarNames()).endsWith("子"), await pillarNames());
+const legalLinks = await page.$$eval("footer .legal-links a", as => as.map(a => `${a.getAttribute("href")} ${a.textContent}`).join("|"));
+check("the footer links to 隱私權政策 and 使用條款", legalLinks === "/privacy 隱私權政策|/terms 使用條款", legalLinks);
 check("no page errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 await browser.close();
 

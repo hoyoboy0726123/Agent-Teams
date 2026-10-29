@@ -2,13 +2,15 @@
 //   public/index.html     the game (src/index.html + src/app.js bundled in, one self-contained page)
 //   public/privacy.html   the privacy policy (src/legal.js)
 //   public/terms.html     the terms of use (src/legal.js)
-// The Worker (worker/index.js) imports these pages as text and serves them at /, /privacy and /terms.
+// The Worker (worker/index.js) imports these pages as text and serves them at /, /privacy and /terms, with the font
+// files in assets/fonts/ at /fonts/ (src/fonts.js: no Google Fonts).
 //   --stats-url <url>   where the page sends its anonymous counts (default /api/stats, the Worker's own;
 //                       pass "" for a copy hosted without the Worker, which then sends nothing)
 import { build } from "esbuild";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { PRIVACY_HTML, TERMS_HTML } from "../src/legal.js";
+import { FONT_CSS, FONT_PRELOAD } from "../src/fonts.js";
 
 const at = p => fileURLToPath(new URL(`../${p}`, import.meta.url));
 const arg = (name, fallback) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] ?? "" : fallback; };
@@ -21,7 +23,7 @@ const bundled = await build({
   banner: { js: "/* Written in the Stars. Includes astronomy-engine (MIT License, Copyright (c) 2019-2023 Don Cross). */" },
 });
 const source = await readFile(at("src/index.html"), "utf8");
-const body = source.replaceAll("__STATS_URL__", arg("--stats-url", "/api/stats")).replace("/*__APP__*/", () => inline(bundled.outputFiles[0].text));
+const body = source.replaceAll("__STATS_URL__", arg("--stats-url", "/api/stats")).replace("<!--__FONT_PRELOAD__-->", FONT_PRELOAD).replace("/*__FONTS__*/", () => FONT_CSS).replace("/*__APP__*/", () => inline(bundled.outputFiles[0].text));
 const split = body.indexOf('<div class="page">');
 const head = body.slice(0, split).trim(), rest = body.slice(split).trim();
 const doc = `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n${head}\n</head>\n<body>\n${rest}\n</body>\n</html>\n`;

@@ -500,7 +500,7 @@ function showChoice() {
 
 const freeOut = html => { const out = $("#free-out"); if (out) out.innerHTML = html; };
 const SAFETY_TEXT = {
-  self_harm: `<div class="help">如果你現在真的有這樣的感覺，請找人說說：1925 安心專線（24 小時）、1995 生命線、1980 張老師。<br>故事裡，我們換一個選擇好嗎？</div>`,
+  self_harm: `<div class="help">如果你現在真的有這樣的感覺，請找人說說：1925 安心專線（24 小時）、1995 生命線、1980 張老師。<br>在新加坡可以打 SOS 1767（24 小時），在馬來西亞可以打 Befrienders 03-7627 2929；其他地方的專線請查 <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a>。<br>故事裡，我們換一個選擇好嗎？</div>`,
   harm: `<p>這個選擇會傷害別人或違法，故事不會往這個方向走。換個方式寫寫看？</p>`,
 };
 
@@ -692,7 +692,8 @@ function drawCards() {
   const max = Math.max(...r.lifespan.bins.map(b => b.n), 1);
   const bins = r.lifespan.bins.filter(b => b.from >= 40 || b.n > 0);
   const hist = `<div class="hist" role="img" aria-label="${esc(tr("100 次人生的壽命分布"))}">${bins.map(b => `<i title="${esc(tr("{binFrom}–{binTo} 歲：{binLives} 次", { binFrom: b.from, binTo: b.to, binLives: b.n }))}" style="height:${Math.max(2, Math.round(b.n / max * 66))}px"></i>`).join("")}</div><div class="hist-axis"><span>${esc(tr("{axisFrom} 歲", { axisFrom: bins[0].from }))}</span><span>${esc(tr("{axisTo} 歲", { axisTo: bins[bins.length - 1].to }))}</span></div>`;
-  // The helplines: Taiwan's 1925 in Chinese; in English also a word for readers elsewhere.
+  // The helplines: Taiwan's 1925 in Chinese; in English also the US, Singapore, Malaysia, the Philippines and
+  // findahelpline.com for anywhere else (i18n/en/ending.json).
   const cards = [
     `<div class="card"><h3>${esc(tr("壽命"))}</h3>
       <p class="count">${tr("100 次人生裡，一半落在 <em>{p25}–{p75} 歲</em>之間", { p25: r.lifespan.p25, p75: r.lifespan.p75 })}</p>
