@@ -107,7 +107,7 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
     <section class="panel" id="panel-all" role="tabpanel" aria-labelledby="tab-all">
       <section class="card notice" id="all-err" hidden></section>
       <div id="cmp"></div>
-      <p class="fine">開始人生是局數（一次瀏覽可以玩好幾局）；完成人生和按 AI 按鈕都以訪次計（同一次瀏覽只算一次）。AI 按鈕點擊率＝按了 AI 按鈕的訪次 ÷ 完成人生的訪次：命盤人生是「AI 分析報告」（ai_life_u），Written in the Stars 是「Get my AI report」（ai_report_u）。命盤人生沒有分享按鈕，所以不算分享。</p>
+      <p class="fine">開始人生是局數（一次瀏覽可以玩好幾局）；完成人生和按 AI 按鈕都以訪次計（同一次瀏覽只算一次）。AI 按鈕點擊率＝按了 AI 按鈕的訪次 ÷ 完成人生的訪次：命盤人生是「AI 分析報告」（ai_life_u），Written in the Stars 是「Get my AI report」（ai_report_u）。命盤人生沒有分享按鈕，所以不算分享。訪客只統計到 2026-10-29，沒有資料的期間不顯示這一列。</p>
     </section>
 
     <section class="panel" id="panel-bazi" role="tabpanel" aria-labelledby="tab-bazi">
@@ -133,7 +133,7 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
           <h2>每日明細</h2>
           <div class="table-wrap"><table id="b-table"></table></div>
         </section>
-        <p class="fine">只統計匿名的次數：不記 IP、不記生日或姓名、沒有 cookie。「訪客」是每個瀏覽器每天算一次，多天的數字是逐日加總。日期依臺灣時間。</p>
+        <p class="fine">只統計匿名的次數：不記 IP、不記生日或姓名、沒有 cookie。「訪客」是每個瀏覽器每天算一次，只統計到 2026-10-29（之後為了歐盟 ePrivacy 不再記錄；之前的天數還在），多天的數字是逐日加總。日期依臺灣時間。</p>
       </div>
     </section>
 
@@ -165,7 +165,7 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
           <h2>每日明細</h2>
           <div class="table-wrap"><table id="w-table"></table></div>
         </section>
-        <p class="fine">只統計匿名的次數：不記 IP、不記生日或姓名、沒有 cookie。「訪客」是每個瀏覽器每天算一次，多天的數字是逐日加總。日期依美東時間。</p>
+        <p class="fine">只統計匿名的次數：不記 IP、不記生日或姓名、沒有 cookie。「訪客」是每個瀏覽器每天算一次，只統計到 2026-10-29（之後為了歐盟 ePrivacy 不再記錄；之前的天數還在），多天的數字是逐日加總。日期依美東時間。</p>
       </div>
     </section>
   </div>
@@ -200,6 +200,12 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
   // Written in the Stars: every way of sharing (the card, the network links and Copy link), by network.
   const NETS = [["x", "X"], ["threads", "Threads"], ["facebook", "Facebook"], ["reddit", "Reddit"], ["whatsapp", "WhatsApp"], ["bluesky", "Bluesky"], ["copy", "複製連結"], ["native", "手機分享選單"], ["png", "下載卡片（PNG）"]];
   const shares = x => Object.keys(x || {}).filter(k => k.indexOf("share_") === 0).reduce((a, k) => a + (x[k] || 0), 0);
+  // 訪客 and 回訪 (visitor, return) are no longer sent since VISITORS_UNTIL (no lastVisit in the browser, for the EU's
+  // ePrivacy rules): older days keep them, newer days have none. They show only where there are some, are labelled with
+  // the date, and no rate is taken over them (the rates use view or end_u).
+  const VISITORS_UNTIL = "2026-10-29", VISITOR_LABEL = "訪客（至 " + VISITORS_UNTIL + "）", VISITOR_COL = "訪客（至 " + VISITORS_UNTIL.slice(5).replace("-", "/") + "）";
+  const visitorTile = t => (t.visitor ? [[VISITOR_LABEL, n(t.visitor), "其中回訪 " + n(t.return)]] : []);
+  const visitorCell = t => (t.visitor ? [n(t.visitor), "回訪 " + n(t.return)] : ["—", "已停止統計"]);
   const byNet = x => NETS.filter(e => x["share_" + e[0]]).map(e => e[1] + " " + n(x["share_" + e[0]])).join("・") || "還沒有人分享";
 
   // GET /api/stats of one site: the Response, or null when it could not be reached (offline, refused by CORS, or no
@@ -288,7 +294,7 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
     const { map, list, t } = totals("bazi", days);
     $("#b-tiles").innerHTML = tilesHtml([
       ["瀏覽次數", n(t.view), "命盤人生 " + n(t.lifeView) + "・排盤 " + n(t.chartView)],
-      ["訪客", n(t.visitor), "其中回訪 " + n(t.return)],
+      ...visitorTile(t),
       ["平均停留", dur((t.seconds || 0) / (t.view || 0)), "每次瀏覽"],
       ["完成人生遊戲", n(t.end_u), "訪次（共 " + n(t.end) + " 局）"],
       ["按 AI 分析報告", n(t.ai_life_u), "訪次（共按 " + n(t.ai_life) + " 次）", true],
@@ -299,14 +305,15 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
     steps("#b-funnel", [["進到命盤人生", t.lifeView || 0], ["開始人生遊戲", t.start || 0], ["完成人生（訪次）", t.end_u || 0], ["按 AI 分析報告", t.ai_life_u || 0]], t.lifeView || 0);
     stay("#b-stay", t);
     chart("#b-chart", "bazi", map, [["view", "var(--accent-2)", "瀏覽"], ["ai_life_u", "var(--accent)", "按 AI 報告"]], "每天的瀏覽與 AI 點擊");
-    table("#b-table", ["日期", "瀏覽", "訪客", "平均停留", "開始人生", "完成（訪次）", "按 AI 報告", "點擊率", "合婚", "按 AI 合婚"], list,
-      d => [n(d.view), n(d.visitor), dur((d.seconds || 0) / (d.view || 0)), n(d.start), n(d.end_u), n(d.ai_life_u), pct(d.ai_life_u, d.end_u), n(d.hehun_u), n(d.ai_match_u)]);
+    const bv = list.some(d => d.visitor);
+    table("#b-table", ["日期", "瀏覽", ...(bv ? [VISITOR_COL] : []), "平均停留", "開始人生", "完成（訪次）", "按 AI 報告", "點擊率", "合婚", "按 AI 合婚"], list,
+      d => [n(d.view), ...(bv ? [n(d.visitor)] : []), dur((d.seconds || 0) / (d.view || 0)), n(d.start), n(d.end_u), n(d.ai_life_u), pct(d.ai_life_u, d.end_u), n(d.hehun_u), n(d.ai_match_u)]);
   }
   function drawWits() {
     const { map, list, t } = totals("wits", days), all = shares(t);
     $("#w-tiles").innerHTML = tilesHtml([
       ["瀏覽次數", n(t.view), "訪次"],
-      ["訪客", n(t.visitor), "其中回訪 " + n(t.return)],
+      ...visitorTile(t),
       ["平均停留", dur((t.seconds || 0) / (t.view || 0)), "每次瀏覽"],
       ["開始人生", n(t.start), "局（隨機出生 " + n(t.random) + " 局）"],
       ["完成人生", n(t.end_u), "訪次（共 " + n(t.end) + " 局）"],
@@ -321,8 +328,9 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
     steps("#w-shares", NETS.map(([k, l]) => [l, t["share_" + k] || 0]), all, true);
     stay("#w-stay", t);
     chart("#w-chart", "wits", map, [["view", "var(--accent-2)", "瀏覽"], ["end_u", "var(--accent)", "完成人生"], ["ai_report_u", "var(--muted)", "按 AI report"]], "每天的瀏覽、完成人生與 AI report 點擊");
-    table("#w-table", ["日期", "瀏覽", "訪客", "平均停留", "開始人生", "完成（訪次）", "按 AI report", "點擊率", "寫決定", "分享"], list,
-      d => [n(d.view), n(d.visitor), dur((d.seconds || 0) / (d.view || 0)), n(d.start), n(d.end_u), n(d.ai_report_u), pct(d.ai_report_u, d.end_u), n(d.written_u), n(shares(d))]);
+    const wv = list.some(d => d.visitor);
+    table("#w-table", ["日期", "瀏覽", ...(wv ? [VISITOR_COL] : []), "平均停留", "開始人生", "完成（訪次）", "按 AI report", "點擊率", "寫決定", "分享"], list,
+      d => [n(d.view), ...(wv ? [n(d.visitor)] : []), dur((d.seconds || 0) / (d.view || 0)), n(d.start), n(d.end_u), n(d.ai_report_u), pct(d.ai_report_u, d.end_u), n(d.written_u), n(shares(d))]);
   }
   // 總覽: today, 7 and 30 days of both sites, side by side.
   function drawAll() {
@@ -330,7 +338,7 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
     const show = ([v, s]) => "<b>" + v + "</b>" + (s ? '<span class="s">' + esc(s) + "</span>" : "");
     const ROWS = [
       ["瀏覽次數", t => [n(t.view), ""], t => [n(t.view), ""]],
-      ["訪客", t => [n(t.visitor), "回訪 " + n(t.return)], t => [n(t.visitor), "回訪 " + n(t.return)]],
+      [VISITOR_LABEL, visitorCell, visitorCell, t => t.visitor > 0],
       ["開始人生（局）", t => [n(t.start), ""], t => [n(t.start), ""]],
       ["完成人生（訪次）", t => [n(t.end_u), "共 " + n(t.end) + " 局"], t => [n(t.end_u), "共 " + n(t.end) + " 局"]],
       ["平均停留", t => [dur((t.seconds || 0) / (t.view || 0)), "每次瀏覽"], t => [dur((t.seconds || 0) / (t.view || 0)), "每次瀏覽"]],
@@ -342,7 +350,7 @@ button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; bac
       const cell = (t, f) => (t ? f(t) : ["—", ""]);
       const when = k === 1 ? "命盤人生 " + S.bazi.today() + "（臺灣）・Written in the Stars " + S.wits.today() + "（美東）" : "含今天往回 " + k + " 天，各依自己的時區";
       return '<section class="card" data-period="' + k + '"><h2>' + title + '</h2><p class="fine" style="margin-bottom:8px">' + esc(when) + '</p><table class="cmp"><tr><th>指標</th><th>命盤人生</th><th>Written in the Stars</th></tr>' +
-        ROWS.map(([label, fb, fw]) => "<tr><td>" + label + "</td><td>" + show(cell(tb, fb)) + "</td><td>" + show(cell(tw, fw)) + "</td></tr>").join("") + "</table></section>";
+        ROWS.filter(([, , , shown]) => !shown || (tb && shown(tb)) || (tw && shown(tw))).map(([label, fb, fw]) => "<tr><td>" + label + "</td><td>" + show(cell(tb, fb)) + "</td><td>" + show(cell(tw, fw)) + "</td></tr>").join("") + "</table></section>";
     }).join("");
     const errs = ["bazi", "wits"].filter(s => !ok(s));
     $("#all-err").hidden = !errs.length;

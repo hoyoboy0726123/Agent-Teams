@@ -14,7 +14,7 @@ The plan is in `PLAN.md`, the legal notes in `docs/COMPLIANCE.md`, the engine in
 | `/privacy`, `/terms` | Static policy pages (`src/legal.js`). The contact address is `CONTACT` at the top of that file, still the placeholder `TODO@example.com`, so the pages say “(contact address coming soon)” |
 | `/fonts/*.woff2`, `/fonts/OFL.txt` | The display face, Fraunces (OFL), served by the Worker itself: no Google Fonts (`src/fonts.js`, `assets/fonts/`) |
 | `/api/stats` | POST anonymous event counts from the page; GET the totals with the `ADMIN_KEY` secret |
-| `/api/live` | The welcome page's live numbers (demo numbers while `LIVE_DEMO = "1"`) |
+| `/api/live` | The welcome page's live numbers (real numbers only; `LIVE_DEMO` is off for good, since made-up activity reads as fake social proof) |
 | `/admin` | The back office (open it once as `/admin#key=…`); both sites together: https://bazi-life.mingpan.workers.dev/admin |
 
 Everything about the player runs in the browser: the chart, the life, the 100 reruns (in a Web Worker made from the

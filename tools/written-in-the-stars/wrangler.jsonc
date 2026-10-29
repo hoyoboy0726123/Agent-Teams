@@ -8,7 +8,7 @@
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
   // The built pages are imported as text modules (static HTML, no asset upload).
-  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }, { "type": "Data", "globs": ["**/*.png"], "fallthrough": true }],
+  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }, { "type": "Data", "globs": ["**/*.png", "**/*.woff2"], "fallthrough": true }],
   // The anonymous counts (/api/stats): a page sends a few a minute. namespace_id must be unique in the account (bazi-life
   // uses 4721–4723).
   "ratelimits": [
@@ -19,9 +19,8 @@
   "durable_objects": { "bindings": [{ "name": "STATS", "class_name": "StatsStore" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StatsStore"] }],
   "vars": {
-    // "1": the welcome page's live numbers are demo numbers (plausible, growing through the day) with the real ones
-    // added on top, while the site is new. Remove to show only the real numbers.
-    "LIVE_DEMO": "1",
+    // LIVE_DEMO "1" would show made-up live numbers on the welcome page; it is off for good (made-up activity reads as
+    // fake social proof under consumer law). Only real numbers show, once there are enough of them (worker/stats.js SHOW).
     // The one other origin that may read GET /api/stats (with the ADMIN_KEY) by CORS: the combined back office of both
     // sites. The same ADMIN_KEY secret has to be set on bazi-life too.
     "ADMIN_ORIGIN": "https://bazi-life.mingpan.workers.dev"

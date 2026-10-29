@@ -427,6 +427,11 @@ test("/admin is the combined back office of both sites, never cached, indexed or
   assert.match(ADMIN_HTML, /\["AI report 點擊率", pct\(t\.ai_report_u, t\.end_u\)/);
   assert.match(ADMIN_HTML, /steps\("#w-shares", NETS\.map/);
   assert.match(ADMIN_HTML, /不接受這把金鑰/);
+  // 訪客/回訪 are no longer sent after 2026-10-29: labelled with that date, hidden where there are none, never a denominator.
+  assert.match(ADMIN_HTML, /VISITORS_UNTIL = "2026-10-29"/);
+  assert.match(ADMIN_HTML, /const visitorTile = t => \(t\.visitor \?/);
+  assert.doesNotMatch(ADMIN_HTML, /pct\([^)]*,\s*[a-z]+\.(visitor|return)\)/);
+  assert.doesNotMatch(ADMIN_HTML, /\["訪客",/);
   // The key, the tab and the period stay in this browser; every use of localStorage is inside a try.
   const uses = ADMIN_HTML.match(/[^\n]*localStorage[^\n]*/g);
   assert.equal(uses.length, 2);

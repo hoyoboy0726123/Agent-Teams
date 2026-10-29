@@ -25,10 +25,9 @@
     // "compact" sends the shorter prompt: about 6 instead of 10 neurons a reading, slightly less accurate.
     "PROMPT": "full",
     // "soon": AI 分析報告 is not open yet; the pages say 敬請期待 and /api/reading answers 503 soon. Remove to open it.
-    "AI_READING": "soon",
-    // "1": the welcome page's live numbers are demo numbers (plausible, growing through the day) with the real ones
-    // added on top, while the site is new. Remove to show only the real numbers.
-    "LIVE_DEMO": "1"
+    "AI_READING": "soon"
+    // LIVE_DEMO "1" would show made-up live numbers on the welcome page; it is off for good (made-up activity reads as
+    // fake social proof under consumer law). Only real numbers show, once there are enough of them (worker/stats.js SHOW).
   },
   "observability": { "enabled": true }
 }
