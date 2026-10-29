@@ -17,6 +17,7 @@ import { drawShareCard, cardBlob } from "./ui/share.js";
 import { natalReading } from "./astro/reading.js";
 import { readingHTML } from "./ui/reading-view.js";
 import { initStats, track, trackOnce, sendLife, heartbeat, liveUrl } from "./ui/stats.js";
+import { readLive, liveTracker, resumeTime, pausedText } from "./ui/live-pause.js";
 import {
   GLYPH, ELEMENT, SIGN_WORDS, ROLE_HINT, profectionText, verdictOf, hundredFacts, hundredLine, labelOf,
   dateText, timeText, decadeOf, ordinal, HOUSE_TOPIC, planetName,
@@ -626,18 +627,40 @@ async function shareCard() {
 // /api/live (worker/stats.js) gives what there is enough of: the total always; playing now and today's count from 50
 // lives; today's averages from 20 lives today; the last few lives from 3. Each block shows only when its numbers came.
 const n0 = n => Number(n || 0).toLocaleString("en-US");
-let liveTimer = null;
+let liveTimer = null, liveRetry = null;
 function initWelcome() { refreshLive(); }
+// Fetched when the welcome page is shown, and every 60 seconds while it is (each fetch is a Worker request, and the
+// Free plan's are counted per day).
+const welcomeShown = () => !$("#welcome").hidden && document.visibilityState !== "hidden";
 function refreshLive() {
   clearInterval(liveTimer);
-  const url = liveUrl();
-  if (!url) return;
-  const tick = async () => {
-    if ($("#welcome").hidden || document.visibilityState === "hidden") return;
-    try { const r = await fetch(url, { cache: "no-store" }); if (r.ok) drawLive(await r.json()); } catch {}
-  };
+  if (!liveUrl()) return;
+  // Opening the page shows the tab too, so this runs twice at once then: one fetch is enough.
+  const tick = () => { if (welcomeShown() && !liveBusy && Date.now() - liveAt > 10e3) loadLive(); };
   tick();
-  liveTimer = setInterval(tick, 30000);
+  liveTimer = setInterval(tick, 60000);
+}
+// Any answer that is not the JSON (Cloudflare's error 1027 once the day's Worker requests are used up, a 5xx, no
+// network) is a failure; two in a row pause the numbers (src/ui/live-pause.js). After a first failure the page asks
+// once more 5 seconds later, so a used-up quota shows the notice at once and a single blip shows nothing.
+const livePause = liveTracker();
+let liveAt = 0, liveBusy = false;
+async function loadLive() {
+  clearTimeout(liveRetry);
+  liveAt = Date.now(); liveBusy = true;
+  const d = await readLive(liveUrl());
+  liveBusy = false;
+  if (d) { livePause.ok(); drawPaused(); drawLive(d); return; }
+  if (livePause.fail()) { drawPaused(); return; }
+  liveRetry = setTimeout(() => { if (welcomeShown()) loadLive(); }, 5000);
+}
+// Paused: the live blocks hide and one line says when the numbers come back (the next 00:00 UTC, in the viewer's time).
+function drawPaused() {
+  const note = $("#live-paused"), paused = livePause.paused;
+  note.hidden = !paused;
+  if (!paused) return;
+  for (const id of ["#live", "#live-recent", "#live-day"]) $(id).hidden = true;
+  note.textContent = pausedText(resumeTime());
 }
 const ELEMENT_LABEL = { fire: "Fire", earth: "Earth", air: "Air", water: "Water" };
 function drawLive(d) {

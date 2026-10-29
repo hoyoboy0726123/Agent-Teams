@@ -359,7 +359,8 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 每次打開網頁都先看到「歡迎」分頁（重新整理會留在原本的分頁，`sessionStorage` 的 `bazi-life.tab`）。版面參考《80億分之1》（1in8b.life）把「此刻」放在首屏的做法，但換成命理的內容，顏色、字體和內頁一致：
 
 - **大標**「同一個生日，一百種人生。」和像素場景。
-- **即時數據**（`src/life-app.js` 的 `loadLive`，每 30 秒向 `/api/live` 拿一次；`worker/stats.js` 的 `liveOf`）：至今走完的人生總數一直顯示；「此刻在過人生」（最近 90 秒內有心跳的頁面數，頁面每分鐘送一次 `beat`）和「今天走完的人生」要累積到 50 段人生才顯示；「今天大家活得怎麼樣」（平均壽命、最長壽、結婚與買房比例、日主五行分布）要今天滿 20 段；「剛剛走完的人生」要滿 3 段。人少的時候不顯示小數字，是為了不讓剛上線的首頁看起來像空房間。**只顯示真實數字。** 剛上線時開過 `LIVE_DEMO`（模擬數字，`worker/stats.js` 的 `demoLive`），推廣前已經關掉：做出來的「有人正在玩」在美國、英國、新加坡、馬來西亞、菲律賓的消費者保護法下都可能算虛假的社會證明。程式還在，但不要再打開。`/api/live` 任何人都能讀，Worker 記憶體和瀏覽器各快取 20 秒。
+- **即時數據**（`src/life-app.js` 的 `loadLive`，歡迎頁開著、畫面看得到時每 60 秒向 `/api/live` 拿一次（每次都算一個 Worker 請求）；`worker/stats.js` 的 `liveOf`）：至今走完的人生總數一直顯示；「此刻在過人生」（最近 90 秒內有心跳的頁面數；玩的時候，頁面每分鐘的統計那一筆順便帶一個 `beat`，不另外送）和「今天走完的人生」要累積到 50 段人生才顯示；「今天大家活得怎麼樣」（平均壽命、最長壽、結婚與買房比例、日主五行分布）要今天滿 20 段；「剛剛走完的人生」要滿 3 段。人少的時候不顯示小數字，是為了不讓剛上線的首頁看起來像空房間。**只顯示真實數字。** 剛上線時開過 `LIVE_DEMO`（模擬數字，`worker/stats.js` 的 `demoLive`），推廣前已經關掉：做出來的「有人正在玩」在美國、英國、新加坡、馬來西亞、菲律賓的消費者保護法下都可能算虛假的社會證明。程式還在，但不要再打開。`/api/live` 任何人都能讀，Worker 記憶體和瀏覽器各快取 20 秒。
+- **免費額度用完時**（`src/live-pause.js`）：Workers 免費方案每個帳號每天 100,000 個 Worker 請求（和 Written in the Stars 共用），用完後到 UTC 0 點（臺灣早上 8 點），Cloudflare 對 Worker 的路徑（`/api/*`、`/admin`）一律回自己的錯誤 1027（429 或 5xx，內容是 HTML）。網頁本身是靜態資源（見「部署到 Cloudflare」），照樣打得開，遊戲照常可以玩：`/api/interpret` 失敗就用本機比對，AI 分析報告本來就是敬請期待，英文包也是靜態檔案，統計送不出去就算了。`/api/live` 只要不是正常的 JSON 就算失敗；第一次失敗 5 秒後再問一次，連續兩次失敗才把即時數據收起來，在原本的位置寫「今天玩的人太多了，即時數字暫停更新，將在你的時間 {time} 恢復。遊戲照常可以玩 😊」（英文見 `src/i18n/en.json`）。`{time}` 是下一個 UTC 0 點換成玩家自己的時間（`Intl.DateTimeFormat`，不是今天就加上星期幾）。只失敗一次（網路閃一下）不會出現。
 - **此刻出生的寶寶，八字是**：用臺北的鐘錶時間即時排四柱（`fourPillars`，不做真太陽時校正），每分鐘更新，附一句日主的意象與個性（`DAY_MASTER_TEXT`）。
 - **剛剛走完的人生**：結局頁送一筆匿名摘要（`src/stats.js` 的 `sendLife`，`worker/stats.js` 的 `readLife`）：出生年代（「80 後」這樣的十年）、日柱天干、活到幾歲、結婚次數、有沒有買房、幾個孩子。不含生日、姓名、出生地、性別，也沒有任何編號，所以無法對回任何人；只留最近 500 筆（`worker/stats-store.js`）。
 - 然後是怎麼玩、好玩的地方、資料放在哪裡。
@@ -397,7 +398,7 @@ PLAYWRIGHT=$(npm root -g)/playwright CHROMIUM=/path/to/chrome node test/life.e2e
 
 給新加坡、馬來西亞、菲律賓和海外華人讀者的英文版：故事和詳批也要能變成英文。**人生故事已經全部有英文**（9 個故事檔、`act.js`/`actions.js`/`monte.js` 的句子，共約 9,200 句、1,100 個詞，`src/i18n/en/*.json`），網頁也接上了：
 
-- 切到英文時，`life-app.js` 的 `ensureEnglish()` 抓 `/i18n/story-en.json`（Worker 提供，約 1 MB，壓縮後約 0.4 MB），之後開始的人生都用英文（`createLife({ lang: "en", english })`）；一段人生用它開始時的語言走完。抓不到時（直接開檔案、Claude Artifact 預覽）故事維持中文，旁邊那行說明（`#play-en-note`）才出現。
+- 切到英文時，`life-app.js` 的 `ensureEnglish()` 抓 `/i18n/story-en.json`（靜態資源，約 1 MB，壓縮後約 0.4 MB），之後開始的人生都用英文（`createLife({ lang: "en", english })`）；一段人生用它開始時的語言走完。抓不到時（直接開檔案、Claude Artifact 預覽）故事維持中文，旁邊那行說明（`#play-en-note`）才出現。
 - 英文人生的開頭一句（出生日期、地點、名字）、紀錄裡的「Your choice」、問題框的回顧和「your nature」標籤、結局的工作和名字，都由 `life-app.js` 用英文寫。
 - **解讀也有英文**：本命詳批（`reading-natal.js`、`analysis.js`、`detail.js`）、大運流年和事件的命理說明（`reading-year.js`、`luck.js`）、綜合論斷、合婚和伴侶／家人合盤（`hehun.js`、`partner.js`、`family.js`）、姓名學（`name-*.js`）、準爸媽、結局頁的卡片、K 線、排盤表和分享圖。解讀的程式照舊寫中文，每一句經過 `src/core/tr.js` 的 `tr()`／`trw()`：中文模式就是原本的填空（`test/lang-readings.test.js` 記下 40 張命盤每一份解讀的指紋，一個字都不能變），英文模式查 `src/i18n/en/*.json`。結局時 `life-app.js` 的 `finish()` 呼叫 `setReadingLang(run.L)`；合婚分頁和準爸媽也各自設定。八字術語的英文統一在 `src/i18n/en/bazi-terms.json`（照 `src/i18n/glossary.md` 第一欄：Day Master、Useful Element、十神 Peer／Rival／Creator／Rebel／Steady Wealth／Windfall Wealth／Authority／Challenger／Nurturer／Maverick），第一次出現的術語在括號裡附中文。
 - 英文人生的「命理：」說明整句有英文才顯示；還沒有英文的就不顯示。
@@ -576,7 +577,11 @@ node scripts/romanise.mjs                        # 重新產生人名字表
 
 網站：**https://bazi-life.mingpan.workers.dev**（Cloudflare 帳號 Agent-Teams）。首頁是「命盤人生」，排盤引擎在 `/index.html`。
 
-一個 Worker（`worker/index.js`、`worker/app.js`）同時放兩個網頁、判讀 API（`/api/interpret`）和 AI 命理師解讀與 AI 合婚（`/api/reading`，Worker 裡也包了一份排盤引擎），設定在 `wrangler.jsonc`。兩個網頁是建置好的 `public/*.html`，當成文字模組包進 Worker（整個 Worker 壓縮後約 1,010 KB，免費方案上限 3 MB），沒有用 Workers 的靜態資源：上傳靜態資源要用 Cloudflare 另外發的一次性金鑰，Claude Code 雲端環境的代理會把它換成帳號的 API 金鑰，上傳就會失敗。
+`public/` 整個資料夾（兩個網頁、隱私權政策和使用條款、`og.png`、英文包 `i18n/story-en.json`、`robots.txt`、`404.html`）用 Workers 的靜態資源（Static Assets，`wrangler.jsonc` 的 `assets`）放：Cloudflare 直接送出檔案，不經過 Worker，免費、不限量，也不算進免費方案每天 100,000 個 Worker 請求，所以額度用完時網站照樣打得開（見「歡迎頁與隱私」的「免費額度用完時」）。網址和以前一樣：`/`、`/life`、`/life.html` 是人生模擬，`/chart`、`/index.html` 是排盤引擎，`/privacy`、`/terms`（加 `.html` 也可以），`/og.png`、`/i18n/story-en.json`；其他路徑是 `404.html`（404）。`html_handling` 是 `none`，乾淨網址寫在 `public/_redirects`（200 改寫，網址不變），標頭寫在 `public/_headers`（網頁 `no-cache` 加 ETag、`nosniff`、`strict-origin-when-cross-origin`；`og.png` 和英文包快取一天），兩個檔案都由 `npm run build` 從 `scripts/static-site.mjs` 寫出來。瀏覽器測試用 `test/helpers/static-site.mjs` 照同樣的規則放 `public/`。
+
+Worker（`worker/index.js`、`worker/app.js`）只在 `run_worker_first` 的路徑執行：`/api/*`（判讀 API `/api/interpret`、AI 命理師解讀與 AI 合婚 `/api/reading`（Worker 裡也包了一份排盤引擎）、`/api/stats`、`/api/live`）和 `/admin`。Worker 不再包網頁（壓縮後約 240 KB，以前約 1,010 KB）。
+
+**要在自己的電腦部署**：上傳靜態資源要用 Cloudflare 另外發的一次性金鑰，Claude Code 雲端環境的代理會把它換成帳號的 API 金鑰，上傳就會失敗（以前網頁包在 Worker 裡就是為了避開這一點）。`wrangler deploy` 只上傳改過的檔案；第一次多傳約 5 MB，不必在 Cloudflare 後台另外設定。
 
 在自己的電腦部署：
 
@@ -586,19 +591,14 @@ npm install
 npm run deploy        # = npm run build，再 npx wrangler deploy（第一次會開瀏覽器登入 Cloudflare）
 ```
 
-在 Claude Code 雲端工作階段部署：環境的「網路密鑰」放一把 Cloudflare API 金鑰（範本 Edit Cloudflare Workers，只給 Agent-Teams 帳號；允許的網站 `api.cloudflare.com`），代理會在送往 Cloudflare 的請求加上金鑰，工作階段裡看不到它。wrangler 需要有一個 `CLOUDFLARE_API_TOKEN`，給任意字串即可，代理會換成真的金鑰：
-
-```bash
-npm run build
-CLOUDFLARE_API_TOKEN=proxy-injected CLOUDFLARE_ACCOUNT_ID=a535bb4f35cdac784e0806f0c58b4944 WRANGLER_SEND_METRICS=false npx wrangler deploy
-```
+在 Claude Code 雲端工作階段部署（環境的「網路密鑰」放一把 Cloudflare API 金鑰，代理在送往 `api.cloudflare.com` 的請求加上它）：靜態資源的上傳會被代理換掉金鑰而失敗。`public/` 沒有改過時 wrangler 不必上傳檔案，也許部署得上去，但沒有試過；有改到 `public/` 就一定要在自己的電腦部署。
 
 - **Workers AI**：Gemma 4 26B（`@cf/google/gemma-4-26b-a4b-it`，關閉思考）。免費方案每個帳號每天 10,000 neurons，台灣時間早上 8 點重置；每句約 1,070 個 token 進、22 個 token 出，約 10 neurons，一天大約 950 句。用完會回錯誤、不會收費，頁面改用本機比對。付費方案每月 5 美元，超過免費額度的部分每句約 0.0001 美元。
 - **精簡版提示詞**：`wrangler.jsonc` 的 `PROMPT` 改成 `"compact"`，每句約 6 neurons、一天約 1,500 句，準確度從 99.4% 降到 97.5%（`free-text-heldout.json`）。
 - **限速**：每個 IP 每分鐘最多 12 句（Workers Rate Limiting，`INTERPRET_LIMIT`）；AI 命理師解讀和合婚每分鐘最多 20 段（`READING_LIMIT`，完整解讀一份 8 段）。
 - **只接受自己網站的請求**：`Origin` 必須是這個 Worker 自己的網址（workers.dev 或接到它的自訂網域），其他網站和 curl 都會被拒絕。
 - **隱私**：Worker 不記錄玩家寫的句子；回覆只有行動代號、15 字以內的摘要和信心值。
-- **網頁快取**：`cache-control: no-cache`，瀏覽器每次開網頁都向網站確認，部署之後馬上看得到新版。以前是 `max-age=600`，手機在部署後還會顯示舊版最多 10 分鐘。Worker 也送 ETag，沒改過可以回 304；但 workers.dev 的 HTML 開著 Email Obfuscation 等功能，Cloudflare 會把 ETag 拿掉（[說明](https://developers.cloudflare.com/cache/reference/etag-headers/)），所以目前每次開網頁都重新下載一次（壓縮後約 560 KB）。改用自訂網域並關掉這些功能後，304 就會生效。
+- **網頁快取**：`cache-control: no-cache`（`public/_headers`），瀏覽器每次開網頁都向網站確認，部署之後馬上看得到新版。以前是 `max-age=600`，手機在部署後還會顯示舊版最多 10 分鐘。靜態資源也送 ETag，沒改過可以回 304；但 workers.dev 的 HTML 開著 Email Obfuscation 等功能，Cloudflare 會把 ETag 拿掉（[說明](https://developers.cloudflare.com/cache/reference/etag-headers/)），所以目前每次開網頁都重新下載一次（壓縮後約 560 KB）。改用自訂網域並關掉這些功能後，304 就會生效。
 - `test/worker.test.js` 用替身測 Worker：正常回答、各種回覆格式、不允許的行動、來源不對、太大、限速、額度用完都會回錯誤狀態；AI 解讀每一段單獨寫、沒有歲數的段不叫模型、一般段落檢查沒過重寫一次再回 502、清單只重問沒寫好的幾項並用引擎原文補上、合婚帶兩個人的命盤、只有帶實驗金鑰的請求能換模型。
 
 ### 檔案
@@ -635,7 +635,7 @@ CLOUDFLARE_API_TOKEN=proxy-injected CLOUDFLARE_ACCOUNT_ID=a535bb4f35cdac784e0806
 | `src/sim/grammar.js` | 句子模板 |
 | `src/sim/actions.js`、`src/sim/act.js` | 行動的清單與結果（按鈕和自己寫的選擇共用） |
 | `src/sim/intent.js`、`src/sim/interpret.js` | 判讀玩家自己寫的選擇：本機比對與安全檢查、給 Workers AI 的提示詞與回覆檢查 |
-| `worker/index.js`、`worker/app.js`、`wrangler.jsonc` | Cloudflare Worker：放網頁（`index.js` 把建置好的網頁交給 `app.js`），在 `/api/interpret` 用 Workers AI 判讀玩家寫的選擇，在 `/api/reading` 寫 AI 命理師解讀和 AI 合婚 |
+| `worker/index.js`、`worker/app.js`、`wrangler.jsonc` | Cloudflare Worker：只跑 `/api/*` 和 `/admin`（網頁是 `public/` 的靜態資源，`scripts/static-site.mjs` 寫出乾淨網址、標頭和 404 頁），在 `/api/interpret` 用 Workers AI 判讀玩家寫的選擇，在 `/api/reading` 寫 AI 命理師解讀和 AI 合婚 |
 | `src/ai-reading.js` | AI 命理師解讀與 AI 合婚：頁面送出的內容、Worker 接受的內容、分段、命盤資料、提示詞和寫完的檢查 |
 | `src/ai-quota.js` | 記住這個分頁「今天的 AI 額度用完了」（只存 UTC 日期），換日前不顯示 AI 的部分、也不送出 |
 | `src/core/simplified.js` | 常見的簡體字（姓名解說和 AI 解讀的檢查共用） |

@@ -2,15 +2,21 @@
 //   public/index.html     the game (src/index.html + src/app.js bundled in, one self-contained page)
 //   public/privacy.html   the privacy policy (src/legal.js)
 //   public/terms.html     the terms of use (src/legal.js)
-// The Worker (worker/index.js) imports these pages as text and serves them at /, /privacy and /terms, with the font
-// files in assets/fonts/ at /fonts/ (src/fonts.js: no Google Fonts).
+//   public/og.png, public/fonts/   copied from assets/ (the share picture; the Fraunces files, src/fonts.js: no Google
+//                         Fonts)
+//   public/404.html, public/robots.txt, public/_redirects, public/_headers   how Cloudflare serves public/ as Workers
+//                         Static Assets (scripts/static-site.mjs): the clean URLs /, /privacy, /terms, the headers, the
+//                         404 page
+// Everything in public/ is a static asset (wrangler.jsonc "assets"): served without running the Worker, so the site
+// keeps working when the Free plan's daily Worker requests run out. The Worker only answers /api/* and /admin.
 //   --stats-url <url>   where the page sends its anonymous counts (default /api/stats, the Worker's own;
 //                       pass "" for a copy hosted without the Worker, which then sends nothing)
 import { build } from "esbuild";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, copyFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { PRIVACY_HTML, TERMS_HTML } from "../src/legal.js";
 import { FONT_CSS, FONT_PRELOAD } from "../src/fonts.js";
+import { REDIRECTS, HEADERS, ROBOTS, NOT_FOUND_HTML } from "./static-site.mjs";
 
 const at = p => fileURLToPath(new URL(`../${p}`, import.meta.url));
 const arg = (name, fallback) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] ?? "" : fallback; };
@@ -31,3 +37,13 @@ await writeFile(at("public/index.html"), doc);
 await writeFile(at("public/privacy.html"), PRIVACY_HTML);
 await writeFile(at("public/terms.html"), TERMS_HTML);
 console.log(`public/index.html ${(doc.length / 1024).toFixed(0)} KB, public/privacy.html, public/terms.html`);
+// The files the Worker used to import: public/ is not in git, so they are copied in on every build.
+await copyFile(at("assets/og.png"), at("public/og.png"));
+await mkdir(at("public/fonts"), { recursive: true });
+const fonts = (await readdir(at("assets/fonts"))).filter(f => /\.woff2$|^OFL\.txt$/.test(f));
+for (const f of fonts) await copyFile(at(`assets/fonts/${f}`), at(`public/fonts/${f}`));
+await writeFile(at("public/_redirects"), REDIRECTS);
+await writeFile(at("public/_headers"), HEADERS);
+await writeFile(at("public/robots.txt"), ROBOTS);
+await writeFile(at("public/404.html"), NOT_FOUND_HTML);
+console.log(`public/og.png, public/fonts/ (${fonts.join(", ")}), public/_redirects, public/_headers, public/robots.txt, public/404.html`);

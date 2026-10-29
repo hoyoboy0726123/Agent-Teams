@@ -12,10 +12,26 @@ The plan is in `PLAN.md`, the legal notes in `docs/COMPLIANCE.md`, the engine in
 | --- | --- |
 | `/` | The game: welcome (live numbers) → birth form with the Big Three → play → ending (life chart, fate vs luck over 100 lives, your sky, share card) |
 | `/privacy`, `/terms` | Static policy pages (`src/legal.js`). The contact address is `CONTACT` at the top of that file, still the placeholder `TODO@example.com`, so the pages say “(contact address coming soon)” |
-| `/fonts/*.woff2`, `/fonts/OFL.txt` | The display face, Fraunces (OFL), served by the Worker itself: no Google Fonts (`src/fonts.js`, `assets/fonts/`) |
+| `/fonts/*.woff2`, `/fonts/OFL.txt` | The display face, Fraunces (OFL), served by the site itself: no Google Fonts (`src/fonts.js`, `assets/fonts/`) |
+| `/og.png`, `/robots.txt`, anything else | The share picture, the crawler rules, and a friendly 404 page (`public/404.html`) |
 | `/api/stats` | POST anonymous event counts from the page; GET the totals with the `ADMIN_KEY` secret |
-| `/api/live` | The welcome page's live numbers (real numbers only; `LIVE_DEMO` is off for good, since made-up activity reads as fake social proof) |
+| `/api/live` | The welcome page's live numbers (real numbers only; `LIVE_DEMO` is off for good, since made-up activity reads as fake social proof). The page asks every 60 seconds, only while the welcome page is on screen |
 | `/admin` | The back office (open it once as `/admin#key=…`); both sites together: https://bazi-life.mingpan.workers.dev/admin |
+
+Everything but `/api/*` and `/admin` is a Workers Static Asset (`public/`, the `assets` block of `wrangler.jsonc`):
+Cloudflare serves it without running the Worker, free, and it does not count against the Free plan's 100,000 Worker
+requests a day (shared with bazi-life). `html_handling` is `none`; the clean URLs `/`, `/privacy` and `/terms` are 200
+rewrites in `public/_redirects`, and the headers the Worker used to set (`no-cache` pages with an ETag, `nosniff`,
+`strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, the permissions policy; a day's cache for `og.png`, the
+fonts and `robots.txt`) are in `public/_headers`. `npm run build` writes both from `scripts/static-site.mjs`, and
+copies `assets/og.png` and `assets/fonts/` in (`public/` is not in git).
+
+**When the day's Worker requests run out**, Cloudflare answers `/api/*` with its own error 1027 (a 429 or a 5xx, with
+an HTML page) until 00:00 UTC, but the site still loads and the game plays to the end. Any `/api/live` answer that is
+not the JSON is a failure; after a first one the page asks again 5 seconds later, and two in a row hide the live
+numbers and show "So many lives today that the live numbers are paused until {time} your time. The game still works."
+(`src/ui/live-pause.js`; `{time}` is the next 00:00 UTC in the viewer's own time, with the weekday when it is not
+today). One blip shows nothing. The counts simply fail silently.
 
 Everything about the player runs in the browser: the chart, the life, the 100 reruns (in a Web Worker made from the
 page's own script) and the "write your own decision" matcher (`src/sim/intent.js`). The Worker keeps only daily event
@@ -33,9 +49,13 @@ only `wits.theme` and `wits.majorOnly`.
 - `src/legal.js`: `/privacy` and `/terms`; `src/fonts.js`: the `@font-face` rules for the self-hosted Fraunces (the
   build fills them into `src/index.html` and the policy pages). The woff2 files are Google Fonts' own latin and
   latin-ext subsets (upright 400–600 and italic 500), with `assets/fonts/OFL.txt`.
-- `scripts/build.mjs`: builds `public/index.html`, `public/privacy.html`, `public/terms.html`.
+- `scripts/build.mjs`: builds `public/index.html`, `public/privacy.html`, `public/terms.html`, copies `og.png` and the
+  fonts in, and writes `public/_redirects`, `_headers`, `robots.txt` and `404.html` (`scripts/static-site.mjs`).
 - `worker/`: `index.js` (entry), `app.js` (routes), `stats.js`, `stats-store.js` (the `StatsStore` Durable Object),
-  `admin.js`. `wrangler.jsonc` deploys it as the Worker `written-in-the-stars`.
+  `admin.js`. `wrangler.jsonc` deploys it as the Worker `written-in-the-stars`, with `public/` as its static assets; the
+  Worker runs only for `/api/*` and `/admin` (`run_worker_first`).
+- `src/ui/stats.js` sends one post a minute: the time on screen, plus the milestones and, while a life is played, the
+  `beat` that counts it as playing now (no separate heartbeat request).
 
 ## The natal reading and the AI report hook
 
@@ -81,10 +101,15 @@ Chinese). That page reads this Worker's `GET /api/stats` across origins:
 npm run build                      # → public/
 node --test test/site-*.test.js    # Worker and page unit tests (npm test runs everything)
 PLAYWRIGHT=/opt/node22/lib/node_modules/playwright CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome \
-  node test/site.e2e.mjs           # browser test of public/ (SHOTS=<dir> saves screenshots); fails on any Google Fonts request
-npm run build && npx wrangler deploy
-# wrangler.jsonc must load the fonts as Data modules: "**/*.woff2" in the Data rule next to "**/*.png"
+  node test/site.e2e.mjs           # browser test of public/, served as static assets are (test/helpers/static-site.mjs);
+                                   # SHOTS=<dir> saves screenshots; fails on any Google Fonts request
+npm run build && npx wrangler deploy   # on your own computer (see below)
 npx wrangler secret put ADMIN_KEY  # once, for /admin: the same key as bazi-life's
 ```
+
+Deploy from your own computer: the static-asset upload is authorised by a one-time token of Cloudflare's own, which
+the Claude Code cloud proxy replaces with the account's API token, so the upload fails there. Nothing has to be set
+in the Cloudflare dashboard; the first deploy with assets uploads about 2 MB, later ones only the changed files.
+`npx wrangler dev --local` serves the site as Cloudflare would.
 
 For entertainment only: astrology has no proven scientific validity, and nothing here predicts anyone's future.

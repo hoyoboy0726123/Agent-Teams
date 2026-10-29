@@ -33,6 +33,7 @@ import { initI18n, lang, t } from "./i18n.js";
 import { ensureEnglish, englishNow } from "./english.js";
 import { setReadingLang, tr, trw, trJoin } from "./core/tr.js";
 import { initStats, track, trackOnce, sendLife, heartbeat, LIVE_URL } from "./stats.js";
+import { readLive, liveTracker, resumeTime, PAUSED_ZH } from "./live-pause.js";
 import { initPixels, startScene, showStep, collectStep, openStory } from "./pixel-app.js";
 import { draftStore, readIds, writeIds, later } from "./draft.js";
 import { initTimeField, readTimeField, syncTimeField, timeFieldIds } from "./time-field.js";
@@ -143,7 +144,7 @@ function setup() {
   // 中／英: the page's own words swap by themselves (i18n.js); the welcome lines built here are drawn again.
   initI18n();
   if (lang() === "en") ensureEnglish();
-  document.addEventListener("langchange", () => { drawNow(); if (lastLive) drawLive(lastLive); if (lang() === "en") ensureEnglish(); if (run && run.summary) endNotes(); });
+  document.addEventListener("langchange", () => { drawNow(); if (livePause.paused) drawPaused(); else if (lastLive) drawLive(lastLive); if (lang() === "en") ensureEnglish(); if (run && run.summary) endNotes(); });
 }
 
 const TABS = ["welcome", "me", "random", "baby", "match"];
@@ -1150,24 +1151,44 @@ const decadeOf = y => (y < 1930 ? DECADES[0] : y >= 2030 ? DECADES[11] : DECADES
 const ELEMENT_OF = { 甲: "木", 乙: "木", 丙: "火", 丁: "火", 戊: "土", 己: "土", 庚: "金", 辛: "金", 壬: "水", 癸: "水" };
 const ELEMENT_COLOR = { 木: "var(--wood)", 火: "var(--fire)", 土: "var(--earth)", 金: "var(--metal)", 水: "var(--water)" };
 const n0 = n => Number(n || 0).toLocaleString("zh-TW");
-let liveTimer = null, nowTimer = null;
+let liveTimer = null, liveRetry = null, nowTimer = null;
 function initWelcome() {
   drawNow();
   nowTimer = setInterval(drawNow, 60000);
   refreshWelcome();
 }
-// Fetch again when the tab is shown, and every 30 seconds while it is.
+// Fetch again when the tab is shown, and every 60 seconds while it is (each fetch is a Worker request, and the Free
+// plan's are counted per day).
+const welcomeShown = () => !$("#welcome").hidden && !$("#setup").hidden && document.visibilityState !== "hidden";
 function refreshWelcome() {
   clearInterval(liveTimer);
   if (!LIVE_URL) return;
-  const tick = () => { if ($("#welcome").hidden || $("#setup").hidden || document.visibilityState === "hidden") return; loadLive(); };
+  // Opening the page shows the tab too, so this runs twice at once then: one fetch is enough.
+  const tick = () => { if (welcomeShown() && !liveBusy && Date.now() - liveAt > 10e3) loadLive(); };
   tick();
-  liveTimer = setInterval(tick, 30000);
+  liveTimer = setInterval(tick, 60000);
 }
+// Any answer that is not the JSON (Cloudflare's error 1027 once the day's Worker requests are used up, a 5xx, no
+// network) is a failure; two in a row pause the numbers (src/live-pause.js). After a first failure the page asks once
+// more 5 seconds later, so a used-up quota shows the notice at once and a single blip shows nothing.
+const livePause = liveTracker();
+let liveAt = 0, liveBusy = false;
 async function loadLive() {
-  let d;
-  try { const r = await fetch(LIVE_URL, { cache: "no-store" }); if (!r.ok) return; d = await r.json(); } catch { return; }
-  drawLive(d);
+  clearTimeout(liveRetry);
+  liveAt = Date.now(); liveBusy = true;
+  const d = await readLive(LIVE_URL);
+  liveBusy = false;
+  if (d) { livePause.ok(); drawPaused(); drawLive(d); return; }
+  if (livePause.fail()) { drawPaused(); return; }
+  liveRetry = setTimeout(() => { if (welcomeShown()) loadLive(); }, 5000);
+}
+// Paused: the live blocks hide and one line says when the numbers come back (the next 00:00 UTC, in the viewer's time).
+function drawPaused() {
+  const note = $("#live-paused"), paused = livePause.paused;
+  note.hidden = !paused;
+  if (!paused) return;
+  for (const id of ["#live-strip", "#live-recent", "#live-day"]) $(id).hidden = true;
+  note.textContent = t(PAUSED_ZH, { time: resumeTime() });
 }
 let lastLive = null;
 function drawLive(d) {

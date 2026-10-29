@@ -7,6 +7,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { makeApp } from "../worker/app.js";
 import { agesOf, partsFor } from "../src/ai-reading.js";
+import { staticSite } from "./helpers/static-site.mjs";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT || "playwright");
@@ -29,19 +30,12 @@ async function fresh(opts, { welcomed = true, soon = false } = {}) {
   await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   return p;
 }
-// Served over http, as the Worker serves it: /api/interpret answers like worker/index.js would. A Worker that is
+// Served over http as Cloudflare serves the site: public/ as static assets (the pages, /privacy and /terms, the English
+// story; test/helpers/static-site.mjs), and /api/* answered here by routing, as the Worker would. A Worker that is
 // busy or out of quota (503), or a request that fails, leaves the player with the local options, with no message.
 const html = await readFile(fileURLToPath(new URL("../public/life.html", import.meta.url)));
 const storyEn = await readFile(fileURLToPath(new URL("../public/i18n/story-en.json", import.meta.url)));
-// 隱私權政策 and 使用條款 (src/legal.js), at /privacy and /terms as the Worker serves them.
-const legal = { "/privacy": await readFile(fileURLToPath(new URL("../public/privacy.html", import.meta.url))), "/terms": await readFile(fileURLToPath(new URL("../public/terms.html", import.meta.url))) };
-const server = createServer((req, res) => {
-  const path = req.url.split(/[?#]/)[0];
-  if (req.url === "/life.html") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(html); }
-  else if (Object.hasOwn(legal, path)) { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(legal[path]); }
-  else if (req.url === "/i18n/story-en.json") { res.writeHead(200, { "content-type": "application/json" }); res.end(storyEn); }
-  else { res.writeHead(404); res.end(); }
-});
+const server = createServer(await staticSite(fileURLToPath(new URL("../public/", import.meta.url))));
 await new Promise(done => server.listen(0, "127.0.0.1", done));
 const site = `http://127.0.0.1:${server.address().port}/life.html`;
 // A pixel canvas has been drawn on (the sky and the place fill it).
@@ -729,6 +723,54 @@ await hhFile.close();
   await lp.waitForFunction(() => document.documentElement.lang === "zh-Hant-TW", null, { timeout: 2000 }).catch(() => {});
   check("繁中 on the policy page switches it back to Chinese", await lp.isVisible("#zh-doc") && await lp.isHidden("#en-doc") && await lp.getAttribute("html", "lang") === "zh-Hant-TW");
   await lp.close();
+}
+// The Worker's daily quota used up (Free plan): Cloudflare answers every /api/* with its error 1027 (a 429 with an HTML
+// page), or the requests fail outright. The pages are static assets and still load: the game plays to the end in both
+// languages, the welcome page hides its live numbers and says when they come back, and nothing throws.
+const QUOTA_PAGE = '<!DOCTYPE html><html><head><title>Error 1027</title></head><body>error code: 1027</body></html>';
+for (const [how, answer] of [["429 (error 1027)", r => r.fulfill({ status: 429, contentType: "text/html; charset=UTF-8", body: QUOTA_PAGE })], ["failing", r => r.abort("failed")]]) {
+  for (const L of ["zh", "en"]) {
+    const before = errors.length;
+    const q = await fresh({ viewport: { width: 420, height: 900 } }, { welcomed: false, soon: true });
+    if (L === "en") await q.addInitScript(() => { try { localStorage.setItem("bazi-life.lang", "en"); } catch {} });
+    const hits = [];
+    await q.route("**/api/**", r => { hits.push(new URL(r.request().url()).pathname); return answer(r); });
+    await q.goto(site);
+    await q.waitForSelector("#live-paused:not([hidden])", { timeout: 12000 }).catch(() => {});
+    const note = await q.isVisible("#live-paused") ? await q.textContent("#live-paused") : "";
+    const text = L === "en" ? /^So many lives today that the live numbers are paused until .*\d{1,2}:\d{2}.* your time\. The game still works\.$/ : /^今天玩的人太多了，即時數字暫停更新，將在你的時間 .*\d{1,2}:\d{2}.* 恢復。遊戲照常可以玩 😊$/;
+    check(`quota out, /api/* ${how} (${L}): the welcome page hides the live numbers and says when they come back, in the viewer's time`, text.test(note) && await q.isHidden("#live-strip") && await q.isHidden("#live-recent") && await q.isHidden("#live-day") && await q.isVisible("#live-now-chart") && hits.filter(h => h === "/api/live").length === 2, note);
+    await q.click('.welcome-go [data-goto="me"]');
+    await q.click("#form-me button[type=submit]");
+    await q.waitForSelector("#play:not([hidden])");
+    await q.click('[data-speed="10"]');
+    await firstChoice(q);
+    let wrote = true;
+    if (L === "zh") {
+      // A written choice: /api/interpret fails too, and the page offers its own closest options.
+      await q.fill("#free-text", "先跟家人好好商量看看");
+      await q.click("#free-go");
+      wrote = await q.waitForSelector("#free-out [data-free-action]", { timeout: 10000 }).then(() => true, () => false);
+      if (wrote) await q.click("#free-out [data-free-action]");
+    } else await q.click("#choice [data-option]");
+    await q.click("#c-skip");
+    await ended(q, 45000);
+    const story = await q.textContent("#feed");
+    check(`quota out, /api/* ${how} (${L}): the life plays to the end, with its K line, the 100 lives and the reading, and no page errors`, wrote && await q.isVisible("#end") && await q.isVisible("#report") && await q.isVisible("#ai-soon") && (L === "zh" ? /歲/.test(story) : /\byou\b/i.test(story)) && errors.length === before, `${errors.slice(before).join(" | ")} ${L === "en" ? story.slice(0, 80) : ""}`);
+    await q.close();
+  }
+}
+// One failed /api/live (a network blip) shows nothing: the page asks again 5 seconds later and draws the numbers.
+{
+  const blip = await fresh({ viewport: { width: 420, height: 900 } }, { welcomed: false });
+  let n = 0;
+  await blip.route("**/api/live", r => (++n === 1 ? r.fulfill({ status: 503, contentType: "text/html", body: "<html>busy</html>" }) : r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ total: 5210 }) })));
+  await blip.goto(site);
+  await blip.waitForTimeout(1500);
+  const early = await blip.isHidden("#live-paused") && await blip.isHidden("#live-strip");
+  await blip.waitForSelector("#live-strip:not([hidden])", { timeout: 10000 }).catch(() => {});
+  check("a single failed /api/live does not pause the numbers: they show after one quick retry", early && n === 2 && await blip.isHidden("#live-paused") && await blip.textContent("#live-total") === "5,210", `${n} requests, early ${early}, paused ${await blip.isVisible("#live-paused")}, total ${await blip.textContent("#live-total")}`);
+  await blip.close();
 }
 server.close();
 

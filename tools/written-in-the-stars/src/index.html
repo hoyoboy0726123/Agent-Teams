@@ -103,6 +103,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .live b { font-family: var(--display); font-size: 30px; font-weight: 500; color: #fbf6ea; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .live span { font-size: 13px; color: var(--night-muted); }
 .live .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #7fd6a6; margin-right: 6px; box-shadow: 0 0 0 0 rgba(127, 214, 166, 0.6); animation: pulse 2s infinite; }
+.live-paused { margin-top: 32px; padding-top: 20px; border-top: 1px solid rgba(201, 194, 247, 0.2); font-size: 15px; color: var(--night-muted); max-width: 46ch; }
 @keyframes pulse { 70% { box-shadow: 0 0 0 8px rgba(127, 214, 166, 0); } 100% { box-shadow: 0 0 0 0 rgba(127, 214, 166, 0); } }
 .welcome-body { display: grid; gap: 40px; padding-top: 40px; padding-bottom: 24px; }
 .stage-card { display: grid; gap: 10px; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); margin-top: 28px; }
@@ -486,6 +487,7 @@ footer .disc { color: var(--night-ink); }
           <div id="live-now-box"><b id="live-now">0</b><span><i class="dot" aria-hidden="true"></i>playing right now</span></div>
           <div id="live-today-box"><b id="live-today">0</b><span>lives finished today</span></div>
         </div>
+        <p class="live-paused" id="live-paused" role="status" hidden></p>
       </div>
       <figure class="stage-card" aria-label="A life in pixels: born, school, work, love, home, later years">
         <canvas class="pixel" id="welcome-scene" width="128" height="44" aria-hidden="true"></canvas>

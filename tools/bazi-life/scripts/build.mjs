@@ -15,11 +15,17 @@
 //                               the contact address is CONTACT there), served at /privacy and /terms
 //   public/i18n/story-en.json   the English of the story (scripts/story-bundle.mjs, from src/i18n/en/), fetched by
 //                               the page only in English, so the Chinese page does not grow (README「英文版（翻譯層）」)
+//   public/404.html, public/robots.txt, public/_redirects, public/_headers   how Cloudflare serves public/ as Workers
+//                               Static Assets (scripts/static-site.mjs): the clean URLs, the headers, the 404 page.
+//   public/og.png               the share picture (committed there; checked here)
+// Everything in public/ is a static asset (wrangler.jsonc "assets"): served without running the Worker, so the site
+// keeps working when the Free plan's daily Worker requests run out. The Worker only answers /api/* and /admin.
 import { build } from "esbuild";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { storyBundle } from "./story-bundle.mjs";
 import { fileURLToPath } from "node:url";
 import { PRIVACY_HTML, TERMS_HTML, SITE } from "../src/legal.js";
+import { REDIRECTS, HEADERS, ROBOTS, NOT_FOUND_HTML } from "./static-site.mjs";
 
 const TYME4TS_CDN = "https://unpkg.com/tyme4ts@1.5.2/dist/lib/index.mjs";
 const at = p => fileURLToPath(new URL(`../${p}`, import.meta.url));
@@ -55,6 +61,13 @@ const LEGAL = {
   standalone: { __PRIVACY_URL__: "/privacy", __TERMS_URL__: "/terms" },
   artifact: { __PRIVACY_URL__: `${SITE}/privacy`, __TERMS_URL__: `${SITE}/terms` },
 };
+await mkdir(at("public"), { recursive: true });
+await access(at("public/og.png")).catch(() => { throw new Error("public/og.png is missing (it is committed: git checkout public/og.png)"); });
+await writeFile(at("public/_redirects"), REDIRECTS);
+await writeFile(at("public/_headers"), HEADERS);
+await writeFile(at("public/robots.txt"), ROBOTS);
+await writeFile(at("public/404.html"), NOT_FOUND_HTML);
+console.log("public/_redirects, public/_headers, public/robots.txt, public/404.html");
 await writeFile(at("public/privacy.html"), PRIVACY_HTML);
 await writeFile(at("public/terms.html"), TERMS_HTML);
 console.log(`public/privacy.html ${(PRIVACY_HTML.length / 1024).toFixed(0)} KB, public/terms.html ${(TERMS_HTML.length / 1024).toFixed(0)} KB`);

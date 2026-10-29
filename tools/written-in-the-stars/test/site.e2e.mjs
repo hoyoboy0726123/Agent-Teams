@@ -1,9 +1,10 @@
-// Browser check of the built site (run `npm run build` first). public/ is served by a tiny local http server;
+// Browser check of the built site (run `npm run build` first). public/ is served by a tiny local http server the way
+// Cloudflare serves it as static assets (test/helpers/static-site.mjs: the clean URLs, the fonts, the 404 page);
 // /api/live is mocked and /api/stats is caught (and checked to carry no birth data).
 //   PLAYWRIGHT=/path/to/playwright CHROMIUM=/path/to/chrome node test/site.e2e.mjs
 //   SHOTS=<dir> also saves phone and desktop screenshots of the welcome page, the Big Three, play, the ending and
-//   the share card. The typeface (Fraunces) is the site's own (assets/fonts/, src/fonts.js), served here at /fonts/ as
-//   the Worker does; every request to Google Fonts is recorded and fails the run.
+//   the share card. The typeface (Fraunces) is the site's own (assets/fonts/, src/fonts.js, copied to public/fonts/ by
+//   the build), served at /fonts/ as on the site; every request to Google Fonts is recorded and fails the run.
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -11,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { ADMIN_HTML } from "../worker/admin.js";
 import { dayOf } from "../worker/stats.js";
+import { staticSite } from "./helpers/static-site.mjs";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT || "playwright");
@@ -20,14 +22,12 @@ const check = (name, ok, extra = "") => { results.push(!!ok); console.log(`${ok 
 
 // ---------- the server ----------
 const PUBLIC = fileURLToPath(new URL("../public/", import.meta.url));
-const FONT_DIR = fileURLToPath(new URL("../assets/fonts/", import.meta.url));
 const fontsServed = [];
 const beacons = [];
-const ROUTES = { "/": "index.html", "/index.html": "index.html", "/privacy": "privacy.html", "/terms": "terms.html" };
 // The back office reads GET /api/stats with the admin key: a day of counts with AI report clicks.
 const ADMIN_ROWS = () => [["view", 120], ["visitor", 90], ["form_u", 60], ["start", 50], ["end", 44], ["end_u", 40], ["ai_report", 13], ["ai_report_u", 10]].map(([metric, n]) => ({ day: dayOf(Date.now()), page: "life", metric, n }));
-const server = createServer(async (req, res) => {
-  const path = new URL(req.url, "http://x").pathname;
+// What the Worker answers here (run_worker_first: /api/* and /admin); anything else is a static file.
+function worker(req, res, path) {
   if (path === "/admin") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(ADMIN_HTML); return; }
   if (path === "/api/stats" && req.method === "GET") {
     if (req.headers.authorization !== "Bearer test-key") { res.writeHead(401); res.end("{}"); return; }
@@ -42,16 +42,13 @@ const server = createServer(async (req, res) => {
     req.on("end", () => { beacons.push(body); res.writeHead(204); res.end(); });
     return;
   }
-  const font = path.match(/^\/fonts\/([a-z-]+\.woff2|OFL\.txt)$/);
-  if (font) {
-    fontsServed.push(font[1]);
-    res.writeHead(200, { "content-type": font[1].endsWith(".txt") ? "text/plain; charset=utf-8" : "font/woff2" });
-    res.end(await readFile(join(FONT_DIR, font[1])));
-    return;
-  }
-  if (!ROUTES[path]) { res.writeHead(404); res.end(); return; }
-  res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-  res.end(await readFile(join(PUBLIC, ROUTES[path])));
+  return false;
+}
+const files = await staticSite(PUBLIC, { worker });
+const server = createServer((req, res) => {
+  const font = new URL(req.url, "http://x").pathname.match(/^\/fonts\/([a-z-]+\.woff2|OFL\.txt)$/);
+  if (font) fontsServed.push(font[1]);
+  return files(req, res);
 });
 await new Promise(done => server.listen(0, "127.0.0.1", done));
 const SITE = `http://127.0.0.1:${server.address().port}`;
@@ -327,6 +324,46 @@ for (const width of [430, 768, 1024, 1440]) {
   const terms = await p.textContent("body");
   check("/terms: entertainment only, 988, the astronomy-engine MIT notice", /entertainment and self-reflection only/.test(terms) && /988/.test(terms) && /Don Cross/.test(terms) && /MIT License/.test(terms) && /findahelpline\.com/.test(terms) && /Fraunces Project Authors/.test(terms) && await p.$eval('a[href="/fonts/OFL.txt"]', a => !!a));
   check("/terms uses the site's own Fraunces", await p.evaluate(async () => { await document.fonts.ready; return [...document.fonts].some(f => f.family.replace(/"/g, "") === "Fraunces" && f.status === "loaded"); }));
+  const missing = await p.goto(`${SITE}/no-such-page`);
+  check("an unknown path gets the friendly 404 page", missing.status() === 404 && /isn't in the stars/.test(await p.textContent("body")) && await p.$eval('a[href="/"]', a => !!a));
+  await p.context().close();
+}
+
+// ---------- 5b. the Worker's daily quota used up ----------
+// On the Free plan, past the day's Worker requests Cloudflare answers every /api/* with its error 1027 (a 429 with an
+// HTML page), or the requests fail outright. The pages are static assets and still load: the game plays to the end,
+// the welcome page hides its live numbers and says when they come back, and nothing throws.
+const QUOTA_PAGE = '<!DOCTYPE html><html><head><title>Error 1027</title></head><body>error code: 1027</body></html>';
+for (const [how, answer] of [["429 (error 1027)", r => r.fulfill({ status: 429, contentType: "text/html; charset=UTF-8", body: QUOTA_PAGE })], ["failing", r => r.abort("failed")]]) {
+  const before = errors.length;
+  const p = await fresh({ width: 390, height: 844 });
+  const hits = [];
+  await p.route("**/api/**", r => { hits.push(new URL(r.request().url()).pathname); return answer(r); });
+  await p.goto(`${SITE}/`);
+  await p.waitForSelector("#live-paused:not([hidden])", { timeout: 12000 }).catch(() => {});
+  const note = await p.isVisible("#live-paused") ? await p.textContent("#live-paused") : "";
+  check(`quota out, /api/* ${how}: the welcome page hides the live numbers and says when they come back, in the viewer's time`, /^So many lives today that the live numbers are paused until .*\d{1,2}:\d{2}.* your time\. The game still works\.$/.test(note) && await p.isHidden("#live") && await p.isHidden("#live-recent") && await p.isHidden("#live-day") && hits.filter(h => h === "/api/live").length === 2 && !(await overflow(p)).length, note);
+  await p.click("#welcome .cta [data-random]");
+  await p.waitForSelector("#play:not([hidden])");
+  await p.click('[data-speed="10"]');
+  if (await untilChoiceOrEnd(p) && await p.isVisible("#choice")) await p.click("#choice [data-option='0']");
+  await p.click("#c-skip").catch(() => {});
+  await p.waitForSelector("#end:not([hidden])", { timeout: 60000 });
+  await closeStory(p);
+  await p.waitForSelector("#cards .card", { timeout: 60000 }).catch(() => {});
+  check(`quota out, /api/* ${how}: the life plays to the end, with the 100 lives and the reading, and no page errors`, /^You lived to \d+\.$/.test(await p.textContent("#end-title")) && (await p.$$("#cards .card")).length >= 4 && (await p.$$("#reading-body details.chapter")).length === 7 && errors.length === before, errors.slice(before).join(" | "));
+  await p.context().close();
+}
+// One failed /api/live (a network blip) shows nothing: the page asks again 5 seconds later and draws the numbers.
+{
+  const p = await fresh({ width: 390, height: 844 });
+  let n = 0;
+  await p.route("**/api/live", r => (++n === 1 ? r.fulfill({ status: 503, contentType: "text/html", body: "<html>busy</html>" }) : r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(LIVE) })));
+  await p.goto(`${SITE}/`);
+  await p.waitForTimeout(1500);
+  const early = await p.isHidden("#live-paused") && await p.isHidden("#live");
+  await p.waitForSelector("#live:not([hidden])", { timeout: 10000 }).catch(() => {});
+  check("a single failed /api/live does not pause the numbers: they show after one quick retry", early && n === 2 && await p.isHidden("#live-paused") && await p.textContent("#live-total") === "5,210", `${n} requests`);
   await p.context().close();
 }
 

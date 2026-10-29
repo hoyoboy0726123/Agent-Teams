@@ -7,7 +7,7 @@ import { interpretPrompt } from "../src/sim/interpret.js";
 import { READING_VERSION, readReadingRequest, readingPart, readingRequest } from "../src/ai-reading.js";
 
 const SITE = "https://bazi-life.example.workers.dev";
-const worker = makeApp({ "/": "<p>命盤人生</p>", "/life.html": "<p>命盤人生</p>", "/index.html": "<p>排盤</p>" });
+const worker = makeApp();
 const CHOICE = {
   situation: "和曉雯為了錢越來越常吵架，婚姻出現危機。要怎麼面對？",
   context: "34 歲・男性・業務・已婚",
@@ -91,36 +91,15 @@ test("failures answer with an error status, so the page falls back to reading th
   assert.equal(e.calls.length, 0);
 });
 
-test("the pages are served as HTML by path; other paths and API paths are not found", async () => {
-  const e = env(null);
-  const home = await worker.fetch(new Request(`${SITE}/`), e);
-  assert.equal(home.status, 200);
-  assert.match(home.headers.get("content-type"), /^text\/html; charset=utf-8/);
-  assert.equal(await home.text(), "<p>命盤人生</p>");
-  assert.equal(await (await worker.fetch(new Request(`${SITE}/index.html`), e)).text(), "<p>排盤</p>");
-  const head = await worker.fetch(new Request(`${SITE}/life.html`, { method: "HEAD" }), e);
-  assert.equal(head.status, 200);
-  assert.equal(await head.text(), "");
-  assert.equal((await worker.fetch(new Request(`${SITE}/life.html`, { method: "POST" }), e)).status, 405);
-  for (const path of ["/nope", "/toString", "/__proto__", "/api/other"]) assert.equal((await worker.fetch(new Request(`${SITE}${path}`), e)).status, 404, path);
-});
-
-test("the pages are checked on every visit: no-cache with an ETag, and 304 when the page has not changed", async () => {
-  const e = env(null);
-  const first = await worker.fetch(new Request(`${SITE}/`), e);
-  const tag = first.headers.get("etag");
-  assert.equal(first.headers.get("cache-control"), "no-cache");
-  assert.match(tag, /^"[0-9a-f]{24}"$/);
-  const again = await worker.fetch(new Request(`${SITE}/`, { headers: { "if-none-match": tag } }), e);
-  assert.equal(again.status, 304);
-  assert.equal(await again.text(), "");
-  assert.equal(again.headers.get("etag"), tag);
-  assert.equal((await worker.fetch(new Request(`${SITE}/`, { headers: { "if-none-match": `W/${tag}, "other"` } }), e)).status, 304);
-  const other = await worker.fetch(new Request(`${SITE}/index.html`, { headers: { "if-none-match": tag } }), e);
-  assert.equal(other.status, 200, "a different page has a different tag");
-  assert.notEqual(other.headers.get("etag"), tag);
-  const updated = makeApp({ "/": "<p>命盤人生 新版</p>" });
-  assert.equal((await updated.fetch(new Request(`${SITE}/`, { headers: { "if-none-match": tag } }), e)).status, 200, "a new deploy is sent in full");
+test("the pages are static assets: anything but the API and /admin goes to env.ASSETS, else a 404", async () => {
+  const asked = [];
+  const e = { ...env(null), ASSETS: { fetch: async req => { asked.push(new URL(req.url).pathname); return new Response("<p>命盤人生</p>", { headers: { "content-type": "text/html" } }); } } };
+  for (const path of ["/", "/life", "/chart", "/privacy", "/og.png", "/nope"]) assert.equal(await (await worker.fetch(new Request(`${SITE}${path}`), e)).text(), "<p>命盤人生</p>", path);
+  assert.deepEqual(asked, ["/", "/life", "/chart", "/privacy", "/og.png", "/nope"]);
+  for (const path of ["/api/other", "/api/", "/admin"]) await worker.fetch(new Request(`${SITE}${path}`), e);
+  assert.equal(asked.length, 6, "the API and /admin never reach the assets");
+  // Without the binding (these tests), everything else is not found.
+  for (const path of ["/", "/nope", "/toString", "/__proto__", "/api/other"]) assert.equal((await worker.fetch(new Request(`${SITE}${path}`), env(null))).status, 404, path);
 });
 
 test("the request is trimmed to what the prompt needs", () => {
@@ -533,13 +512,26 @@ test("demo numbers for a new site: plausible, the same within a half minute, gro
   assert.ok(body.demo && body.recent.length === 5 && body.todayLives);
 });
 
-test("a file such as the share image is served with its type and a day's cache", async () => {
-  const app = makeApp({ "/": "<p>命盤人生</p>" }, { "/og.png": { body: new Uint8Array([137, 80, 78, 71]), type: "image/png" } });
-  const res = await app.fetch(new Request(`${SITE}/og.png`), {});
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get("content-type"), "image/png");
-  assert.match(res.headers.get("cache-control"), /max-age=86400/);
-  assert.equal((await res.arrayBuffer()).byteLength, 4);
-  assert.equal((await app.fetch(new Request(`${SITE}/og.png`, { method: "POST" }), {})).status, 405);
-  assert.equal((await app.fetch(new Request(`${SITE}/nope.png`), {})).status, 404);
+test("wrangler.jsonc serves public/ as static assets and runs the Worker only for /api/* and /admin", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const text = (await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")).replace(/^\s*\/\/.*$/gm, "");
+  const config = JSON.parse(text.replace(/,(\s*[}\]])/g, "$1"));
+  assert.deepEqual(config.assets, { directory: "./public", binding: "ASSETS", html_handling: "none", not_found_handling: "404-page", run_worker_first: ["/api/*", "/admin"] });
+  assert.equal(config.rules, undefined, "nothing is imported as a page any more");
+  assert.doesNotMatch(await readFile(new URL("../worker/index.js", import.meta.url), "utf8"), /\bimport\b.*public\//);
+});
+
+test("the clean URLs and the headers of the static files (scripts/static-site.mjs)", async () => {
+  const { REDIRECTS, HEADERS, ROBOTS, NOT_FOUND_HTML } = await import("../scripts/static-site.mjs");
+  const { parseRedirects, parseHeaders, headersFor } = await import("./helpers/static-site.mjs");
+  const to = Object.fromEntries(parseRedirects(REDIRECTS).map(r => [r.from, `${r.to} ${r.status}`]));
+  assert.deepEqual(to, { "/": "/life.html 200", "/life": "/life.html 200", "/chart": "/index.html 200", "/privacy": "/privacy.html 200", "/terms": "/terms.html 200" });
+  const rules = parseHeaders(HEADERS);
+  for (const path of ["/", "/life", "/life.html", "/index.html", "/chart", "/privacy", "/terms.html"]) {
+    assert.deepEqual(headersFor(rules, path), { "x-content-type-options": "nosniff", "referrer-policy": "strict-origin-when-cross-origin", "cache-control": "no-cache" }, path);
+  }
+  for (const path of ["/og.png", "/i18n/story-en.json"]) assert.equal(headersFor(rules, path)["cache-control"], "public, max-age=86400", path);
+  assert.match(ROBOTS, /Disallow: \/admin/);
+  assert.match(NOT_FOUND_HTML, /找不到這個頁面/);
+  assert.match(NOT_FOUND_HTML, /href="\/"/);
 });

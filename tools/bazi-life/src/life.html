@@ -190,6 +190,7 @@ body.story-open { overflow: hidden; }
 .welcome .tile .u { font-size: 12px; color: var(--muted); }
 .live-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
 .live-strip .tile[hidden] { display: none; }
+.live-paused { margin: 0; background: var(--sheet); border: 1px dashed var(--rule); border-radius: 12px; padding: 10px 14px; font-size: 14px; color: var(--muted); line-height: 1.6; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--down); display: inline-block; animation: pulse 1.6s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
@@ -688,6 +689,7 @@ footer .legal-links { display: flex; flex-wrap: wrap; gap: 4px 18px; }
         <div class="tile" id="live-today-box" hidden><span class="k">今天走完的人生</span><span class="v num" id="live-today">0</span><span class="u">段</span></div>
         <div class="tile"><span class="k">至今一共</span><span class="v num" id="live-total">0</span><span class="u">段人生</span></div>
       </div>
+      <p class="live-paused" id="live-paused" role="status" hidden data-no-i18n></p>
       <div class="now-chart" id="live-now-chart" hidden>
         <div class="now-head"><span>此刻出生的寶寶，八字是</span><span class="num" id="now-clock"></span></div>
         <div class="now-pillars">

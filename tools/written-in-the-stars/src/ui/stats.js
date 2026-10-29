@@ -27,10 +27,16 @@ export function initStats(p) {
     if (document.visibilityState === "hidden") { pause(); flush(); } else if (!since) since = Date.now();
   });
   addEventListener("pagehide", () => { pause(); flush(); });
+  // Each Worker request counts against the Free plan's daily quota, so the minute's post also carries what needs no
+  // hurry: the milestones (t30…) and, while a life is played, the heartbeat. One post a minute.
   setInterval(() => {
     const total = visible();
-    for (const [s, e] of MILESTONES) if (total >= s) trackOnce(e, false);
-    if (seconds + (since ? (Date.now() - since) / 1000 : 0) >= 60) { pause(); if (document.visibilityState !== "hidden") since = Date.now(); flush(); }
+    for (const [s, e] of MILESTONES) if (total >= s && !once.has(e)) { once.add(e); queue.push(e); }
+    if (seconds + (since ? (Date.now() - since) / 1000 : 0) >= 60) {
+      pause();
+      if (document.visibilityState !== "hidden") { since = Date.now(); if (playing && playing()) queue.push("beat"); }
+      flush();
+    }
   }, 5000);
 }
 
@@ -47,13 +53,13 @@ export function sendLife(summary) {
 }
 
 // While a life is being played the page beats once a minute, so the welcome page can say how many are playing now.
-let beatTimer = null;
-export function heartbeat(playing) {
+// The first beat goes at once, in the same post as the "start" counted with it; the next ones ride along with the
+// minute's post (initStats), never a request of their own.
+let playing = null;
+export function heartbeat(isPlaying) {
   if (!on) return;
-  clearInterval(beatTimer); beatTimer = null;
-  if (!playing()) return;
-  track("beat");
-  beatTimer = setInterval(() => { if (playing() && document.visibilityState !== "hidden") track("beat"); else { clearInterval(beatTimer); beatTimer = null; } }, 60000);
+  playing = isPlaying;
+  if (playing()) track("beat");
 }
 
 export function track(e) {
