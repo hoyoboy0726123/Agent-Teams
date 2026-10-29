@@ -162,3 +162,72 @@ test("the AI report button's clicks are counted (ai_report each time, ai_report_
   assert.match(ADMIN_HTML, /<th>AI report<\/th><th>AI rate<\/th>/);
   assert.match(ADMIN_HTML, /\["Pressed AI report", t\.ai_report_u/);
 });
+
+// ---------- the combined back office on bazi-life reads GET /api/stats by CORS ----------
+const ADMIN_ORIGIN = "https://bazi-life.mingpan.workers.dev";
+const CORS = ["access-control-allow-origin", "access-control-allow-headers", "access-control-allow-methods"];
+const preflight = origin => new Request(`${SITE}/api/stats?days=90`, { method: "OPTIONS", headers: { origin, "access-control-request-method": "GET", "access-control-request-headers": "authorization" } });
+
+test("the combined back office (ADMIN_ORIGIN) gets CORS for a preflight and a GET of the totals, with the same key check", async () => {
+  const key = crypto.randomUUID(), env = statsEnv({ ADMIN_KEY: key, ADMIN_ORIGIN });
+  const pre = await worker.fetch(preflight(ADMIN_ORIGIN), env);
+  assert.equal(pre.status, 204);
+  assert.equal(pre.headers.get("access-control-allow-origin"), ADMIN_ORIGIN);
+  assert.equal(pre.headers.get("access-control-allow-headers"), "authorization");
+  assert.equal(pre.headers.get("access-control-allow-methods"), "GET");
+  assert.equal(pre.headers.get("vary"), "Origin");
+  const ok = await worker.fetch(get("/api/stats?days=90", { origin: ADMIN_ORIGIN, authorization: `Bearer ${key}` }), env);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get("access-control-allow-origin"), ADMIN_ORIGIN);
+  assert.equal(ok.headers.get("vary"), "Origin");
+  assert.equal(ok.headers.get("cache-control"), "no-store");
+  assert.deepEqual((await ok.json()).rows, [{ day: "2026-11-02", page: "life", view: 4, end: 2 }]);
+  // A wrong or missing key is still 401, readable by the back office so it can say the key was refused.
+  for (const auth of [`Bearer ${key}x`, "Bearer ", ""]) {
+    const bad = await worker.fetch(get("/api/stats", { origin: ADMIN_ORIGIN, ...(auth ? { authorization: auth } : {}) }), env);
+    assert.equal(bad.status, 401, auth);
+    assert.deepEqual(await bad.json(), { error: "key" });
+    assert.equal(bad.headers.get("access-control-allow-origin"), ADMIN_ORIGIN);
+  }
+});
+
+test("no other origin gets CORS on /api/stats, and the beacon POST is unchanged", async () => {
+  const key = crypto.randomUUID(), env = statsEnv({ ADMIN_KEY: key, ADMIN_ORIGIN });
+  for (const origin of ["https://evil.example", "https://bazi-life.mingpan.workers.dev.evil.example", "http://bazi-life.mingpan.workers.dev", "null", SITE]) {
+    const pre = await worker.fetch(preflight(origin), env);
+    assert.equal(pre.status, 405, origin);
+    for (const h of CORS) assert.equal(pre.headers.get(h), null, `${origin} preflight ${h}`);
+    const res = await worker.fetch(get("/api/stats", { origin, authorization: `Bearer ${key}` }), env);
+    assert.equal(res.status, 200, "the key alone still opens it (same origin, curl)");
+    for (const h of CORS) assert.equal(res.headers.get(h), null, `${origin} GET ${h}`);
+    assert.equal(res.headers.get("vary"), "Origin");
+    const bad = await worker.fetch(get("/api/stats", { origin, authorization: "Bearer nope" }), env);
+    assert.equal(bad.status, 401);
+    assert.equal(bad.headers.get("access-control-allow-origin"), null);
+  }
+  // Without ADMIN_ORIGIN set, nobody gets CORS, not even bazi-life.
+  const none = statsEnv({ ADMIN_KEY: key });
+  assert.equal((await worker.fetch(preflight(ADMIN_ORIGIN), none)).status, 405);
+  assert.equal((await worker.fetch(get("/api/stats", { origin: ADMIN_ORIGIN, authorization: `Bearer ${key}` }), none)).headers.get("access-control-allow-origin"), null);
+  // The beacon: only this site's own pages may POST, the back office's origin included in the refusal.
+  assert.equal((await worker.fetch(post({ p: "life", e: ["view"] }, { origin: ADMIN_ORIGIN }), env)).status, 403);
+  const beacon = await worker.fetch(post({ p: "life", e: ["view"] }), env);
+  assert.equal(beacon.status, 204);
+  for (const h of CORS) assert.equal(beacon.headers.get(h), null);
+});
+
+test("/admin keeps noindex, no-store and no-referrer, and links to the combined back office", async () => {
+  const res = await worker.fetch(get("/admin"), {});
+  assert.equal(res.headers.get("cache-control"), "no-store");
+  assert.equal(res.headers.get("referrer-policy"), "no-referrer");
+  assert.match(res.headers.get("x-robots-tag"), /noindex/);
+  assert.match(ADMIN_HTML, /<meta name="robots" content="noindex, nofollow">/);
+  assert.match(ADMIN_HTML, /<a href="https:\/\/bazi-life\.mingpan\.workers\.dev\/admin">All sites in one dashboard → https:\/\/bazi-life\.mingpan\.workers\.dev\/admin<\/a>/);
+});
+
+test("ADMIN_ORIGIN in wrangler.jsonc is the combined back office's origin", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const text = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+  assert.match(text, /"ADMIN_ORIGIN": "https:\/\/bazi-life\.mingpan\.workers\.dev"/);
+  assert.doesNotMatch(await readFile(new URL("../worker/app.js", import.meta.url), "utf8"), /bazi-life\.mingpan/, "the origin lives in wrangler.jsonc only");
+});

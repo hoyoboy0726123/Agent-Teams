@@ -405,6 +405,55 @@ test("the totals are read only with the admin key, day by day per page; /admin i
   assert.match(await admin.text(), /命盤人生・後台[\s\S]*AI 報告點擊率/);
 });
 
+// The combined back office of both sites: 總覽, 命盤人生 and Written in the Stars, read with one key.
+import { ADMIN_HTML, WITS_STATS } from "../worker/admin.js";
+test("/admin is the combined back office of both sites, never cached, indexed or sent as a referrer", async () => {
+  const res = await worker.fetch(new Request(`${SITE}/admin`), {});
+  assert.equal(res.headers.get("cache-control"), "no-store");
+  assert.equal(res.headers.get("referrer-policy"), "no-referrer");
+  assert.match(res.headers.get("x-robots-tag"), /noindex/);
+  assert.match(ADMIN_HTML, /<meta name="robots" content="noindex, nofollow">/);
+  // Three tabs, the UI in Traditional Chinese, the site names as they are.
+  assert.match(ADMIN_HTML, /<html lang="zh-Hant-TW">/);
+  for (const [tab, label] of [["all", "總覽"], ["bazi", "命盤人生"], ["wits", "Written in the Stars"]]) {
+    assert.match(ADMIN_HTML, new RegExp(`role="tab" id="tab-${tab}" data-tab="${tab}" aria-controls="panel-${tab}">${label}<`));
+    assert.match(ADMIN_HTML, new RegExp(`id="panel-${tab}" role="tabpanel"`));
+  }
+  // Written in the Stars is read from its own Worker, with the same key, and its shares by network and AI report rate.
+  assert.equal(WITS_STATS, "https://written-in-the-stars.mingpan.workers.dev/api/stats");
+  assert.ok(ADMIN_HTML.includes(`const WITS_STATS = "${WITS_STATS}";`));
+  assert.match(ADMIN_HTML, /get\(WITS_STATS \+ "\?days=90"\)/);
+  assert.match(ADMIN_HTML, /authorization: "Bearer " \+ key/);
+  assert.match(ADMIN_HTML, /\["AI report 點擊率", pct\(t\.ai_report_u, t\.end_u\)/);
+  assert.match(ADMIN_HTML, /steps\("#w-shares", NETS\.map/);
+  assert.match(ADMIN_HTML, /不接受這把金鑰/);
+  // The key, the tab and the period stay in this browser; every use of localStorage is inside a try.
+  const uses = ADMIN_HTML.match(/[^\n]*localStorage[^\n]*/g);
+  assert.equal(uses.length, 2);
+  for (const u of uses) assert.match(u, /try \{[^}]*localStorage/);
+  assert.match(ADMIN_HTML, /"bazi-life\.adminTab"/);
+  assert.match(ADMIN_HTML, /"bazi-life\.adminDays"/);
+  // The page's script is valid JavaScript (it lives in a template string, where a stray backslash would vanish).
+  const script = ADMIN_HTML.match(/<script>([\s\S]*)<\/script>/)[1];
+  assert.doesNotThrow(() => new Function(script));
+});
+
+test("命盤人生's own /api/stats gives CORS to no one, and a bad key is 401", async () => {
+  const key = crypto.randomUUID(), e = statsEnv({ key });
+  const CORS = ["access-control-allow-origin", "access-control-allow-headers", "access-control-allow-methods"];
+  for (const origin of ["https://written-in-the-stars.mingpan.workers.dev", "https://evil.example", SITE]) {
+    const ok = await worker.fetch(new Request(`${SITE}/api/stats?days=7`, { headers: { origin, authorization: `Bearer ${key}` } }), e);
+    assert.equal(ok.status, 200);
+    for (const h of CORS) assert.equal(ok.headers.get(h), null, `${origin} ${h}`);
+    const bad = await worker.fetch(new Request(`${SITE}/api/stats?days=7`, { headers: { origin, authorization: `Bearer ${key}!` } }), e);
+    assert.equal(bad.status, 401);
+    for (const h of CORS) assert.equal(bad.headers.get(h), null);
+    const pre = await worker.fetch(new Request(`${SITE}/api/stats`, { method: "OPTIONS", headers: { origin, "access-control-request-method": "GET" } }), e);
+    assert.equal(pre.status, 405);
+    for (const h of CORS) assert.equal(pre.headers.get(h), null);
+  }
+});
+
 test("while AI 分析報告 is 敬請期待, /api/reading writes nothing", async () => {
   const e = { ...env(openai("{}")), AI_READING: "soon" };
   const body = readingRequest({ date: { y: 1990, m: 6, d: 21 }, time: { h: 12, mi: 0 }, place: { name: "臺北市" }, sex: "female" }, "full", { part: "a" });

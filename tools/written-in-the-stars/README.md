@@ -14,7 +14,7 @@ The plan is in `PLAN.md`, the legal notes in `docs/COMPLIANCE.md`, the engine in
 | `/privacy`, `/terms` | Static policy pages (`src/legal.js`; the contact address is a TODO placeholder) |
 | `/api/stats` | POST anonymous event counts from the page; GET the totals with the `ADMIN_KEY` secret |
 | `/api/live` | The welcome page's live numbers (demo numbers while `LIVE_DEMO = "1"`) |
-| `/admin` | The back office (open it once as `/admin#key=…`) |
+| `/admin` | The back office (open it once as `/admin#key=…`); both sites together: https://bazi-life.mingpan.workers.dev/admin |
 
 Everything about the player runs in the browser: the chart, the life, the 100 reruns (in a Web Worker made from the
 page's own script) and the "write your own decision" matcher (`src/sim/intent.js`). The Worker keeps only daily event
@@ -55,6 +55,19 @@ shows “Coming soon!” and counts `ai_report` (each press) and `ai_report_u` (
 `ai_life`. Nothing about the chart is sent. `/admin` shows both, with the click rate per finished life
 (`ai_report_u / end_u`).
 
+## The back office
+
+`/admin` (`worker/admin.js`) shows this site's numbers, with a link at the top to the combined dashboard of both sister
+sites, **https://bazi-life.mingpan.workers.dev/admin** (tabs 總覽, 命盤人生 and Written in the Stars, in Traditional
+Chinese). That page reads this Worker's `GET /api/stats` across origins:
+
+- CORS is allowed for exactly one origin, `ADMIN_ORIGIN` in `wrangler.jsonc` vars (`https://bazi-life.mingpan.workers.dev`):
+  a preflight `OPTIONS /api/stats` gets 204 with `Access-Control-Allow-Origin`, `Allow-Headers: authorization`,
+  `Allow-Methods: GET` and `Vary: Origin`; a GET gets the same origin header on every answer, so a refused key (401)
+  can be told apart from no answer. No other origin gets CORS; without `ADMIN_ORIGIN` nobody does.
+- The key check is unchanged: the same `ADMIN_KEY` secret has to be set on both Workers (one key opens both).
+- The beacon (`POST /api/stats`) is unchanged: only this site's own pages may send it.
+
 ## Build, test, deploy
 
 ```bash
@@ -63,7 +76,7 @@ node --test test/site-*.test.js    # Worker and page unit tests (npm test runs e
 PLAYWRIGHT=/opt/node22/lib/node_modules/playwright CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome \
   node test/site.e2e.mjs           # browser test of public/ (SHOTS=<dir> saves screenshots, FONTS=<dir> a local font copy)
 npm run build && npx wrangler deploy
-npx wrangler secret put ADMIN_KEY  # once, for /admin
+npx wrangler secret put ADMIN_KEY  # once, for /admin: the same key as bazi-life's
 ```
 
 For entertainment only: astrology has no proven scientific validity, and nothing here predicts anyone's future.

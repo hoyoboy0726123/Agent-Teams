@@ -3,13 +3,16 @@
 //
 //   /, /index.html          the game (public/index.html)
 //   /privacy, /terms        the policies (public/privacy.html, public/terms.html; .html also works)
-//   /api/stats              POST: anonymous daily counts from the page (worker/stats.js); GET with the ADMIN_KEY secret
+//   /api/stats              POST: anonymous daily counts from the page (worker/stats.js); GET with the ADMIN_KEY secret,
+//                           also from the combined back office (ADMIN_ORIGIN) by CORS
 //   /api/live               GET: the welcome page's live numbers, for anyone
 //   /admin                  the back office (worker/admin.js), which asks for the ADMIN_KEY
 //
 // Bindings (wrangler.jsonc): STATS (the Durable Object with the counts), STATS_LIMIT (requests per minute per IP).
-// Variables: LIVE_DEMO = "1" shows demo numbers with the real ones added on top while the site is new.
-// Secrets: ADMIN_KEY opens GET /api/stats. Only the pages this Worker serves may POST to it (the Origin must be its own).
+// Variables: LIVE_DEMO = "1" shows demo numbers with the real ones added on top while the site is new; ADMIN_ORIGIN is
+// the one other origin that may read GET /api/stats by CORS: the combined back office of both sites on bazi-life.
+// Secrets: ADMIN_KEY opens GET /api/stats (the same key as bazi-life's, so its back office can read both sites). Only
+// the pages this Worker serves may POST to it (the Origin must be its own).
 // Nothing the player types reaches the Worker: there is no AI in this version.
 import { readStats, tableOf, sameKey, dayOf, liveOf, demoLive } from "./stats.js";
 import { ADMIN_HTML } from "./admin.js";
@@ -31,15 +34,32 @@ async function readBody(request, max) {
 // ---------- /api/stats ----------
 const STATS_MAX_BODY = 1024;
 const store = env => env.STATS.get(env.STATS.idFromName("all"));
+// Reading the totals from the combined back office (env.ADMIN_ORIGIN, in wrangler.jsonc): CORS headers for a GET with
+// the key in Authorization, for that one origin only. Every other origin gets none, and the key is checked the same way.
+function corsOf(request, env) {
+  const origin = request.headers.get("origin");
+  const allowed = !!env.ADMIN_ORIGIN && origin === env.ADMIN_ORIGIN;
+  return allowed
+    ? { "access-control-allow-origin": origin, "access-control-allow-headers": "authorization", "access-control-allow-methods": "GET", vary: "Origin" }
+    : { vary: "Origin" };
+}
+const withHeaders = (res, headers) => { for (const [k, v] of Object.entries(headers)) res.headers.set(k, v); return res; };
+async function readTotals(request, env) {
+  const auth = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  if (!env.ADMIN_KEY) return answer(503, { error: "unavailable" });
+  if (!sameKey(auth, env.ADMIN_KEY)) return answer(401, { error: "key" });
+  if (!env.STATS) return answer(503, { error: "unavailable" });
+  const days = Math.max(1, Math.min(366, Number(new URL(request.url).searchParams.get("days")) || 30));
+  const from = dayOf(Date.now() - (days - 1) * 86400e3);
+  return answer(200, { today: dayOf(Date.now()), from, rows: tableOf(await store(env).read(from)) });
+}
 export async function stats(request, env, ctx) {
-  if (request.method === "GET") {
-    const auth = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-    if (!env.ADMIN_KEY) return answer(503, { error: "unavailable" });
-    if (!sameKey(auth, env.ADMIN_KEY)) return answer(401, { error: "key" });
-    if (!env.STATS) return answer(503, { error: "unavailable" });
-    const days = Math.max(1, Math.min(366, Number(new URL(request.url).searchParams.get("days")) || 30));
-    const from = dayOf(Date.now() - (days - 1) * 86400e3);
-    return answer(200, { today: dayOf(Date.now()), from, rows: tableOf(await store(env).read(from)) });
+  // The answer carries the CORS headers whatever it is, so the back office can tell a refused key (401) from no answer.
+  if (request.method === "GET") return withHeaders(await readTotals(request, env), corsOf(request, env));
+  if (request.method === "OPTIONS") {
+    const cors = corsOf(request, env);
+    if (cors["access-control-allow-origin"]) return new Response(null, { status: 204, headers: { ...cors, "cache-control": "no-store" } });
+    return withHeaders(answer(405, { error: "method" }), cors);
   }
   const got = await readBody(request, STATS_MAX_BODY);
   if (got.error) return got.error;

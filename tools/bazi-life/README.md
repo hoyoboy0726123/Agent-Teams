@@ -553,12 +553,16 @@ node scripts/romanise.mjs                        # 重新產生人名字表
 
 ### 後台統計
 
-用來決定要不要開放付費的 AI 報告：**https://bazi-life.mingpan.workers.dev/admin**。第一次用帶金鑰的連結打開（`/admin#key=…`，金鑰是 Worker 的密鑰 `ADMIN_KEY`，不在程式裡），之後這台瀏覽器會記住；金鑰不對只看得到輸入框。
+用來決定要不要開放付費的 AI 報告：**https://bazi-life.mingpan.workers.dev/admin**。這也是姊妹站 Written in the Stars 的後台，兩站的數字都在這一頁。第一次用帶金鑰的連結打開（`/admin#key=…`，金鑰是 Worker 的密鑰 `ADMIN_KEY`，不在程式裡），之後這台瀏覽器會記住；金鑰不對只看得到輸入框。
+
+- **三個分頁**（`worker/admin.js`）：「總覽」把兩站的今天、近 7 天、近 30 天並排（瀏覽、訪客、開始和完成人生、平均停留、AI 按鈕點擊率、分享；命盤人生沒有分享按鈕）；「命盤人生」是本站原本的後台；「Written in the Stars」是那個站自己後台的全部數字（含各分享管道和 AI report 點擊率），介面一樣是中文。選的分頁和期間記在這台瀏覽器（`localStorage`，讀不到也照常運作）。日期各依各站的時區：命盤人生臺灣、Written in the Stars 美東。
+- **一把金鑰讀兩站**：頁面帶同一把金鑰，GET 本站的 `/api/stats`，以及 `https://written-in-the-stars.mingpan.workers.dev/api/stats`（`WITS_STATS`）。那邊的 Worker 只對 `ADMIN_ORIGIN`（它的 `wrangler.jsonc`，就是本站網址）開放 CORS，金鑰照樣檢查。所以**兩個 Worker 的 `ADMIN_KEY` 要設成同一串**。那邊讀不到（連不上、金鑰不對、還沒設金鑰）時，它的分頁和總覽會寫出原因，命盤人生的分頁照常。本站的 `/api/stats` 不給任何其他網站 CORS。
+- **部署**：先部署 Written in the Stars（帶 `ADMIN_ORIGIN`），再部署本站；兩邊各跑一次 `npx wrangler secret put ADMIN_KEY`，貼上同一串。
 
 - **收什麼**（`src/stats.js`）：瀏覽（`view`）、當天第一次來的瀏覽器（`visitor`，以前來過另記 `return`）、畫面真的在看的秒數（切到別的 App 不算；每分鐘或離開時送一次）和停留滿 30 秒、1、3、10 分鐘、開始人生、走到結局、按「AI 分析報告」、做了合婚、按「AI 深度合婚」。名稱帶 `_u` 的是「同一次瀏覽只算一次」，用來算點擊率。只送事件名稱和秒數，用 `sendBeacon` 送到 `/api/stats`；檔案或 Claude Artifact 預覽不送。
 - **存什麼**（`worker/stats.js`、`worker/stats-store.js`）：每天（臺灣時間）、每個網頁（命盤人生、排盤）、每種事件一個總數，加上最近 10 分鐘的心跳時間和最近 500 筆走完的人生摘要（給歡迎頁的即時數據），放在 Worker 自己的 Durable Object（SQLite）裡，跟著 Worker 一起部署，不必另外建資料庫。不記 IP 或任何個人資料。只接受自己網站送來、名單上的事件，每個 IP 每分鐘最多 60 次（`STATS_LIMIT`），一次最多 20 個事件、900 秒。
-- **後台看什麼**（`worker/admin.js`）：今天、近 7、30、90 天的瀏覽、訪客、平均停留、完成人生、按 AI 分析報告的訪次和點擊率（按的訪次 ÷ 完成人生的訪次）、合婚和 AI 深度合婚；從進站到按下 AI 報告的漏斗、停留分布、每天的長條圖和明細。`/admin` 不讓搜尋引擎收錄。
-- **換金鑰**：`npx wrangler secret put ADMIN_KEY`，貼上新的一串，舊連結就失效。
+- **命盤人生分頁看什麼**：今天、近 7、30、90 天的瀏覽、訪客、平均停留、完成人生、按 AI 分析報告的訪次和點擊率（按的訪次 ÷ 完成人生的訪次）、合婚和 AI 深度合婚；從進站到按下 AI 報告的漏斗、停留分布、每天的長條圖和明細。`/admin` 不讓搜尋引擎收錄。
+- **換金鑰**：在兩個網站的資料夾各跑一次 `npx wrangler secret put ADMIN_KEY`，貼上同一串新的，舊連結就失效。
 
 ### 部署到 Cloudflare
 

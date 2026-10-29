@@ -1,6 +1,7 @@
 // /admin: the back office, as in bazi-life. It shows the totals of worker/stats.js for today, 7, 30 and 90 days, and day
 // by day. The key (the ADMIN_KEY secret) comes in the link as #key=… once; the page keeps it in this browser and sends
-// it as a Bearer token to GET /api/stats. Without the right key it shows nothing but the key box.
+// it as a Bearer token to GET /api/stats. Without the right key it shows nothing but the key box. The combined back office
+// of both sites is bazi-life's /admin, which reads this Worker's GET /api/stats by CORS (ADMIN_ORIGIN in wrangler.jsonc).
 export const ADMIN_HTML = `<!doctype html>
 <html lang="en">
 <head>
@@ -40,11 +41,12 @@ form { display: flex; gap: 8px; flex-wrap: wrap; }
 input { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); min-width: 0; flex: 1 1 220px; }
 button.go { font: inherit; padding: 8px 16px; border: 0; border-radius: 8px; background: var(--accent-2); color: #fff; cursor: pointer; }
 .err { color: #c0392b; } .fine { color: var(--muted); font-size: 13px; margin: 0; }
+header a { color: var(--accent-2); overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
 <main>
-  <header><h1>Written in the Stars · Back office</h1><p class="sub">Anonymous counts of visits, time on screen and button presses. Days are US Eastern.</p></header>
+  <header><h1>Written in the Stars · Back office</h1><p class="sub">Anonymous counts of visits, time on screen and button presses. Days are US Eastern.</p><p class="sub"><a href="https://bazi-life.mingpan.workers.dev/admin">All sites in one dashboard → https://bazi-life.mingpan.workers.dev/admin</a></p></header>
   <section class="card" id="login" hidden>
     <h2>Enter the admin key</h2>
     <form id="login-form"><input id="key" type="password" autocomplete="current-password" placeholder="Key" aria-label="Admin key"><button class="go">Open</button></form>
