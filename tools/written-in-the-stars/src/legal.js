@@ -2,11 +2,9 @@
 // scripts/build.mjs. Plain documents with the site's colors, in light and dark.
 import { FONT_CSS } from "./fonts.js";
 
-// ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
-// │ TODO(owner): the contact address, used by /privacy and /terms. While it is the placeholder the │
-// │ pages say "(contact address coming soon)" instead of showing it.                               │
-// └──────────────────────────────────────────────────────────────────────────────────────────────┘
-export const CONTACT = "TODO@example.com";
+// The contact address, shown on /privacy and /terms (both sites use the same mailbox). A placeholder
+// (TODO@… or @example.…) makes the pages say the address is coming soon instead.
+export const CONTACT = "mingpan.studio@gmail.com";
 export const CONTACT_READY = !/^TODO@|@example\.(com|org|net)$/i.test(CONTACT);
 export const UPDATED = "October 29, 2026";
 export const SITE_NAME = "Written in the Stars";

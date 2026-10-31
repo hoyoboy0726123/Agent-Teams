@@ -318,7 +318,7 @@ for (const width of [430, 768, 1024, 1440]) {
   const p = await fresh({ width: 390, height: 844 });
   await p.goto(`${SITE}/privacy`);
   const privacy = await p.textContent("body");
-  check("/privacy: what is collected, what stays on the device, processors, no sale, children, rights, contact, date", ["What stays on your device", "What we collect", "Service providers", "No sale or sharing", "Children", "Your rights", "Contact", "Last updated"].every(h => privacy.includes(h)) && /Cloudflare/.test(privacy) && /up to 7 days/.test(privacy) && /\(contact address coming soon\)/.test(privacy) && !/Google|last visit/i.test(privacy) && /wits\.theme/.test(privacy));
+  check("/privacy: what is collected, what stays on the device, processors, no sale, children, rights, contact, date", ["What stays on your device", "What we collect", "Service providers", "No sale or sharing", "Children", "Your rights", "Contact", "Last updated"].every(h => privacy.includes(h)) && /Cloudflare/.test(privacy) && /up to 7 days/.test(privacy) && /mingpan\.studio@gmail\.com/.test(privacy) && !/Google|last visit/i.test(privacy) && /wits\.theme/.test(privacy));
   check("/privacy fits a phone", !(await overflow(p)).length, (await overflow(p)).join("; "));
   await p.goto(`${SITE}/terms`);
   const terms = await p.textContent("body");

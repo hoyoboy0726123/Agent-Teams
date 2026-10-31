@@ -5,11 +5,9 @@
 // worker/stats.js (the finished-life summary), src/sim/privacy.js + src/sim/interpret.js (the written decision),
 // src/ai-reading.js (the AI reading, not open yet), src/draft.js and the storage keys listed below.
 
-// ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-// │ TODO(owner): the contact address, used by both pages. While it is still the placeholder the pages say            │
-// │ 「聯絡信箱即將公布」/ "contact address coming soon" instead of showing it.                                         │
-// └──────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-export const CONTACT = "TODO@example.com";
+// The contact address, shown on /privacy and /terms (both sites use the same mailbox). A placeholder
+// (TODO@… or @example.…) makes the pages say the address is coming soon instead.
+export const CONTACT = "mingpan.studio@gmail.com";
 export const CONTACT_READY = !/^TODO@|@example\.(com|org|net)$/i.test(CONTACT);
 export const UPDATED = { zh: "2026 年 10 月 29 日", en: "October 29, 2026" };
 export const SITE = "https://bazi-life.mingpan.workers.dev";

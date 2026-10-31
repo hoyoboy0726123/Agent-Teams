@@ -693,7 +693,7 @@ await hhFile.close();
   check("/privacy opens in Chinese: who runs it, what stays on the phone, what is sent, hosting, fonts, storage, no sale, 13+, rights, date", await lp.isVisible("#zh-doc") && await lp.isHidden("#en-doc") && await lp.getAttribute("html", "lang") === "zh-Hant-TW" && await lp.title() === "隱私權政策｜命盤人生"
     && ["誰經營這個網站", "在你的裝置上計算的資料", "會送出的資料", "主機與記錄", "字型（Google Fonts）", "瀏覽器裡存的東西", "不賣、不分享", "年齡", "你的權利", "最後更新：2026 年 10 月 29 日"].every(h => pz.includes(h))
     && /出生年代.+日柱天干.+活到幾歲.+結婚幾次.+買房.+幾個孩子/.test(pz) && /Cloudflare Workers AI/.test(pz) && /「你」「爸爸」「伴侶」/.test(pz) && /尚未開放/.test(pz) && /最多 7 天/.test(pz) && /13 歲以上/.test(pz)
-    && ["bazi-life.lang", "bazi-life.majorOnly", "bazi-life.form", "bazi-life.seen", "bazi-life.aiOut"].every(k => pz.includes(k)) && !/lastVisit/.test(pz) && !/cookie[^，。]*存/.test(pz) && /（聯絡信箱即將公布）/.test(pz), pz.slice(0, 120));
+    && ["bazi-life.lang", "bazi-life.majorOnly", "bazi-life.form", "bazi-life.seen", "bazi-life.aiOut"].every(k => pz.includes(k)) && !/lastVisit/.test(pz) && !/cookie[^，。]*存/.test(pz) && /mingpan\.studio@gmail\.com/.test(pz), pz.slice(0, 120));
   check("/privacy fits a phone", await sideways() <= 0, `${await sideways()}px`);
   await lp.goBack();
   await lp.click("#terms-link");
@@ -713,7 +713,7 @@ await hhFile.close();
   const pe = await lp.textContent("#en-doc");
   check("/privacy follows English: the full English policy, the Chinese hidden", await lp.isVisible("#en-doc") && await lp.isHidden("#zh-doc") && await lp.getAttribute("html", "lang") === "en" && await lp.title() === "Privacy Policy | BaZi Life"
     && ["Who runs this site", "What is computed on your device", "What is sent", "Hosting and logs", "Fonts (Google Fonts)", "What your browser keeps", "No sale or sharing", "Age", "Your rights", "Last updated: October 29, 2026"].every(h => pe.includes(h))
-    && /Cloudflare Workers AI/.test(pe) && /not open yet/.test(pe) && /up to 7 days/.test(pe) && /13 and older/.test(pe) && /\(contact address coming soon\)/.test(pe) && !/[\u4e00-\u9fff]{3}/.test(pe.replace(/命盤人生|繁中/g, "")), pe.slice(0, 120));
+    && /Cloudflare Workers AI/.test(pe) && /not open yet/.test(pe) && /up to 7 days/.test(pe) && /13 and older/.test(pe) && /mingpan\.studio@gmail\.com/.test(pe) && !/[\u4e00-\u9fff]{3}/.test(pe.replace(/命盤人生|繁中/g, "")), pe.slice(0, 120));
   await lp.goBack();
   await lp.click("#terms-link");
   await lp.waitForURL(/\/terms$/);
