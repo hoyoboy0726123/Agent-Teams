@@ -11,7 +11,7 @@ The plan is in `PLAN.md`, the legal notes in `docs/COMPLIANCE.md`, the engine in
 | Route | What |
 | --- | --- |
 | `/` | The game: welcome (live numbers) → birth form with the Big Three → play → ending (life chart, fate vs luck over 100 lives, your sky, share card) |
-| `/privacy`, `/terms` | Static policy pages (`src/legal.js`). The contact address is `CONTACT` at the top of that file, still the placeholder `TODO@example.com`, so the pages say “(contact address coming soon)” |
+| `/privacy`, `/terms` | Static policy pages (`src/legal.js`). The contact address is `CONTACT` at the top of that file (mingpan.studio@gmail.com) |
 | `/fonts/*.woff2`, `/fonts/OFL.txt` | The display face, Fraunces (OFL), served by the site itself: no Google Fonts (`src/fonts.js`, `assets/fonts/`) |
 | `/og.png`, `/robots.txt`, anything else | The share picture, the crawler rules, and a friendly 404 page (`public/404.html`) |
 | `/api/stats` | POST anonymous event counts from the page; GET the totals with the `ADMIN_KEY` secret |

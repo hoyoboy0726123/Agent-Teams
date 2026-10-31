@@ -135,6 +135,12 @@ await busy.click("#lang-toggle");
 await busy.waitForTimeout(200);
 check("中文 swaps everything back", /^這一次，你活到 \d+ 歲。$/.test(await busy.textContent("#end-title")) && await busy.textContent("#tab-me") === "我的人生" && /^\d+ 歲$/.test(await busy.textContent("#s-age")) && await busy.getAttribute("html", "lang") === "zh-Hant-TW" && await busy.isHidden("#end .en-note") && /學歷/.test(await busy.textContent("#end-facts")));
 await busy.close();
+// A link from an English post (…/?lang=en) opens the site in English and keeps it, like a click on EN.
+const viaLink = await fresh({ viewport: { width: 400, height: 900 } });
+await viaLink.goto(site + "?lang=en");
+await viaLink.waitForTimeout(300);
+check("a link with ?lang=en opens the site in English and keeps the choice", await viaLink.getAttribute("html", "lang") === "en" && await viaLink.textContent("#lang-toggle") === "繁中" && await viaLink.evaluate(() => localStorage.getItem("bazi-life.lang")) === "en");
+await viaLink.close();
 check("the welcome page and the footer say only anonymous counts are kept, and promise no AI reading yet", /只統計匿名的次數.+不含生日、姓名或 IP/.test(welcome) && !/AI 命理師會自動|結局自動 AI 解讀|AI 深度合婚/.test(welcome) && /網站不保存/.test(await page.textContent(".privacy-pill")) && /只統計匿名的瀏覽次數、停留時間和按鈕點擊/.test(await page.textContent("footer")) && !/結局頁的解讀預設自動開始/.test(await page.textContent("footer")));
 await page.click('[data-goto="me"]');
 await page.waitForTimeout(250);

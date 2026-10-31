@@ -36,11 +36,14 @@ function english(zh) {
   return null;
 }
 
-// The language to start in: the one chosen before in this browser, else Chinese. (Not the browser's language: the
-// story and the readings are Chinese either way, so English is something a visitor asks for.)
+// The language to start in: ?lang=en / ?lang=zh in the link (so an English post can open the English site, and it is
+// kept like a click on the toggle), else the one chosen before in this browser, else Chinese. (Not the browser's
+// language: English is something a visitor asks for.)
 export function initLang() {
-  let saved = null;
+  let saved = null, asked = null;
+  try { asked = new URLSearchParams(location.search).get("lang"); } catch {}
   try { saved = localStorage.getItem(LANG_KEY); } catch {}
+  if (LANGS.includes(asked)) { saved = asked; try { localStorage.setItem(LANG_KEY, asked); } catch {} }
   current = LANGS.includes(saved) ? saved : "zh";
   return current;
 }
