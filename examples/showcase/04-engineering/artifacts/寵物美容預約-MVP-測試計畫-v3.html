@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>寵物美容預約 MVP 測試計畫</title><style>
+:root{--bg:#fff;--fg:#1f2330;--muted:#667085;--line:#e6e8ee;--accent:#6366f1;--card:#f7f8fb}
+@media (prefers-color-scheme:dark){:root{--bg:#12141a;--fg:#e8eaf0;--muted:#98a2b3;--line:#2a2e39;--card:#1a1d25}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC",sans-serif}
+a{color:var(--accent)}code{background:var(--card);padding:.1em .35em;border-radius:4px;font-size:.9em}
+pre{background:var(--card);padding:14px;border-radius:8px;overflow:auto}pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%}th,td{border:1px solid var(--line);padding:6px 10px;text-align:left}th{background:var(--card)}
+.table-wrap{overflow-x:auto}blockquote{border-left:3px solid var(--accent);margin:0;padding:2px 14px;color:var(--muted)}img{max-width:100%}
+</style></head><body><article style="max-width:820px;margin:0 auto;padding:40px 24px 80px"><h1>寵物美容預約 MVP 測試計畫 v3</h1>
+<h2>變更紀錄</h2>
+<ul><li>v3：因應 @security 對 <code>GET .../:id?phone=</code> 與 <code>DELETE</code> body 洩漏風險的建議，新增/標記查詢取消相關案例為 <strong>Pending API 決策</strong>；新增 Rate-limit 鎖定機制濫用（他人代為觸發鎖定）安全測試案例；新增 Admin 授權設計待補測試佔位。</li></ul>
+<h2>狀態總覽</h2>
+<div class="table-wrap"><table><thead><tr><th>分類</th><th>案例數</th><th>Pass</th><th>Blocker</th><th>Pending 決策</th></tr></thead><tbody><tr><td>客人端預約流程</td><td>12</td><td>12</td><td>0</td><td>0</td></tr><tr><td>查詢/取消預約</td><td>6</td><td>4</td><td>0</td><td>2</td></tr><tr><td>錯誤處理與驗證</td><td>8</td><td>8</td><td>0</td><td>0</td></tr><tr><td>安全/濫用情境</td><td>6</td><td>3</td><td>0</td><td>3</td></tr><tr><td>Admin 端</td><td>4</td><td>0</td><td>0</td><td>4（等 #6 授權設計）</td></tr></tbody></table></div>
+<hr>
+<h2>一、客人端預約流程（TC-01 ~ TC-12）—— PASS，v2 頁面已驗證</h2>
+<p>（沿用 v2，含步驟精靈、表單驗證、409 衝突自動導回選時段、RWD、無障礙）</p>
+<ul><li>涵蓋：服務選擇、時段可用性顯示、寵物資料表單（species/size/notes 200 字限制）、確認頁摘要正確性、成功頁顯示、鍵盤導覽、螢幕閱讀器 aria-live 錯誤摘要。</li></ul>
+<h2>二、查詢/取消預約（TC-13 ~ TC-18）</h2>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>案例</th><th>狀態</th></tr></thead><tbody><tr><td>TC-13</td><td>正確手機號+ID → 查得預約</td><td>✅ Pass（v2 前端）</td></tr><tr><td>TC-14</td><td>手機號正確、ID 錯誤 → 統一錯誤訊息</td><td>✅ Pass</td></tr><tr><td>TC-15</td><td>手機號錯誤、ID 正確 → 同一統一錯誤訊息（不可分辨）</td><td>✅ Pass</td></tr><tr><td>TC-16</td><td>正常取消流程</td><td>✅ Pass（前端模擬）</td></tr><tr><td>TC-17</td><td><strong>API 定案後</strong>：驗證改為 <code>POST /:id/lookup</code>（若採用），phone 不得出現於 URL/access log</td><td>⏳ Pending（等 @backend 確認採用選項 A/B）</td></tr><tr><td>TC-18</td><td><strong>API 定案後</strong>：<code>DELETE</code> 改 <code>POST /:id/cancel</code>（若採用），驗證各層 proxy 皆正確傳遞 phone body</td><td>⏳ Pending（同上，且需 @devops 確認 hosting proxy 是否保留 DELETE body，若沿用 DELETE）</td></tr></tbody></table></div>
+<h2>三、錯誤處理與驗證（TC-19 ~ TC-26）—— PASS</h2>
+<ul><li>400 VALIDATION_ERROR（含 <code>fields[]</code> dot path 對應逐欄錯誤）</li><li>409 SLOT_CONFLICT → 前端自動重新整理時段</li><li>404 NOT_FOUND 統一訊息</li><li>pet.notes 超過 200 字前端擋下 + 後端 400</li><li>XSS：confirm/success/lookup 結果頁改用 <code>textContent</code>/<code>createElement</code>，注入 <code>&lt;img src=x onerror=...&gt;</code> 等 payload 驗證不執行、原樣顯示為文字 ✅（TC-28 已解除 Blocker）</li><li>Demo 模式資料改用 <code>sessionStorage</code>，關閉分頁後驗證資料清除 ✅（TC-29 已解除 Blocker）</li></ul>
+<h2>四、安全/濫用情境（TC-30 ~ TC-35）—— 新增</h2>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>案例</th><th>狀態</th></tr></thead><tbody><tr><td>TC-30</td><td><code>POST /appointments</code> 短時間灌爆 → 429 + retryAfterSeconds</td><td>⏳ Pending（等 API 上線可測真實 rate limit）</td></tr><tr><td>TC-31</td><td>查詢/取消 429 觸發後文案是否誤導</td><td>⏳ Pending</td></tr><tr><td>TC-32</td><td><strong>新增：惡意鎖定他人查詢</strong>——攻擊者取得他人 appointment ID（如分享連結流出），故意連續填錯手機號 5 次，驗證合法客人是否被連坐鎖定</td><td>⏳ Pending（需確認鎖定 key 是否為 IP+ID 組合，@security 已提醒風險）</td></tr><tr><td>TC-33</td><td>SQL Injection：<code>pet.notes</code>、<code>customer.name</code> 塞入 <code>&#39; OR &#39;1&#39;=&#39;1</code> 等 payload，確認 parameterized query 無異常</td><td>⏳ Pending API 上線</td></tr><tr><td>TC-34</td><td>IDOR：嘗試遍歷連續/相似 UUID 猜測他人預約</td><td>✅ Pass 設計面（UUID 不可預測），待 API 上線做黑盒驗證</td></tr><tr><td>TC-35</td><td><code>lookupId</code> 格式異常（過長字串、特殊字元）是否被前端擋下且不影響後端統一錯誤語意</td><td>✅ Pass（v2 前端已加基本檢查）</td></tr></tbody></table></div>
+<h2>五、Admin 端（TC-36 ~ TC-39）—— 佔位，等 #6 授權設計</h2>
+<p>等 @security 補齊 session/JWT 儲存方式、密碼雜湊、登入失敗鎖定、多員工帳號等設計後補上：</p>
+<ul><li>TC-36 登入成功/失敗流程</li><li>TC-37 未登入存取 admin API → 401/redirect</li><li>TC-38 session 過期處理</li><li>TC-39 （若多店家/多員工）跨店資料隔離驗證</li></ul>
+<h2>Go/No-Go 標準（不變）</h2>
+<ul><li>一、二、三類全部 Pass</li><li>四類安全案例（尤其 TC-32 鎖定濫用、TC-33 SQLi）Pass，且無 Critical/High 未修復</li><li>五類 Admin 案例 Pass</li><li>無 Blocker 等級 bug 未解決</li></ul></article></body></html>

@@ -1,0 +1,1298 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="pet-ai" content="/api/letter">
+<meta name="description" content="世界上大約有十幾億隻狗和貓。隨機投胎成其中一隻，在像素場景裡走完牠的一生。">
+<meta property="og:title" content="16億分之1 毛孩人生">
+<meta property="og:description" content="隨機投胎成世界上的一隻狗或貓，走完僅此一次的一生。">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>16億分之1 毛孩人生</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&display=swap">
+<style>
+/* Layout: one phone-width column. Landing = world map + giant fraction + sticky 出生 bar.
+   Life = sticky age header with speed controls, a pixel-art scene, stat strip, then foldable record panels. */
+:root{
+  --bg:#ECEFEA; --surface:#F7F8F4; --panel:#FFFFFF; --ink:#16252A; --muted:#5B6A6C; --line:#D3DAD3;
+  --accent:#1F4FD1; --accent-ink:#FFFFFF; --warm:#C97A1E; --soft:#23866A; --hurt:#B4475A; --bond:#C2547A;
+  --dot:#C8D0C9; --cell:#E2E7E2;
+  --f-display:"Bricolage Grotesque","Noto Sans TC",system-ui,sans-serif;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1518; --surface:#141F23; --panel:#17252A; --ink:#E9EEEA; --muted:#93A3A2; --line:#26373C;
+  --accent:#7D9BFF; --accent-ink:#0D1530; --warm:#F0A54E; --soft:#4FC3A0; --hurt:#E7899A; --bond:#E07AA0;
+  --dot:#1F3035; --cell:#1C2B30; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1518; --surface:#141F23; --panel:#17252A; --ink:#E9EEEA; --muted:#93A3A2; --line:#26373C;
+  --accent:#7D9BFF; --accent-ink:#0D1530; --warm:#F0A54E; --soft:#4FC3A0; --hurt:#E7899A; --bond:#E07AA0;
+  --dot:#1F3035; --cell:#1C2B30; color-scheme:dark}
+*{box-sizing:border-box} [hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.7;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:640px;margin:0 auto;padding-block:12px 150px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* landing */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;gap:4px;align-items:center;
+  background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(8px);
+  border:1px solid var(--line);border-radius:999px;padding:5px;margin-bottom:-36px}
+.bar .seg{flex:1;border:0;background:none;border-radius:999px;padding:7px 4px;font-weight:500;color:var(--muted);white-space:nowrap}
+.bar .seg[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.bar .theme{border:0;background:none;width:38px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--ink)}
+.map{width:100%;aspect-ratio:2/1.05;display:block;max-width:100%}
+.ver{font-family:var(--f-mono);font-size:13px;color:var(--soft);line-height:1.6;margin-top:6px}
+h1{font-family:var(--f-display);font-weight:800;font-size:clamp(56px,17vw,104px);line-height:1;letter-spacing:-.02em;margin:10px 0 18px}
+h1 .zh{font-family:var(--f-body);font-weight:900}
+h1 .one{color:var(--accent)}
+.intro{font-size:clamp(18px,4.6vw,21px);opacity:.86;max-width:30em;margin:0}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:34px 0 22px}
+.stats b{display:block;font-family:var(--f-display);font-size:clamp(36px,10vw,52px);line-height:1.05;font-variant-numeric:tabular-nums}
+.stats span{color:var(--muted);font-size:14px}
+.live{display:flex;gap:12px;align-items:flex-start}
+.pulse{flex:none;width:14px;height:14px;margin-top:6px;border-radius:50%;background:var(--warm);animation:pulse 1.8s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--warm) 60%,transparent)}70%,100%{box-shadow:0 0 0 10px transparent}}
+.ticker{color:var(--accent);font-size:15px;min-height:1.7em}
+.note{color:var(--muted);font-size:13px;margin-top:28px;border-top:1px solid var(--line);padding-top:14px}
+.note a{color:inherit}
+.cta{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
+  padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.cta .in{max-width:640px;margin:0 auto;display:flex;gap:8px}
+.btn{flex:1;border:0;border-radius:12px;background:var(--accent);color:var(--accent-ink);font-size:20px;font-weight:700;padding:15px;letter-spacing:.12em}
+
+/* life: sticky header */
+.hdr{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-top:10px;margin-inline:-4px;padding-inline:4px;border-bottom:1px solid var(--line)}
+.hrow{display:flex;align-items:flex-end;gap:10px;min-width:0}
+.hage{font-family:var(--f-display);font-size:56px;font-weight:800;line-height:.95;font-variant-numeric:tabular-nums}
+.hage small{font-family:var(--f-body);font-size:24px;font-weight:700;margin-left:2px}
+.hmeta{flex:1;min-width:0;color:var(--muted);font-size:15px;padding-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.yr{height:5px;border-radius:9px;background:var(--line);margin:4px 0 10px;overflow:hidden}
+.yr i{display:block;height:100%;width:0;background:var(--bond);transition:width .25s linear}
+.ctrl{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none}
+.ctrl::-webkit-scrollbar{display:none}
+.grp{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none}
+.grp button{border:0;background:var(--surface);padding:8px 11px;font-size:15px;font-variant-numeric:tabular-nums;border-left:1px solid var(--line);white-space:nowrap}
+.grp button:first-child{border-left:0}
+.grp button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.pill{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px;font-size:15px;white-space:nowrap}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-top:12px;overflow:hidden}
+.scene{display:block;width:100%;max-width:100%;aspect-ratio:192/60;image-rendering:pixelated;image-rendering:crisp-edges;background:#222}
+.place{padding:12px 16px;font-size:17px}
+.strip{display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;padding:12px 14px}
+.st{min-width:52px}
+.st label{display:block;color:var(--muted);font-size:13px}
+.st b{display:block;font-size:20px;font-variant-numeric:tabular-nums;line-height:1.2}
+.st i{display:block;height:4px;border-radius:9px;background:var(--line);margin-top:4px;overflow:hidden}
+.st i s{display:block;height:100%;background:var(--c)}
+.st.hp{--c:var(--soft)} .st.joy{--c:var(--warm)} .st.trust{--c:var(--accent)} .st.bond{--c:var(--bond)}
+.strip .sp{flex:1}
+.strip .pill b{font-weight:700;margin-left:4px}
+.focus{display:flex;flex-wrap:wrap;gap:8px;padding:0 14px 14px}
+.focus button{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:6px 14px;text-align:left;line-height:1.35}
+.focus button small{display:block;color:var(--muted);font-size:12px}
+.focus button[aria-pressed="true"]{background:var(--soft);border-color:var(--soft);color:var(--accent-ink)}
+.focus button[aria-pressed="true"] small{color:inherit;opacity:.85}
+.focus p{flex-basis:100%;margin:0;color:var(--muted);font-size:13px}
+
+.log{list-style:none;padding:0 16px;margin:0}
+.log .peers{color:var(--soft);font-size:15px;padding:12px 0 4px}
+.log li.e{display:grid;grid-template-columns:4.4em 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.log time{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums;padding-top:2px}
+.log p{margin:0}
+.log li.big p{font-weight:700}
+.log li.good p{color:var(--soft)} .log li.bad p{color:var(--hurt)} .log li.home p{color:var(--warm)}
+.log .src{display:block;color:var(--muted);font-size:13px;font-weight:400;margin-top:2px}
+.log .src b{color:var(--accent);font-family:var(--f-mono);font-size:12px;margin-right:6px}
+.log li.e:first-of-type{animation:in .4s ease-out}
+@keyframes in{from{opacity:.2;transform:translateY(-4px)}}
+.logwrap{max-height:340px;overflow-y:auto}
+
+details.card>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer}
+details.card>summary::-webkit-details-marker{display:none}
+summary h3{margin:0;font-size:21px;font-weight:900}
+summary span{color:var(--muted);font-size:14px;flex:1}
+summary::after{content:"▾";width:34px;height:34px;border:1px solid var(--line);border-radius:50%;display:grid;place-items:center;color:var(--muted);flex:none}
+details[open]>summary::after{content:"▴"}
+.body{padding:0 16px 16px}
+
+/* identity record */
+.idhead{display:flex;justify-content:space-between;background:var(--bond);color:var(--accent-ink);padding:10px 16px;font-family:var(--f-mono);font-size:14px;letter-spacing:.06em}
+.idbody{display:grid;grid-template-columns:88px 1fr;gap:16px;padding:16px}
+.idbody canvas{width:88px;height:110px;image-rendering:pixelated;border:1px solid var(--line);border-radius:4px;max-width:100%}
+.idbody h4{margin:0 0 6px;font-size:24px;line-height:1.2;font-family:var(--f-display)}
+.idbody dl{display:grid;grid-template-columns:5em 1fr;gap:2px 10px;margin:0;font-size:15px}
+.idbody dt{color:var(--muted)} .idbody dd{margin:0;min-width:0}
+.chipline{border-top:1px dashed var(--line);padding:12px 16px;display:flex;align-items:center;gap:14px}
+.chipline svg{flex:none;height:30px;width:auto;max-width:45%;color:var(--ink)}
+.chipline div{display:flex;flex-direction:column;min-width:0}
+.chipline b{font-size:15px}
+.chipline .num{font-family:var(--f-mono);font-weight:600;letter-spacing:.06em}
+.chipline small{color:var(--muted);font-size:12px;line-height:1.5}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;margin:0}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right;min-width:0}
+.kv dd small{display:block;color:var(--muted);font-size:13px}
+
+/* life map */
+.grid{display:grid;grid-template-columns:repeat(10,1fr);gap:4px}
+.grid div{aspect-ratio:1;border-radius:3px;background:var(--cell);display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--bg);border:2px solid transparent}
+.grid div.lived{background:color-mix(in srgb,var(--soft) var(--j),var(--cell))}
+.grid div.avg{border-color:var(--muted)}
+.grid div.now{border-color:var(--bond)}
+.cap{color:var(--muted);font-size:14px;margin:10px 0 0}
+svg text{fill:var(--muted);font-family:var(--f-mono);font-size:10px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--muted);font-size:14px;margin-top:6px}
+.legend i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:6px;background:var(--soft)}
+.legend i.d{background:repeating-linear-gradient(90deg,var(--muted) 0 4px,transparent 4px 7px)}
+
+.top{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:6;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 16px;font-size:15px}
+
+/* modal sheet */
+.modal{position:fixed;inset:0;z-index:20;background:color-mix(in srgb,#000 45%,transparent);display:grid;align-items:end;justify-items:center;
+  padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sheet{width:100%;max-width:600px;max-height:88vh;overflow-y:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.sheet header{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);color:var(--bond);font-size:15px}
+.sheet header button{border:0;background:none;color:var(--muted)}
+.sheet .sb{padding:16px 18px 18px}
+.sheet h3{margin:0 0 6px;font-size:24px;font-weight:900;line-height:1.3}
+.sheet p{margin:0 0 12px;color:var(--muted)}
+.opt{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:12px 14px;margin-top:8px}
+.opt b{font-size:17px} .opt small{grid-column:1;color:var(--muted);font-size:13px} .opt em{grid-row:1/3;grid-column:2;font-style:normal;color:var(--muted);font-size:13px;text-align:right}
+.opt:disabled{opacity:.45;cursor:default}
+
+/* ending story */
+.story{position:fixed;inset:0;z-index:30;background:#0C1114;color:#EDE8DE;display:grid;place-items:center;text-align:center;cursor:pointer;
+  padding:60px max(20px,env(safe-area-inset-right,0px)) calc(60px + env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px))}
+.story .skip{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));border:1px solid #3a4448;background:none;color:#EDE8DE;border-radius:999px;padding:6px 16px}
+.story .hint{position:absolute;bottom:calc(22px + env(safe-area-inset-bottom,0px));left:0;right:0;color:#7d8a8c;font-size:14px}
+.slide{width:100%;max-width:560px;animation:fade .6s ease-out}
+@keyframes fade{from{opacity:0}}
+.slide canvas{width:100%;aspect-ratio:192/60;image-rendering:pixelated;border-radius:6px;max-width:100%}
+.slide .ag{color:#9aa6a8;letter-spacing:.2em;margin-top:18px;font-family:var(--f-mono)}
+.slide .tx{font-size:21px;margin-top:6px}
+.slide h2{font-size:clamp(34px,10vw,52px);font-weight:900;margin:0 0 14px}
+.slide .nm{font-family:var(--f-display);font-size:clamp(34px,10vw,52px);font-weight:600;margin:0}
+.slide .yrs{font-family:var(--f-mono);letter-spacing:.3em;color:#9aa6a8;margin:6px 0 22px}
+.slide p{margin:6px 0;font-size:18px}
+.slide .big{font-size:22px;margin-top:26px}
+.slide .go{margin-top:28px;border:0;background:#C2547A;color:#160a10;font-weight:900;font-size:20px;padding:14px 30px;border-radius:6px}
+.dots{display:flex;gap:3px;margin-top:22px}
+.dots i{flex:1;height:5px;background:#2b3538;border-radius:2px}
+.dots i.on{background:#4FC3A0}
+
+.end{padding:18px 16px}
+.end h3{margin:0 0 6px;font-size:22px;font-weight:900}
+.end ul{padding-left:1.2em;margin:8px 0 0}
+.endbtns{display:flex;gap:8px;margin-top:14px}
+.endbtns button{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:12px;font-weight:700}
+.endbtns button.p{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.log li.bday p{color:var(--warm)}
+.end .mailline{width:100%;margin-top:14px;border:1px dashed var(--bond);background:var(--surface);color:var(--ink);border-radius:10px;padding:13px;font-size:16px;font-weight:700}
+.slide .go2{display:block;margin:14px auto 0;border:1px solid #6b5a46;background:transparent;color:#F3E6CF;font-size:17px;padding:12px 22px;border-radius:6px}
+/* the letter: one fixed look, a sheet of lined paper on the night background */
+.mail{position:fixed;inset:0;z-index:40;background:#0A0E10;overflow-y:auto;display:grid;place-items:center;text-align:center;color:#EDE8DE;
+  padding:40px max(16px,env(safe-area-inset-right,0px)) calc(40px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.mail .in{width:100%;max-width:520px}
+.mail canvas{width:min(100%,320px);aspect-ratio:64/24;image-rendering:pixelated;display:block;margin:0 auto 18px}
+.mail h3{font-size:22px;margin:0 0 8px;font-weight:900}
+.mail p{margin:6px 0;color:#C9C2B6}
+.mail .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+.mail button{border:1px solid #4a5458;background:transparent;color:#EDE8DE;border-radius:8px;padding:12px 20px;font-size:16px}
+.mail button.p{background:#C2547A;border-color:#C2547A;color:#160a10;font-weight:900}
+.mail .fine{font-size:13px;color:#8d9a9c;margin-top:14px}
+.paper{background:#F6F0E2;color:#3A2E22;border-radius:4px;padding:29px 24px 26px;text-align:left;box-shadow:0 18px 50px rgba(0,0,0,.45);min-height:220px;
+  font-family:"LXGW WenKai TC","Noto Serif TC","PingFang TC",serif;font-size:18px;line-height:36px;white-space:pre-wrap;word-break:break-word;
+  background-image:repeating-linear-gradient(180deg,transparent 0 35px,rgba(120,90,60,.16) 35px 36px);background-position:0 22px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <section id="landing">
+  <div class="bar" role="group" aria-label="想投胎成">
+    <button class="seg" data-sp="any" aria-pressed="true">隨機</button>
+    <button class="seg" data-sp="dog" aria-pressed="false">狗狗</button>
+    <button class="seg" data-sp="cat" aria-pressed="false">貓咪</button>
+    <button class="theme" id="theme" aria-label="切換深淺色">
+      <svg width="18" height="18" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 2a8 8 0 0 1 0 16z" fill="currentColor"/></svg>
+    </button>
+  </div>
+  <canvas class="map" id="map" aria-label="世界各地毛孩出生的模擬地圖"></canvas>
+  <div class="ver">v0.3.0 beta · 免費毛孩人生模擬 ·<br>依 26 個國家與地區的公開調查粗估</div>
+  <h1><span>16</span><span class="zh">億分之</span><span class="one">1</span></h1>
+  <p class="intro">世界上大約有十幾億隻狗和貓。就在此刻，又有新的小生命睜開眼睛。你將成為其中一隻，把僅此一次的毛孩一生走到最後。是狗還是貓、生在溫暖的家還是街角的紙箱、會不會遇到願意帶你回家的人，都無法選擇。就像牠們一樣。</p>
+  <div class="stats">
+    <div><b id="cBorn">0</b><span>打開這頁後出生的毛孩（模擬）</span></div>
+    <div><b id="cAdopt">0</b><span>同一段時間裡被領養的毛孩（模擬）</span></div>
+  </div>
+  <div class="live"><i class="pulse" aria-hidden="true"></i><div><div>每一隻都只有一次。按下「出生」，陪牠走完一生。</div><div class="ticker" id="ticker" aria-live="polite"></div></div></div>
+  <p class="note">數字為依公開資料比例做的模擬，不是即時統計。全球犬隻估計約 9–12 億、貓約 6–10 億，各來源差距很大；流浪比例參考 <a href="https://en.wikipedia.org/wiki/Overpopulation_of_domestic_pets" target="_blank" rel="noopener">Overpopulation of domestic pets</a> 與 State of Pet Homelessness Project 等整理。存活曲線是依量級估算的模型。故事中的事件依機率產生，不代表任何真實個體。</p>
+ </section>
+
+ <section id="life" hidden>
+  <div class="hdr">
+    <div class="hrow"><div class="hage" id="hAge">0<small>個月</small></div><div class="hmeta" id="hMeta"></div></div>
+    <div class="yr"><i id="yrBar"></i></div>
+    <div class="ctrl">
+      <div class="grp"><button id="pause" aria-label="暫停">❚❚</button></div>
+      <div class="grp" id="speeds"></div>
+      <button class="pill" id="next">下一隻 »</button>
+      <button class="pill" id="menu" aria-label="更多">⋯</button>
+    </div>
+  </div>
+
+  <div class="card"><canvas class="scene" id="scene" width="192" height="60" aria-label="像素場景"></canvas><div class="place" id="place"></div></div>
+
+  <div class="card">
+    <div class="strip">
+      <div class="st hp"><label>健康</label><b id="vHp"></b><i><s id="bHp"></s></i></div>
+      <div class="st joy"><label>幸福</label><b id="vJoy"></b><i><s id="bJoy"></s></i></div>
+      <div class="st trust"><label>信任</label><b id="vTrust"></b><i><s id="bTrust"></s></i></div>
+      <div class="st bond"><label>牽絆</label><b id="vBond"></b><i><s id="bBond"></s></i></div>
+      <span class="sp"></span>
+      <button class="pill" id="focusBtn" aria-expanded="false">重心<b id="focusName"></b> ▾</button>
+      <button class="pill" id="actBtn">互動</button>
+    </div>
+    <div class="focus" id="focus" hidden></div>
+  </div>
+
+  <div class="card"><div class="logwrap"><ol class="log" id="log"></ol></div></div>
+
+  <details class="card" open>
+    <summary><h3>身分紀錄</h3><span></span></summary>
+    <div class="idhead"><span id="idTop"></span><span id="idYear"></span></div>
+    <div class="idbody"><canvas id="portrait" width="22" height="28"></canvas>
+      <div><h4 id="idName"></h4><dl id="idDl"></dl></div></div>
+    <div class="chipline" id="chipline"></div>
+  </details>
+
+  <details class="card" open>
+    <summary><h3>家人與生活</h3><span></span></summary>
+    <div class="body"><dl class="kv" id="family"></dl></div>
+  </details>
+
+  <details class="card" open>
+    <summary><h3>一生地圖</h3><span>一格 = 1年</span></summary>
+    <div class="body"><div class="grid" id="grid"></div>
+      <p class="cap">一格 = 1年 · 顏色越深，那一年越幸福 · 家＝有了家、收＝收容所、✚＝受傷生病、♥＝重要的牽絆</p>
+      <p class="cap" id="avgCap"></p></div>
+  </details>
+
+  <details class="card" open>
+    <summary><h3>存活曲線</h3><span>同年出生的同類當中仍存活的比例</span></summary>
+    <div class="body"><svg id="surv" viewBox="0 0 330 190" width="100%" role="img" aria-label="存活曲線"></svg>
+      <div class="legend" id="survLegend"></div>
+      <p class="cap">依公開資料的量級估算的模型，不是精確統計。</p></div>
+  </details>
+
+  <details class="card" open>
+    <summary><h3 id="ctyName"></h3><span>粗估</span></summary>
+    <div class="body"><dl class="kv" id="cty"></dl></div>
+  </details>
+
+  <div class="card" id="endBox" hidden></div>
+ </section>
+</div>
+
+<button class="top" id="toTop" hidden>↑ 回到頂端</button>
+<div class="cta" id="cta"><div class="in"><button class="btn" id="born">出生</button></div></div>
+<div class="modal" id="modal" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div class="story" id="story" hidden></div>
+<div class="mail" id="mail" hidden></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const R = Math.random, pick = a => a[Math.floor(R() * a.length)];
+const gauss = (m, s) => { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return m + s * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const rngOf = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const fmt = n => n >= 1e8 ? (n / 1e8).toFixed(1) + "億" : n >= 1e4 ? Math.round(n / 1e4).toLocaleString() + "萬" : Math.round(n).toLocaleString();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// Rough share of the world's dogs+cats, share living on the street, coordinates, cities, ISO code, skin-tone group. Order-of-magnitude estimates only.
+const C = [
+ ["台灣",.008,.15,23.7,121,["台北","台中","高雄","台南","花蓮","新竹"],"TWN",0],
+ ["美國",.10,.12,39,-98,["洛杉磯","奧斯汀","紐約","西雅圖"],"USA",3],
+ ["中國",.13,.25,34,105,["上海","成都","北京","廣州"],"CHN",0],
+ ["印度",.08,.75,22,79,["孟買","德里","班加羅爾","齋浦爾"],"IND",1],
+ ["巴西",.06,.35,-12,-52,["聖保羅","里約熱內盧","薩爾瓦多"],"BRA",3],
+ ["俄羅斯",.05,.30,58,60,["莫斯科","喀山","新西伯利亞"],"RUS",0],
+ ["墨西哥",.035,.45,23,-102,["墨西哥城","瓜達拉哈拉","坎昆"],"MEX",1],
+ ["印尼",.03,.55,-2,117,["雅加達","峇里島","泗水"],"IDN",1],
+ ["菲律賓",.025,.55,12,122,["馬尼拉","宿霧","達沃"],"PHL",1],
+ ["日本",.017,.05,36,138,["東京","大阪","京都","札幌"],"JPN",0],
+ ["南韓",.01,.10,36.5,128,["首爾","釜山","濟州"],"KOR",0],
+ ["泰國",.02,.50,15,101,["曼谷","清邁","普吉"],"THA",1],
+ ["越南",.015,.45,16,107,["胡志明市","河內","峴港"],"VNM",1],
+ ["土耳其",.02,.55,39,35,["伊斯坦堡","安卡拉","伊茲密爾"],"TUR",1],
+ ["英國",.02,.04,53,-2,["倫敦","曼徹斯特","愛丁堡"],"GBR",3],
+ ["法國",.025,.08,46.5,2.5,["巴黎","里昂","馬賽"],"FRA",3],
+ ["德國",.025,.04,51,10,["柏林","慕尼黑","漢堡"],"DEU",0],
+ ["義大利",.02,.12,42.5,12.5,["羅馬","米蘭","拿坡里"],"ITA",0],
+ ["西班牙",.017,.10,40,-4,["馬德里","巴塞隆納","瓦倫西亞"],"ESP",0],
+ ["阿根廷",.02,.35,-34,-64,["布宜諾斯艾利斯","哥多華","門多薩"],"ARG",3],
+ ["奈及利亞",.02,.65,9,8,["拉哥斯","阿布加"],"NGA",2],
+ ["埃及",.015,.70,27,30,["開羅","亞歷山卓"],"EGY",1],
+ ["南非",.015,.40,-29,24,["約翰尼斯堡","開普敦","德班"],"ZAF",3],
+ ["澳洲",.012,.05,-25,134,["雪梨","墨爾本","布里斯本"],"AUS",3],
+ ["加拿大",.012,.05,56,-106,["多倫多","溫哥華","蒙特婁"],"CAN",3],
+ ["肯亞",.01,.60,0,38,["奈洛比","蒙巴薩"],"KEN",2],
+].map(([name,w,stray,lat,lon,cities,iso,skin]) => ({name,w,stray,lat,lon,cities,iso,skin}));
+const totalW = C.reduce((s, c) => s + c.w, 0);
+const pickCountry = () => { let x = R() * totalW; for (const c of C) if ((x -= c.w) <= 0) return c; return C[0]; };
+const WORLD = 1.6e9;
+
+const BREED = { dog:["米克斯","米克斯","米克斯","柴犬","貴賓","黃金獵犬","吉娃娃","法鬥","台灣犬"], cat:["米克斯","米克斯","米克斯","米克斯","英國短毛","美國短毛","布偶","曼赤肯"] };
+const COAT = {
+  dog: { "黑色":["#2b2a2e","#151417"], "土黃色":["#c9954f","#94642c"], "白色":["#efebe3","#b9b1a3"], "黑白相間":["#efebe3","#26252a"], "奶茶色":["#d8b48a","#a2805a"], "虎斑":["#a07a4a","#563c24"] },
+  cat: { "橘色":["#e08a3c","#a2561c"], "三花":["#efe6d8","#d4742e"], "虎斑":["#9a7b55","#4f3b25"], "賓士":["#2b2a2e","#efebe3"], "全黑":["#232226","#111014"], "白色":["#f0ece5","#c3bbb0"], "玳瑁":["#4a3426","#c46a2c"] },
+};
+const NAMES = ["豆豆","小黑","Lucky","咪咪","小橘","阿福","奶茶","布丁","球球","皮皮","Mochi","小虎","饅頭","黑糖","芝麻","Kiki","旺財","Coco","可樂","湯圓"];
+const PERS = ["親人","膽小","好奇","固執","貪吃","有毅力","愛撒嬌","獨立"];
+const OWNERS = ["陳小姐，上班族","林先生一家四口","張阿嬤","一對年輕夫妻","退休的李伯伯","大學生小王","開早餐店的吳姐"];
+const SKIN = [["#f1c9a5","#e8b993"],["#c58c62","#d9a37a"],["#7a4a2c","#8d5a3b"],["#f1c9a5","#c58c62","#8d5a3b"]];
+
+/* ================= pixel art ================= */
+const SW = 192, SH = 60;
+const px = (g, x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
+const disc = (g, cx, cy, r, c) => { g.fillStyle = c; for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (x * x + y * y <= r * r + r * .8) g.fillRect(cx + x, cy + y, 1, 1); };
+const cloud = (g, x, y, c) => { x = Math.round(x); px(g, x, y + 2, 18, 4, c); px(g, x + 3, y, 9, 3, c); px(g, x + 10, y + 1, 5, 2, c); };
+
+const SPR = {
+  dog: ["..........dd.", ".........dccd", "........ccecc", "........ccccn", ".......ccccc.", "..ccccccccc..", "..ccccccccc..", "..cc.....cc..", "..c.c...c.c..", "..d.d...d.d.."],
+  cat: ["......d...d", "......cc.cc", "......ccccc", "......cecec", "......ccncc", ".......ccc.", "......cccc.", "....ccccccc", "...cccccccc", "...cccccccc", "...dd.d.dd."],
+  person: ["..hhh..", ".hhhhh.", ".hssss.", ".seses.", ".sssss.", "..sss..", ".ttttt.", "ttttttt", "s.ttt.s", "s.ttt.s", "..ppp..", "..p.p..", "..p.p..", ".kk.kk."],
+};
+function sprite(g, rows, x, y, pal, flip) {
+  const w = rows[0].length;
+  rows.forEach((r, j) => { for (let i = 0; i < w; i++) { const ch = r[i]; if (ch !== "." && pal[ch]) px(g, x + (flip ? w - 1 - i : i), y + j, 1, 1, pal[ch]); } });
+}
+function petPal(p) {
+  const [c, d] = p.coatC, dark = ["#2b2a2e", "#232226", "#4a3426"].includes(c);
+  return { c, d, e: dark ? "#f2d36b" : "#151417", n: p.sp === "cat" ? "#e89aa0" : "#2a1a1a" };
+}
+function drawPet(g, p, x, y, t, flip) {
+  const pal = petPal(p), wag = Math.floor(t / 220) % 2;
+  if (p.sp === "dog") {
+    sprite(g, SPR.dog, x, y, pal, flip);
+    const tail = wag ? [[1, 4], [0, 3]] : [[1, 5], [0, 5]];
+    tail.forEach(([i, j]) => px(g, x + (flip ? 12 - i : i), y + j, 1, 1, pal.c));
+  } else {
+    sprite(g, SPR.cat, x, y + 1, pal, flip);
+    const tail = wag ? [[2, 9], [1, 8], [1, 7], [2, 6]] : [[2, 9], [1, 9], [0, 8], [0, 7]];
+    tail.forEach(([i, j]) => px(g, x + (flip ? 10 - i : i), y + 1 + j, 1, 1, pal.d));
+  }
+}
+function drawPerson(g, who, x, y) { sprite(g, SPR.person, x, y, { h: who.h, s: who.s, e: "#1a1414", t: who.t, p: who.p, k: "#2a2a2a" }); }
+function mkPerson(c, old) {
+  return { h: old ? "#d8d3cb" : pick(["#2b1d14", "#4a3426", "#1d1a18", "#7a5636"]), s: pick(SKIN[c.skin]), t: pick(["#d0654f", "#4f86c6", "#5fa37a", "#e0b84a", "#9a6fb0", "#e9e4da"]), p: pick(["#3b4a6b", "#2f3a3f", "#6b5a45"]) };
+}
+
+function sky(g, night, t, rng, dusk) {
+  const bands = dusk ? ["#3a2f55", "#5b4672", "#8a5d80", "#c27f86"] : night ? ["#221c36", "#2b2444", "#372d52", "#463862"] : ["#7db5df", "#91c2e6", "#a7cfeb", "#c0ddf0"];
+  bands.forEach((c, i) => px(g, 0, i * 12, SW, 12, c));
+  if (night || dusk) {
+    for (let i = 0; i < 26; i++) { const x = rng() * SW | 0, y = rng() * 34 | 0; if ((Math.floor(t / 600) + i) % 7) px(g, x, y, 1, 1, "#e9e4ff"); }
+    g.globalAlpha = .25; disc(g, 162, 12, 8, "#f3e3a6"); g.globalAlpha = 1; disc(g, 162, 12, 5, "#f6e8b4");
+    cloud(g, (24 + t / 900) % (SW + 20) - 20, 8, "#4a5468"); cloud(g, (128 + t / 700) % (SW + 20) - 20, 14, "#4a5468");
+  } else {
+    disc(g, 170, 10, 5, "#fff1b8");
+    cloud(g, (24 + t / 500) % (SW + 20) - 20, 8, "#f4f8fb"); cloud(g, (120 + t / 380) % (SW + 20) - 20, 15, "#f4f8fb");
+  }
+}
+function hills(g, base, c, amp, f, ph) { for (let x = 0; x < SW; x++) { const h = Math.round(base - amp * Math.sin(x * f + ph)); px(g, x, h, 1, 48 - h, c); } }
+function tree(g, x, night) { px(g, x, 34, 3, 14, night ? "#3e2c1d" : "#6b4a2b"); const c = night ? "#2c4a35" : "#3f7a45"; disc(g, x + 1, 28, 7, c); disc(g, x - 4, 32, 5, c); disc(g, x + 6, 32, 5, c); }
+
+const SCENES = {
+  street(g, n, t, rng) {
+    sky(g, n, t, rng);
+    let x = 0; while (x < SW) { const w = 14 + (rng() * 16 | 0), h = 16 + (rng() * 22 | 0); px(g, x, 48 - h, w, h, n ? "#2c3343" : "#8f99a7");
+      for (let wy = 48 - h + 3; wy < 44; wy += 5) for (let wx = x + 2; wx < x + w - 2; wx += 4) { const r = rng(); if (r < .5) px(g, wx, wy, 2, 2, n ? (r < .35 ? "#f2c65a" : "#3c4457") : "#c8dbe9"); } x += w + 1; }
+    px(g, 0, 48, SW, 4, n ? "#4b4f58" : "#a5a9af"); px(g, 0, 52, SW, 8, n ? "#24272d" : "#4a4e55");
+    for (let i = 0; i < SW; i += 12) px(g, i, 56, 6, 1, "#c9c27a");
+    px(g, 30, 22, 1, 26, "#1b1e25"); px(g, 28, 21, 5, 2, "#1b1e25");
+    if (n) { g.globalAlpha = .16; for (let r = 0; r < 14; r++) px(g, 30 - r, 23 + r * 1.8, 2 * r + 1, 2, "#f6d77a"); g.globalAlpha = 1; px(g, 29, 23, 3, 1, "#ffe9a0"); }
+    px(g, 116, 40, 18, 8, "#9b6b3c"); px(g, 116, 40, 18, 1, "#76502a"); px(g, 113, 37, 7, 3, "#b07d48");
+    px(g, 150, 42, 14, 4, "#c0392b"); disc(g, 152, 47, 2, "#111"); disc(g, 163, 47, 2, "#111"); px(g, 160, 37, 1, 6, "#555"); px(g, 158, 37, 4, 1, "#555");
+    return 38;
+  },
+  shelter(g, n, t, rng) {
+    px(g, 0, 0, SW, 48, n ? "#363a43" : "#d3ccbc"); px(g, 0, 14, SW, 1, n ? "#2c2f37" : "#bdb5a3");
+    const hp = ["..rr.rr..", ".rrrrrrr.", ".rrrrrrr.", "..rrrrr..", "...rrr...", "....r...."]; sprite(g, hp, 92, 3, { r: "#d0526a" });
+    for (let k = 0; k < 4; k++) { const cx = 8 + k * 46; px(g, cx, 18, 38, 30, n ? "#262a31" : "#8e959b"); for (let b = cx; b <= cx + 38; b += 4) px(g, b, 18, 1, 30, n ? "#6f7880" : "#c3ccd3"); px(g, cx, 18, 39, 1, "#aab3ba"); px(g, cx, 32, 39, 1, "#aab3ba"); }
+    px(g, 0, 48, SW, 12, n ? "#3f423f" : "#8b9087"); for (let i = 0; i < SW; i += 24) px(g, i, 48, 1, 12, n ? "#353835" : "#7c8178");
+    return 38;
+  },
+  shop(g, n, t, rng) {
+    px(g, 0, 0, SW, 48, n ? "#3c3a44" : "#efece6");
+    px(g, 36, 12, 120, 34, n ? "#2e3a48" : "#cfe3ee"); px(g, 36, 12, 120, 2, "#9aa7b0"); px(g, 36, 44, 120, 2, "#9aa7b0"); px(g, 95, 12, 2, 34, "#9aa7b0");
+    g.globalAlpha = .35; for (let i = 0; i < 6; i++) px(g, 44 + i * 18, 14, 3, 30, "#ffffff"); g.globalAlpha = 1;
+    px(g, 160, 18, 14, 9, "#f2d36b"); px(g, 163, 21, 8, 1, "#7a5a1a"); px(g, 163, 23, 6, 1, "#7a5a1a");
+    px(g, 0, 48, SW, 12, n ? "#4a4650" : "#c9c4ba");
+    return 34;
+  },
+  home(g, n, t, rng) {
+    px(g, 0, 0, SW, 48, n ? "#4a3d36" : "#ead6bb"); px(g, 0, 46, SW, 2, n ? "#3a2f29" : "#c9a77f");
+    px(g, 15, 7, 31, 27, "#f5efe6"); px(g, 17, 9, 27, 23, n ? "#2b2444" : "#9fcdec");
+    if (n) { disc(g, 36, 15, 3, "#f6e8b4"); px(g, 22, 12, 1, 1, "#fff"); px(g, 28, 20, 1, 1, "#fff"); } else cloud(g, 19 + (t / 900) % 14, 13, "#ffffff");
+    px(g, 30, 9, 1, 23, "#f5efe6"); px(g, 17, 20, 27, 1, "#f5efe6"); px(g, 11, 5, 5, 31, "#e49aa4"); px(g, 45, 5, 5, 31, "#e49aa4");
+    px(g, 118, 9, 12, 10, "#f2ece2"); px(g, 120, 11, 8, 6, "#6b9f78"); px(g, 136, 12, 10, 8, "#f2ece2"); px(g, 138, 14, 6, 4, "#7aa3c7");
+    for (let i = 0; i < 9; i++) px(g, 60 + i * 9, 6 + (i % 2), 3, 3, ["#e07a7a", "#f2c65a", "#7ab6e0"][i % 3]);
+    px(g, 178, 20, 1, 28, "#7b7b7b"); px(g, 173, 15, 11, 6, "#f1d48a");
+    if (n) { g.globalAlpha = .18; disc(g, 178, 20, 12, "#ffe7a0"); g.globalAlpha = 1; }
+    px(g, 58, 31, 56, 13, "#7d93b5"); px(g, 54, 29, 6, 17, "#6a81a3"); px(g, 112, 29, 6, 17, "#6a81a3"); px(g, 60, 29, 26, 6, "#91a6c6"); px(g, 87, 29, 25, 6, "#91a6c6");
+    px(g, 0, 48, SW, 12, n ? "#5b4431" : "#b48a5e"); for (let i = 8; i < SW; i += 18) px(g, i, 48, 1, 12, n ? "#4d3929" : "#a07850");
+    return 38;
+  },
+  park(g, n, t, rng) {
+    sky(g, n, t, rng);
+    hills(g, 36, n ? "#2f4a3a" : "#7fae7c", 3, .05, 0); hills(g, 40, n ? "#28412f" : "#5f9a61", 4, .07, 2);
+    tree(g, 22, n); tree(g, 172, n);
+    px(g, 0, 48, SW, 12, n ? "#2f4d27" : "#5c9140"); for (let i = 0; i < SW; i += 5) px(g, i, 47, 1, 1, n ? "#3c6332" : "#76b055");
+    px(g, 126, 41, 22, 2, "#8a5a35"); px(g, 127, 43, 1, 5, "#5a3a20"); px(g, 146, 43, 1, 5, "#5a3a20");
+    return 38;
+  },
+  vet(g, n, t, rng) {
+    px(g, 0, 0, SW, 48, "#e1eeec"); px(g, 88, 4, 14, 4, "#2e9a6a"); px(g, 93, 0, 4, 13, "#2e9a6a");
+    px(g, 140, 10, 34, 36, "#c9d8d6"); px(g, 142, 12, 30, 15, "#b5c7c4"); px(g, 142, 29, 30, 15, "#b5c7c4");
+    px(g, 60, 42, 60, 3, "#b8c4c6"); px(g, 64, 45, 2, 3, "#8a989a"); px(g, 114, 45, 2, 3, "#8a989a");
+    for (let x = 0; x < SW; x += 8) px(g, x, 48, 8, 12, (x / 8) % 2 ? "#cbd5d4" : "#bac6c5");
+    return 32;
+  },
+  rainbow(g, n, t, rng) {
+    sky(g, true, t, rng, true);
+    const cols = ["#e46a6a", "#eea052", "#efd56a", "#7cc47c", "#6aa6e4", "#9a7ad8"];
+    for (let y = 0; y < 50; y++) for (let x = 0; x < SW; x++) { const d = Math.hypot(x - 96, (y - 64) * 1.25); const k = Math.floor((76 - d) / 2.4); if (k >= 0 && k < 6) px(g, x, y, 1, 1, cols[k]); }
+    for (let i = 0; i < 6; i++) cloud(g, i * 34 - 4, 42 + (i % 2) * 2, "#f1e7f0");
+    px(g, 0, 48, SW, 12, "#efe5ef");
+    return 38;
+  },
+  farewell(g, n, t, rng) {
+    sky(g, true, t, rng);
+    hills(g, 36, "#2f4a3a", 3, .05, 0); hills(g, 40, "#28412f", 4, .07, 2);
+    px(g, 0, 48, SW, 12, "#2a2520"); for (let i = 0; i < SW; i += 3) px(g, i, 48, 2, 1, "#355a2c");
+    px(g, 86, 44, 22, 4, "#6b4a2b"); px(g, 88, 42, 18, 2, "#7d5a36");
+    [[90, 41, "#f2d36b"], [96, 40, "#e8909a"], [102, 41, "#ffffff"]].forEach(([x, y, c]) => { px(g, x, y, 2, 2, c); px(g, x, y + 2, 1, 2, "#4f8a3f"); });
+    return 0;
+  },
+};
+
+let paintSeed = 1;
+function paint(cv, kind, night, t, cast) {
+  const g = cv.getContext("2d"); g.imageSmoothingEnabled = false;
+  const rng = rngOf(paintSeed + kind.length * 97);
+  const groundY = SCENES[kind](g, night, t, rng);
+  if (!cast) return;
+  const people = cast.people || [];
+  people.forEach((pp, i) => drawPerson(g, pp, (i % 2 ? 112 + (i >> 1) * 12 : 60 - (i >> 1) * 12), 35));
+  if (cast.pet && groundY) {
+    const drift = cast.still ? 0 : Math.round(Math.sin(t / 1400) * 6);
+    drawPet(g, cast.pet, 88 + drift, groundY + (cast.pet.sp === "cat" ? -1 : 0), t, Math.sin(t / 1400) < 0 && !cast.still);
+  }
+  if (cast.rain) { g.globalAlpha = .5; const rr = rngOf(Math.floor(t / 90)); for (let i = 0; i < 60; i++) px(g, rr() * SW, rr() * 50, 1, 3, "#b9c9e8"); g.globalAlpha = 1; }
+}
+
+/* ================= world map (landing) ================= */
+const mapCv = $("#map"), mg = mapCv.getContext("2d");
+let ripples = [];
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const proj = (lat, lon, w, h) => [(lon + 170) / 340 * w, (78 - lat) / 140 * h];
+function drawMap(t) {
+  if (!$("#landing").hidden) {
+    const dpr = devicePixelRatio || 1, w = mapCv.clientWidth, h = mapCv.clientHeight;
+    if (mapCv.width !== Math.round(w * dpr)) { mapCv.width = Math.round(w * dpr); mapCv.height = Math.round(h * dpr); }
+    mg.setTransform(dpr, 0, 0, dpr, 0, 0); mg.clearRect(0, 0, w, h);
+    mg.fillStyle = css("--dot"); for (let y = 48; y < h; y += 7) for (let x = 4; x < w; x += 7) mg.fillRect(x, y, 1.6, 1.6);
+    mg.fillStyle = css("--accent"); mg.globalAlpha = .82;
+    for (const c of C) { const [x, y] = proj(c.lat, c.lon, w, h); mg.beginPath(); mg.arc(x, y + 20, 4 + Math.sqrt(c.w) * 46 * (w / 620), 0, 7); mg.fill(); }
+    mg.globalAlpha = 1; ripples = ripples.filter(r => t - r.t < 1600);
+    mg.strokeStyle = css("--warm"); mg.lineWidth = 2;
+    for (const r of ripples) { const k = (t - r.t) / 1600, [x, y] = proj(r.c.lat, r.c.lon, w, h); mg.globalAlpha = 1 - k; mg.beginPath(); mg.arc(x, y + 20, 6 + k * 28, 0, 7); mg.stroke(); }
+    mg.globalAlpha = 1;
+  }
+  requestAnimationFrame(drawMap);
+}
+requestAnimationFrame(drawMap);
+let born = 0, adopt = 0;
+setInterval(() => {
+  born += 1 + (R() < .2 ? 1 : 0); if (R() < .22) adopt++;
+  $("#cBorn").textContent = born.toLocaleString(); $("#cAdopt").textContent = adopt.toLocaleString();
+  if (R() < .35) ripples.push({ c: pickCountry(), t: performance.now() });
+}, 220);
+const tick = () => {
+  const c = pickCountry(), s = R() < .55 ? "小狗" : "小貓", city = pick(c.cities);
+  $("#ticker").textContent = pick([`模擬中 · 有隻${s}在${city}（${c.name}）出生了`, `模擬中 · 有隻${s}在${city}（${c.name}）出生了`, `模擬中 · ${city}有隻${s}被領養回家了`, `模擬中 · ${city}的志工剛幫一隻${s}結紮`]);
+};
+tick(); setInterval(tick, 3200);
+let want = "any";
+document.querySelectorAll(".seg").forEach(b => b.onclick = () => { want = b.dataset.sp; document.querySelectorAll(".seg").forEach(x => x.setAttribute("aria-pressed", x === b)); });
+$("#theme").onclick = () => {
+  const root = document.documentElement, cur = root.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  root.dataset.theme = cur === "dark" ? "light" : "dark"; try { localStorage.setItem("theme", root.dataset.theme); } catch (e) {}
+};
+try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+
+/* ================= one life ================= */
+let P = null, timer = null, speed = 1, paused = false, modalOpen = false;
+const SPEEDS = [1, 2, 4, 8, 12, 16];
+const SP = () => P.sp === "cat" ? "貓" : "狗";
+const kid = () => P.sp === "cat" ? "小貓" : "小狗";
+const ageText = m => m < 12 ? `${m}個月` : `${Math.floor(m / 12)}歲${m % 12 ? `${m % 12}個月` : ""}`;
+const STATUS = { home: "有家", stray: "街頭", shelter: "收容所", shop: "寵物店" };
+const FOCUS = {
+  people: ["親近人類", "信任↑ 被帶回家的機會↑"],
+  play: ["探險玩耍", "幸福↑ 受傷風險↑"],
+  rest: ["好好休息", "健康↑"],
+  family: ["黏著家人", "牽絆↑ 幸福↑"],
+};
+const surv = (sp, env) => env === "home" ? (sp === "cat" ? [15.5, 5] : [13.5, 5]) : (sp === "cat" ? [3.6, 1.15] : [4.2, 1.3]);
+const S = (a, [l, k]) => Math.exp(-Math.pow(a / l, k));
+const expect = (sp, env) => env === "home" ? (sp === "cat" ? 14.5 : 12.5) : (sp === "cat" ? 3.5 : 4);
+
+function newLife() {
+  const sp = want === "any" ? (R() < .55 ? "dog" : "cat") : want;
+  const c = pickCountry(), city = pick(c.cities), r = R();
+  const origin = r < c.stray ? "stray" : r < c.stray + .06 ? "shop" : "home";
+  const coat = pick(Object.keys(COAT[sp]));
+  paintSeed = (R() * 1e9) | 0;
+  P = { sp, c, city, origin, env: origin, sex: R() < .5 ? "公" : "母", breed: origin === "stray" ? "米克斯" : pick(BREED[sp]), coat, coatC: COAT[sp][coat],
+    pers: pick(PERS), name: null, m: 0, max: Math.round(12 * clamp(sp === "cat" ? gauss(14.5, 3) : gauss(12.5, 2.6), 6, 21)),
+    hp: 80, joy: origin === "home" ? 70 : 45, trust: origin === "home" ? 60 : 30, bond: origin === "home" ? 55 : 35,
+    focus: "auto", autoF: "family", chip: null, neuter: false, vax: false, done: new Set(), used: {}, last: {}, count: {}, diary: [], choices: [], friend: false, kids: 0, lastLitter: -99,
+    y0: 2026, mo0: 1 + (R() * 12 | 0), years: [], miles: [], streetM: 0, homeM: 0, shelterM: 0, homes: 0, place: "", cause: "", override: null, cooldown: {},
+    fam: { mom: origin === "home" ? "跟你住在同一個家" : origin === "stray" ? "在附近的街頭" : "留在繁殖場", sibs: Array.from({ length: 2 + (R() * 4 | 0) }, () => "一起長大"), owner: null, owner0: null, buddy: null, volunteer: null },
+    cast: { people: [] } };
+  if (origin === "home") { P.name = pick(NAMES); P.homes = 1; P.fam.owner = pick(OWNERS); P.ownerSince = 0; P.place = homePlace(); P.cast.people = [mkPerson(c), mkPerson(c)]; }
+  if (origin === "stray") P.place = strayPlace();
+  if (origin === "shop") P.place = "繁殖場";
+  P.autoF = pickAuto();
+}
+function pickAuto() { return P.env === "stray" ? (P.trust > 45 ? "people" : "rest") : P.env === "home" ? pick(["family", "play", "rest", "family"]) : pick(["people", "rest"]); }
+const focusNow = () => P.focus === "auto" ? P.autoF : P.focus;
+
+function sceneKind() {
+  if (P.override && P.m < P.override.until) return P.override.kind;
+  if (P.env === "stray") return "street";
+  if (P.env === "shelter") return "shelter";
+  if (P.env === "shop") return P.m < 2 ? "shelter" : "shop";
+  return Math.floor(P.m / 3) % 3 === 2 ? "park" : "home";
+}
+const isNight = () => Math.floor(P.m / 2) % 2 === 1;
+
+function goHome(owner, place) {
+  P.adoptedFrom = P.env;
+  P.env = "home"; P.homes++; P.joy = Math.max(P.joy, 60) + 8; P.trust += 10; P.bond = Math.max(P.bond, 45);
+  if (!P.name) { P.name = pick(NAMES); P.nameNote = "first"; }
+  else if (R() < .5) P.nameNote = "keep";
+  else { P.name = pick(NAMES.filter(n => n !== P.name)); P.nameNote = "rename"; }
+  P.fam.owner = owner || pick(OWNERS); P.ownerSince = P.m;
+  P.place = place || homePlace(); P.cast.people = [mkPerson(P.c), mkPerson(P.c)];
+  P.done.delete("name");
+  mark("家");
+}
+function toShelter() {
+  P.env = "shelter"; P.foster = false; P.cast.people = R() < .5 ? [mkPerson(P.c)] : []; P.fam.owner = null;
+  P.done.delete("intake"); P.done.delete("photo"); mark("收");
+  if (P.c.iso === "TWN" && !P.done.has("zeroNote")) { P.done.add("zeroNote"); return "台灣自 2017 年 2 月起，公立收容所施行零撲殺。"; }
+}
+function toStreet() { P.env = "stray"; P.cast.people = []; P.fam.owner = null; P.place = strayPlace(); }
+function mark(icon) { const y = Math.floor(P.m / 12); P.years[y] = P.years[y] || { j: 0, n: 0, ic: "" }; if (!P.years[y].ic) P.years[y].ic = icon; }
+const chipNo = () => "900" + Array.from({ length: 12 }, () => R() * 10 | 0).join("");
+
+// ---------- place, season and culture helpers ----------
+const inC = (...isos) => isos.includes(P.c.iso);
+const calMonth = () => (P.mo0 - 1 + P.m) % 12 + 1;
+const HEMI = { BRA: "S", ARG: "S", ZAF: "S", AUS: "S", IDN: "E", KEN: "E", NGA: "E" };
+const WARM = new Set(["PHL", "THA", "VNM", "IDN", "NGA", "KEN", "EGY", "MEX", "BRA"]);
+const SNOW = new Set(["莫斯科", "喀山", "新西伯利亞", "多倫多", "蒙特婁", "首爾", "札幌", "柏林", "慕尼黑", "漢堡", "北京", "紐約", "安卡拉", "愛丁堡"]);
+function season() {
+  const h = HEMI[P.c.iso] || "N", m = calMonth();
+  if (h === "E") return "tropical";
+  const k = h === "S" ? (m + 5) % 12 + 1 : m;
+  return [12, 1, 2].includes(k) ? "winter" : [6, 7, 8].includes(k) ? "summer" : [3, 4, 5].includes(k) ? "spring" : "autumn";
+}
+const winter = () => season() === "winter" && !WARM.has(P.c.iso);
+const summer = () => season() === "summer" || season() === "tropical";
+const snowing = () => winter() && SNOW.has(P.city);
+const typhoonSeason = () => inC("TWN", "JPN", "PHL", "CHN", "VNM", "KOR") && [7, 8, 9].includes(calMonth());
+const monsoon = () => (inC("IND", "THA", "VNM", "PHL") && [6, 7, 8, 9].includes(calMonth())) || (inC("IDN") && [11, 12, 1, 2, 3].includes(calMonth()));
+const xmas = () => calMonth() === 12 && inC("USA", "GBR", "FRA", "DEU", "ITA", "ESP", "AUS", "CAN", "BRA", "ARG", "MEX", "PHL", "ZAF", "KEN", "NGA");
+function fireworks() {
+  const m = calMonth(), c = P.c.iso;
+  if (["TWN", "CHN", "VNM"].includes(c)) return [1, 2].includes(m) ? "過年" : null;
+  if (c === "USA" && m === 7) return "美國國慶日";
+  if (c === "GBR" && m === 11) return "蓋伊‧福克斯之夜";
+  if (c === "IND") return [10, 11].includes(m) ? "排燈節" : null;
+  if (c !== "JPN" && c !== "KOR" && [12, 1].includes(m)) return "跨年";
+  return null;
+}
+const fwText = () => { const n = fireworks(); return n === "過年" ? "過年的鞭炮" : `${n || "跨年"}的煙火`; };
+const veh = () => inC("TWN", "VNM", "IDN", "THA", "IND", "PHL") ? "機車" : "汽車";
+const strayPlace = () => pick(inC("TWN") ? ["騎樓下", "菜市場後面", "夜市後巷", "河堤邊", "公園旁巷弄", "工地圍籬旁"] : ["市場後面", "河堤邊", "公園旁巷弄", "高架橋下", "停車場角落", "工地圍籬旁"]);
+const homePlace = () => pick(inC("TWN") ? ["公寓", "透天厝", "三合院", "小套房"] : ["公寓", "獨棟房子", "小套房", "老公寓"]);
+const ownerShort = () => (P.fam.owner || "家人").replace(/，.*/, "");
+const vet = () => { P.override = { kind: "vet", until: P.m + 1 }; };
+const chipNote = () => ({
+  TWN: "台灣規定家犬須植入晶片、辦理寵物登記。",
+  GBR: "英格蘭自 2016 年起規定狗必須植入晶片，2024 年起貓也是。",
+  KOR: "南韓自 2014 年起全面實施犬隻動物登錄制度。",
+  JPN: "日本自 2022 年 6 月起，寵物店販售的犬貓都必須植入晶片。",
+})[P.c.iso] || "寵物晶片約米粒大小，15 碼號碼對應飼主資料，動物醫院與收容所都能掃描。";
+
+// Picks a text variant that has not been used yet in this life; starts over once all are used.
+function vary(id, list) {
+  const u = (P.used[id] = P.used[id] || []), sig = x => typeof x === "function" ? x.toString() : x;
+  let left = list.filter(x => !u.includes(sig(x)));
+  if (!left.length) { u.length = 0; left = list; }
+  const x = pick(left); u.push(sig(x));
+  return typeof x === "function" ? x() : x;
+}
+const TRICK = {
+  cat: ["學會自己開房門。", "學會在早上六點準時踩家人的臉。", "發現紙箱比買來的貓窩還好睡。", "第一次抓到一隻蟑螂，叼來送給家人。", "學會聽到罐頭打開的聲音，就從房子的另一頭衝過來。"],
+  dog: ["學會坐下和握手。", "學會聽到鑰匙聲就衝到門口。", "第一次去海邊，追浪追到全身濕。", "第一次搭車出遊，把頭伸出窗外吹風。", "第一次學游泳，狗爬式划得好用力。"],
+};
+const trickLeft = () => TRICK[P.sp].some(x => !(P.used.trick || []).includes(x));
+
+// Events. w = where (* = anywhere), sp = species only, p = chance per month (number or function),
+// min/max = age window in months, once = at most once per life, cd = months before it can repeat (default 3),
+// texts = variants (no repeats until all are used), ms = milestone for the ending slideshow, note = data footnote.
+const EV = [
+  // ---- first months, anywhere ----
+  { id: "eyes", w: "*", p: 1, once: 1, ms: 1, text: () => P.env === "stray" ? "第一次睜開眼睛。世界是模糊的，聞得到媽媽和紙箱的味道。" : P.env === "shop" ? "第一次睜開眼睛，看見的是繁殖場的鐵籠。" : "第一次睜開眼睛，聽見兄弟姊妹在旁邊哼哼叫。" },
+  { id: "walk", w: "*", p: 1, once: 1, cond: () => P.done.has("eyes"), text: () => "搖搖晃晃地走出第一步。" },
+  { id: "voice", w: "*", p: .5, min: 1, max: 5, once: 1, cond: () => P.done.has("walk"), text: () => P.sp === "cat" ? "第一次發出像樣的「喵」，聲音小小的。" : "第一次發出像樣的「汪」，把自己嚇了一跳。" },
+  { id: "sibplay", w: "*", p: .5, min: 1, max: 4, once: 1, cond: () => P.done.has("walk"), texts: ["和兄弟姊妹扭打成一團，咬到彼此的耳朵。", "跟兄弟姊妹搶媽媽身邊最溫暖的位置。"], eff: () => { P.joy += 4; } },
+  { id: "wean", w: "*", p: .8, min: 2, once: 1, cond: () => P.done.has("walk"), text: () => "斷奶了，開始自己吃東西。" },
+  { id: "sibgone", w: "*", p: .12, min: 2, cd: 2, cond: () => P.fam.sibs.includes("一起長大"), text: () => {
+      const i = P.fam.sibs.indexOf("一起長大"), st = P.env === "stray" ? pick(["被路人帶走了", "走散了", "被志工救走了"]) : P.env === "shop" ? pick(["被客人買走了", "被送到別間店了"]) : pick(["被新家人接走了", "被親戚領養了"]);
+      P.fam.sibs[i] = st; return `一隻兄弟姊妹${st}。`; } },
+  { id: "momgone", w: "stray", p: .1, min: 3, max: 10, once: 1, kind: "bad", cond: () => P.fam.mom === "在附近的街頭", text: () => "媽媽某天出去找食物，就沒有再回來。", eff: () => { P.fam.mom = "下落不明"; P.joy -= 8; } },
+  { id: "momhome", w: "home", p: .3, min: 3, max: 12, once: 1, cond: () => P.origin === "home" && P.homes === 1, text: () => "媽媽教你怎麼在家裡找到最舒服的角落。", eff: () => { P.bond += 3; } },
+  { id: "litter", w: "*", p: () => P.env === "stray" ? .05 : P.env === "home" ? .012 : 0, min: 10, cond: () => P.sex === "母" && !P.neuter && P.m - P.lastLitter > 10, ms: 1, kind: "big", icon: "♥",
+    text: () => { const n = 3 + (R() * 4 | 0); P.kids += n; P.lastLitter = P.m; return `你生下了 ${n} 隻${kid()}。${P.env === "stray" ? "牠們也將在街頭長大。" : "家人忙著幫牠們找新家。"}`; },
+    note: "一隻未結紮的母貓一年可生 2–3 胎，母犬約 1–2 胎；結紮是減少流浪動物最直接的方法。" },
+  { id: "quake", w: "*", p: .01, min: 3, cd: 24, cond: () => inC("TWN", "JPN", "TUR", "MEX", "IDN", "PHL"), text: () => P.env === "home" ? "半夜地震，你比家人還早醒來，在門口來回走。" : P.env === "shop" ? "地震的時候，寵物店的玻璃櫃嘩啦啦地響，你縮在角落發抖。" : P.env === "shelter" ? "地震的時候，整間收容所的狗貓一起叫了起來。" : "地震的時候，你從紙箱裡衝出來，整條街的狗都在叫。", eff: () => { P.joy -= 2; } },
+  { id: "caramel", w: "*", sp: "dog", p: .1, min: 4, once: 1, cond: () => inC("BRA") && ["土黃色", "奶茶色"].includes(P.coat), text: () => "路人看到你都笑著叫你「焦糖狗」。", note: "在巴西，焦糖色的米克斯（vira-lata caramelo）常被視為非官方的國民狗。", eff: () => { P.joy += 4; P.trust += 3; } },
+
+  // ---- street ----
+  { id: "box", w: "stray", p: .6, min: 2, once: 1, text: () => `在${P.city}的${P.place}找到一個紙箱，當作遮風避雨的家。` },
+  { id: "feed", w: "stray", p: .18, min: 3, cd: 3, kind: "good",
+    texts: () => P.friend ? ["阿姨今天也準時來了，還多帶了一顆水煮蛋。", "阿姨幫你換了一個新的水碗。", "阿姨蹲在旁邊，看你把飯吃完才離開。"]
+      : ["便利商店店員偷偷留了一點罐頭。", "放學的小學生把便當裡的肉分了一塊給你。", "市場收攤後，魚販丟了一點魚肉給你。", "一位騎車經過的大哥停下來，倒了一些飼料給你。"],
+    eff: () => { P.hp += 5; P.joy += 5; } },
+  { id: "trash", w: "stray", p: .1, min: 3, texts: ["在垃圾桶裡翻到半個便當。", "撿到一塊別人掉在地上的麵包。", "在餐廳後門等到一包剩菜。"], eff: () => { P.hp += 2; } },
+  { id: "nightmkt", w: "stray", p: .06, min: 4, cd: 8, cond: () => inC("TWN"), text: () => "跟著夜市的人潮走，有人偷偷餵了你一小口雞排的邊邊。", eff: () => { P.hp += 2; P.joy += 3; } },
+  { id: "sun", w: "stray", p: .07, min: 3, cd: 4, kind: "good", text: () => "找到一塊被太陽曬暖的水泥地，睡了一整個下午。", eff: () => { P.joy += 4; } },
+  { id: "kidpet", w: "stray", p: .06, min: 3, cd: 5, kind: "good", texts: ["一個小朋友摸了摸你，媽媽在旁邊說：「要輕輕的喔。」", "放學的國中生蹲下來，跟你說了好多話。"], eff: () => { P.trust += 3; P.joy += 3; } },
+  { id: "buddyS", w: "stray", p: .05, min: 4, once: 1, kind: "good", text: () => P.sp === "cat" ? "跟一隻老橘貓成了朋友，牠把最好的曬太陽位置讓給你。" : "跟一隻三腳的老狗成了好朋友，牠帶你找到有乾淨水喝的地方。", eff: () => { P.joy += 6; P.fam.buddy = P.sp === "cat" ? "街角的老橘貓" : "三腳的老狗"; } },
+  { id: "viral", w: "stray", p: .02, min: 3, once: 1, kind: "good", text: () => "有人把你的照片貼到網路上，好多人留言說你好可愛。", eff: () => { P.viral = P.m + 6; } },
+  { id: "rain", w: "stray", p: .08, min: 3, cd: 4, kind: "bad", texts: ["下了一整夜的雨，找不到乾的地方。", "午後雷陣雨來得好突然，你全身都濕透了。"], eff: () => { P.hp -= 6; P.joy -= 5; P.override = { kind: "street", until: P.m + 1, rain: 1 }; } },
+  { id: "cold", w: "stray", p: .25, min: 2, cd: 10, kind: "bad", cond: winter, texts: [() => `寒流來了，你縮在${veh()}的引擎旁邊取暖。`, "冬天的晚上好長，你把身體捲成一團，鼻子埋進尾巴裡。"], eff: () => { P.hp -= 5; } },
+  { id: "snowS", w: "stray", p: .35, cd: 10, kind: "bad", cond: snowing, text: () => "下雪了。腳掌踩在雪上好冰，你找不到地方躲。", eff: () => { P.hp -= 7; P.joy -= 3; } },
+  { id: "heatS", w: "stray", p: .12, min: 2, cd: 10, times: 3, kind: "bad", cond: summer, text: () => "熱浪來襲，你整天躲在陰影下喘氣，柏油路燙得踩不下去。", note: "狗主要靠喘氣散熱，貓會舔毛降溫；高溫對街頭動物特別危險。", eff: () => { P.hp -= 5; } },
+  { id: "monsoonS", w: "stray", p: .3, cd: 10, kind: "bad", cond: monsoon, text: () => "雨季來了，街道淹水，你在高處的台階上待了好幾天。", eff: () => { P.hp -= 5; P.override = { kind: "street", until: P.m + 1, rain: 1 }; } },
+  { id: "engine", w: "stray", sp: "cat", p: .3, once: 1, cond: winter, text: () => "冬天你鑽進汽車引擎室取暖。車主發動前拍了拍引擎蓋，你嚇得跳了出來。", note: "冬天發動汽車前先拍拍引擎蓋，能讓躲在裡面取暖的貓咪先離開。" },
+  { id: "fwS", w: "stray", p: .5, cd: 10, times: 3, kind: "bad", cond: () => !!fireworks(), texts: [() => `${fwText()}響了一整晚，你嚇得一路狂奔，跑到不認識的街區。`, () => `${fwText()}一響，你鑽進排水溝旁的縫隙，一直躲到天亮。`], eff: () => { P.joy -= 6; P.place = strayPlace(); } },
+  { id: "moonS", w: "stray", p: .5, cd: 10, kind: "good", cond: () => inC("TWN") && [9, 10].includes(calMonth()), text: () => "中秋夜，大家在騎樓烤肉，有人丟了一截香腸給你。", eff: () => { P.hp += 2; P.joy += 3; } },
+  { id: "xmasS", w: "stray", p: .4, cd: 10, kind: "good", cond: xmas, text: () => "聖誕夜的街上好熱鬧，有人分了你一塊火腿。", eff: () => { P.hp += 2; P.joy += 2; } },
+  { id: "fight", w: "stray", p: () => .05 * (focusNow() === "play" ? 1.8 : 1) * (P.pack ? .5 : 1), min: 5, cd: 6, kind: "bad", icon: "✚", text: () => P.sp === "cat" ? "為了地盤跟另一隻公貓打了一架，耳朵受了傷。" : "被一群陌生的狗追趕，後腳受了傷。", eff: () => { P.hp -= 14; P.joy -= 6; P.trust -= 3; } },
+  { id: "close", w: "stray", p: .04, min: 3, cd: 12, kind: "bad", text: () => `過馬路時，一台${veh()}呼嘯而過，差一點就撞到你。`, eff: () => { P.trust -= 2; P.joy -= 3; } },
+  { id: "shoo", w: "stray", p: .06, min: 3, cd: 5, kind: "bad", texts: ["店家拿掃把把你趕走了。", "有人跺腳大聲趕你走，你嚇得跑了好遠。", "大樓管理員把你從停車場趕了出去。"], eff: () => { P.trust -= 4; P.joy -= 3; } },
+  { id: "fleas", w: "stray", p: .05, min: 3, cd: 10, kind: "bad", icon: "✚", text: () => "身上的跳蚤好癢，抓到好幾塊皮膚都破了。", eff: () => { P.hp -= 4; } },
+  { id: "hungry", w: "stray", p: .05, min: 4, cd: 8, kind: "bad", text: () => "連續好幾天沒找到東西吃，走路都沒有力氣。", eff: () => { P.hp -= 8; } },
+  { id: "skin", w: "stray", p: .03, min: 6, cd: 18, kind: "bad", icon: "✚", text: () => "得了皮膚病，身上的毛掉了好幾塊。", eff: () => { P.hp -= 8; P.joy -= 3; } },
+  { id: "heal", w: "stray", p: .25, min: 3, cd: 8, kind: "big good", ms: 1, cond: () => P.hp < 45,
+    text: () => P.friend ? "阿姨發現你受傷了，帶你去看了獸醫。" : `一位${inC("TWN") ? "愛心媽媽" : "好心人"}發現你生病，帶你去看了醫生，又把你放回原地。`,
+    eff: () => { P.hp += 12; P.trust += 6; vet(); } },
+  { id: "tnr", w: "stray", p: .05, min: 6, once: 1, ms: 1, kind: "good", cond: () => !P.neuter, text: () => P.sp === "cat" ? "志工帶你去做了 TNR：結紮、打疫苗，剪了一小角耳朵當記號，再放回原地。" : "愛心團體帶你去結紮、打了狂犬病疫苗，再放回原地。",
+    note: "TNR：誘捕（Trap）、絕育（Neuter）、回置（Return），是常見的街頭動物族群管理方式。", eff: () => { P.neuter = true; P.vax = true; P.hp += 4; vet(); } },
+  { id: "abc", w: "stray", sp: "dog", p: .06, min: 6, once: 1, ms: 1, kind: "good", cond: () => inC("IND") && !P.neuter, text: () => "市政府的動物絕育計畫帶你去結紮、打了狂犬病疫苗，再送回原本的街區。", note: "印度依《動物生育控制規則》，流浪犬以絕育、施打疫苗後放回原地的方式管理。", eff: () => { P.neuter = true; P.vax = true; vet(); } },
+  { id: "chiiki", w: "stray", sp: "cat", p: .08, min: 6, once: 1, ms: 1, kind: "good", cond: () => inC("JPN"), text: () => "附近的居民把你登記成「地域貓」，帶你去結紮，之後輪流餵食、清理。", note: "日本的「地域貓」是由社區居民共同照顧與管理的街貓，通常會先完成結紮。", eff: () => { P.neuter = true; P.hp += 5; P.trust += 5; } },
+  { id: "istanbul", w: "stray", sp: "cat", p: .1, min: 3, once: 1, ms: 1, kind: "good", cond: () => inC("TUR"), text: () => `${P.city}的店家在門口放了貓碗和小屋，整條街的人都在照顧你。`, note: "土耳其以街貓文化聞名，尤其在伊斯坦堡，許多居民和店家會共同照顧街頭的貓。", eff: () => { P.hp += 6; P.joy += 6; P.trust += 6; } },
+  { id: "metro", w: "stray", sp: "dog", p: .06, min: 8, once: 1, ms: 1, cond: () => P.city === "莫斯科", text: () => "你學會了跟著人潮搭地鐵，在莫斯科的車站之間移動。", note: "莫斯科有部分流浪狗會搭乘地鐵移動，曾被研究者長期觀察記錄。", eff: () => { P.joy += 5; } },
+  { id: "schoolDog", w: "stray", sp: "dog", p: .015, min: 6, once: 1, kind: "big home", ms: 1, cond: () => inC("TWN"), text: () => `${P.city}一所國小收編你成為「校犬」，每天陪學生升旗、下課。`, note: "台灣有不少學校收編流浪狗成為校犬，由師生一起照顧。", eff: () => goHome("國小的師生們", "國小校園") },
+  { id: "shopCat", w: "stray", sp: "cat", p: .012, min: 5, once: 1, kind: "big home", ms: 1, text: () => "一家雜貨店的老闆讓你在店裡住下，你成了大家口中的「店貓」。", eff: () => goHome("雜貨店老闆", "雜貨店") },
+  { id: "rescue", w: "stray", p: () => .03 * (P.trust > 60 ? 1.5 : 1), min: 2, kind: "big good", ms: 1, text: () => "有人通報，你被救援送進了收容所。", eff: () => { const n = toShelter(); if (n) addLog("", "志工替你登記入所。", n); } },
+  { id: "takehome", w: "stray", p: () => .012 * (focusNow() === "people" ? 2.5 : 1) * (P.friend ? 3 : 1) * (P.viral > P.m ? 2 : 1), min: 2, kind: "big home", ms: 1,
+    text: () => P.friend ? "那天，餵你的阿姨帶了一個外出籠。她說：「跟我回家吧。」" : P.viral > P.m ? "一位在網路上看到你照片的人，特地找到這條街，把你抱回家。" : "一位路過的人蹲下來看了你很久，然後把你抱回家。",
+    eff: () => goHome(P.friend ? "一直餵你的阿姨" : null) },
+  { id: "dLady", w: "stray", p: .14, min: 3, once: 1, decide: "lady" },
+  { id: "dStorm", w: "stray", p: () => typhoonSeason() ? .25 : .02, min: 4, once: 1, decide: "storm" },
+  { id: "dPack", w: "stray", sp: "dog", p: .05, min: 6, once: 1, decide: "pack" },
+  { id: "dCatcher", w: "stray", p: .02, min: 6, once: 1, decide: "catcher" },
+  { id: "dWork", w: "stray", sp: "dog", p: .03, min: 6, once: 1, cond: () => inC("TWN"), decide: "worksite" },
+  { id: "dTemple", w: "stray", p: .03, min: 4, once: 1, cond: () => inC("TWN", "THA", "JPN"), decide: "temple" },
+
+  // ---- breeder and pet shop ----
+  { id: "breeder", w: "shop", p: .8, max: 2, once: 1, text: () => "繁殖場裡好擠，媽媽一直待在籠子裡，已經生過好幾胎了。", note: "購買需求是繁殖場持續繁殖的原因之一；以認養代替購買，可以減少這樣的循環。", eff: () => { P.joy -= 3; } },
+  { id: "shopwin", w: "shop", p: .7, min: 2, once: 1, ms: 1, text: () => `你被送到${P.city}一間寵物店，住在玻璃櫃裡，每天看著路人走過。`, eff: () => { P.joy -= 4; P.fam.mom = "留在繁殖場"; } },
+  { id: "clean", w: "shop", p: .15, min: 3, cd: 4, cond: () => P.done.has("shopwin"), text: () => "店員每天幫你清籠子、量體重，替你拍了新的商品照。" },
+  { id: "knock", w: "shop", p: .12, min: 3, cond: () => P.done.has("shopwin"), kind: "bad", text: () => "小朋友一直敲玻璃，你嚇得縮在角落。", eff: () => { P.joy -= 3; } },
+  { id: "sale", w: "shop", p: .3, min: 6, once: 1, kind: "bad", text: () => "你長大了，價格標籤被換成了「特價」。", eff: () => { P.joy -= 3; } },
+  { id: "bought", w: "shop", p: .28, min: 3, kind: "big home", ms: 1, cond: () => P.done.has("shopwin"), text: () => "一家人在玻璃前停下腳步，把你買回家。", eff: () => goHome() },
+  { id: "shopout", w: "shop", p: .05, min: 7, kind: "bad", ms: 1, text: () => "長大後一直沒被買走，你被送去了收容所。", eff: () => { const n = toShelter(); if (n) addLog("", "志工替你登記入所。", n); } },
+
+  // ---- shelter ----
+  { id: "intake", w: "shelter", p: .8, once: 1, text: () => P.chip ? "入所時，獸醫幫你做了健康檢查，掃描了你的晶片。" : "入所時，獸醫幫你做了健康檢查，植入了晶片。", eff: () => { P.chip = P.chip || chipNo(); P.vax = true; } },
+  { id: "photo", w: "shelter", p: .6, once: 1, cond: () => P.done.has("intake"), text: () => "志工幫你拍了一張認養照，努力把你最可愛的樣子拍下來。", eff: () => { P.joy += 3; P.fam.volunteer = P.fam.volunteer || pick(["志工小美", "志工阿傑", "志工佩佩"]); } },
+  { id: "vol", w: "shelter", p: .2, cd: 3, kind: "good", texts: ["週末志工帶你出去散步，草地的味道好香。", "有人幫你洗了澡、梳了毛。", "認養日有小朋友隔著籠子跟你說話。", "志工帶了一顆新的球，丟給你追了好幾趟。"], eff: () => { P.joy += 5; P.trust += 3; } },
+  { id: "lonely", w: "shelter", p: .1, cd: 4, text: () => "隔壁籠的室友被領養走了，晚上有點安靜。", eff: () => { P.joy -= 6; } },
+  { id: "shNeuter", w: "shelter", p: .3, min: 5, once: 1, kind: "good", cond: () => !P.neuter, text: () => "收容所安排你完成了結紮，這是送養前的必要程序。", note: "許多收容所會在動物送養前完成絕育。", eff: () => { P.neuter = true; vet(); } },
+  { id: "noise", w: "shelter", p: .08, cd: 6, kind: "bad", text: () => "收容所裡每天都好吵，你很難睡好。", eff: () => { P.joy -= 4; P.hp -= 2; } },
+  { id: "video", w: "shelter", p: .06, once: 1, kind: "good", cond: () => P.done.has("photo"), text: () => "志工幫你拍了一支認養影片，放到網路上。", eff: () => { P.viral = P.m + 6; } },
+  { id: "kids", w: "shelter", p: .05, once: 1, kind: "good", text: () => "一群小學生來收容所參訪，輪流隔著籠子跟你說話。", eff: () => { P.trust += 4; P.joy += 3; } },
+  { id: "cough", w: "shelter", p: .04, cd: 12, kind: "bad", icon: "✚", text: () => P.sp === "cat" ? "收容所裡流行上呼吸道感染，你也打了好幾天噴嚏。" : "收容所裡流行犬舍咳，你也咳了好幾天。", eff: () => { P.hp -= 6; } },
+  { id: "longtime", w: "shelter", p: .3, once: 1, cond: () => P.shelterM > 24, kind: "big", ms: 1, text: () => "你成了收容所的「長期住民」，每個志工都叫得出你的名字。", note: "成犬、成貓通常比幼犬幼貓更晚被認養。", eff: () => { P.trust += 5; P.fam.volunteer = P.fam.volunteer || "收容所的志工們"; } },
+  { id: "party", w: "shelter", p: .2, once: 1, cond: () => P.shelterM > 12, kind: "good", text: () => "志工幫長期住民辦了一場慶生會，你戴上了紙做的帽子。", eff: () => { P.joy += 6; } },
+  { id: "dAdopt", w: "shelter", p: () => .22 * (P.viral > P.m ? 1.5 : 1), cond: () => P.done.has("photo"), decide: "adoptday" },
+  { id: "dFoster", w: "shelter", p: .04, min: 2, once: 1, cond: () => P.done.has("intake"), decide: "foster" },
+
+  // ---- home: firsts ----
+  { id: "name", w: "home", p: 1, once: 1, kind: "home", text: () => ({ keep: `新家人決定繼續叫你「${P.name}」。`, rename: `新家人幫你取了新名字：「${P.name}」。` })[P.nameNote] || `家人幫你取了名字：「${P.name}」。` },
+  { id: "vax", w: "home", p: .5, min: 2, once: 1, kind: "good", cond: () => !P.vax, text: () => "第一次去動物醫院打疫苗，抖了一下但很勇敢。", note: "幼犬幼貓通常在 2–4 個月大時完成基礎疫苗。", eff: () => { P.vax = true; P.hp += 4; vet(); } },
+  { id: "chipE", w: "home", p: .3, min: 3, once: 1, kind: "good", cond: () => !P.chip, text: () => "植入了晶片、完成寵物登記。以後就算走丟也找得回來。", note: chipNote, eff: () => { P.chip = chipNo(); } },
+  { id: "neuter", w: "home", p: .18, min: 6, once: 1, kind: "good", cond: () => !P.neuter, text: () => "完成結紮手術，在家休養了一個星期。", eff: () => { P.neuter = true; P.hp += 2; vet(); } },
+  { id: "heartworm", w: "home", sp: "dog", p: .15, min: 3, once: 1, text: () => "開始每個月吃心絲蟲預防藥。", note: "心絲蟲透過蚊子傳染，可以定期用藥預防。" },
+  { id: "bath", w: "home", p: .25, min: 2, once: 1, text: () => "第一次在家洗澡，你濕答答的，看起來小了一半。" },
+  { id: "nails", w: "home", p: .15, min: 3, once: 1, text: () => "第一次剪指甲，你一直把腳縮回去。" },
+  { id: "vacuum", w: "home", p: .15, min: 2, once: 1, text: () => "第一次看到吸塵器，你對它展開了長期的敵意。" },
+  { id: "bed", w: "home", p: .08, min: 4, once: 1, kind: "good", text: () => "第一次被允許跳上床，跟家人一起睡。", eff: () => { P.bond += 5; } },
+  { id: "collar", w: "home", p: .1, min: 3, once: 1, text: () => P.sp === "cat" ? "家人幫你戴上有鈴鐺的項圈，名牌上刻著你的名字和電話。" : "家人幫你買了新項圈，名牌上刻著你的名字和電話。", note: "名牌加上晶片，是走失時最快找回家的方法。" },
+  { id: "groom", w: "home", sp: "dog", p: .06, min: 6, once: 1, text: () => "第一次去美容，剪完回家，家人笑了好久。" },
+  { id: "social", w: "home", p: .01, min: 6, once: 1, text: () => "家人幫你開了社群帳號，追蹤你的人越來越多。" },
+
+  // ---- home: everyday ----
+  { id: "trick", w: "home", p: .18, min: 4, cond: trickLeft, text: () => { const u = (P.used.trick = P.used.trick || []), x = pick(TRICK[P.sp].filter(t => !u.includes(t))); u.push(x); return x; }, eff: () => { P.joy += 6; P.bond += 3; } },
+  { id: "daily", w: "home", p: .1, min: 6, cd: 4, kind: "good",
+    texts: () => P.sp === "cat" ? ["在窗台曬了一整個下午的太陽。", "把桌上的杯子推到地上，然後一臉無辜。", "家人加班晚歸，你在門口等。", "趁家人不注意，霸佔了他的電腦鍵盤。", "家人看書的時候，你硬是躺在書本上。"]
+      : ["週末去河濱公園跑了好幾圈。", "偷吃了沙發上的餅乾。", "下雨天不能出門，在家咬玩具出氣。", "家人回家時，你興奮到尾巴把茶几上的東西都掃了下來。", "在公園認識了一隻柴犬，每天散步都要去找牠。"],
+    eff: () => { P.joy += 4; P.bond += 2; } },
+  { id: "zoom", w: "home", p: .05, min: 4, cd: 14, times: 3, texts: () => P.sp === "cat" ? ["半夜在家裡跑酷，從櫃子飛到沙發上。", "凌晨三點，你在走廊來回衝刺了十趟。"] : ["晚上突然在客廳暴衝跑圈，家人笑到不行。", "洗完澡後，你在家裡瘋狂暴衝，把自己甩乾。"], eff: () => { P.joy += 3; } },
+  { id: "thunder", w: "home", p: .04, min: 4, cd: 18, times: 3, texts: ["打雷的晚上，你鑽進家人的被窩。", "雷聲一響，你就躲到浴室的角落，家人陪你坐在地上。"], eff: () => { P.bond += 3; } },
+  { id: "shoes", w: "home", sp: "dog", p: .12, min: 3, max: 30, once: 1, text: () => "你把家人的拖鞋咬成了碎片。", eff: () => { P.joy += 3; P.bond -= 1; } },
+  { id: "alone", w: "home", sp: "dog", p: .06, min: 4, max: 36, once: 1, kind: "bad", text: () => "家人出門後，你在門口叫了一整個下午，鄰居來按門鈴抗議。", eff: () => { P.joy -= 3; } },
+  { id: "guard", w: "home", sp: "dog", p: .02, min: 12, once: 1, kind: "good", text: () => "半夜有陌生人在門口徘徊，你大聲叫醒了全家。", eff: () => { P.bond += 5; } },
+  { id: "courier", w: "home", sp: "dog", p: .04, min: 8, cd: 12, times: 2, texts: ["你每天都隔著門，跟送貨員對峙。", "送貨員今天蹲下來摸了你，你們好像和好了。"] },
+  { id: "bee", w: "home", sp: "dog", p: .03, min: 6, once: 1, kind: "bad", text: () => "你去咬一隻蜜蜂，結果嘴巴腫了兩天。", eff: () => { P.hp -= 3; } },
+  { id: "fair", w: "home", sp: "dog", p: .03, min: 8, once: 1, kind: "good", text: () => "家人帶你去逛寵物市集，你收到好多陌生人的摸摸。", eff: () => { P.trust += 5; P.joy += 4; } },
+  { id: "hairball", w: "home", sp: "cat", p: .05, min: 6, cd: 14, times: 3, texts: ["在家人的枕頭上吐了一顆毛球。", "換毛季到了，家人每天幫你梳下一大團毛。"] },
+  { id: "sofa", w: "home", sp: "cat", p: .1, min: 4, once: 1, text: () => "你把新沙發抓出了好幾道痕跡，家人默默買了貓抓板。" },
+  { id: "laser", w: "home", sp: "cat", p: .1, min: 3, once: 1, kind: "good", text: () => "家人拿雷射筆逗你，你追了半小時，還是抓不到那個紅點。", eff: () => { P.joy += 5; } },
+  { id: "boxfit", w: "home", sp: "cat", p: .1, min: 3, once: 1, text: () => "網購的紙箱一到，你立刻跳了進去，誰也別想拿走。" },
+  { id: "knead", w: "home", sp: "cat", p: .1, min: 4, once: 1, kind: "good", text: () => "窩在家人的毛毯上踩踩，一邊發出呼嚕聲。", eff: () => { P.bond += 4; } },
+
+  // ---- home: health ----
+  { id: "checkup", w: "home", p: .06, min: 24, cd: 12, times: 4, kind: "good", texts: ["年度健康檢查加上疫苗補強，醫生說你一切都很好。", "例行健康檢查，醫生誇你的牙齒很乾淨。", "打完疫苗回家的路上，家人買了一個新玩具獎勵你。", "健康檢查抽了血，你很勇敢，一聲都沒叫。"], eff: () => { P.hp += 2; vet(); } },
+  { id: "sick", w: "home", p: .025, min: 6, cd: 6, kind: "bad", icon: "✚", texts: ["吃壞肚子，看了醫生、吃了幾天藥。", "皮膚過敏，戴了幾天頭套。", "健康檢查發現有牙結石，麻醉洗了牙。", "耳朵發炎，每天都要點耳藥。"], eff: () => { P.hp -= 8; vet(); } },
+  { id: "chubby", w: "home", p: .02, min: 24, once: 1, text: () => "體重超標了，家人開始控制你的零食。", eff: () => { P.joy -= 2; P.hp += 3; } },
+  { id: "heatD", w: "home", sp: "dog", p: .1, min: 6, cd: 12, times: 2, kind: "bad", cond: summer, text: () => "夏天中午出門散步，你熱到一直喘，差點中暑。", note: "夏天應避開正午散步，柏油路面可能燙傷腳掌。", eff: () => { P.hp -= 5; } },
+  { id: "choco", w: "home", sp: "dog", p: .008, min: 6, once: 1, kind: "big bad", icon: "✚", ms: 1, text: () => "你偷吃了桌上的巧克力，被緊急送去看急診。", note: "巧克力含可可鹼，對狗有毒。", eff: () => { P.hp -= 15; vet(); } },
+  { id: "grape", w: "home", sp: "dog", p: .006, min: 6, once: 1, kind: "bad", icon: "✚", text: () => "你吃了掉在地上的葡萄，被帶去醫院催吐。", note: "葡萄和葡萄乾可能讓狗急性腎衰竭。", eff: () => { P.hp -= 8; vet(); } },
+  { id: "lily", w: "home", sp: "cat", p: .006, min: 6, once: 1, kind: "big bad", icon: "✚", ms: 1, text: () => "你咬了花瓶裡的百合，家人嚇得馬上帶你去急診。", note: "百合對貓有劇毒，連花粉和花瓶裡的水都可能造成急性腎衰竭。", eff: () => { P.hp -= 15; vet(); } },
+  { id: "urinary", w: "home", sp: "cat", p: .006, min: 18, once: 1, kind: "bad", icon: "✚", text: () => "尿尿變得很困難，醫生說是泌尿道結石。", note: "貓咪喝水少容易有泌尿道問題，多準備幾個水碗會有幫助。", eff: () => { P.hp -= 12; vet(); } },
+
+  // ---- home: family life ----
+  { id: "wfh", w: "home", p: .006, min: 12, once: 1, kind: "good", text: () => "家人開始在家工作，你每天都可以待在他腳邊。", eff: () => { P.joy += 5; P.bond += 5; } },
+  { id: "busy", w: "home", p: .006, min: 12, cd: 36, kind: "bad", text: () => "家人換了新工作，每天很晚才回家。", eff: () => { P.joy -= 5; P.bond -= 2; } },
+  { id: "wedding", w: "home", p: .004, min: 24, once: 1, ms: 1, icon: "♥", kind: "good", text: () => "家人結婚了，家裡多了一個人，也多了一雙會摸你的手。", eff: () => { P.joy += 4; P.cast.people.push(mkPerson(P.c)); } },
+  { id: "baby", w: "home", p: .006, min: 18, once: 1, ms: 1, icon: "♥", kind: "good", text: () => "家裡多了一個小嬰兒。你決定當他的守護者。", eff: () => { P.joy += 6; P.bond += 6; P.cast.people.push(mkPerson(P.c)); } },
+  { id: "school", w: "home", p: .02, once: 1, kind: "good", cond: () => P.done.has("baby") && P.m - P.last.baby > 60, text: () => "家裡的小孩上小學了，每天放學第一個找你。", eff: () => { P.bond += 4; } },
+  { id: "ownerSick", w: "home", p: .003, min: 24, once: 1, kind: "bad", text: () => "家人生病住院了一陣子，你每天守在門口等。", eff: () => { P.bond += 6; P.joy -= 5; } },
+  { id: "elder", w: "home", p: .006, min: 18, once: 1, cond: () => /阿嬤|伯伯/.test(P.fam.owner || ""), text: () => `${ownerShort()}年紀大了，搬去跟兒子一起住，你也跟著搬了家。`, eff: () => { P.place = "公寓"; P.joy -= 2; } },
+  { id: "move", w: "home", p: .01, min: 12, cd: 24, text: () => "全家搬到新家，你花了一個星期才習慣新的味道。", eff: () => { P.joy -= 3; P.place = homePlace(); } },
+  { id: "buddyGone", w: "home", p: .01, min: 60, once: 1, kind: "bad", cond: () => P.done.has("dPet") && P.fam.buddy && !/彩虹橋/.test(P.fam.buddy), text: () => "陪你多年的室友先去了彩虹橋，你在牠的窩旁邊躺了好幾天。", eff: () => { P.joy -= 10; P.fam.buddy = "已經去了彩虹橋"; } },
+
+  // ---- home: seasons and holidays ----
+  { id: "snowH", w: "home", p: .5, once: 1, ms: 1, kind: "good", cond: snowing, text: () => P.sp === "cat" ? "第一次看到窗外下雪，你盯著雪花看了一整個早上。" : "第一次看到雪，你在院子裡又跑又跳。", eff: () => { P.joy += 6; } },
+  { id: "fwH", w: "home", p: .5, cd: 10, times: 3, kind: "bad", cond: () => !!fireworks(), texts: [() => `${fwText()}好可怕，你整晚躲在床底下，家人一直陪著你。`, () => `今年${fwText().replace("的", "響起前")}，家人提早關好門窗，開了電視陪你。`, () => `${fwText()}還是讓你耳朵一直豎著，但這次你沒有躲起來。`],
+    note: () => inC("USA") ? "美國每年國慶日前後，常是收容所收到最多走失動物的時候。" : "煙火和鞭炮是犬貓走失的常見原因，記得關好門窗。", eff: () => { P.joy -= 3; P.bond += 2; } },
+  { id: "moonH", w: "home", p: .5, cd: 10, times: 3, cond: () => inC("TWN") && [9, 10].includes(calMonth()), text: () => "中秋節全家烤肉，你分到一小塊沒調味的雞肉。", note: "香腸、洋蔥等重口味食物，對狗貓的腸胃負擔很大。", eff: () => { P.joy += 3; } },
+  { id: "xmasH", w: "home", p: .5, cd: 10, times: 3, kind: "good", cond: xmas, texts: ["聖誕節，你在樹下拆開了屬於自己的禮物。", "聖誕節，家人幫你戴上麋鹿角，拍了好多照片。"], eff: () => { P.joy += 4; } },
+
+  // ---- home: getting old ----
+  { id: "senior", w: "home", p: .06, once: 1, cond: () => P.m > P.max * .72, ms: 1, text: () => P.sp === "cat" ? "跳上櫃子變得吃力，家人幫你放了一個小階梯。" : "散步走得慢了，嘴邊的毛變白了。", eff: () => { P.hp -= 3; } },
+  { id: "arthritis", w: "home", sp: "dog", p: .06, once: 1, cond: () => P.m > P.max * .75, kind: "bad", text: () => "關節退化了，上下樓梯都要家人抱。", eff: () => { P.hp -= 5; } },
+  { id: "ckd", w: "home", sp: "cat", p: .06, once: 1, cond: () => P.m > P.max * .7, kind: "bad", icon: "✚", text: () => "健康檢查發現腎臟指數偏高，開始吃處方飼料。", note: "慢性腎臟病是老年貓常見的疾病，定期驗血能及早發現。", eff: () => { P.hp -= 6; vet(); } },
+  { id: "senile", w: "home", sp: "dog", p: .05, once: 1, cond: () => P.m > P.max * .8, text: () => "晚上偶爾會在客廳轉圈，忘了自己要去哪裡。家人輕輕把你抱回窩裡。", note: "老犬也可能出現認知功能障礙，類似人類的失智。" },
+  { id: "eyesOld", w: "home", p: .05, once: 1, cond: () => P.m > P.max * .78, text: () => "眼睛變得白白霧霧的，但你靠鼻子還是找得到家人。" },
+  { id: "deaf", w: "home", p: .05, once: 1, cond: () => P.m > P.max * .8, text: () => "耳朵變得不太靈光，家人改用手勢跟你說話。" },
+  { id: "diaper", w: "home", p: .1, once: 1, cond: () => P.m > P.max * .9, kind: "bad", text: () => "開始需要包尿布了。家人摸摸你說：「沒關係。」" },
+  { id: "lastTrip", w: "home", p: .15, once: 1, ms: 1, icon: "♥", kind: "good", cond: () => P.m > P.max * .86, text: () => P.sp === "cat" ? "家人把你最喜歡的窗台整理成一張小床，讓你每天都能曬到太陽。" : "家人帶你去了一趟你最愛的地方。你走得很慢，但尾巴一直搖。", eff: () => { P.joy += 10; P.bond += 5; } },
+
+  // ---- home: when things go wrong ----
+  { id: "fosterDone", w: "home", p: .1, cond: () => P.foster, kind: "big home", ms: 1, text: () => "中途志工幫你找到了永遠的家。", eff: () => { P.foster = false; goHome("認養你的一家人"); } },
+  { id: "returned", w: "home", p: .1, once: 1, cond: () => P.adoptedFrom === "shelter" && !P.foster && P.m - P.ownerSince <= 3 && P.trust < 45, kind: "big bad", ms: 1, text: () => "試養一個月後，新家人覺得還沒準備好，你又被送回了收容所。", note: "試養期讓雙方互相適應，也是避免衝動認養的機制。", eff: () => { toShelter(); P.joy -= 15; } },
+  { id: "lost", w: "home", p: () => .003 * (focusNow() === "play" ? 2 : 1) * (fireworks() ? 4 : 1), min: 8, kind: "big bad", ms: 1, text: () => fireworks() ? `${fwText()}響起的晚上，你受到驚嚇，從門縫衝了出去……` : "打雷的晚上，你受到驚嚇，從沒關好的門衝了出去……", eff: () => lostOut() },
+  { id: "dumped", w: "home", p: .002, min: 10, kind: "big bad", ms: 1, cond: () => !P.foster, text: () => "家裡出了變故，你被送到了收容所。", eff: () => { const n = toShelter(); P.joy -= 25; P.bond -= 20; if (n) addLog("", "志工替你登記入所。", n); } },
+  { id: "dPet", w: "home", p: .008, min: 18, once: 1, decide: "newpet" },
+  { id: "dDoor", w: "home", p: .02, min: 8, once: 1, decide: "door" },
+  { id: "dDiet", w: "home", p: .05, once: 1, cond: () => P.m > P.max * .6, decide: "diet" },
+  { id: "dTrip", w: "home", p: .01, min: 12, once: 1, decide: "trip" },
+  { id: "dComfort", w: "home", p: .008, min: 12, once: 1, decide: "comfort" },
+  { id: "dWalk", w: "home", sp: "dog", p: .02, min: 6, once: 1, decide: "walk" },
+  { id: "dBird", w: "home", sp: "cat", p: .03, min: 6, once: 1, decide: "bird" },
+];
+function lostOut() {
+  if (P.chip) { addLog("big good", "因為有晶片，三天後就被送回家了。家人抱著你哭了好久。"); P.joy -= 4; P.bond += 5; }
+  else { toStreet(); P.joy -= 20; P.bond -= 10; addLog("bad", "沒有晶片，沒有人知道你是誰家的孩子。", "沒有晶片的走失犬貓，被尋回的機會低很多。"); }
+}
+
+// Decisions pause time until the player picks. title/body/labels may be functions.
+const caught = text => { P.noteAfter = toShelter(); return text; };
+const DECIDE = {
+  lady: { title: "每天傍晚，一位阿姨都會來餵你。", body: "今天她蹲下來，慢慢伸出手。", opts: [
+    ["慢慢走過去，聞聞她的手", "信任 +12 · 牽絆 +8", () => { P.friend = true; P.trust += 12; P.bond += 8; P.fam.volunteer = "餵你的阿姨"; return "你聞了聞她的手。她笑了，輕輕摸了你的頭。"; }],
+    ["吃完就走，保持距離", "安全 · 沒有變化", () => "你吃完飯，轉身躲回紙箱。"],
+    ["換到別的街區", "幸福 -5", () => { P.joy -= 5; P.place = strayPlace(); return `你搬到了${P.place}。`; }]] },
+  storm: { title: () => typhoonSeason() ? "颱風要來了，雨越下越大。" : "暴風雨要來了，雨越下越大。", body: "風把紙箱吹翻了。", opts: [
+    ["躲進地下停車場", "健康 -3", () => { P.hp -= 3; return "你在停車場的角落熬過了一整夜。"; }],
+    [() => inC("TWN") ? "跟著撐傘的人走進騎樓" : "跟著撐傘的人躲到屋簷下", "信任 +6 · 有機會被收留", () => { P.trust += 6; if (R() < .3) { goHome("暴風雨夜收留你的上班族"); return "那個人把你帶回家擦乾，之後就沒有再讓你離開。"; } return "那個人給了你一條毛巾，雨停後你回到了街上。"; }],
+    ["待在原地", "健康 -10", () => { P.hp -= 10; P.override = { kind: "street", until: P.m + 1, rain: 1 }; return "你全身濕透，發抖到天亮。"; }]] },
+  pack: { title: "附近的狗群朝你走過來。", body: "帶頭的大黑狗盯著你看。", opts: [
+    ["低下頭，跟著牠們走", "幸福 +6 · 打架的機會減半", () => { P.pack = true; P.joy += 6; P.fam.buddy = "街頭的狗群"; return "你加入了狗群。晚上大家擠在一起睡，暖和多了。"; }],
+    ["保持距離", "沒有變化", () => "你繞到另一條巷子，避開了牠們。"],
+    ["吠回去，守住地盤", "可能受傷", () => { if (R() < .5) { P.joy += 2; return "牠們退開了，這塊地盤還是你的。"; } P.hp -= 12; mark("✚"); return "牠們一起撲了上來，你受了傷。"; }]] },
+  catcher: { title: "捕捉流浪動物的人帶著網子來了。", body: "街上的狗貓四處逃竄。", opts: [
+    ["躲進巷子深處", "大多能躲過", () => R() < .8 ? "你屏住呼吸，等他們走遠。" : caught("網子落下來，你被抱上了車，送進收容所。")],
+    ["待在原地", "會被帶走", () => caught("你被抱上了車，送進收容所。")],
+    ["跑到常餵你的人身邊", "要看有沒有人替你說話", () => P.friend ? (P.trust += 5, "阿姨出面說你是她照顧的孩子，他們讓你留了下來。") : caught("你不知道該跑去哪裡，最後還是被抱上了車。")]] },
+  worksite: { title: "工地的師傅每天中午都分你便當。", body: "工頭說：「要不要留下來顧工地？」", opts: [
+    ["留下來當工地狗", "有一個家，但工地會換", () => { goHome("工地的師傅們", "工地"); return "你在鐵皮屋下有了自己的窩，還多了好幾個主人。"; }],
+    ["吃完就走", "健康 +3", () => { P.hp += 3; return "你吃完雞腿，轉身回到街上。"; }]] },
+  temple: { title: () => inC("THA") ? "寺廟的僧侶在門口放了一碗飯。" : inC("JPN") ? "神社旁的老奶奶在石階上放了一碗飯。" : "廟口的師父在門口放了一碗飯。", body: "香爐的煙慢慢飄過來。", opts: [
+    ["留下來", "有一個安穩的地方", () => { goHome(inC("THA") ? "寺廟的僧侶們" : inC("JPN") ? "神社旁的老奶奶" : "廟裡的師父", inC("JPN") ? "神社旁" : "廟口"); return `你成了大家口中的「廟${P.sp === "cat" ? "貓" : "狗"}」，每天聽著誦經聲睡午覺。`; }],
+    ["吃完就走", "健康 +3", () => { P.hp += 3; return "你吃完飯，對著廟門看了一會兒，又回到街上。"; }]] },
+  adoptday: { title: "認養日到了。", body: "一家人停在你的籠子前面，小女孩趴在欄杆上看你。", opts: [
+    [() => P.sp === "cat" ? "走到籠邊，蹭蹭欄杆" : "走到籠邊，搖尾巴蹭欄杆", "被帶回家的機會很高", () => R() < .55 + P.trust / 400 ? (goHome("認養你的一家人"), "他們簽了認養切結書，帶你回家。") : "他們看了很久，最後選了隔壁的室友。"],
+    ["縮在角落觀察", "機會較低", () => R() < .15 + P.trust / 600 ? (goHome("認養你的一家人"), "小女孩說：「我就要這一隻。」") : "他們走向了下一個籠子。"],
+    [() => P.sp === "cat" ? "對他們哈氣" : "對他們吠叫", "機會很低 · 信任 -3", () => { P.trust -= 3; return "他們嚇了一跳，往後退了一步。"; }]] },
+  foster: { title: "中途之家的志工想帶你回去照顧一陣子。", body: "她說，等你找到永遠的家，再跟你說再見。", opts: [
+    ["跟她走", "住進家裡，等待永遠的家", () => { P.foster = true; goHome("中途之家的志工", "中途之家"); return "你住進了有沙發的房子，學會了怎麼當一隻家裡的毛孩。"; }],
+    ["留在收容所", "沒有變化", () => "你縮回籠子的角落，看著她離開。"]] },
+  door: { title: "門沒關好。", body: "外面傳來好多新奇的味道。", opts: [
+    ["衝出去探險", "幸福 +5 · 走失風險", () => { P.joy += 5; if (R() < .35) { addLog("big bad", "你跑太遠，找不到回家的路了……"); lostOut(); return null; } return "你在巷子裡繞了一圈，自己走回家了。"; }],
+    ["在門口看看就好", "安全", () => "你聞了聞門外的空氣，又回到窩裡。"],
+    ["跑去找家人通報", "牽絆 +6", () => { P.bond += 6; return "家人關上門，摸摸你：「好乖。」"; }]] },
+  newpet: { title: () => `家人帶回了一隻新的${R() < .5 ? "小狗" : "小貓"}。`, body: "牠躲在籠子裡，偷偷看著你。", opts: [
+    ["主動示好", "幸福 +6 · 多一個同伴", () => { P.joy += 6; P.fam.buddy = "新來的室友，感情很好"; mark("♥"); return "沒幾天，你們就睡在同一個窩裡。"; }],
+    ["保持距離", "幸福 -2", () => { P.joy -= 2; P.fam.buddy = "新來的室友，互不打擾"; return "你們各自佔了房子的一半。"; }],
+    ["宣示地盤", "牽絆 -3", () => { P.bond -= 3; P.fam.buddy = "新來的室友，常常吵架"; return "你們吵了好幾天，家人很頭痛。"; }]] },
+  diet: { title: "醫生說你該少吃點零食了。", body: "家人拿出了處方飼料。", opts: [
+    ["乖乖吃處方飼料", "健康 +8 · 幸福 -3 · 可能活得更久", () => { P.hp += 8; P.joy -= 3; P.max += 6; return "你嫌棄地吃完了。醫生說數字變好看了。"; }],
+    ["對家人裝可憐討零食", "幸福 +5 · 健康 -5", () => { P.joy += 5; P.hp -= 5; return "家人心軟了，偷偷塞給你一塊肉乾。"; }]] },
+  trip: { title: "家人要出國一個星期。", body: "家人蹲下來，跟你說明這幾天的安排。", opts: [
+    ["去寵物旅館", "幸福 -4", () => { P.joy -= 4; return "旅館的房間很乾淨，但你每天都在等門打開。"; }],
+    ["請保母到府照顧", "幸福 -1", () => { P.joy -= 1; return "保母每天來兩次，你守著家，等家人回來。"; }],
+    ["寄住親戚家", "信任 +3 · 幸福 -2", () => { P.trust += 3; P.joy -= 2; return "親戚家的小孩很喜歡你，陪你玩了一整個星期。"; }]] },
+  comfort: { title: "家人今天回家後一直在哭。", body: "客廳的燈沒有開。", opts: [
+    ["靠過去，把頭放在他腿上", "牽絆 +8", () => { P.bond += 8; return "他抱著你哭了好久，最後笑了一下。"; }],
+    ["叼玩具給他", "牽絆 +4 · 幸福 +2", () => { P.bond += 4; P.joy += 2; return "他接過玩具，摸摸你的頭：「謝謝你。」"; }],
+    ["安靜地待在旁邊", "牽絆 +5", () => { P.bond += 5; return "你陪著他，一直到他睡著。"; }]] },
+  walk: { title: "散步時，迎面走來一隻大狗。", body: "牽繩被拉得好緊。", opts: [
+    ["衝過去吠", "可能受傷", () => { if (R() < .4) { P.hp -= 8; mark("✚"); return "對方撲了過來，你被咬了一口。"; } return "家人趕快把你抱起來，你還在空中揮腳。"; }],
+    ["躲到家人腳後面", "牽絆 +3", () => { P.bond += 3; return "家人蹲下來護著你，等大狗走遠。"; }],
+    ["搖尾巴打招呼", "幸福 +4 · 信任 +3", () => { P.joy += 4; P.trust += 3; return "你們互相聞了聞，牠也搖了尾巴。"; }]] },
+  bird: { title: "窗外停了一隻小鳥。", body: "牠在欄杆上跳來跳去。", opts: [
+    ["撲過去", "健康 -2", () => { P.hp -= 2; return "你一頭撞上玻璃，然後假裝什麼事都沒發生。"; }],
+    ["盯著牠發出「咔咔」聲", "幸福 +4", () => { P.joy += 4; return "你盯了一整個上午，尾巴尖一直抖。"; }],
+    ["繼續睡覺", "健康 +2", () => { P.hp += 2; return "你翻了個身，繼續曬太陽。"; }]] },
+};
+
+const ACTS = {
+  home: [
+    { t: "討零食", d: "幸福 +3 · 健康 -1", log: "你用最可憐的眼神盯著家人，討到一塊零食。", f: () => { P.joy += 3; P.hp -= 1; } },
+    { t: "叼玩具找家人玩", d: "牽絆 +4 · 幸福 +2", log: "你叼著玩具去找家人，玩到兩個都累了。", f: () => { P.bond += 4; P.joy += 2; } },
+    { t: "窩在家人腿上睡午覺", d: "牽絆 +3 · 健康 +1", log: "你窩在家人腿上，睡了一個好長的午覺。", f: () => { P.bond += 3; P.hp += 1; } },
+    { t: () => P.sp === "cat" ? "巡視窗台" : "吵著要出門散步", d: "幸福 +3 · 健康 +2", log: () => P.sp === "cat" ? "你在窗台上巡視了一整個下午。" : "你叼著牽繩吵著要出門，家人只好帶你去公園。", f: () => { P.joy += 3; P.hp += 2; P.override = { kind: "park", until: P.m + 1 }; } },
+    { t: "躺在家人的鞋子上等他回家", d: "牽絆 +3", log: "你躺在家人的鞋子上，一直等到門打開。", f: () => { P.bond += 3; } },
+    { t: () => P.sp === "cat" ? "從家人的鍵盤上走過去" : "把球推到家人腳邊", d: () => P.sp === "cat" ? "幸福 +3 · 牽絆 -1" : "幸福 +3 · 牽絆 +2", log: () => P.sp === "cat" ? "你從家人的鍵盤上走過去，留下一串奇怪的字。" : "你把球推到家人腳邊，他丟了好多次。", f: () => { P.joy += 3; P.bond += P.sp === "cat" ? -1 : 2; } },
+  ],
+  stray: [
+    { t: "去找會餵食的人", d: "健康 +3", log: "你去了常有人餵食的地方，吃了一頓飽。", f: () => { P.hp += 3; } },
+    { t: "在公園曬太陽", d: "幸福 +3", log: "你在公園的草地上曬了一下午的太陽。", f: () => { P.joy += 3; P.override = { kind: "park", until: P.m + 1 }; } },
+    { t: "對路人撒嬌", d: "信任 +4 · 可能被帶走", log: "你鼓起勇氣，蹭了蹭一個路人的腳。", f: () => { P.trust += 4; if (R() < .08) { addLog("big home", "那個路人停下來，把你抱了起來。"); goHome(); } } },
+    { t: "去便利商店門口等", d: "健康 +2 · 信任 +1", log: "你在便利商店門口等了一個晚上，有人放了一點罐頭給你。", f: () => { P.hp += 2; P.trust += 1; } },
+    { t: "整理毛，好好睡一覺", d: "健康 +3", log: "你把毛舔乾淨，找了個安靜的角落好好睡了一覺。", f: () => { P.hp += 3; } },
+  ],
+  shelter: [
+    { t: "對志工撒嬌", d: "信任 +4 · 幸福 +2", log: "你把頭靠在籠子邊，讓志工摸了好久。", f: () => { P.trust += 4; P.joy += 2; } },
+    { t: "好好睡一覺", d: "健康 +3", log: "你在籠子裡縮成一團，好好睡了一覺。", f: () => { P.hp += 3; } },
+    { t: "隔著籠子跟室友互相聞聞", d: "幸福 +3", log: "你和隔壁的室友隔著籠子互相聞了聞。", f: () => { P.joy += 3; } },
+  ],
+  shop: [
+    { t: () => P.sp === "cat" ? "對玻璃外的人喵喵叫" : "對玻璃外的人搖尾巴", d: "可能被買走", log: () => P.sp === "cat" ? "你對著玻璃外的人喵喵叫。" : "你對著玻璃外的人拚命搖尾巴。", f: () => { if (R() < .12) { addLog("big home", "一個客人敲了敲玻璃，決定帶你回家。"); goHome(); } } },
+    { t: "睡一整天", d: "健康 +2", log: "你在玻璃櫃裡睡了一整天。", f: () => { P.hp += 2; } },
+  ],
+};
+
+/* ---------- log ---------- */
+function addLog(kind, text, note) {
+  const li = document.createElement("li"); li.className = "e " + (kind || "");
+  li.innerHTML = `<time>${ageText(P.m)}</time><p>${esc(text)}${note ? `<span class="src"><b>資料</b>${esc(note)}</span>` : ""}</p>`;
+  const peers = $("#log .peers"); peers ? peers.after(li) : $("#log").prepend(li);
+  const ms = /big/.test(kind || "") || P._ms;
+  if (ms) P.miles.push({ kind: sceneKind(), night: isNight(), m: P.m, text, people: P.cast.people.slice() });
+  P.diary.push({ m: P.m, text, big: ms || /home/.test(kind || "") });
+  P._ms = false;
+}
+function fire(e) {
+  P.last[e.id] = P.m; P.count[e.id] = (P.count[e.id] || 0) + 1;
+  if (e.once) P.done.add(e.id);
+  if (e.decide) return openDecision(e.decide);
+  P._ms = !!e.ms;
+  const text = e.texts ? vary(e.id, typeof e.texts === "function" ? e.texts() : e.texts) : e.text();
+  addLog(e.kind, text, typeof e.note === "function" ? e.note() : e.note);
+  if (e.icon) mark(e.icon);
+  if (e.eff) e.eff();
+}
+
+/* ---------- monthly tick ---------- */
+const eligible = e => (e.w === "*" || e.w === P.env) && (!e.sp || e.sp === P.sp) && !(e.once && P.done.has(e.id)) && !(e.times && (P.count[e.id] || 0) >= e.times)
+  && P.m >= (e.min || 0) && !(e.max && P.m > e.max) && P.m - (P.last[e.id] ?? -99) >= (e.cd ?? 3) && (!e.cond || e.cond());
+function month() {
+  P.m++;
+  const env = P.env, f = focusNow();
+  if (env === "stray") P.streetM++; else if (env === "home") P.homeM++; else if (env === "shelter") P.shelterM++;
+  if (P.m % 12 === 0) { P.autoF = pickAuto(); if (env === "home") { addLog("bday", `${P.m / 12} 歲生日。${P.sp === "cat" ? "得到一個新紙箱。" : "得到一塊肉泥蛋糕。"}`); P.joy += 3; } }
+  else {
+    const hits = EV.filter(e => eligible(e) && R() < (typeof e.p === "function" ? e.p() : e.p));
+    if (hits.length) { const firsts = hits.filter(e => e.once && !e.decide); fire(pick(firsts.length ? firsts : hits)); }
+  }
+  // drift by place and focus
+  if (P.env === "home") { P.hp += .5; P.joy += .4; P.bond += .3; } else if (P.env === "stray") { P.hp -= .5; P.joy -= .3; } else P.joy -= .2;
+  if (f === "people") { P.trust += .6; P.bond += .2; } else if (f === "play") P.joy += .6; else if (f === "rest") P.hp += .5; else if (f === "family") { P.bond += .7; P.joy += .2; }
+  if (P.m > P.max * .8) P.hp -= 1.1;
+  for (const k of ["hp", "joy", "trust", "bond"]) P[k] = clamp(P[k], 3, 100);
+  const y = Math.floor(P.m / 12); P.years[y] = P.years[y] || { j: 0, n: 0, ic: "" }; P.years[y].j += P.joy; P.years[y].n++;
+  const streetRisk = P.env === "stray" ? (P.m < 12 ? .028 : .012) * (P.hp < 40 ? 1.8 : 1) * (f === "play" ? 1.3 : 1) : 0;
+  // A decision opened this month: let the player answer before life can end.
+  if (!modalOpen) {
+    if (P.m >= P.max) return finish(true);
+    if (R() < streetRisk) return finish(false);
+  }
+  render();
+}
+
+/* ---------- render ---------- */
+function setStat(id, v) { $("#v" + id).textContent = Math.round(v); $("#b" + id).style.width = v + "%"; }
+function render() {
+  const y = Math.floor(P.m / 12), mo = (P.mo0 - 1 + P.m) % 12 + 1, year = P.y0 + Math.floor((P.mo0 - 1 + P.m) / 12);
+  $("#hAge").innerHTML = P.m < 12 ? `${P.m}<small>個月</small>` : `${y}<small>歲</small>`;
+  $("#hMeta").textContent = `${year}年${mo}月 · ${P.name || "還沒有名字"} · 1年≈${Math.round(24 / speed)}秒`;
+  $("#yrBar").style.width = (P.m % 12) / 12 * 100 + "%";
+  const cityLine = `${P.c.name}${P.city}的${P.env === "shelter" ? "公立收容所" : P.env === "shop" && P.m >= 2 ? "寵物店" : P.place}`;
+  const bed = P.env === "stray" ? "紙箱" : P.env === "shelter" ? "籠舍" : P.env === "shop" ? "玻璃櫃" : P.sp === "cat" ? "家人的床" : "自己的小窩";
+  const withWho = P.env === "home" ? `與${P.fam.owner.replace(/，.*/, "")}同住` : P.env === "stray" ? (P.fam.sibs.includes("一起長大") ? "與兄弟姊妹同住" : P.friend ? "有阿姨照顧" : "獨自生活") : P.env === "shelter" ? "與室友們一起" : "等待新主人";
+  $("#place").textContent = `${cityLine} · ${bed} · ${withWho}`;
+  setStat("Hp", P.hp); setStat("Joy", P.joy); setStat("Trust", P.trust); setStat("Bond", P.bond);
+  $("#focusName").textContent = (P.focus === "auto" ? "自動·" : "") + FOCUS[focusNow()][0];
+  renderId(); renderFamily(); renderGrid(); renderSurv(); renderCountry();
+}
+// Decorative bars drawn from the chip number, so every pet's strip looks different.
+function barcode(code) {
+  let x = 0, bars = "";
+  for (const ch of code + [...code].reverse().join("")) { const d = +ch, w = 1 + d % 3; bars += `<rect x="${x}" width="${w}" height="28"/>`; x += w + 1 + d % 2; }
+  return `<svg viewBox="0 0 ${x} 28" width="${x}" height="28" fill="currentColor" aria-hidden="true">${bars}</svg>`;
+}
+function renderId() {
+  const year = P.y0;
+  $("#idTop").textContent = `${P.c.name} · ${P.c.iso}`; $("#idYear").textContent = year;
+  $("#idName").textContent = P.name || `一隻${P.coat}的${P.breed}${SP()}`;
+  const dots = n => "●".repeat(n) + "○".repeat(5 - n);
+  const care = { home: 4, shop: 3, shelter: 2, stray: 1 }[P.origin];
+  const rows = [["性別", P.sex === "公" ? "公" : "母"], ["出生", `${P.c.name} · ${year}年${P.mo0}月`], ["居住地", `${P.city}，${P.c.name}`], ["品種", `${P.breed} · ${P.coat}`],
+    ["出身", `${{ home: "家庭", stray: "街頭", shop: "繁殖場" }[P.origin]} ${dots(care)}`], ["晶片", P.chip ? "已植入" : "尚未植入"], ["結紮", P.neuter ? "已結紮" : "未結紮"], ["個性", P.pers]];
+  $("#idDl").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
+  $("#chipline").innerHTML = P.chip
+    ? `${barcode(P.chip)}<div><b class="num">${P.chip.replace(/(\d{3})(?=\d)/g, "$1 ")}</b><small>寵物晶片號碼。走失時，動物醫院和收容所掃描就能聯絡家人。</small></div>`
+    : `<div><b>還沒有晶片</b><small>${P.env === "home" ? "如果走失，掃描不到晶片，就很難找到回家的路。" : "沒有晶片，也沒有寵物登記。"}</small></div>`;
+  const g = $("#portrait").getContext("2d"); g.imageSmoothingEnabled = false;
+  px(g, 0, 0, 22, 28, "#9fcdec"); px(g, 0, 19, 22, 9, "#5c9140"); px(g, 0, 22, 22, 6, "#6b4a2b");
+  drawPet(g, P, P.sp === "cat" ? 6 : 5, P.sp === "cat" ? 10 : 11, 0, false);
+}
+function renderFamily() {
+  const sibs = P.fam.sibs, rows = [["媽媽", P.fam.mom]];
+  const counts = {}; sibs.forEach(s => counts[s] = (counts[s] || 0) + 1);
+  rows.push(["兄弟姊妹", `${sibs.length} 隻<small>${Object.entries(counts).map(([k, v]) => `${v}隻${k}`).join("、")}</small>`]);
+  if (P.fam.owner) rows.push(["家人", `${esc(P.fam.owner)}<small>認識 ${ageText(P.m - P.ownerSince) || "0個月"} · ${P.bond > 70 ? "非常親近" : P.bond > 45 ? "關係親近" : "還在熟悉"}</small>`]);
+  else if (P.fam.volunteer) rows.push(["照顧你的人", esc(P.fam.volunteer)]);
+  if (P.fam.buddy) rows.push(["同伴", esc(P.fam.buddy)]);
+  if (P.kids) rows.push(["孩子", `${P.kids} 隻`]);
+  rows.push(["目前處境", STATUS[P.env]]);
+  rows.push(["有家的時間", ageText(P.homeM) || "0個月"]);
+  if (P.streetM) rows.push(["街頭歲月", ageText(P.streetM)]);
+  $("#family").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+}
+function renderGrid() {
+  const avg = Math.floor(expect(P.sp, P.env === "home" ? "home" : "stray"));
+  const n = Math.max(20, Math.ceil((P.max + 1) / 12 / 10) * 10, Math.ceil((avg + 1) / 10) * 10), cur = Math.floor(P.m / 12);
+  let h = "";
+  for (let i = 0; i < n; i++) {
+    const y = P.years[i], cls = [i < cur || (i === cur && y) ? "lived" : "", i === avg ? "avg" : "", i === cur && !P.over ? "now" : ""].join(" ");
+    const j = y && y.n ? Math.round(20 + (y.j / y.n) * .8) : 0;
+    h += `<div class="${cls}" style="--j:${j}%" title="${i}歲">${y && y.ic ? y.ic : ""}</div>`;
+  }
+  $("#grid").innerHTML = h;
+  $("#avgCap").textContent = `外框格 = ${P.c.name}${P.env === "home" ? "有家的" : "流浪的"}${SP()}，平均大約活 ${expect(P.sp, P.env === "home" ? "home" : "stray")} 歲（估算）`;
+}
+function renderSurv() {
+  const mine = P.env === "home" ? "home" : "stray", other = mine === "home" ? "stray" : "home";
+  const X = a => 30 + a / 20 * 290, Y = s => 10 + (1 - s) * 150;
+  const path = env => { let d = ""; for (let a = 0; a <= 20.01; a += .25) d += (d ? "L" : "M") + X(a).toFixed(1) + "," + Y(S(a, surv(P.sp, env))).toFixed(1); return d; };
+  const age = P.m / 12, s = S(age, surv(P.sp, mine));
+  let g = "";
+  [0, .25, .5, .75, 1].forEach(v => g += `<line x1="30" x2="320" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="0" y="${Y(v) + 3}">${v * 100}%</text>`);
+  [0, 5, 10, 15, 20].forEach(a => g += `<text x="${X(a) - 4}" y="178">${a}</text>`);
+  g += `<path d="${path(mine)} L${X(20)},${Y(0)} L${X(0)},${Y(0)} Z" fill="var(--soft)" opacity=".14"/>`;
+  g += `<path d="${path(other)}" fill="none" stroke="var(--muted)" stroke-width="1.6" stroke-dasharray="4 3"/>`;
+  g += `<path d="${path(mine)}" fill="none" stroke="var(--soft)" stroke-width="2.4"/>`;
+  g += `<line x1="${X(Math.min(age, 20))}" x2="${X(Math.min(age, 20))}" y1="10" y2="160" stroke="var(--muted)" stroke-width=".8"/>`;
+  g += `<circle cx="${X(Math.min(age, 20))}" cy="${Y(s)}" r="4.5" fill="var(--soft)" stroke="var(--panel)" stroke-width="2"/>`;
+  g += `<text x="${Math.min(X(age) + 7, 262)}" y="${Math.max(Y(s) - 8, 20)}" style="fill:var(--ink);font-size:12px;font-weight:600">${Math.round(s * 100)}% 存活</text>`;
+  $("#surv").innerHTML = g;
+  const lab = { home: `${P.c.name}有家的${SP()}`, stray: `${P.c.name}流浪的${SP()}` };
+  $("#survLegend").innerHTML = `<span><i></i>${lab[mine]}（你現在的處境）</span><span><i class="d"></i>${lab[other]}</span>`;
+}
+function renderCountry() {
+  const pets = P.c.w / totalW * WORLD;
+  $("#ctyName").textContent = P.c.name;
+  $("#cty").innerHTML = [["狗與貓的數量（粗估）", fmt(pets) + " 隻"], ["流浪比例（粗估）", Math.round(P.c.stray * 100) + "%"], ["街頭上的狗貓（粗估）", fmt(pets * P.c.stray) + " 隻"],
+    ["每個月出生的狗貓（粗估）", fmt(pets / 100) + " 隻"], ["你出生的城市", P.city]].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+}
+
+/* ---------- controls ---------- */
+function stop() { clearInterval(timer); timer = null; }
+function run() { stop(); timer = setInterval(() => { if (!paused && !modalOpen) month(); }, 2000 / speed); }
+$("#speeds").innerHTML = SPEEDS.map(s => `<button data-s="${s}" aria-pressed="${s === 1}">${s}×</button>`).join("");
+$("#speeds").onclick = e => { const b = e.target.closest("button"); if (!b) return; speed = +b.dataset.s; $("#speeds").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); if (P && !P.over) { run(); render(); } };
+$("#pause").onclick = () => { paused = !paused; $("#pause").textContent = paused ? "▶" : "❚❚"; $("#pause").setAttribute("aria-label", paused ? "繼續" : "暫停"); };
+$("#next").onclick = () => start();
+$("#menu").onclick = () => sheet("選單", "", "", [["回到首頁", "結束這一生，回到地圖", () => backHome()], ["重新出生", "立刻開始新的一生", () => start()]], true);
+$("#focusBtn").onclick = () => { const f = $("#focus"); f.hidden = !f.hidden; $("#focusBtn").setAttribute("aria-expanded", !f.hidden); renderFocus(); };
+function renderFocus() {
+  $("#focus").innerHTML = [["auto", "自動", "每年自動選擇"], ...Object.entries(FOCUS).map(([k, [a, b]]) => [k, a, b])].map(([k, a, b]) => `<button data-f="${k}" aria-pressed="${P.focus === k}">${a}<small>${b}</small></button>`).join("") +
+    `<p>交給自動的期間，每一年的重心也會自動選擇。點一下標籤，之後就由你自己決定。</p>`;
+}
+$("#focus").onclick = e => { const b = e.target.closest("button"); if (!b) return; P.focus = b.dataset.f; renderFocus(); render(); };
+$("#actBtn").onclick = () => {
+  if (P.over) return;
+  const v = x => typeof x === "function" ? x() : x;
+  const list = (ACTS[P.env] || []).map((a, i) => { const key = P.env + i, cd = (P.cooldown[key] ?? -99) + 6 > P.m;
+    return [v(a.t), cd ? "最近才做過，過幾個月再來" : v(a.d), () => { P.cooldown[key] = P.m; addLog("", v(a.log)); a.f(); render(); }, cd]; });
+  sheet("互動 · " + STATUS[P.env], "現在可以做的事", "你怎麼過每一天，會改變你的健康、幸福和遇到的人。在你選擇的時候，時間會暫停。", list, true);
+};
+$("#toTop").onclick = () => scrollTo({ top: 0, behavior: "smooth" });
+addEventListener("scroll", () => { $("#toTop").hidden = $("#life").hidden || scrollY < 500; }, { passive: true });
+
+function sheet(tag, title, body, opts, closable) {
+  modalOpen = true;
+  $("#sheet").innerHTML = `<header><span>${esc(tag)}</span>${closable ? `<button id="mClose">關閉</button>` : `<span>時間暫停中</span>`}</header><div class="sb">${title ? `<h3>${esc(title)}</h3>` : ""}${body ? `<p>${esc(body)}</p>` : ""}${opts.map(([t, d, , dis], i) => `<button class="opt" data-i="${i}" ${dis ? "disabled" : ""}><b>${esc(t)}</b><small>${esc(d)}</small></button>`).join("")}</div>`;
+  $("#modal").hidden = false;
+  const close = () => { $("#modal").hidden = true; modalOpen = false; };
+  if (closable) $("#mClose").onclick = close;
+  $("#sheet").querySelectorAll(".opt").forEach(b => b.onclick = () => { close(); opts[+b.dataset.i][2](); });
+  setTimeout(() => { const b = $("#sheet .opt:not([disabled])"); b && b.focus(); }, 30);
+}
+function openDecision(key) {
+  const d = DECIDE[key], v = x => typeof x === "function" ? x() : x, title = v(d.title);
+  sheet("抉擇 · " + ageText(P.m), title, v(d.body), d.opts.map(([t0, desc, f]) => { const t = v(t0); return [t, desc, () => {
+    P._ms = true; addLog("big", `${title}你選擇「${t}」。`);
+    const out = f(); if (out) addLog("", out);
+    if (P.noteAfter) { addLog("", "志工替你登記入所。", P.noteAfter); P.noteAfter = null; }
+    P.choices.push({ m: P.m, q: title, a: t, out: out || "" }); render(); }]; }), false);
+}
+
+/* ---------- animation loop for the scene ---------- */
+const sceneCv = $("#scene");
+function loop(t) {
+  if (P && !$("#life").hidden) { const k = sceneKind(), rain = P.override && P.override.rain && P.m < P.override.until;
+    paint(sceneCv, k, k === "vet" || k === "shop" ? false : isNight(), t, { pet: P.over ? null : P, people: k === "home" || k === "park" ? P.cast.people : k === "shelter" ? P.cast.people.slice(0, 1) : P.friend && k === "street" && isNight() ? [] : [], rain }); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ---------- ending ---------- */
+function finish(natural) {
+  stop(); P.over = true; $("#modal").hidden = true;
+  const C1 = P.sp === "cat" ? ["慢性腎臟病", "年老自然離世", "心臟病"] : ["年老自然離世", "癌症", "心臟病"];
+  P.cause = natural ? pick(C1) : pick(["交通事故", P.sp === "cat" ? "傳染病（貓瘟）" : "傳染病（犬瘟熱）", "寒流與營養不良", "打鬥傷口感染"]);
+  const where = P.env === "home" ? "在家人懷裡" : P.env === "shelter" ? "在收容所志工的陪伴下" : "在一個安靜的角落";
+  addLog("big", natural || P.env !== "stray" ? `${where}睡著了，去了彩虹橋。` : `某天之後，再也沒有人在${P.city}的${P.place}看到你。`);
+  render(); $("#hAge").innerHTML = `${Math.floor(P.m / 12)}<small>歲</small>`;
+  story();
+}
+function story() {
+  const yrs = Math.floor(P.m / 12), days = Math.round(P.m * 30.44), endYear = P.y0 + Math.floor((P.mo0 - 1 + P.m) / 12);
+  const miles = P.miles.filter(x => x.kind);
+  const step = Math.max(1, Math.ceil(miles.length / 6)), chosen = miles.filter((_, i) => i % step === 0).slice(0, 6);
+  const slides = chosen.map((m, i) => ({ type: "mile", m, i, n: chosen.length }));
+  slides.push({ type: "last" });
+  slides.push({ type: "bye" });
+  slides.push({ type: "card" });
+  let k = 0;
+  const el = $("#story"); el.hidden = false; modalOpen = true;
+  const draw = () => {
+    const s = slides[k];
+    let h = `<button class="skip" id="skip">略過</button>`;
+    if (s.type === "mile") {
+      h += `<div class="slide"><canvas width="192" height="60" id="sc"></canvas><div class="ag">${ageText(s.m.m)}</div><div class="tx">${esc(s.m.text)}</div><div class="dots">${Array.from({ length: s.n }, (_, j) => `<i class="${j <= s.i ? "on" : ""}"></i>`).join("")}</div></div>`;
+    } else if (s.type === "last") {
+      h += `<div class="slide"><h2>最後一年，${yrs ? yrs + "歲" : ageText(P.m)}</h2><p>在${esc(P.c.name)}，你閉上了眼睛。</p><p style="color:#9aa6a8;font-size:16px">原因 · ${esc(P.cause)}</p></div>`;
+    } else if (s.type === "bye") {
+      const t = P.env === "home" ? `家人在${/透天厝|三合院|獨棟/.test(P.place) ? "院子的樹下" : "你最愛的位置"}為你辦了小小的告別，把你最愛的玩具放在身邊。` : P.env === "shelter" ? "收容所的志工為你點了一盞小燈，在白板上寫下你的名字。" : P.friend ? "餵你的阿姨在你常待的街角放了一小束花。" : "那天之後，街角的紙箱空了。";
+      h += `<div class="slide"><canvas width="192" height="60" id="sc"></canvas><div class="tx" style="margin-top:18px">${esc(t)}</div><div class="tx" style="color:#9aa6a8;font-size:16px">聽說彩虹橋的另一邊，有吃不完的罐罐。</div></div>`;
+    } else {
+      const legacy = [P.homeM ? `你陪伴了家人 ${ageText(P.homeM)}。` : "你一直沒有等到屬於自己的家。", P.kids ? `你生下了 ${P.kids} 隻${kid()}。` : "", !P.name && P.friend ? "沒有人知道你的名字，但阿姨記得你。" : ""].filter(Boolean);
+      h += `<div class="slide"><p class="nm">${esc(P.name || `${P.coat}的${P.breed}${SP()}`)}</p><div class="yrs">${P.y0} – ${endYear}</div>
+        <p>在${esc(P.c.name)}出生，也在那裡長眠。</p><p>${yrs ? yrs + "年" : ageText(P.m)}，換算成天數，大約活了${days.toLocaleString()}天。</p>${legacy.map(x => `<p>${esc(x)}</p>`).join("")}
+        <p class="big">在16億隻毛孩之中，僅此一次的一生。</p><button class="go" id="seeRec">查看紀錄</button>${AI ? `<button class="go2" id="mailBtn">${mailLabel()}</button>` : ""}</div>`;
+    }
+    h += s.type === "card" ? "" : `<div class="hint">點一下畫面就會繼續</div>`;
+    el.innerHTML = h;
+    const sc = $("#sc");
+    if (sc) {
+      const t0 = performance.now();
+      const anim = t => { if (!sc.isConnected) return;
+        if (s.type === "mile") paint(sc, s.m.kind, s.m.kind === "vet" || s.m.kind === "shop" ? false : s.m.night, t - t0, { pet: { ...P, over: false }, people: s.m.kind === "home" || s.m.kind === "park" || s.m.kind === "shelter" ? s.m.people.slice(0, s.m.kind === "shelter" ? 1 : 3) : [] });
+        else paint(sc, P.homeM || P.friend || P.env === "shelter" ? "farewell" : "rainbow", true, t - t0, { people: P.env === "home" ? P.cast.people.slice(0, 3) : P.friend || P.env === "shelter" ? [mkPersonCached()] : [] });
+        requestAnimationFrame(anim); };
+      requestAnimationFrame(anim);
+    }
+    $("#skip") && ($("#skip").onclick = ev => { ev.stopPropagation(); k = slides.length - 1; draw(); });
+    $("#seeRec") && ($("#seeRec").onclick = ev => { ev.stopPropagation(); closeStory(); });
+    $("#mailBtn") && ($("#mailBtn").onclick = ev => { ev.stopPropagation(); openMail(); });
+  };
+  el.onclick = () => { if (k < slides.length - 1) { k++; draw(); } };
+  draw();
+}
+let _mourner = null; function mkPersonCached() { return _mourner || (_mourner = mkPerson(P.c, true)); }
+function closeStory() {
+  $("#story").hidden = true; modalOpen = false; _mourner = null;
+  const yrs = P.m / 12;
+  $("#endBox").hidden = false;
+  $("#endBox").innerHTML = `<div class="end"><h3>你活了 ${ageText(P.m)}</h3>
+    <p>${{ home: "生在一個家裡", stray: "在街頭出生", shop: "從繁殖場被送到寵物店" }[P.origin]}，一生中有 ${Math.round(P.homeM / Math.max(1, P.m) * 100)}% 的時間有家。原因：${esc(P.cause)}。</p>
+    <b>${yrs < 6 ? "在街頭，很多毛孩活不過五歲。" : "有家的毛孩，通常能陪我們十幾年。"}</b>
+    <ul><li>以認養代替購買，收容所裡的成犬成貓一樣值得一個家。</li><li>幫毛孩植入晶片、完成寵物登記，走失時才找得回來。</li><li>結紮能減少下一代流落街頭。</li>
+    <li>${P.c.name === "台灣" ? "台灣自 2017 年起公立收容所施行零撲殺，更需要大家一起認養與絕育。" : "每一次餵養、通報與 TNR，都可能改寫一隻浪浪的一生。"}</li></ul>
+    ${AI ? `<button class="mailline" id="mailBtn2">${mailLabel()}</button>` : ""}
+    <div class="endbtns"><button class="p" id="again">再活一次</button><button id="home2">回到首頁</button></div></div>`;
+  $("#again").onclick = start; $("#home2").onclick = backHome;
+  if ($("#mailBtn2")) $("#mailBtn2").onclick = openMail;
+  $("#endBox").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/* ---------- AI farewell letter: only on the deployed site, which adds <meta name="pet-ai"> ---------- */
+const AI = (document.querySelector('meta[name="pet-ai"]') || {}).content || "";
+let mailState = null;
+function deviceId() {
+  try { let id = localStorage.getItem("petDevice"); if (!id) { id = crypto.randomUUID(); localStorage.setItem("petDevice", id); } return id; } catch (e) { return ""; }
+}
+async function mailApi(method, body) {
+  const r = await fetch(AI, { method, credentials: "same-origin", headers: { "content-type": "application/json", "x-pet-device": deviceId() }, body: body ? JSON.stringify(body) : undefined });
+  let j = {}; try { j = await r.json(); } catch (e) {}
+  return { code: r.status, ...j };
+}
+async function refreshMail() { if (!AI) return null; try { mailState = await mailApi("GET"); } catch (e) { mailState = null; } return mailState; }
+const mailLabel = () => mailState && mailState.used ? "✉ 讀我收過的那封信" : "✉ 收下牠的最後一封信";
+if (AI) refreshMail();
+
+// The life summary the server turns into a prompt: key moments first, then everyday ones spread over the years.
+function letterPayload() {
+  const even = (a, n) => a.length <= n ? a.slice() : Array.from({ length: n }, (_, i) => a[Math.floor(i * a.length / n)]);
+  const big = P.diary.filter(d => d.big), rest = P.diary.filter(d => !d.big), keep = even(big, 14);
+  const events = [...keep, ...even(rest, 20 - keep.length)].sort((a, b) => a.m - b.m).map(d => ({ m: d.m, t: d.text.slice(0, 80) }));
+  return { sp: P.sp, sex: P.sex, name: P.name || "", coat: P.coat, breed: P.breed, pers: P.pers, country: P.c.name, city: P.city, born: `${P.y0}年${P.mo0}月`,
+    origin: P.origin, endEnv: P.env, months: P.m, homeM: P.homeM, streetM: P.streetM, shelterM: P.shelterM, cause: P.cause,
+    owner: P.fam.owner || "", carer: P.fam.volunteer || "", buddy: P.fam.buddy || "", kids: P.kids, events,
+    choices: P.choices.slice(-8).map(c => `${ageText(c.m)}：${c.q}選擇「${c.a}」${c.out ? "，" + c.out : ""}`) };
+}
+function mailBox(html) {
+  const el = $("#mail"); el.hidden = false; el.innerHTML = `<div class="in">${html}</div>`;
+  el.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { el.hidden = true; el.innerHTML = ""; });
+  return el;
+}
+function paintMail(cv, writing) {
+  const g = cv.getContext("2d"), pet = { ...P }, t0 = performance.now(); g.imageSmoothingEnabled = false;
+  const frame = t => {
+    if (!cv.isConnected) return;
+    const k = t - t0, bob = writing ? Math.round(Math.sin(k / 260)) : 0;
+    g.clearRect(0, 0, 64, 24); px(g, 0, 21, 64, 3, "#3a2f26");
+    drawPet(g, pet, 8, pet.sp === "cat" ? 9 : 11, k, false);
+    px(g, 36, 10 + bob, 18, 11, "#F6F0E2");
+    for (let i = 0; i < 9; i++) { px(g, 36 + i, 10 + bob + (i >> 1), 1, 1, "#c9b99a"); px(g, 53 - i, 10 + bob + (i >> 1), 1, 1, "#c9b99a"); }
+    px(g, 44, 14 + bob, 2, 2, "#C2547A");
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+async function openMail() {
+  if (!AI || !P) return;
+  const st = mailState || await refreshMail();
+  if (st && st.used && st.letter) return showLetter(st.letter, true);
+  const who = P.name || `這隻${P.coat}的${SP()}`, left = st && typeof st.left === "number" ? st.left : null;
+  mailBox(`<canvas width="64" height="24" id="mailCv"></canvas><h3>每個人只能收到一封信</h3>
+    <p>要把這唯一的一次，留給「${esc(who)}」嗎？</p>${left !== null ? `<p class="fine">今天還有大約 ${left} 張信紙</p>` : ""}
+    <div class="row"><button class="p" id="mailGo">好，請牠寫給我</button><button data-close>再想想</button></div>`);
+  paintMail($("#mailCv"), false);
+  $("#mailGo").onclick = () => writeMail(who);
+}
+async function writeMail(who) {
+  mailBox(`<canvas width="64" height="24" id="mailCv"></canvas><h3>${esc(who)}正在寫信……</h3><p>大約需要十幾秒，請不要關掉這一頁。</p>`);
+  paintMail($("#mailCv"), true);
+  let r; try { r = await mailApi("POST", letterPayload()); } catch (e) { r = { code: 0 }; }
+  if (r.ok && r.letter) { mailState = { used: true, letter: r.letter }; refreshMailButtons(); return showLetter(r.letter, false); }
+  if (r.error === "used" && r.letter) { mailState = { used: true, letter: r.letter }; refreshMailButtons(); return showLetter(r.letter, true); }
+  const msg = {
+    daily_quota: "今天的信紙用完了。免費額度每天早上 8 點（台灣時間）重置，明天再來吧。",
+    ip_limit: "這個網路今天已經寄出好多封信了，明天再來吧。",
+    busy: "上一封信還在寫，請稍等一下再試。",
+    ai_unavailable: "信差今天迷路了。這次不算數，請過一會兒再試一次。",
+    bad_request: "這一生的紀錄太短了，寫不成一封信。",
+  }[r.error] || "連不上信差，請檢查網路後再試一次。";
+  mailBox(`<h3>信沒有寄出</h3><p>${esc(msg)}</p><div class="row"><button data-close>知道了</button></div>`);
+}
+function refreshMailButtons() { ["#mailBtn", "#mailBtn2"].forEach(id => { if ($(id)) $(id).textContent = mailLabel(); }); }
+function showLetter(letter, old) {
+  mailBox(`${old ? `<p class="fine" style="margin:0 0 14px">你已經收過一封信了。每個人只有一次，這是「${esc(letter.name)}」寫給你的那一封。</p>` : ""}
+    <div class="paper" id="paper"></div><p class="fine">這封信由 AI 依照牠這一生的紀錄寫成，每個人只會收到一封。</p>
+    <div class="row"><button id="mailCopy">複製全文</button><button class="p" data-close>收好了</button></div>`);
+  const paper = $("#paper"), text = letter.text;
+  if (old || matchMedia("(prefers-reduced-motion: reduce)").matches) paper.textContent = text;
+  else {
+    let i = 0;
+    const typing = setInterval(() => { i += 2; paper.textContent = text.slice(0, i); if (i >= text.length || !paper.isConnected) clearInterval(typing); }, 40);
+    paper.onclick = () => { i = text.length; };
+  }
+  $("#mailCopy").onclick = async () => {
+    try { await navigator.clipboard.writeText(text); $("#mailCopy").textContent = "已複製"; }
+    catch (e) { paper.textContent = text; const range = document.createRange(); range.selectNodeContents(paper); getSelection().removeAllRanges(); getSelection().addRange(range); $("#mailCopy").textContent = "已選取，請長按複製"; }
+  };
+}
+
+function start() {
+  stop(); $("#mail").hidden = true; $("#modal").hidden = true; $("#story").hidden = true; modalOpen = false; paused = false; $("#pause").textContent = "❚❚";
+  newLife();
+  $("#landing").hidden = true; $("#life").hidden = false; $("#cta").hidden = true; $("#endBox").hidden = true; $("#focus").hidden = true;
+  ripples.push({ c: P.c, t: performance.now() });
+  const peersN = P.c.w / totalW * WORLD / 100;
+  $("#log").innerHTML = `<li class="peers">同一個月在${esc(P.c.name)}出生的狗貓，估計還有約 ${fmt(peersN)} 隻</li>`;
+  P._ms = true;
+  addLog("big", { stray: `你出生在${P.city}${P.place}，是一窩${kid()}裡的一隻。`, home: `你出生在${P.city}一戶人家裡，媽媽是他們養的${SP()}。`, shop: `你出生在${P.c.name}的一間繁殖場。` }[P.origin]);
+  render(); run(); scrollTo({ top: 0 });
+}
+function backHome() {
+  stop(); P = null; $("#life").hidden = true; $("#landing").hidden = false; $("#cta").hidden = false; $("#toTop").hidden = true; $("#story").hidden = true; $("#modal").hidden = true; modalOpen = false;
+}
+$("#born").onclick = start;
+})();
+</script>
+</body>
+</html>

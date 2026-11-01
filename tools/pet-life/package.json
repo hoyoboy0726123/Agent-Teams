@@ -1,0 +1,16 @@
+{
+  "name": "pet-life",
+  "private": true,
+  "type": "module",
+  "description": "16億分之1 毛孩人生：a pixel-art pet life simulator with an optional AI farewell letter on Cloudflare Workers AI.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs && wrangler dev -c wrangler.local.jsonc",
+    "deploy": "node scripts/build.mjs && wrangler deploy",
+    "test:letter": "node test/letter-gemma.mjs",
+    "test:e2e": "node test/e2e.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.145.0"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "title": "Agent Teams 開源版 — 90天上市規劃 Dashboard(規劃假設,非實測)",
+  "kpis": [
+    {"label": "90天 GitHub Stars 目標", "value": "1,000", "delta": "規劃假設"},
+    {"label": "活躍自架實例數", "value": "150", "delta": "規劃假設"},
+    {"label": "Discord/社群成員", "value": "500", "delta": "規劃假設"},
+    {"label": "貢獻者數(PR merged ≥1)", "value": "25", "delta": "規劃假設"}
+  ],
+  "charts": [
+    {
+      "type": "line",
+      "title": "每月成長目標(累積值,規劃假設)",
+      "labels": ["Month 1", "Month 2", "Month 3"],
+      "series": [
+        {"name": "GitHub Stars", "data": [200, 550, 1000]},
+        {"name": "Discord 成員", "data": [100, 280, 500]},
+        {"name": "貢獻者數", "data": [5, 14, 25]},
+        {"name": "活躍自架實例", "data": [20, 70, 150]}
+      ]
+    },
+    {
+      "type": "pie",
+      "title": "三大用戶 Segment 優先度佔比(規劃假設,依 Week7-10 冷啟動資源分配)",
+      "labels": ["Segment A 獨立開發者/新創", "Segment B Agency", "Segment C 企業 IT/RPA"],
+      "series": [{"name": "資源分配佔比", "data": [60, 25, 15]}]
+    },
+    {
+      "type": "bar",
+      "title": "訂閱制 vs API 計量成本比較(月成本估算,USD,情境假設)",
+      "labels": ["輕量用戶(Segment A)", "重度用戶(Segment B Agency)"],
+      "series": [
+        {"name": "API 計量估算成本", "data": [29.70, 95.04]},
+        {"name": "訂閱制費用(市價中位數)", "data": [20, 150]}
+      ]
+    }
+  ],
+  "table": {
+    "columns": ["階段", "時間", "核心里程碑", "Owner", "狀態"],
+    "rows": [
+      ["排雷+零門檻Demo", "Week 1-2", "關閉阻斷性問題1(訂閱ToS/rate limit實測)、問題2(B最小付費方案);docker-compose零key Demo;安全模型文件初稿", "@hoyo指定執行人 / 技術團隊", "⚠️ 進行中,Deadline 9/25"],
+      ["內部驗證+素材補強", "Week 3-6", "Dogfooding重跑訂閱vs API成本;內部工作稿→視問題1結果轉對外正式版", "@analyst / @writer", "待Week1-2結果"],
+      ["冷啟動+B最小商業化", "Week 7-10", "GitHub/技術社群發布(主打SegmentA);B segment waitlist/客製合約上線", "@lead / 業務", "未開始"],
+      ["觀察與調整", "Week 11-13", "追蹤star/留存/首次成功跑通demo比例;視B waitlist反饋決定是否加碼多租戶", "@lead", "未開始"]
+    ]
+  },
+  "notes": "⚠️ 所有KPI數字、成長曲線、Segment佔比與成本比較均為規劃假設(9/22),非實測/非官方數據,發布對外前需依討論結論校正:(1) 成本模型的70/30 input/output比例為假設,訂閱制費用取市價區間佔位(輕量$20單一數字;重度$100-200取中位數$150,已用calc驗證=150);(2) 重度用戶14.4M tokens/月大機率撞消費版rate limit,此賣點依團隊決議已限定僅對Segment A成立,B的成本比較僅供內部參考,不建議放入對外文件;(3) Segment佔比為資源分配優先度,非市場實際佔比;(4) 兩個阻斷性問題(訂閱ToS合法性、B最小付費方案)deadline為9/25,若未解則觸發fallback:訂閱賣點下架,僅保留多供應商彈性+開源自架兩條訊息對外。"
+}

@@ -1,0 +1,11 @@
+# Headers for the static files (scripts/static-site.mjs). The Worker's own answers (/api/*, /admin) set theirs.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Cache-Control: no-cache
+/og.png
+  ! Cache-Control
+  Cache-Control: public, max-age=86400
+/i18n/*
+  ! Cache-Control
+  Cache-Control: public, max-age=86400

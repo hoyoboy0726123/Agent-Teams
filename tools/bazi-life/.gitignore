@@ -1,0 +1,4 @@
+node_modules/
+.wrangler/
+.official-cache/
+src/i18n/catalog-zh.json

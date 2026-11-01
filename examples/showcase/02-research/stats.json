@@ -1,0 +1,30 @@
+{
+  "key": "research",
+  "dir": "02-research",
+  "title": "🔬 專家圓桌：中小企業導入生成式 AI",
+  "ok": true,
+  "wallSeconds": 484,
+  "agentReplies": 12,
+  "agents": 5,
+  "toolCalls": 11,
+  "artifacts": [
+    {
+      "id": "art_UBEW-QzN70yo",
+      "title": "台灣中小企業導入生成式AI的三大障礙與對策（專家圓桌報告）",
+      "type": "document",
+      "versions": 1,
+      "file": "台灣中小企業導入生成式AI的三大障礙與對策專家圓桌報告",
+      "author": "✍️ 撰稿人 Writer (@writer)"
+    },
+    {
+      "id": "art_3LcPXQTmCHGl",
+      "title": "台灣中小企業導入生成式AI：專家圓桌研究報告",
+      "type": "research",
+      "versions": 2,
+      "file": "台灣中小企業導入生成式AI：專家圓桌研究報告",
+      "author": "✍️ 撰稿人 Writer (@writer)"
+    }
+  ],
+  "genSeconds": 447,
+  "extra": {}
+}

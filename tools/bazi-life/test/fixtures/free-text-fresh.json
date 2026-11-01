@@ -1,0 +1,173 @@
+{
+  "about": "Fresh free-text test set, written without seeing the matcher.",
+  "situations": {
+    "layoff": {
+      "items": [
+        {"text": "先揣頭路較要緊，丟履歷找一樣寫程式的工做", "gold": ["layoff.search", "jobSearch"]},
+        {"text": "趁這個機會去念個資料科學學程，之後換跑道", "gold": ["layoff.retrain", "study", "careerSwitch"]},
+        {"text": "去考公家的，至少不會再被裁員", "gold": ["layoff.civil", "civilService"]},
+        {"text": "先放自己一個長假，做了二十年都沒好好休息過", "gold": ["layoff.rest", "rest"]},
+        {"text": "先跑外送ㄅ", "gold": ["layoff.gig", "sideJob"]},
+        {"text": "寫code寫到怕了，這次想去做跟科技業八竿子打不著的工作", "gold": ["careerSwitch", "layoff.retrain"]},
+        {"text": "資遣費根本沒照勞基法算，我要去勞工局申請調解", "gold": ["dispute", "insist"]},
+        {"text": "ㄅㄆㄇㄈㄉㄊ", "gold": ["unknown"]},
+        {"text": "先跟老婆好好商量，兩個小孩的開銷要怎麼撐", "gold": ["talk"]},
+        {"text": "拿資遣費頂一間早餐店，自己當頭家", "gold": ["startup"]},
+        {"text": "從今天開始每一筆花費都寫下來，能不花就不花", "gold": ["save"]},
+        {"text": "打給以前帶過我的主管，問他們公司有沒有缺人", "gold": ["seekHelp", "layoff.search", "jobSearch"]},
+        {"text": "去彩券行買張大樂透", "gold": ["lottery"]},
+        {"text": "Maybe I'll just take freelance projects for a while", "gold": ["layoff.gig", "sideJob"]},
+        {"text": "去日本找軟體工程師的工作，台灣中年工程師太難找頭路了", "gold": ["workAbroad"]}
+      ]
+    },
+    "marriageCrisis": {
+      "items": [
+        {"text": "今晚等孩子睡了，兩個人坐下來把話講開", "gold": ["crisis.talk", "talk"]},
+        {"text": "Maybe we need couples therapy", "gold": ["crisis.counsel", "counsel"]},
+        {"text": "偶們先不要講話ㄌ，各自冷靜ㄧ下", "gold": ["crisis.cold", "avoid"]},
+        {"text": "訂個沖繩三天兩夜，就我們兩個，找回以前的感覺", "gold": ["crisis.trip", "travel"]},
+        {"text": "這樣吵下去對囡仔也不好，我要跟他提離婚", "gold": ["crisis.split", "separate"]},
+        {"text": "先跟老公道歉，最近確實是我脾氣太差", "gold": ["crisis.talk", "talk", "reconcile"]},
+        {"text": "便當要排骨還是雞腿", "gold": ["unknown"]},
+        {"text": "找個專業的第三方來幫我們看看問題出在哪", "gold": ["crisis.counsel", "counsel"]},
+        {"text": "不想再忍了，直接找律師談離婚條件", "gold": ["crisis.split", "separate", "dispute"]},
+        {"text": "不要再冷戰了，冷戰只會越來越糟，有什麼不爽就直接說出來", "gold": ["crisis.talk", "talk"]},
+        {"text": "為了孩子先忍著吧，日子還是要過", "gold": ["pushThrough", "wait"]},
+        {"text": "找兩邊的爸媽出來幫忙勸和", "gold": ["seekHelp"]},
+        {"text": "再生一個好了，說不定有了老二感情會變好", "gold": ["haveChild"]},
+        {"text": "先別理他", "gold": ["crisis.cold", "avoid"]},
+        {"text": "其實我早就跟公司一個同事走很近了，想跟她在一起", "gold": ["affair"]}
+      ]
+    },
+    "parentCare": {
+      "items": [
+        {"text": "我家己顧就好", "gold": ["care.self", "care"]},
+        {"text": "請一個外籍看獲24小時陪她", "gold": ["care.hire", "hireCare"]},
+        {"text": "跟哥輪流顧ㄅ，一人一個禮拜", "gold": ["care.share", "shareCare"]},
+        {"text": "白天送去日照，晚上下班再接她回來", "gold": ["care.daycare", "hireCare"]},
+        {"text": "我不放心給外人顧，還是我自己來", "gold": ["care.self", "care"]},
+        {"text": "把工作辭掉，專心在家陪我媽", "gold": ["care.self", "care", "quitJob"]},
+        {"text": "去跟哥哥談，照顧的費用和時間都要對分", "gold": ["care.share", "shareCare", "negotiate"]},
+        {"text": "找間 nursing home 吧，讓專業的來", "gold": ["care.hire", "hireCare"]},
+        {"text": "明天台北會下雨嗎", "gold": ["unknown"]},
+        {"text": "讓她白天去社區的長照據點上課、跟老人家聊天，晚上再回家", "gold": ["care.daycare", "hireCare"]},
+        {"text": "幫自己買個長照險，以後才不會換我拖累小孩", "gold": ["insurance"]},
+        {"text": "搬回老家附近住，就近照顧她", "gold": ["moveHome", "care.self", "care"]},
+        {"text": "打給阿姨，拜託她有空過來幫忙看一下", "gold": ["seekHelp", "shareCare"]},
+        {"text": "乾脆提早退休，專心顧媽媽", "gold": ["retire", "care.self", "care"]},
+        {"text": "先問媽媽她自己想怎麼安排，尊重她的意思", "gold": ["talk"]}
+      ]
+    },
+    "exam15": {
+      "items": [
+        {"text": "讀普通高中，三年後再拚個好大學", "gold": ["exam15.high"]},
+        {"text": "去讀高職學一技之長，以後比較好找頭路", "gold": ["exam15.vocational"]},
+        {"text": "五專讀護理，畢業就可以直接考執照", "gold": ["exam15.five"]},
+        {"text": "不想讀書了，先去打工賺錢", "gold": ["exam15.work", "sideJob"]},
+        {"text": "我想重考一年，拚一間更好的學校", "gold": ["study"]},
+        {"text": "去讀餐飲科，我以後想當 chef", "gold": ["exam15.vocational"]},
+        {"text": "想去紐西蘭當小留學生", "gold": ["studyAbroad"]},
+        {"text": "去我爸的水電行當學徒，邊做邊學", "gold": ["familyBusiness", "exam15.work"]},
+        {"text": "我要明天醒來直接變成大人", "gold": ["unknown"]},
+        {"text": "偶想讀五專ㄉ電機科", "gold": ["exam15.five"]},
+        {"text": "讀高中ㄅ，我還不知道自己以後要幹嘛", "gold": ["exam15.high"]},
+        {"text": "不要讀高中，那種一直考試的生活我受夠了，想學點實用的", "gold": ["exam15.vocational", "exam15.five"]},
+        {"text": "暑假先去學吉他，升學的事之後再說", "gold": ["hobby", "wait"]},
+        {"text": "先跟爸媽討論看看他們怎麼想", "gold": ["talk"]},
+        {"text": "毋想讀冊矣，欲去食頭路", "gold": ["exam15.work"]}
+      ]
+    },
+    "startupOffer": {
+      "items": [
+        {"text": "直接遞辭呈，all in 創業", "gold": ["startup.go", "startup", "quitJob"]},
+        {"text": "先利用下班跟週末做做看，有起色再辭", "gold": ["startup.side", "sideJob"]},
+        {"text": "找個信得過的朋友一起合夥，風險分攤", "gold": ["startup.partner", "startup"]},
+        {"text": "算了，還是乖乖領死薪水比較安心", "gold": ["startup.stay", "pushThrough", "wait"]},
+        {"text": "工作不要辭，晚上接一些相關的案子試水溫就好", "gold": ["startup.side", "sideJob"]},
+        {"text": "我自己不跳下去做，錢借給要做的朋友周轉就好", "gold": ["lend", "startup.stay"]},
+        {"text": "錢可能不太夠，先跟爸媽借一點", "gold": ["borrow"]},
+        {"text": "去跟老闆談加薪，談不攏再說", "gold": ["negotiate"]},
+        {"text": "那筆錢拿去買台積電放著還比較實在", "gold": ["invest"]},
+        {"text": "拚啦，頭路辭掉", "gold": ["startup.go", "startup", "quitJob"]},
+        {"text": "我業務做得不錯，乾脆跳槽去同業薪水比較高的", "gold": ["jobHop"]},
+        {"text": "再觀望半年，看市場反應再決定", "gold": ["wait", "startup.stay"]},
+        {"text": "Find a co-founder first，一個人扛太累了", "gold": ["startup.partner", "startup"]},
+        {"text": "與其自己創業，不如回去接我家的工廠", "gold": ["familyBusiness"]}
+      ]
+    },
+    "proposal": {
+      "items": [
+        {"text": "準備戒指，找個海邊跟她求婚", "gold": ["proposal.yes", "marry"]},
+        {"text": "去戶政事務所登記就好，婚禮太燒錢了", "gold": ["proposal.small", "marry"]},
+        {"text": "偶還沒準備好ㄋ，過一陣子再說ㄅ", "gold": ["proposal.wait", "wait"]},
+        {"text": "我們個性真的不合，分開對彼此都好", "gold": ["proposal.no", "separate"]},
+        {"text": "先拿兩個人的八字去給老師合一下", "gold": ["spiritual"]},
+        {"text": "先存錢，等存款夠了再談結婚", "gold": ["save", "proposal.wait", "wait"]},
+        {"text": "辦一場大的，席開三十桌，親戚朋友都請來", "gold": ["proposal.yes", "marry"]},
+        {"text": "先跟她講清楚，我這輩子不打算生小孩", "gold": ["talk", "noChild"]},
+        {"text": "不要宴客，拍個婚紗照、登記完就好", "gold": ["proposal.small", "marry"]},
+        {"text": "I think we should break up", "gold": ["proposal.no", "separate"]},
+        {"text": "最近對另一個人有感覺，想先跟對方約出來看看", "gold": ["pursue", "affair"]},
+        {"text": "不婚，但我們可以繼續在一起", "gold": ["proposal.wait", "wait"]},
+        {"text": "我們先一起去做婚前諮商", "gold": ["counsel"]},
+        {"text": "好啦，嫁予你", "gold": ["proposal.yes", "marry"]}
+      ]
+    },
+    "burnout": {
+      "items": [
+        {"text": "不要再硬撐了，先請長假把身體顧好", "gold": ["burnout.leave", "rest"]},
+        {"text": "去掛身心科，先把睡眠問題處理好", "gold": ["burnout.doctor", "seeDoctor", "counsel"]},
+        {"text": "閣拚一下啦，年底若升上去就輕鬆矣", "gold": ["burnout.push", "pushThrough"]},
+        {"text": "不幹了，明天就遞辭程", "gold": ["burnout.quit", "quitJob"]},
+        {"text": "每天下班去跑步，流流汗應該比較好睡", "gold": ["exercise"]},
+        {"text": "找個心理師聊聊，我需要有人聽我說", "gold": ["counsel", "burnout.doctor"]},
+        {"text": "你是AI嗎", "gold": ["unknown"]},
+        {"text": "跟老闆談能不能調去比較不操的部門", "gold": ["negotiate"]},
+        {"text": "換一間不用一直加班的公司，薪水少一點沒差", "gold": ["jobHop"]},
+        {"text": "先把每天睡前那幾杯酒戒掉，早點上床", "gold": ["quitHabit"]},
+        {"text": "下班就打電動打到天亮，什麼都不想管", "gold": ["vice"]},
+        {"text": "I need a break. 請假去峇里島放空一週", "gold": ["burnout.leave", "rest", "travel"]},
+        {"text": "多約老同學出來聚一聚，生活不要只有工作", "gold": ["socialize"]},
+        {"text": "房貸跟小孩學費都在等，再累也只能做下去", "gold": ["burnout.push", "pushThrough"]},
+        {"text": "週末去偏鄉陪小朋友讀書，做點跟工作無關的事", "gold": ["volunteer"]}
+      ]
+    },
+    "inheritance": {
+      "items": [
+        {"text": "照法律走，一人一半，誰都不吃虧", "gold": ["inherit.split"]},
+        {"text": "房子予阿兄啦，兄弟毋通為著錢翻面", "gold": ["inherit.give", "reconcile"]},
+        {"text": "我也有出錢照顧爸媽，我那份一定要拿到", "gold": ["inherit.insist", "insist"]},
+        {"text": "交給仲介脫手，錢兩個人對分", "gold": ["inherit.sell", "sellAsset"]},
+        {"text": "他再不講理我就請律師處理", "gold": ["dispute", "inherit.insist", "insist"]},
+        {"text": "找舅舅出來當公親，大家坐下來講", "gold": ["seekHelp", "talk"]},
+        {"text": "先不要分，房子放著，等大家情緒過了再說", "gold": ["wait", "avoid"]},
+        {"text": "捐給社福團體算了，省得兄弟吵", "gold": ["donate"]},
+        {"text": "跟這種哥哥不用再來往了，房子我不要了", "gold": ["cutOff", "inherit.give", "reconcile"]},
+        {"text": "我出錢把哥哥那一半買下來", "gold": ["buyHome", "inherit.split"]},
+        {"text": "Just sell it and split the money", "gold": ["inherit.sell", "sellAsset"]},
+        {"text": "就照民法規定，該多少就多少，不要再吵ㄌ", "gold": ["inherit.split"]},
+        {"text": "先跟哥哥好好談，聽聽他為什麼想要房子", "gold": ["talk"]},
+        {"text": "去爸媽靈前擲筊，問他們同不同意賣", "gold": ["spiritual"]}
+      ]
+    },
+    "abroadOffer": {
+      "items": [
+        {"text": "去ㄚ，年輕不衝什麼時候衝", "gold": ["abroad.go", "workAbroad"]},
+        {"text": "不去，女朋友在台灣，遠距離我沒信心", "gold": ["abroad.stay", "wait"]},
+        {"text": "先跟公司談好薪水、住宿跟機票，條建好再去", "gold": ["abroad.negotiate", "negotiate"]},
+        {"text": "先跟女朋友商量，看她願不願意跟我過去", "gold": ["talk"]},
+        {"text": "先求婚，結完婚兩個人一起去日本", "gold": ["marry", "abroad.go", "workAbroad"]},
+        {"text": "先報名日文補習班，把語言練起來", "gold": ["study"]},
+        {"text": "日本的拉麵是不是比台灣好吃", "gold": ["unknown"]},
+        {"text": "去了就不回來了，直接在日本定居", "gold": ["emigrate", "abroad.go", "workAbroad"]},
+        {"text": "跟主管說我拿到日本的offer，看台灣這邊能不能加薪留我", "gold": ["negotiate"]},
+        {"text": "日本薪水沒比較高又要加班，不如留在台灣", "gold": ["abroad.stay", "wait"]},
+        {"text": "先不要決定，問問在日本上班的學長實際情況", "gold": ["seekHelp", "wait"]},
+        {"text": "Only if they cover my housing and flights home", "gold": ["abroad.negotiate", "negotiate"]},
+        {"text": "就算女朋友不支持我也要去", "gold": ["abroad.go", "workAbroad"]},
+        {"text": "去打工度假一年就好，正職先不要接", "gold": ["workAbroad"]},
+        {"text": "莫去啦，佇台灣較好", "gold": ["abroad.stay", "wait"]}
+      ]
+    }
+  }
+}

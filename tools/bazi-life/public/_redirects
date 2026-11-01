@@ -1,0 +1,6 @@
+# 命盤人生's clean URLs (scripts/static-site.mjs). 200 = served in place, the address does not change.
+/ /life.html 200
+/life /life.html 200
+/chart /index.html 200
+/privacy /privacy.html 200
+/terms /terms.html 200

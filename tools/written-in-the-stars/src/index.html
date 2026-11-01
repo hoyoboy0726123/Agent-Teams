@@ -1,0 +1,722 @@
+<title>Written in the Stars · Live your life 100 times</title>
+<meta name="description" content="Enter your birth date, time and place, live a whole American life year by year with odds tilted by your birth chart, then live it 99 more times. Is your life written in the stars, or just luck?">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0b1026">
+<meta property="og:title" content="Written in the Stars">
+<meta property="og:description" content="Is your life written in the stars, or just luck? Live it 100 times.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://written-in-the-stars.mingpan.workers.dev/">
+<meta property="og:image" content="https://written-in-the-stars.mingpan.workers.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Written in the Stars: is your life written in the stars, or just luck? Live it 100 times.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Written in the Stars">
+<meta name="twitter:description" content="Is your life written in the stars, or just luck? Live it 100 times.">
+<meta name="twitter:image" content="https://written-in-the-stars.mingpan.workers.dev/og.png">
+<meta name="stats-endpoint" content="__STATS_URL__">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1026'/%3E%3Cpath d='M16 5l2.6 7.4L26 15l-7.4 2.6L16 25l-2.6-7.4L6 15l7.4-2.6z' fill='%23f0cd84'/%3E%3C/svg%3E">
+<!--__FONT_PRELOAD__-->
+<style>
+/* Fraunces, served by the site itself (src/fonts.js). */
+/*__FONTS__*/
+/* ---------- tokens: night sky, warm gold, soft lavender ---------- */
+:root {
+  --bg: #f7f5fc; --surface: #ffffff; --surface-2: #f0ecfa; --ink: #161a3a; --muted: #4f5476; --rule: #dcd6ee;
+  --gold: #85600c; --gold-fill: #d9a93f; --gold-soft: #f6ead0; --lav: #5446a8; --lav-soft: #ebe7fb; --lav-ink: #3d3290;
+  --night: #0b1026; --night-2: #141b45; --night-ink: #eceaf8; --night-muted: #b4b6d8; --night-gold: #f0cd84; --night-lav: #c9c2f7;
+  --up: #b8860b; --down: #6f63c4; --band: rgba(84, 70, 168, 0.12); --median: #5446a8;
+  --good: #1f6e48; --bad: #a3324a; --focus: #5446a8;
+  --display: "Fraunces", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius: 16px; --shadow: 0 1px 2px rgba(22, 26, 58, 0.06), 0 6px 24px rgba(22, 26, 58, 0.06);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1026; --surface: #141a3d; --surface-2: #1b2250; --ink: #eceaf8; --muted: #b0b3d3; --rule: #2c3468;
+    --gold: #f0cd84; --gold-fill: #e3b75f; --gold-soft: #2c2a3c; --lav: #c3bbf6; --lav-soft: #232a5c; --lav-ink: #d9d3ff;
+    --up: #e9bf63; --down: #a99ff0; --band: rgba(195, 187, 246, 0.14); --median: #c3bbf6;
+    --good: #7fd6a6; --bad: #f19aae; --focus: #c3bbf6; --shadow: none; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1026; --surface: #141a3d; --surface-2: #1b2250; --ink: #eceaf8; --muted: #b0b3d3; --rule: #2c3468;
+  --gold: #f0cd84; --gold-fill: #e3b75f; --gold-soft: #2c2a3c; --lav: #c3bbf6; --lav-soft: #232a5c; --lav-ink: #d9d3ff;
+  --up: #e9bf63; --down: #a99ff0; --band: rgba(195, 187, 246, 0.14); --median: #c3bbf6;
+  --good: #7fd6a6; --bad: #f19aae; --focus: #c3bbf6; --shadow: none; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body); overflow-x: hidden; }
+img, svg, canvas { max-width: 100%; }
+h1, h2, h3 { font-family: var(--display); font-weight: 500; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: clamp(26px, 5vw, 36px); }
+h3 { font-size: 20px; }
+p { margin: 0; }
+a { color: var(--lav); text-underline-offset: 2px; }
+[hidden] { display: none !important; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+[tabindex="-1"]:focus { outline: none; }
+.wrap { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+.narrow { max-width: 760px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 22px; border-radius: 999px; border: 1px solid transparent; font-weight: 600; text-decoration: none; text-align: center; }
+.btn.primary { background: var(--night-gold); color: #1a1530; }
+.btn.primary:hover { background: #f6dba3; }
+.btn.ghost { background: transparent; border-color: rgba(201, 194, 247, 0.55); color: var(--night-ink); }
+.btn.ghost:hover { background: rgba(201, 194, 247, 0.12); }
+.btn.solid { background: var(--lav-ink); color: #fff; }
+:root[data-theme="dark"] .btn.solid { background: var(--night-gold); color: #1a1530; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.solid { background: var(--night-gold); color: #1a1530; } }
+.btn.outline { background: var(--surface); border-color: var(--rule); color: var(--ink); }
+.btn.outline:hover { border-color: var(--lav); }
+.btn.big { min-height: 56px; padding: 14px 30px; font-size: 18px; }
+.fine { font-size: 13px; color: var(--muted); }
+.disclaimer { font-size: 13px; color: var(--muted); border-left: 3px solid var(--gold-fill); padding: 8px 12px; background: var(--surface); border-radius: 0 10px 10px 0; }
+
+/* ---------- top bar ---------- */
+.topbar { position: relative; z-index: 3; background: var(--night); color: var(--night-ink); }
+.topbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; }
+.brand { display: inline-flex; align-items: center; gap: 8px; color: var(--night-ink); text-decoration: none; font-family: var(--display); font-size: 18px; }
+.brand svg { width: 22px; height: 22px; color: var(--night-gold); }
+.theme { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(201, 194, 247, 0.4); background: transparent; color: var(--night-ink); font-size: 14px; }
+.theme svg { width: 16px; height: 16px; }
+
+/* ---------- welcome ---------- */
+.hero { position: relative; overflow: hidden; background: radial-gradient(120% 80% at 50% 0%, #1d2766 0%, var(--night) 62%); color: var(--night-ink); padding: 56px 0 40px; isolation: isolate; }
+.hero::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0.9;
+  background-image: radial-gradient(1.4px 1.4px at 12% 18%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 22% 62%, #fff 50%, transparent 51%), radial-gradient(1.6px 1.6px at 31% 34%, #f0cd84 50%, transparent 51%), radial-gradient(1px 1px at 44% 12%, #fff 50%, transparent 51%), radial-gradient(1.2px 1.2px at 58% 78%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 66% 28%, #c9c2f7 50%, transparent 51%), radial-gradient(1.8px 1.8px at 78% 16%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 86% 52%, #fff 50%, transparent 51%), radial-gradient(1.3px 1.3px at 93% 82%, #f0cd84 50%, transparent 51%), radial-gradient(1px 1px at 6% 86%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 52% 46%, #fff 50%, transparent 51%), radial-gradient(1.2px 1.2px at 72% 64%, #fff 50%, transparent 51%);
+  background-size: 100% 100%; }
+.constellation { position: absolute; right: -40px; top: 18px; width: 340px; opacity: 0.55; z-index: -1; pointer-events: none; }
+.hero .kicker { font-size: 14px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--night-gold); margin-bottom: 14px; }
+.hero h1 { font-size: clamp(46px, 12vw, 96px); font-weight: 500; color: #fbf6ea; letter-spacing: -0.02em; }
+.hero h1 em { font-style: italic; color: var(--night-gold); }
+.hero .tagline { font-family: var(--display); font-size: clamp(20px, 4.4vw, 28px); color: var(--night-lav); margin-top: 16px; max-width: 30ch; }
+.hero .tagline b { color: #fbf6ea; font-weight: 500; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.privacy-line { margin-top: 16px; font-size: 14px; color: var(--night-muted); display: flex; align-items: center; gap: 8px; }
+.privacy-line svg { width: 16px; height: 16px; flex: none; color: var(--night-gold); }
+.live { display: flex; flex-wrap: wrap; gap: 10px 28px; margin-top: 32px; padding-top: 20px; border-top: 1px solid rgba(201, 194, 247, 0.2); }
+.live div { display: grid; }
+.live b { font-family: var(--display); font-size: 30px; font-weight: 500; color: #fbf6ea; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.live span { font-size: 13px; color: var(--night-muted); }
+.live .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #7fd6a6; margin-right: 6px; box-shadow: 0 0 0 0 rgba(127, 214, 166, 0.6); animation: pulse 2s infinite; }
+.live-paused { margin-top: 32px; padding-top: 20px; border-top: 1px solid rgba(201, 194, 247, 0.2); font-size: 15px; color: var(--night-muted); max-width: 46ch; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 8px rgba(127, 214, 166, 0); } 100% { box-shadow: 0 0 0 0 rgba(127, 214, 166, 0); } }
+.welcome-body { display: grid; gap: 40px; padding-top: 40px; padding-bottom: 24px; }
+.stage-card { display: grid; gap: 10px; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); margin-top: 28px; }
+canvas.pixel { width: 100%; height: auto; aspect-ratio: 128 / 44; image-rendering: pixelated; image-rendering: crisp-edges; border-radius: 10px; display: block; background: #20295c; }
+.stages { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; color: var(--muted); }
+.stages span + span::before { content: "·"; margin-right: 8px; }
+.stages span.on { color: var(--lav); font-weight: 600; }
+.steps { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 14px; counter-reset: step; }
+.steps li { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 18px 18px 18px 64px; position: relative; counter-increment: step; box-shadow: var(--shadow); }
+.steps li::before { content: counter(step); position: absolute; left: 18px; top: 16px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-family: var(--display); font-size: 18px; background: var(--lav-soft); color: var(--lav-ink); }
+.steps b { display: block; font-family: var(--display); font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+.steps p { color: var(--muted); }
+.recent ul { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+.recent li { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 10px 14px; }
+.recent li small { display: block; color: var(--muted); font-size: 12px; }
+.glyph { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; background: var(--lav-soft); color: var(--lav-ink); }
+.glyph.fire, .glyph.earth { background: var(--gold-soft); color: var(--gold); }
+.day-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.day-grid div { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 10px 14px; }
+.day-grid b { display: block; font-family: var(--display); font-size: 26px; font-weight: 500; }
+.day-grid span { font-size: 13px; color: var(--muted); }
+.elements { display: flex; gap: 12px; align-items: flex-end; height: 90px; margin-top: 12px; max-width: 520px; }
+.elements .bar { flex: 1; display: grid; grid-template-rows: 1fr auto; height: 100%; text-align: center; font-size: 12px; color: var(--muted); }
+.elements .bar i { align-self: end; height: var(--h); min-height: 3px; border-radius: 6px 6px 2px 2px; background: var(--lav); }
+.elements .bar.fire i, .elements .bar.earth i { background: var(--gold-fill); }
+.why-box { display: grid; gap: 14px; }
+.feature-grid { display: grid; gap: 12px; margin-top: 14px; }
+.feature { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 4px; }
+.feature b { font-family: var(--display); font-weight: 500; font-size: 19px; }
+.feature p { color: var(--muted); font-size: 15px; }
+
+/* ---------- the form ---------- */
+#setup { padding: 28px 0 40px; }
+.setup-grid { display: grid; gap: 20px; margin-top: 20px; max-width: 980px; }
+.back { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 8px 0; color: var(--lav); font-weight: 600; min-height: 44px; }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+.fields { display: grid; gap: 16px; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field > span, .field legend { font-weight: 600; font-size: 15px; }
+.field small { color: var(--muted); font-size: 13px; }
+input[type="text"], input[type="date"], input[type="time"], select { font: inherit; font-size: 16px; color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px; min-height: 50px; width: 100%; min-width: 0; }
+input:disabled { opacity: 0.55; }
+input:focus-visible, select:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+.check { display: inline-flex; align-items: center; gap: 10px; font-size: 15px; min-height: 40px; cursor: pointer; }
+.check input { width: 20px; height: 20px; accent-color: var(--lav); flex: none; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.seg { display: flex; gap: 8px; flex-wrap: wrap; }
+.seg label { flex: 1 1 120px; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.seg span { display: flex; align-items: center; justify-content: center; min-height: 48px; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); font-weight: 600; cursor: pointer; }
+.seg input:checked + span { border-color: var(--lav); background: var(--lav-soft); color: var(--lav-ink); box-shadow: inset 0 0 0 1px var(--lav); }
+.seg input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+.error { color: var(--bad); font-weight: 600; }
+.form-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.privacy-note { display: flex; gap: 8px; font-size: 13px; color: var(--muted); }
+.privacy-note svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--lav); }
+
+/* The Big Three badge. */
+.bigthree { background: linear-gradient(160deg, #1d2766, var(--night) 70%); color: var(--night-ink); border-radius: var(--radius); padding: 20px; display: grid; gap: 14px; position: relative; overflow: hidden; }
+.bigthree::after { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(1px 1px at 18% 22%, #fff 50%, transparent 51%), radial-gradient(1.4px 1.4px at 82% 18%, #f0cd84 50%, transparent 51%), radial-gradient(1px 1px at 64% 78%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 34% 88%, #fff 50%, transparent 51%); opacity: 0.8; }
+.bt-title { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--night-gold); }
+.bt-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.bt { display: grid; justify-items: center; text-align: center; gap: 2px; padding: 12px 6px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(201, 194, 247, 0.18); min-width: 0; }
+.bt .bt-icon, .bt > svg { width: 26px; height: 26px; color: var(--night-lav); }
+.bt.on .bt-icon, .bt.on > svg { color: var(--night-gold); }
+.bt-role { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--night-muted); }
+.bt-sign { font-family: var(--display); font-size: clamp(14px, 4.2vw, 24px); font-weight: 500; color: #fbf6ea; overflow-wrap: anywhere; letter-spacing: -0.01em; }
+.bt-glyph { min-height: 1.2em; font-size: 20px; line-height: 1.2; color: var(--night-gold); font-family: "Segoe UI Symbol", "DejaVu Sans", "Noto Sans Symbols", sans-serif; }
+.bt-words { font-size: 12px; color: var(--night-muted); line-height: 1.35; }
+.bt-note { font-size: 14px; color: var(--night-lav); position: relative; z-index: 1; }
+.bigthree.pop .bt.on { animation: pop 0.5s ease-out; }
+@keyframes pop { 0% { transform: scale(0.92); opacity: 0.4; } 60% { transform: scale(1.04); } 100% { transform: scale(1); opacity: 1; } }
+
+/* ---------- playing ---------- */
+#play { padding: 0 0 8px; }
+.play-log { display: grid; gap: 12px; align-content: start; padding: 12px 0; }
+/* While a life plays, the scene stays on screen: #play fills the window and the story scrolls in its own box under
+   it. On a window too short for both (a phone on its side) the page scrolls as a whole. */
+@media (min-height: 560px) {
+  body[data-screen="play"] .topbar { display: none; }
+  #play:not([hidden]) { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+  #play .status { flex: none; }
+  .play-log { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; position: relative; }
+}
+.status { background: var(--bg); padding: 10px 0 8px; display: grid; gap: 8px; border-bottom: 1px solid var(--rule); padding-top: max(10px, env(safe-area-inset-top)); }
+.scene { margin: 0; display: grid; gap: 4px; }
+.scene .pixel { width: min(100%, calc(30vh * 128 / 44)); margin: 0 auto; }
+.scene-cap { font-size: 12px; color: var(--muted); text-align: center; min-height: 1.2em; }
+.status-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.status .age { font-family: var(--display); font-size: 26px; font-weight: 500; line-height: 1; }
+.status .year { font-size: 15px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pill { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; padding: 4px 12px; border-radius: 999px; background: var(--lav-soft); color: var(--lav-ink); font-size: 13px; border: 0; text-align: left; }
+.pill b { font-weight: 700; }
+.pill::after { content: "ⓘ"; margin-left: 2px; opacity: 0.7; }
+.pill .lord { opacity: 0.9; }
+.prof-more { font-size: 13px; color: var(--muted); }
+.mood { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
+.mood .track { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; border: 1px solid var(--rule); }
+.mood .track i { display: block; height: 100%; background: linear-gradient(90deg, var(--down), var(--up)); border-radius: 4px; transition: width 0.4s; }
+.controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.controls button { border: 1px solid var(--rule); background: var(--surface); border-radius: 999px; padding: 6px 14px; font-size: 14px; min-height: 40px; }
+.controls button[aria-pressed="true"] { background: var(--lav-soft); border-color: var(--lav); color: var(--lav-ink); font-weight: 600; }
+.controls .skip { margin-left: auto; font-weight: 600; }
+.major { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); min-height: 36px; cursor: pointer; }
+.major input { width: 18px; height: 18px; accent-color: var(--lav); }
+.who { display: grid; gap: 6px; font-size: 14px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 6px; border-radius: 999px; background: var(--surface); border: 1px solid var(--rule); font-size: 13px; color: var(--ink); }
+.chip svg { width: 16px; height: 16px; color: var(--gold); }
+.chip.moon svg, .chip.rising svg { color: var(--lav); }
+.born { font-size: 15px; color: var(--ink); background: var(--gold-soft); border-radius: 12px; padding: 10px 14px; }
+.feed { list-style: none; margin: 0; padding: 0; display: grid; }
+.feed li { scroll-margin-top: 12px; display: grid; grid-template-columns: 3.2em minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.feed li:focus { outline: none; background: var(--lav-soft); border-radius: 8px; }
+.feed .when { font-family: var(--display); font-size: 20px; color: var(--ink); line-height: 1.2; }
+.feed .when small { display: block; font-family: var(--body); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.feed .lines { display: grid; gap: 4px; min-width: 0; overflow-wrap: break-word; }
+.feed .big { font-weight: 600; }
+.why { font-size: 13px; color: var(--lav); }
+.chose { font-size: 13px; color: var(--muted); font-style: italic; }
+.choice { background: var(--surface); border: 2px solid var(--lav); border-radius: var(--radius); padding: 18px; display: grid; gap: 14px; scroll-margin-top: 12px; box-shadow: var(--shadow); }
+.choice .q { font-family: var(--display); font-size: 22px; line-height: 1.25; }
+.choice .recap { border-left: 3px solid var(--rule); padding-left: 12px; display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
+.choice .recap ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.choice .recap b { color: var(--ink); margin-right: 4px; }
+.options { display: grid; gap: 8px; }
+.options button { display: grid; gap: 2px; text-align: left; padding: 12px 16px; min-height: 52px; border: 1px solid var(--rule); border-radius: 12px; background: var(--bg); position: relative; }
+.options button:hover { border-color: var(--lav); background: var(--lav-soft); }
+.options button b { font-weight: 600; padding-right: 7.5em; }
+.options button small { color: var(--muted); font-size: 13px; }
+.options .lean { position: absolute; right: 10px; top: 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: var(--gold); background: var(--gold-soft); border-radius: 999px; padding: 2px 8px; }
+.lean-note { font-size: 13px; color: var(--muted); }
+.free { display: grid; gap: 8px; border-top: 1px dashed var(--rule); padding-top: 14px; }
+.free label { font-weight: 600; }
+.free-row { display: flex; gap: 8px; }
+.free-row input { flex: 1 1 auto; }
+.free-row button { flex: none; min-height: 50px; padding: 0 18px; border-radius: 12px; border: 0; background: var(--lav-ink); color: #fff; font-weight: 600; }
+:root[data-theme="dark"] .free-row button { background: var(--night-gold); color: #1a1530; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .free-row button { background: var(--night-gold); color: #1a1530; } }
+.free-out { display: grid; gap: 8px; }
+.free-out:empty { display: none; }
+.suggest { display: flex; flex-wrap: wrap; gap: 8px; }
+.suggest button { min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--lav); background: var(--lav-soft); color: var(--lav-ink); font-weight: 600; }
+.suggest button.own { background: var(--surface); }
+.suggest button.plain { border-color: var(--rule); background: transparent; color: var(--muted); }
+.help { border: 2px solid var(--bad); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; background: var(--surface); }
+.help a { color: var(--bad); font-weight: 700; }
+
+/* ---------- the ending ---------- */
+#end { padding: 28px 0 40px; }
+.end-wrap { display: grid; gap: 28px; }
+.end-head { display: grid; gap: 10px; }
+.end-head h2 { font-size: clamp(40px, 10vw, 68px); }
+.end-head .label { font-family: var(--display); font-style: italic; font-size: 20px; color: var(--gold); }
+.end-head .sub { color: var(--muted); }
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 0; }
+.facts div { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 10px 14px; min-width: 0; }
+.facts dt { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.facts dd { margin: 2px 0 0; font-weight: 600; overflow-wrap: break-word; }
+.box { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 18px; display: grid; gap: 12px; box-shadow: var(--shadow); min-width: 0; }
+.box > .lede { color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; border-radius: 2px; }
+.key-up { background: var(--up); }
+.key-down { border: 2px solid var(--down); }
+.key-band { background: var(--band); border: 1px solid var(--rule); }
+.key-median { height: 0 !important; border-top: 2px dashed var(--median); border-radius: 0 !important; vertical-align: 3px !important; }
+.plot { position: relative; min-height: 200px; }
+.plot svg { display: block; touch-action: pan-y; }
+.plot svg:focus-visible { outline: 3px solid var(--focus); }
+.tip { position: absolute; z-index: 2; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 8px 10px; font-size: 13px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); pointer-events: none; overflow-wrap: break-word; }
+.muted { color: var(--muted); }
+details.table summary { cursor: pointer; color: var(--lav); font-weight: 600; min-height: 40px; display: flex; align-items: center; }
+.table-wrap { overflow-x: auto; max-height: 360px; overflow-y: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { padding: 4px 8px; border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap; }
+th:nth-child(3), td:nth-child(3) { text-align: left; }
+.fate-head { display: grid; gap: 12px; }
+.fate-col { border-radius: 14px; padding: 16px; display: grid; gap: 6px; }
+.fate-col.fate { background: linear-gradient(160deg, #1d2766, var(--night)); color: var(--night-ink); }
+.fate-col.fate .fine { color: var(--night-muted); }
+.fate-col.fate h3 { color: var(--night-gold); }
+.fate-col.luck { background: var(--surface-2); border: 1px solid var(--rule); }
+.fate-col ul { margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.fate-col li b { font-variant-numeric: tabular-nums; margin-right: 6px; }
+.cards { display: grid; gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.card .count { font-size: 17px; }
+.card .count em { font-style: normal; font-family: var(--display); font-size: 24px; color: var(--lav); }
+.card .this { font-size: 14px; color: var(--muted); }
+.card .this b { color: var(--ink); }
+.verdict { justify-self: start; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; border-radius: 999px; padding: 3px 10px; }
+.verdict.fate { background: var(--night); color: var(--night-gold); }
+.verdict.luck { background: var(--surface-2); color: var(--lav-ink); border: 1px solid var(--rule); }
+.verdict.lean { background: var(--gold-soft); color: var(--gold); }
+.hist { display: flex; align-items: flex-end; gap: 2px; height: 68px; }
+.hist i { flex: 1; background: var(--band); border-top: 2px solid var(--lav); border-radius: 2px 2px 0 0; }
+.hist i.me { background: var(--gold-fill); border-top-color: var(--gold); }
+.hist-axis { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.wait { color: var(--muted); font-style: italic; }
+.loading .wait::after { content: ""; display: inline-block; width: 14px; height: 14px; margin-left: 10px; vertical-align: -2px; border: 2px solid var(--rule); border-top-color: var(--lav); border-radius: 50%; animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.end-bt { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.sky-box { background: linear-gradient(160deg, #1d2766, var(--night) 70%); color: var(--night-ink); border-color: transparent; }
+.sky-box h3 { color: #fbf6ea; }
+.sky-box .lede { color: var(--night-muted); }
+.moments { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.moments li { display: grid; grid-template-columns: 3.4em minmax(0, 1fr); gap: 12px; padding: 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(201, 194, 247, 0.18); }
+.moments .m-age { font-family: var(--display); font-size: 24px; color: var(--night-gold); line-height: 1.1; }
+.moments .m-age small { display: block; font-family: var(--body); font-size: 12px; color: var(--night-muted); }
+.moments b { color: #fbf6ea; font-weight: 600; }
+.moments p { font-size: 14px; color: var(--night-lav); }
+.moments .m-life { color: var(--night-ink); margin-top: 4px; font-style: italic; }
+.moments li.bad .m-age { color: #c9c2f7; }
+.share-grid { display: grid; gap: 16px; align-items: start; }
+.share-img { width: 100%; max-width: 300px; height: auto; aspect-ratio: 9 / 16; border-radius: 18px; box-shadow: 0 10px 40px rgba(11, 16, 38, 0.35); background: var(--night); justify-self: center; display: block; }
+.share-box.loading .share-img { opacity: 0.4; }
+.share-actions { display: grid; gap: 10px; align-content: start; }
+.share-actions .row { display: flex; flex-wrap: wrap; gap: 10px; }
+.share-actions .share-to { margin: 6px 0 -2px; font-weight: 600; }
+.share-actions .social .btn { min-height: 44px; padding: 8px 16px; font-weight: 500; }
+.share-actions .social .btn[aria-disabled="true"] { pointer-events: none; opacity: 0.5; }
+.again { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* ---------- the natal reading ---------- */
+.chapters { display: grid; gap: 10px; }
+details.chapter { border: 1px solid var(--rule); border-radius: 14px; background: var(--bg); min-width: 0; }
+details.chapter > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 34px minmax(0, 1fr) 16px; gap: 12px; align-items: center; padding: 12px 14px; min-height: 56px; }
+details.chapter > summary::-webkit-details-marker { display: none; }
+details.chapter > summary::after { content: ""; width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform 0.15s; justify-self: center; margin-top: -4px; }
+details.chapter[open] > summary::after { transform: rotate(-135deg); margin-top: 4px; }
+details.chapter[open] > summary { border-bottom: 1px solid var(--rule); }
+.ch-n { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-family: var(--display); font-size: 17px; background: var(--lav-soft); color: var(--lav-ink); }
+.ch-t { display: grid; min-width: 0; }
+.ch-t b { font-family: var(--display); font-weight: 500; font-size: 19px; line-height: 1.25; }
+.ch-t small { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.ch-body { padding: 14px 16px 18px; display: grid; gap: 12px; min-width: 0; max-width: 72ch; }
+.ch-body h4 { margin: 10px 0 -4px; font-family: var(--display); font-weight: 500; font-size: 18px; line-height: 1.3; color: var(--ink); }
+.ch-body p { overflow-wrap: break-word; }
+.r-life { font-size: 14px; background: var(--gold-soft); border-radius: 10px; padding: 8px 12px; color: var(--ink); }
+.r-life-k { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); margin-right: 6px; }
+.r-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.r-list li { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--rule); background: var(--surface); min-width: 0; }
+.r-list li.spot { border-color: var(--lav); box-shadow: inset 3px 0 0 var(--lav); }
+.r-list li > b { font-weight: 600; }
+.r-list li p { font-size: 15px; }
+.r-tag { justify-self: start; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; border-radius: 999px; padding: 1px 8px; background: var(--surface-2); color: var(--lav-ink); }
+.r-tag.tension { background: var(--gold-soft); color: var(--gold); }
+.r-wheel { margin: 0; display: grid; gap: 8px; justify-items: center; }
+.wheel { width: min(100%, 440px); height: auto; display: block; }
+.wheel text { font-family: "DejaVu Sans", "Segoe UI Symbol", "Noto Sans Symbols 2", "Noto Sans Symbols", "Apple Symbols", sans-serif; text-anchor: middle; dominant-baseline: central; }
+.wheel .w-sign { fill: var(--surface); stroke: none; }
+.wheel .w-sign.fire, .wheel .w-sign.earth { fill: var(--gold-soft); }
+.wheel .w-sign.air, .wheel .w-sign.water { fill: var(--lav-soft); }
+.wheel .w-sglyph { font-size: 17px; fill: var(--ink); }
+.wheel .w-house { font-size: 11px; fill: var(--muted); font-family: var(--body); }
+.wheel .w-house.ang { fill: var(--lav-ink); font-weight: 700; }
+.wheel .w-ring, .wheel .w-cusp { fill: none; stroke: var(--rule); stroke-width: 1; }
+.wheel .w-inner { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.wheel .w-angle { stroke: var(--ink); stroke-width: 1.5; }
+.wheel .w-angle.asc, .wheel .w-angle.mc { stroke-width: 2.5; }
+.wheel .w-alabel { font-size: 10px; font-weight: 700; fill: var(--ink); font-family: var(--body); }
+.wheel .w-asp { stroke-width: 1.6; }
+.wheel .w-asp.hard { stroke: var(--bad); }
+.wheel .w-asp.soft { stroke: var(--lav); stroke-dasharray: 5 3; }
+.wheel .w-asp.wide { stroke-opacity: 0.55; }
+.wheel .w-tick { stroke: var(--ink); stroke-width: 2; }
+.wheel .w-lead { stroke: var(--muted); stroke-width: 0.8; }
+.wheel .w-pglyph { font-size: 19px; fill: var(--ink); }
+.wheel .w-planet.sun .w-pglyph, .wheel .w-planet.jupiter .w-pglyph { fill: var(--gold); }
+.wheel .w-rx { font-size: 9px; font-style: italic; fill: var(--bad); font-family: var(--body); }
+.r-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; font-size: 13px; color: var(--muted); }
+.r-legend i { display: inline-block; width: 18px; height: 0; margin-right: 6px; vertical-align: 3px; }
+.r-legend .k-hard { border-top: 2px solid var(--bad); }
+.r-legend .k-soft { border-top: 2px dashed var(--lav); }
+.r-bars { display: grid; gap: 6px; max-width: 460px; }
+.r-bars-t { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.r-bar { display: grid; grid-template-columns: 5.6em minmax(0, 1fr) 3em; gap: 10px; align-items: center; font-size: 14px; }
+.r-bar-track { height: 12px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.r-bar-track i { display: block; height: 100%; background: var(--lav); border-radius: 0 4px 4px 0; }
+.r-bar-v { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.r-table th[scope="row"] { text-align: left; font-weight: 600; }
+.r-table td, .r-table th { text-align: left; }
+.ai-card { border: 2px solid var(--lav); background: linear-gradient(160deg, var(--lav-soft), var(--surface) 70%); }
+.ai-head { display: flex; align-items: center; gap: 10px; }
+.ai-icon { width: 36px; height: 36px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--night); color: var(--night-gold); }
+.ai-icon svg { width: 20px; height: 20px; }
+.ai-go { display: flex; flex-wrap: wrap; gap: 10px; }
+.ai-msg:empty { display: none; }
+.ai-msg { background: var(--surface); border: 1px solid var(--lav); border-radius: 12px; padding: 10px 14px; }
+.ai-msg b { color: var(--lav-ink); margin-right: 4px; }
+
+/* ---------- the recap dialog ---------- */
+body.story-open { overflow: hidden; }
+.story { position: fixed; inset: 0; z-index: 50; background: rgba(6, 9, 26, 0.94); color: var(--night-ink); display: grid; place-items: center; padding: 16px; cursor: pointer; }
+.story .slide { width: min(560px, 100%); display: grid; gap: 12px; justify-items: center; text-align: center; cursor: auto; }
+.story canvas { width: 100%; height: auto; aspect-ratio: 128 / 44; image-rendering: pixelated; border-radius: 12px; }
+.story .ag { font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--night-gold); }
+.story .tx { font-family: var(--display); font-size: clamp(19px, 4.6vw, 24px); line-height: 1.35; color: #fbf6ea; }
+.story h2 { color: var(--night-gold); }
+.story .soft { color: var(--night-lav); }
+.story .dots { display: flex; gap: 6px; }
+.story .dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(201, 194, 247, 0.3); }
+.story .dots i.on { background: var(--night-gold); }
+.story .skip { position: absolute; top: max(14px, env(safe-area-inset-top)); right: 14px; min-height: 44px; padding: 8px 16px; border-radius: 999px; border: 1px solid rgba(201, 194, 247, 0.4); background: transparent; color: var(--night-ink); }
+.story .next, .story .go { min-height: 48px; padding: 10px 24px; border-radius: 999px; border: 0; background: var(--night-gold); color: #1a1530; font-weight: 600; }
+.story .hint { position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); font-size: 13px; color: var(--night-muted); }
+
+/* ---------- footer ---------- */
+footer { background: var(--night); color: var(--night-muted); padding: 28px 0 36px; margin-top: 24px; font-size: 14px; }
+body[data-screen="play"] footer { margin-top: 0; }
+footer .wrap { display: grid; gap: 12px; }
+footer a { color: var(--night-gold); }
+footer .links { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+footer .disc { color: var(--night-ink); }
+
+/* ---------- wider screens ---------- */
+@media (min-width: 720px) {
+  .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .feature-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .day-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fate-head { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .share-grid { grid-template-columns: 300px minmax(0, 1fr); }
+  .options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero { padding: 84px 0 56px; }
+  .constellation { width: 460px; right: 0; top: 24px; }
+}
+@media (min-width: 960px) {
+  #form { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); column-gap: 28px; align-items: start; }
+  #form > * { grid-column: 1; }
+  #form > .bigthree { grid-column: 2; grid-row: 1 / span 9; position: sticky; top: 20px; }
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .welcome-top { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 32px; align-items: center; }
+  .stage-card { margin-top: 0; }
+}
+@media (max-width: 600px) {
+  .controls { gap: 4px; }
+  .controls button { padding: 6px 10px; font-size: 13px; }
+}
+@media (max-width: 480px) {
+  .reading.box { padding: 16px 12px; }
+  .ch-body { padding: 12px 10px 16px; }
+  details.chapter > summary { padding: 10px; gap: 10px; }
+  .r-wheel { margin: 0 -8px; }
+  .wheel { width: 100%; }
+}
+@media (max-width: 400px) {
+  .bt-words { display: none; }
+  .status .age { font-size: 22px; }
+  .controls button { padding: 6px 8px; }
+  .options button b { padding-right: 0; }
+  .options .lean { position: static; justify-self: start; margin-top: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+</style>
+<div class="page">
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="/" id="home-link"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2 6.5L20.5 11 14 13.5 12 20l-2-6.5L3.5 11 10 8.5z" fill="currentColor"/></svg>Written in the Stars</a>
+    <button type="button" class="theme" id="theme" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" fill="currentColor"/></svg><span>Dark</span></button>
+  </div>
+</header>
+
+<main id="main">
+<section id="welcome" aria-labelledby="welcome-title">
+  <div class="hero">
+    <svg class="constellation" viewBox="0 0 400 260" aria-hidden="true"><g fill="none" stroke="#c9c2f7" stroke-width="1" stroke-opacity="0.6"><path d="M30 200 L110 150 L170 170 L230 110 L300 120 L360 60"/><path d="M230 110 L250 40 L320 30"/></g><g fill="#f0cd84"><circle cx="30" cy="200" r="3"/><circle cx="110" cy="150" r="2.4"/><circle cx="170" cy="170" r="3.4"/><circle cx="230" cy="110" r="2.6"/><circle cx="300" cy="120" r="3"/><circle cx="360" cy="60" r="2.2"/><circle cx="250" cy="40" r="2.6"/><circle cx="320" cy="30" r="3.2"/></g></svg>
+    <div class="wrap welcome-top">
+      <div>
+        <p class="kicker">A life simulator, steered by your birth chart</p>
+        <h1 id="welcome-title" tabindex="-1">Written <em>in</em> the Stars</h1>
+        <p class="tagline">Is your life written in the stars, or just luck? <b>Live it 100 times.</b></p>
+        <div class="cta">
+          <button type="button" class="btn primary big" data-start>Start my life</button>
+          <button type="button" class="btn ghost big" data-random>Random birth</button>
+        </div>
+        <p class="privacy-line"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z" fill="currentColor"/></svg>Free, no sign-up, no cookies. Your birth data never leaves this device.</p>
+        <div class="live" id="live" hidden aria-live="off">
+          <div><b id="live-total">0</b><span>lives lived so far</span></div>
+          <div id="live-now-box"><b id="live-now">0</b><span><i class="dot" aria-hidden="true"></i>playing right now</span></div>
+          <div id="live-today-box"><b id="live-today">0</b><span>lives finished today</span></div>
+        </div>
+        <p class="live-paused" id="live-paused" role="status" hidden></p>
+      </div>
+      <figure class="stage-card" aria-label="A life in pixels: born, school, work, love, home, later years">
+        <canvas class="pixel" id="welcome-scene" width="128" height="44" aria-hidden="true"></canvas>
+        <figcaption class="stages" id="welcome-stages"></figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <div class="wrap welcome-body">
+    <section aria-labelledby="how-title">
+      <h2 id="how-title">How it works</h2>
+      <ol class="steps">
+        <li><b>Enter your birth</b><p>Date, time and place in the US. We cast your Western chart and reveal your Big Three: Sun, Moon and Rising.</p></li>
+        <li><b>Live one whole life</b><p>Year by year, from your first word to your last birthday. You make the big calls; your chart tilts the odds, which start from real US statistics.</p></li>
+        <li><b>Live it 99 more times</b><p>The same chart, 100 lives. See what happened in almost every life, and what was just luck.</p></li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="what-title">
+      <h2 id="what-title">What makes it different</h2>
+      <div class="feature-grid">
+        <div class="feature"><b>A real American life</b><p>School, first jobs, love, a mortgage, the moon landing or the iPhone, depending on when you were born.</p></div>
+        <div class="feature"><b>Your sky, year by year</b><p>Annual profections, Saturn returns and Jupiter's cycles nudge each year. The story tells you when.</p></div>
+        <div class="feature"><b>Fate vs luck</b><p>One life is a story. A hundred lives show which parts of it were the stars, and which were a coin flip.</p></div>
+      </div>
+    </section>
+
+    <section class="recent" id="live-recent" hidden aria-labelledby="recent-title">
+      <h2 id="recent-title">Lives just lived</h2>
+      <ul id="live-recent-list"></ul>
+    </section>
+
+    <section id="live-day" hidden aria-labelledby="day-title">
+      <h2 id="day-title">Today's lives</h2>
+      <p class="fine" id="live-day-n"></p>
+      <div class="day-grid">
+        <div><b id="live-avg"></b><span>average age reached</span></div>
+        <div><b id="live-max"></b><span>oldest today</span></div>
+        <div><b id="live-married"></b><span>got married</span></div>
+        <div><b id="live-home"></b><span>owned a home</span></div>
+      </div>
+      <div class="elements" id="live-elements" role="img" aria-label="Today's lives by the element of their Sun sign"></div>
+    </section>
+
+    <div class="cta" style="margin-top:0">
+      <button type="button" class="btn solid big" data-start>Start my life</button>
+      <button type="button" class="btn outline big" data-random>Random birth</button>
+    </div>
+    <p class="disclaimer">A game for entertainment and self-reflection only. Astrology has no proven scientific validity. Nothing here predicts your future or is medical, legal, financial or psychological advice.</p>
+  </div>
+</section>
+
+<section id="setup" hidden aria-labelledby="setup-title">
+  <div class="wrap">
+    <button type="button" class="back" id="setup-back"><span aria-hidden="true">←</span> Back</button>
+    <h2 id="setup-title" tabindex="-1">When and where were you born?</h2>
+    <p class="fine" style="margin-top:6px">Use your own birth, or anyone's. It stays on this device.</p>
+    <div class="setup-grid">
+      <form class="panel fields" id="form" novalidate>
+        <label class="field"><span>Name <small>(optional, for the story)</small></span><input type="text" id="f-name" maxlength="40" autocomplete="off" placeholder="e.g. Jordan Lee" spellcheck="false"></label>
+        <label class="field"><span>Birth date</span><input type="date" id="f-date" min="1950-01-01" max="2025-12-31" required aria-describedby="date-help"><small id="date-help">Born between 1950 and 2025.</small></label>
+        <div class="field">
+          <label class="field" for="f-time"><span>Birth time</span></label>
+          <input type="time" id="f-time" step="60" aria-describedby="time-help">
+          <label class="check"><input type="checkbox" id="f-unknown"> I don't know my birth time</label>
+          <small id="time-help">The time sets your Rising sign. A birth certificate usually has it.</small>
+        </div>
+        <label class="field"><span>Birthplace</span><select id="f-place" required aria-describedby="place-help"></select><small id="place-help">The largest US cities, by state. Pick the closest.</small></label>
+        <div class="bigthree" id="bigthree" role="group" aria-label="Your Big Three">
+        <p class="bt-title">Your Big Three</p>
+        <div class="bt-row">
+          <div class="bt" data-role="sun"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg><span class="bt-role">Sun</span><span class="bt-glyph" aria-hidden="true"></span><b class="bt-sign">?</b><small class="bt-words">your core</small></div>
+          <div class="bt" data-role="moon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 3.5a8.5 8.5 0 1 0 5 15.2A7 7 0 0 1 15.5 3.5Z" fill="currentColor"/></svg><span class="bt-role">Moon</span><span class="bt-glyph" aria-hidden="true"></span><b class="bt-sign">?</b><small class="bt-words">your inner world</small></div>
+          <div class="bt" data-role="rising"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18M12 15V5M8 9l4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="bt-role">Rising</span><span class="bt-glyph" aria-hidden="true"></span><b class="bt-sign">?</b><small class="bt-words">how you come across</small></div>
+        </div>
+        <p class="bt-note" id="bt-note" aria-live="polite">Enter your birth date to reveal your Big Three.</p>
+      </div>
+        <fieldset class="field">
+          <legend>Sex</legend>
+          <div class="seg">
+            <label><input type="radio" name="sex" value="female" id="sex-f"><span>Female</span></label>
+            <label><input type="radio" name="sex" value="male" id="sex-m"><span>Male</span></label>
+          </div>
+          <small>US life tables and statistics are kept by sex at birth.</small>
+        </fieldset>
+        <p class="error" id="error" role="alert" hidden></p>
+        <div class="form-actions">
+          <button type="submit" class="btn solid big" id="go">Start my life</button>
+          <button type="button" class="btn outline" data-random>Random birth instead</button>
+        </div>
+        <p class="privacy-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z" fill="currentColor"/></svg>Your chart and your life are worked out in this browser. Nothing you enter is sent or stored. <a href="/privacy">Privacy</a></p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section id="play" hidden aria-label="Your life">
+  <div class="status">
+    <div class="wrap narrow" style="display:grid;gap:8px">
+      <figure class="scene">
+        <canvas class="pixel" id="scene" width="128" height="44" aria-hidden="true"></canvas>
+        <figcaption class="scene-cap" id="scene-cap" aria-hidden="true"></figcaption>
+      </figure>
+      <div class="status-row">
+        <span class="age" id="s-age" aria-live="off">Age 0</span>
+        <span class="year" id="s-year"></span>
+        <button type="button" class="pill" id="s-prof" aria-expanded="false" aria-controls="s-prof-more"><b></b><span class="topic"></span><span class="lord"></span></button>
+      </div>
+      <p class="prof-more" id="s-prof-more" hidden></p>
+      <div class="mood"><span id="mood-label">Mood</span><span class="track" id="mood" role="meter" aria-labelledby="mood-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="60"><i id="s-mood" style="width:60%"></i></span></div>
+      <div class="controls" role="group" aria-label="Speed">
+        <button type="button" id="c-pause" aria-pressed="false">Pause</button>
+        <button type="button" data-speed="1" aria-pressed="true">Slow</button>
+        <button type="button" data-speed="3" aria-pressed="false">Fast</button>
+        <button type="button" data-speed="10" aria-pressed="false">Faster</button>
+        <button type="button" class="skip" id="c-skip">Skip to end</button>
+      </div>
+    </div>
+  </div>
+  <div class="play-log" id="play-log">
+    <div class="wrap narrow" style="display:grid;gap:12px">
+      <div class="who"><span id="who"></span><span class="chips" id="who-big"></span></div>
+      <label class="major"><input type="checkbox" id="c-major"> Only ask me the big decisions</label>
+      <p class="born" id="born" hidden></p>
+      <ol class="feed" id="feed" aria-label="Your life, year by year"></ol>
+      <div class="choice" id="choice" hidden role="region" aria-label="A decision"></div>
+    </div>
+  </div>
+</section>
+
+<section id="end" hidden aria-labelledby="end-title">
+  <div class="wrap end-wrap">
+    <div class="end-head">
+      <h2 id="end-title" tabindex="-1"></h2>
+      <p class="label" id="end-label"></p>
+      <p class="sub">This is one of the 100 lives your chart could live. Below, the other 99.</p>
+      <div class="chips" id="end-big"></div>
+    </div>
+    <dl class="facts" id="end-facts"></dl>
+
+    <section class="box" aria-labelledby="chart-title">
+      <h3 id="chart-title">Your life chart</h3>
+      <p class="lede">Each candle is a year of this life: how your mood started and ended it.</p>
+      <div class="legend">
+        <span><i class="key-up"></i>Years of growth</span>
+        <span><i class="key-down"></i>Years of strain</span>
+        <span><i class="key-band"></i>Middle 80 of your 100 lives</span>
+        <span><i class="key-median"></i>Their median</span>
+      </div>
+      <div class="plot" id="plot"><div class="tip" id="tip" hidden></div></div>
+      <details class="table"><summary>See the numbers, year by year</summary><div class="table-wrap" id="kline-table"></div></details>
+    </section>
+
+    <section class="box" id="hundred" aria-labelledby="hundred-title">
+      <h3 id="hundred-title">Fate vs luck: the same chart, 100 lives</h3>
+      <p class="lede">Every life gets different choices and different dice. What keeps happening is the chart; what doesn't is luck.</p>
+      <div class="fate-head" id="fate-head" aria-live="polite"></div>
+      <div class="cards" id="cards" aria-live="polite"></div>
+    </section>
+
+    <section class="box reading" id="reading" aria-labelledby="reading-title">
+      <h3 id="reading-title">Your birth chart, read in full</h3>
+      <p class="lede" id="reading-lede"></p>
+      <div class="chapters" id="reading-body"></div>
+      <p class="fine">Written for self-reflection, not prediction: astrology has no proven scientific validity. The words are hand-written and chosen by your chart's factors; no AI.</p>
+    </section>
+
+    <section class="box ai-card" id="ai-card" aria-labelledby="ai-title">
+      <div class="ai-head">
+        <span class="ai-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2l1.8 5.7L19.5 9.5 13.8 11.3 12 17l-1.8-5.7L4.5 9.5l5.7-1.8z" fill="currentColor"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" fill="currentColor"/></svg></span>
+        <h3 id="ai-title">AI Astrology Report</h3>
+      </div>
+      <p class="lede">We're building an AI astrologer that will read your whole chart and write you a personal report: your Big Three in depth, love and relationships, career and money, your strengths and growth edges, and your years ahead, one by one.</p>
+      <div class="ai-go"><button type="button" class="btn solid big" id="ai-btn">Get my AI report</button></div>
+      <p class="ai-msg" id="ai-msg" role="status"></p>
+      <p class="fine">For entertainment and self-reflection. AI-written.</p>
+    </section>
+
+    <section class="box sky-box" aria-labelledby="sky-title">
+      <h3 id="sky-title">Your sky in this life</h3>
+      <p class="lede">Your Big Three, and the years your chart turned the volume up.</p>
+      <div class="end-bt" id="end-bt"></div>
+      <ul class="moments" id="moments"></ul>
+    </section>
+
+    <section class="box share-box loading" id="share-box" aria-labelledby="share-title">
+      <h3 id="share-title">Your card</h3>
+      <div class="share-grid">
+        <img class="share-img" id="share-img" alt="" width="1080" height="1920">
+        <div class="share-actions">
+          <p class="lede">Made for stories. Save it, post it, and ask your friends how many of their 100 lives got married.</p>
+          <div class="row">
+            <button type="button" class="btn solid" id="share-native" hidden>Share…</button>
+            <button type="button" class="btn solid" id="share-png">Download PNG</button>
+          </div>
+          <p class="share-to" id="share-to-label">Or post it:</p>
+          <div class="row social" role="group" aria-labelledby="share-to-label">
+            <a class="btn outline" data-net="x" target="_blank" rel="noopener" href="#">X</a>
+            <a class="btn outline" data-net="threads" target="_blank" rel="noopener" href="#">Threads</a>
+            <a class="btn outline" data-net="facebook" target="_blank" rel="noopener" href="#">Facebook</a>
+            <a class="btn outline" data-net="reddit" target="_blank" rel="noopener" href="#">Reddit</a>
+            <a class="btn outline" data-net="whatsapp" target="_blank" rel="noopener" href="#">WhatsApp</a>
+            <a class="btn outline" data-net="bluesky" target="_blank" rel="noopener" href="#">Bluesky</a>
+            <button type="button" class="btn outline" id="share-copy">Copy link</button>
+          </div>
+          <p class="fine" id="share-copied" role="status" aria-live="polite"></p>
+          <p class="fine">Instagram and TikTok: save the card (or tap Share… on your phone) and add it to your Story.</p>
+          <p class="fine">The card shows your Big Three and this life, never your birth date or name.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="again">
+      <button type="button" class="btn solid big" id="again-same">Live this chart again</button>
+      <button type="button" class="btn outline big" id="again-new">Someone new</button>
+    </div>
+    <p class="disclaimer">A game for entertainment and self-reflection only. Astrology has no proven scientific validity. Nothing here predicts your future or is medical, legal, financial or psychological advice. Health events in the story are fiction, not predictions.</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p class="disc">Written in the Stars is a game for entertainment and self-reflection only. Astrology has no proven scientific validity. Nothing here predicts your future or is medical, legal, financial or psychological advice.</p>
+    <p>Odds start from public US statistics (SSA life tables, CDC/NCHS, Census Bureau) and are tilted by your chart: tropical zodiac, whole sign houses, annual profections, Saturn and Jupiter transits. Planet positions by astronomy-engine (MIT License). Everything runs in your browser; the site counts anonymous visits only, with no cookies and no IDs.</p>
+    <p class="links"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><span>If you're struggling, call or text <a href="tel:988">988</a>.</span></p>
+  </div>
+</footer>
+</div>
+<div class="story" id="story" hidden role="dialog" aria-modal="true" aria-label="Your life in pictures"></div>
+
+<script id="app">/*__APP__*/</script>

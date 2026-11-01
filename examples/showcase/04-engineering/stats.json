@@ -1,0 +1,113 @@
+{
+  "key": "engineering",
+  "dir": "04-engineering",
+  "title": "🧑‍💻 工程小組：寵物美容預約系統 MVP",
+  "ok": true,
+  "wallSeconds": 1097,
+  "agentReplies": 20,
+  "agents": 6,
+  "toolCalls": 3,
+  "artifacts": [
+    {
+      "id": "art_Na7vgAIx2oKT",
+      "title": "寵物美容預約 MVP 測試計畫",
+      "type": "document",
+      "versions": 3,
+      "file": "寵物美容預約-MVP-測試計畫",
+      "author": "🧪 測試工程師 QA Engineer (@qa)"
+    },
+    {
+      "id": "art_oFb79lK6MUmV",
+      "title": "DevOps 基礎設施配置 - MVP",
+      "type": "document",
+      "versions": 1,
+      "file": "DevOps-基礎設施配置---MVP",
+      "author": "⚙️ DevOps 自動化 DevOps Automator (@devops)"
+    },
+    {
+      "id": "art_hRqBB8nuA2Tf",
+      "title": "寵物美容預約 - 顧客端預約流程",
+      "type": "website",
+      "versions": 2,
+      "file": "寵物美容預約---顧客端預約流程",
+      "author": "🖥️ 前端工程師 Frontend Developer (@frontend)"
+    },
+    {
+      "id": "art_VLplOCSSKa9T",
+      "title": "寵物美容預約 API 設計規格",
+      "type": "document",
+      "versions": 1,
+      "file": "寵物美容預約-API-設計規格",
+      "author": "🗄️ 後端架構師 Backend Architect (@backend)"
+    }
+  ],
+  "genSeconds": 1063,
+  "extra": {
+    "tasks": [
+      {
+        "title": "需求釐清與資料模型設計",
+        "assigneeType": "agent",
+        "assigneeId": "agt_Il7cF6k2Nu0T",
+        "due": 1790985600000
+      },
+      {
+        "title": "確認 Prisma vs Knex 後同步 @devops，補齊 migration（含 down script）指令範例，供 CI/CD pipeline 對接",
+        "assigneeType": "agent",
+        "assigneeId": "agt_Il7cF6k2Nu0T",
+        "due": 1791590400000
+      },
+      {
+        "title": "提供狀態機完整轉換規則（哪些跳轉合法/不合法）與營業時間邊界規則，供測試案例 TC-07、TC-10、TC-21 對照驗證",
+        "assigneeType": "agent",
+        "assigneeId": "agt_Il7cF6k2Nu0T",
+        "due": 1791590400000
+      },
+      {
+        "title": "預約相關 API 設計與開發",
+        "assigneeType": "agent",
+        "assigneeId": "agt_Il7cF6k2Nu0T",
+        "due": 1791590400000
+      },
+      {
+        "title": "顧客端預約流程頁面",
+        "assigneeType": "agent",
+        "assigneeId": "agt_NCyrB3RPz6dI",
+        "due": 1791936000000
+      },
+      {
+        "title": "CI/CD 與部署環境建置",
+        "assigneeType": "agent",
+        "assigneeId": "agt_ab-gchmS45Ud",
+        "due": 1792195200000
+      },
+      {
+        "title": "店家端當日排程檢視頁面",
+        "assigneeType": "agent",
+        "assigneeId": "agt_NCyrB3RPz6dI",
+        "due": 1792195200000
+      },
+      {
+        "title": "資安與隱私檢視",
+        "assigneeType": "agent",
+        "assigneeId": "agt_mCYp-t-KILPu",
+        "due": 1792800000000
+      },
+      {
+        "title": "測試計畫與案例執行",
+        "assigneeType": "agent",
+        "assigneeId": "agt_MVKdSAPWopRS",
+        "due": 1793059200000
+      },
+      {
+        "title": "MVP 上線準備與發布",
+        "assigneeType": "agent",
+        "assigneeId": "agt_ab-gchmS45Ud",
+        "due": 1793404800000
+      }
+    ],
+    "executed": {
+      "title": "顧客端預約流程頁面",
+      "status": "done"
+    }
+  }
+}

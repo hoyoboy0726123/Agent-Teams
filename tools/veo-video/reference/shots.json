@@ -1,0 +1,38 @@
+{
+  "08-home-share": {
+    "model": "veo-3.1-generate-preview",
+    "rate": 0.4,
+    "tag": "-std",
+    "prompt": "Warm evening at home. The father leans toward the laptop with a curious smile and asks once, in Mandarin Chinese with a Taiwanese accent: 「今天學了什麼？」 Then the boy turns to him excitedly, points at the colorful game on the laptop screen and answers once: 「你看！這是我自己做的遊戲！」 Each line is spoken only one time, no repetition. The father laughs, delighted. Gentle handheld camera slowly pushing in. Natural room tone. Only these two people speak. No music."
+  },
+  "02-acceptance-card": {
+    "model": "veo-3.1-generate-preview",
+    "rate": 0.4,
+    "tag": "-std",
+    "prompt": "Bright classroom. The girl finishes writing on the yellow sticky note in front of her with the black marker. The three yellow sticky notes already on the desk keep their handwritten text exactly as it is the whole time; nobody picks them up, nothing is erased, no note turns blank. She caps the marker, looks up at the camera with a confident smile and says one short sentence once, in Mandarin Chinese with a Taiwanese accent: 「先寫驗收卡，AI 才准動工！」 Slow, steady camera push-in. Soft classroom ambience. Only the girl speaks, exactly once. No music."
+  },
+  "03-teacher-hands-off": {
+    "model": "veo-3.1-generate-preview",
+    "rate": 0.4,
+    "tag": "-std",
+    "prompt": "Bright classroom. The female teacher leans in behind the girl, points at one spot on the laptop screen and says once, warmly, in Mandarin Chinese with a Taiwanese accent: 「看這裡，它哪裡做錯了？」 The girl looks closely at the screen, her eyes light up, and she answers once: 「分數沒有加！」 The teacher smiles and nods. Gentle camera drift. Soft classroom ambience. Only the teacher and the girl speak, each exactly once. No music."
+  },
+  "04-debug-pair": {
+    "model": "veo-3.1-generate-preview",
+    "rate": 0.4,
+    "tag": "-std",
+    "prompt": "Bright classroom. Two kids debug together at a laptop. The girl points at the screen and says once, encouragingly, in Mandarin Chinese with a Taiwanese accent: 「紅字是線索，不是責罵！」 The boy, chin on hand, nods thoughtfully, then starts typing a fix. Slow camera push-in. Soft classroom ambience, keyboard clicks. Only the girl speaks. No music."
+  },
+  "06-highfive": {
+    "model": "veo-3.1-generate-preview",
+    "rate": 0.4,
+    "tag": "-std",
+    "prompt": "Bright classroom. The boy and the girl look at their laptop, see their program work, smile widely and give each other a happy high five, and the girl cheers once: 「過關了！」 Classmates in the background smile. Natural handheld camera movement. Audio: soft classroom ambience, the clap of the high five and the girl's short cheer. No music."
+  },
+  "07-showcase-parents": {
+    "model": "veo-3.1-generate-preview",
+    "rate": 0.4,
+    "tag": "-std",
+    "prompt": "Bright classroom on showcase day. The boy turns toward his parents, gestures at the game on his laptop and says once, proudly, in Mandarin Chinese with a Taiwanese accent: 「這是我做的，你們試試看！」 His mother smiles and holds up her phone, his father leans in toward the screen and smiles. Slow camera push-in. Quiet room tone. Only the boy speaks. No music."
+  }
+}

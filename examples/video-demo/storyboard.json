@@ -1,0 +1,13 @@
+{
+  "title": "晨光咖啡訂閱 30 秒介紹",
+  "format": "16:9",
+  "theme": { "bg": "#1c1917", "fg": "#fafaf9", "accent": "#f59e0b", "font": "sans" },
+  "scenes": [
+    { "layout": "title", "icon": "☕", "kicker": "MORNING LIGHT", "title": "每月一包，喝到產地的晨光", "subtitle": "精品咖啡訂閱，新鮮烘焙直送", "narration": "每天早上的第一杯咖啡，值得更好的。", "animation": "zoom" },
+    { "layout": "bullets", "title": "為什麼選晨光", "items": ["烘焙 72 小時內出貨", "每月換一個產區", "隨時暫停，不綁約"], "narration": "我們在烘焙後三天內出貨，每個月帶你認識一個新產區，而且隨時可以暫停。" },
+    { "layout": "stat", "icon": "📈", "value": "94%", "label": "訂閱者續訂率", "caption": "封測 200 位用戶", "narration": "封測期間，九成四的訂閱者選擇續訂。" },
+    { "layout": "chart", "title": "訂閱人數成長", "chart": { "type": "bar", "labels": ["1月", "2月", "3月", "4月", "5月", "6月"], "series": [{ "name": "訂閱數", "data": [120, 180, 260, 390, 520, 710] }] }, "narration": "上線半年，訂閱人數成長了將近六倍。" },
+    { "layout": "quote", "text": "開箱的香氣，是我一天裡最期待的時刻。", "author": "台北・林小姐", "narration": "這是用戶最常跟我們說的話。", "animation": "fade" },
+    { "layout": "end", "icon": "🌅", "title": "首月 5 折", "subtitle": "morninglight.example.com", "narration": "現在訂閱，首月五折。", "duration": 4 }
+  ]
+}

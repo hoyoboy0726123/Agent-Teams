@@ -1,0 +1,556 @@
+<title>林語晴 八字命書</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&family=Noto+Serif+TC:wght@400;600;700&family=Noto+Sans+TC:wght@400;500&display=swap">
+<style>/* A printed 命書: rice-paper white, ink, a vermilion seal, and the five elements in muted pigments. One look in every
+   theme (a book page), so every colour is set here. A4 pages when printed; one reading column on screens. */
+:root {
+  --paper: #fbf9f4; --ink: #1f1c22; --ink-2: #4c4752; --ink-3: #8d8792; --rule: #e3ddd2; --wash: #f2eee6;
+  --seal: #b2382b; --jade: #2f7a5f; --gold: #9a7a32;
+  --wood: #3f7d4f; --fire: #b8432f; --earth: #9a6b2c; --metal: #7c7f86; --water: #2b5a8a;
+  --display: "LXGW WenKai TC", "Kaiti TC", "BiauKai", serif;
+  --body: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+  --ui: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  color-scheme: light;
+}
+html { background: #e9e5dc; }
+body { background: #e9e5dc; color: var(--ink); font: 15px/1.85 var(--body); margin: 0; padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.book { max-width: 794px; margin: 0 auto; display: grid; gap: 18px; }
+.page { background: var(--paper); padding: 44px 52px; box-shadow: 0 1px 3px rgba(40, 30, 20, .12); display: grid; gap: 12px; align-content: start; }
+h1, h2, h3, h4 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; line-height: 1.35; }
+h2 { font-size: 25px; }
+h3 { font-size: 17px; color: var(--ink-2); margin-top: 6px; }
+h4 { font-size: 16px; }
+p { margin: 0; }
+ul { margin: 0; padding-left: 20px; display: grid; gap: 5px; }
+b { font-weight: 700; }
+.kicker { font-family: var(--ui); font-size: 12px; letter-spacing: .2em; color: var(--seal); }
+.fine { font-family: var(--ui); font-size: 12px; color: var(--ink-3); line-height: 1.7; }
+.e { font-weight: 700; }
+.e-木 { color: var(--wood); } .e-火 { color: var(--fire); } .e-土 { color: var(--earth); } .e-金 { color: var(--metal); } .e-水 { color: var(--water); }
+
+/* cover */
+.cover { min-height: 1000px; align-content: center; justify-items: center; text-align: center; gap: 22px; position: relative; background:
+  radial-gradient(circle at 50% 38%, rgba(178, 56, 43, .06), transparent 55%), var(--paper); }
+.cover .sample { position: absolute; top: 28px; left: 0; right: 0; font-family: var(--ui); font-size: 12px; letter-spacing: .1em; color: var(--ink-3); }
+.cover .seal { width: 78px; height: 78px; border: 3px solid var(--seal); color: var(--seal); border-radius: 8px; font-family: var(--display); font-size: 20px; line-height: 1.15; display: grid; place-content: center; transform: rotate(-4deg); }
+.cover h1 { font-size: 54px; letter-spacing: .12em; }
+.cover h1 span { font-size: 30px; letter-spacing: .5em; color: var(--ink-2); }
+.cover .sub { font-family: var(--ui); font-size: 14px; color: var(--ink-2); letter-spacing: .08em; }
+.cover-pillars { display: flex; gap: 22px; margin: 10px 0; }
+.cover-pillars div { display: grid; gap: 2px; padding: 12px 16px; border: 1px solid var(--rule); background: #fffdf9; min-width: 64px; }
+.cover-pillars small { font-family: var(--ui); font-size: 11px; color: var(--ink-3); }
+.cover-pillars b { font-family: var(--display); font-size: 34px; line-height: 1.15; }
+.cover-meta { display: grid; grid-template-columns: auto auto; gap: 4px 16px; font-family: var(--ui); font-size: 13.5px; text-align: left; margin: 0; }
+.cover-meta dt { color: var(--ink-3); } .cover-meta dd { margin: 0; }
+
+/* letter */
+.letter p { font-size: 15.5px; }
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 8px 0; }
+.three div { background: var(--wash); padding: 12px 14px; border-top: 3px solid var(--seal); }
+.three b { font-family: var(--display); font-size: 15px; }
+.three p { font-size: 13.5px; line-height: 1.7; margin-top: 4px; }
+
+/* tables */
+table { border-collapse: collapse; width: 100%; }
+.pillars th, .pillars td { border: 1px solid var(--rule); padding: 6px 6px; text-align: center; vertical-align: middle; font-size: 13.5px; }
+.pillars thead th { font-family: var(--ui); background: var(--wash); font-weight: 500; }
+.pillars tbody th { font-family: var(--ui); font-weight: 500; color: var(--ink-3); width: 54px; background: var(--wash); }
+.pillars .big { font-family: var(--display); font-size: 30px; line-height: 1.2; }
+.pillars small { font-family: var(--ui); font-size: 11px; color: var(--ink-3); margin-left: 1px; }
+.pillars .stars { font-family: var(--ui); font-size: 11.5px; line-height: 1.5; color: var(--ink-2); }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.bars { display: grid; gap: 7px; }
+.bar { display: grid; grid-template-columns: 64px 1fr 48px; gap: 8px; align-items: center; font-family: var(--ui); font-size: 13px; }
+.bar .bl small { color: var(--ink-3); margin-left: 6px; font-size: 11px; }
+.track { height: 10px; background: var(--wash); border-radius: 5px; overflow: hidden; }
+.track i { display: block; height: 100%; }
+.f-木 { background: var(--wood); } .f-火 { background: var(--fire); } .f-土 { background: var(--earth); } .f-金 { background: var(--metal); } .f-水 { background: var(--water); }
+.bv { text-align: right; font-variant-numeric: tabular-nums; }
+.basis, .luck, .gloss { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 13.5px; }
+.basis dt, .luck dt, .gloss dt { font-family: var(--ui); color: var(--ink-3); white-space: nowrap; }
+.basis dd, .luck dd, .gloss dd { margin: 0; }
+.why, .warn { background: var(--wash); padding: 14px 16px; border-left: 3px solid var(--water); display: grid; gap: 4px; }
+.warn { border-left-color: var(--seal); background: #f8ece8; }
+.why > b, .warn > b { font-family: var(--display); font-size: 15.5px; }
+.cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 22px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tags span { font-family: var(--ui); font-size: 12.5px; border: 1px solid currentColor; border-radius: 999px; padding: 1px 10px; }
+.mini td { border-bottom: 1px solid var(--rule); padding: 6px 4px; font-size: 13.5px; vertical-align: top; }
+.mini td:first-child { white-space: nowrap; font-family: var(--display); width: 92px; }
+.timeline { width: 100%; height: auto; }
+.timeline .tl-name { fill: #fff; font-family: var(--display); font-size: 16px; font-weight: 700; }
+.timeline .tl-sub { fill: var(--ink-3); font-family: var(--ui); font-size: 10.5px; }
+.timeline .tl-now { fill: var(--ink); font-family: var(--ui); font-size: 11px; font-weight: 500; }
+.decades th, .decades td { border-bottom: 1px solid var(--rule); padding: 6px 5px; font-size: 13px; text-align: left; vertical-align: top; }
+.decades th { font-family: var(--ui); font-weight: 500; color: var(--ink-3); }
+.decades td:nth-child(2), .decades td:nth-child(3) { white-space: nowrap; font-family: var(--ui); font-variant-numeric: tabular-nums; }
+.decades tr.now td { background: #fff6e8; }
+.tone { font-family: var(--ui); font-size: 11.5px; border-radius: 4px; padding: 0 6px; color: #fff; white-space: nowrap; }
+.t-順 { background: var(--jade); } .t-平 { background: var(--ink-3); } .t-守 { background: var(--seal); }
+.years-chart { width: 100%; height: auto; }
+.years-chart .axis { fill: var(--ink-3); font-family: var(--ui); font-size: 11px; }
+.years-chart .axis-y { fill: var(--ink); font-family: var(--ui); font-size: 12px; font-weight: 500; }
+.years-chart .axis-p { fill: var(--ink-3); font-family: var(--display); font-size: 12px; }
+.years { display: grid; gap: 12px; }
+.year { border: 1px solid var(--rule); background: #fffdf9; padding: 12px 16px; display: grid; gap: 6px; break-inside: avoid; }
+.year header { display: flex; align-items: baseline; gap: 10px; }
+.yy { font-family: var(--display); font-size: 22px; font-weight: 700; }
+.yp { font-family: var(--display); font-size: 16px; }
+.year dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; font-size: 13.5px; line-height: 1.7; }
+.year dt { font-family: var(--ui); color: var(--ink-3); font-size: 12px; padding-top: 2px; }
+.year dd { margin: 0; }
+.todo { font-family: var(--ui); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.todo b { color: var(--seal); margin-right: 4px; }
+.todo span { background: var(--wash); border-radius: 4px; padding: 1px 8px; }
+.strip { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; }
+.strip span { color: #fff; text-align: center; font-family: var(--display); font-size: 14px; padding: 4px 0; border-radius: 3px; }
+.months td { border-bottom: 1px solid var(--rule); padding: 7px 5px; font-size: 13.5px; vertical-align: top; line-height: 1.7; }
+.months .mt { width: 80px; } .months .mt b { font-family: var(--display); display: block; } .months .mt small { font-family: var(--ui); color: var(--ink-3); font-size: 11.5px; }
+.months .mp { width: 74px; font-family: var(--display); font-size: 18px; white-space: nowrap; } .months .mp .tone { margin-left: 4px; vertical-align: middle; }
+.method { font-size: 13.5px; }
+
+@media (max-width: 640px) {
+  .page { padding: 28px 18px; }
+  .cover { min-height: 0; padding-block: 60px; }
+  .cover h1 { font-size: 40px; }
+  .three, .two, .cols { grid-template-columns: 1fr; }
+  .cover-pillars { gap: 8px; } .cover-pillars div { min-width: 0; padding: 8px 10px; }
+  .pillars .big { font-size: 24px; }
+  .pillars .stars { font-size: 10.5px; }
+}
+
+/* Print: one A4 page per section start, the paper colour kept, no screen frame. */
+@page { size: A4; margin: 14mm 13mm 16mm; }
+@media print {
+  html, body { background: var(--paper); padding: 0; }
+  .book { max-width: none; gap: 0; }
+  .page { box-shadow: none; padding: 0; break-after: page; }
+  .page:last-child { break-after: auto; }
+  .cover { min-height: 255mm; }
+  .year, .why, .warn, .mini tr, .months tr, .decades tr { break-inside: avoid; }
+  h2, h3 { break-after: avoid; }
+}
+.edge { background: #fff6e8; border-left: 3px solid var(--gold); padding: 10px 12px; margin-top: 10px; font-size: 13px; line-height: 1.7; display: grid; gap: 2px; }
+.edge b { font-family: var(--display); font-size: 14.5px; }
+.look td { border-bottom: 1px solid var(--rule); padding: 8px 5px; vertical-align: top; font-size: 13.5px; line-height: 1.7; }
+.look .ly { width: 92px; white-space: nowrap; display: grid; gap: 2px; justify-items: start; }
+.look .ly b { font-family: var(--display); font-size: 17px; }
+.look .ly span:not(.tone) { font-family: var(--display); font-size: 15px; }
+.look .q { color: var(--water); font-family: var(--ui); font-size: 12.5px; margin-top: 2px; }
+.heat { table-layout: fixed; font-family: var(--ui); }
+.heat th, .heat td { border: 2px solid var(--paper); text-align: center; font-size: 12px; padding: 5px 0; }
+.heat thead th { font-weight: 500; font-size: 11.5px; line-height: 1.3; }
+.heat thead th small { display: block; font-family: var(--display); color: var(--ink-3); font-size: 12px; }
+.heat tbody th { font-weight: 500; color: var(--ink-3); width: 46px; text-align: left; }
+.timing th, .timing td { border-bottom: 1px solid var(--rule); padding: 7px 5px; vertical-align: top; text-align: left; }
+.timing th { font-family: var(--display); font-size: 14px; width: 128px; }
+.timing td b { font-family: var(--display); font-size: 16px; display: block; }
+.timing td small { font-family: var(--ui); font-size: 11.5px; color: var(--ink-2); line-height: 1.5; display: block; }
+.decades td:first-child { white-space: nowrap; }
+@media (max-width: 640px) { .timing th { width: 84px; } .heat th, .heat td { font-size: 10px; } .heat thead th small { font-size: 10px; } }
+</style>
+<main class="book">
+
+<section class="cover page">
+  <p class="sample">範例命書・人物與生日為虛構</p>
+  <div class="seal" aria-hidden="true">命盤<br>人生</div>
+  <h1>林語晴<br><span>八字命書</span></h1>
+  <p class="sub">終身格局・十年大運・2026–2035 逐年・2027 逐月</p>
+  <div class="cover-pillars"><div><small>年柱</small><b><span class="e e-金">庚</span></b><b><span class="e e-火">午</span></b></div><div><small>月柱</small><b><span class="e e-水">壬</span></b><b><span class="e e-火">午</span></b></div><div><small>日柱</small><b><span class="e e-火">丁</span></b><b><span class="e e-火">巳</span></b></div><div><small>時柱</small><b><span class="e e-火">丙</span></b><b><span class="e e-火">午</span></b></div></div>
+  <dl class="cover-meta">
+    <dt>坤造</dt><dd>1990 年 6 月 21 日 12:00　臺北市</dd>
+    <dt>真太陽時</dt><dd>12:04（經度與均時差校正 +5 分鐘）</dd>
+    <dt>農曆</dt><dd>庚午年五月廿九　午時</dd>
+    <dt>製作</dt><dd>2026 年 10 月　命盤人生</dd>
+  </dl>
+</section>
+
+<section class="page letter">
+  <p class="kicker">給語晴的話</p>
+  <h2>你是盛夏正午的一盞燈</h2>
+  <p>你的命盤四柱有八個字，其中六個屬火，而且生在一年裡火最旺的午月。傳統命理把丁火比作燭光、星光：不像太陽那樣強烈，卻能照亮身邊的人。只是你這盞燈點在盛夏的正午，四周已經很亮、很熱，所以這張命盤真正的課題，不是「怎麼更亮」，而是「怎麼讓這份熱度有地方去」。</p>
+  <p>命理上，能讓火有去處的有三樣東西：水（規範與方向）、土（把才華做成作品）、金（把努力變成收入）。它們正好是你的用神與喜神。這也是整本命書反覆出現的一句話：<strong>你不缺熱情與能力，你需要的是一個好的容器。</strong></p>
+  <div class="three">
+    <div><b>三個關鍵字</b><p>獨立、有主見、需要出口</p></div>
+    <div><b>這十年（2025–2034）</b><p>前五年發揮才華、後五年守成；2029 年是十年裡最順的一年。</p></div>
+    <div><b>現在最重要的事</b><p>2026 本命年，守住錢與作息；2027 秋天起準備迎接三年的順運。</p></div>
+  </div>
+  <p class="fine">這本命書依你的出生時刻、出生地的真太陽時與節氣排盤，所有干支、喜忌與年份都由排盤引擎計算並自動檢查。命理說的是傾向與時機，不是預言；路怎麼走，始終由你決定。</p>
+</section>
+
+<section class="page">
+  <p class="kicker">怎麼讀這本命書</p>
+  <h2>先對照過去，再參考未來</h2>
+  <p>這本命書分成三部分：<b>你是誰</b>（命格、性格、事業、財運、感情、健康、家人），<b>一生的時機</b>（大運、未來十年逐年、時機表、逐月），以及<b>行動清單</b>。建議先讀下一頁的「回顧驗證」：命書說的 2021–2025 年，和你實際經歷的對不對得上？對得上越多，後面的時機表越值得參考；如果幾乎都對不上，可能是出生時間需要再確認。</p>
+  <div class="why"><b>這本命書是怎麼寫成的</b>
+    <p>命盤由本站的曆法引擎計算：年柱、月柱與起運對準節氣到分鐘，日柱、時柱用出生地的真太陽時。所有干支、十神、喜忌、格局、年份與歲數都由引擎決定；文字依這些命盤事實撰寫，送出前逐項核對。正式版的文字由 AI 撰寫並經自動校對；這份範例由 Claude 依同一份命盤事實親自撰寫。</p>
+  </div>
+  <h3>回顧驗證：2021–2025</h3>
+  <table class="look"><tbody>
+    <tr><td class="ly"><b>2021</b><span><span class="e e-金">辛</span><span class="e e-土">丑</span></span><span class="tone t-順">順</span></td><td><p>財官雙美、收入成長的一年；同時丑土害月令，職場上可能有人在背後扯後腿。</p><p class="q">收入或職位有沒有往上？有沒有遇到暗中掣肘的人？</p></td></tr><tr><td class="ly"><b>2022</b><span><span class="e e-水">壬</span><span class="e e-木">寅</span></span><span class="tone t-平">平</span></td><td><p>壬水正官是你的用神，又合日主：容易被上司肯定，感情也容易有進展；寅木刑日支，和伴侶之間也常互相挑剔，開銷變多。</p><p class="q">工作上有沒有被賞識？感情是否進了一步，卻也吵得比較多？</p></td></tr><tr><td class="ly"><b>2023</b><span><span class="e e-水">癸</span><span class="e e-木">卯</span></span><span class="tone t-平">平</span></td><td><p>癸水七殺帶來突破與更大的責任，流年又逢天喜、桃花，人緣好、容易有喜事；壓力直接衝著自己，睡眠與胃口容易受影響。</p><p class="q">是否扛下更重的擔子？家裡或身邊有沒有喜事？</p></td></tr><tr><td class="ly"><b>2024</b><span><span class="e e-木">甲</span><span class="e e-土">辰</span></span><span class="tone t-平">平</span></td><td><p>辰土傷官生財，靠專業與手藝賺錢；傷官見官，感情容易起口角；也提醒多關心家中長輩與母親。</p><p class="q">有沒有靠專長多一份收入？和伴侶或家人是否比較多摩擦？</p></td></tr><tr><td class="ly"><b>2025</b><span><span class="e e-木">乙</span><span class="e e-火">巳</span></span><span class="tone t-守">守</span></td><td><p>交入戊寅大運的第一年，也是近年最不順的一年：阻力大、開銷大、錢容易出去，生活環境也容易變動。</p><p class="q">今年是否特別累、花費特別多，或有搬家、換部門之類的變動？</p></td></tr>
+  </tbody></table>
+  <p class="fine">命理說的是傾向，不是事件；「對得上」指的是那一年的主題和感受，不必每一件事都吻合。</p>
+</section>
+
+<section class="page">
+  <p class="kicker">命盤總覽</p>
+  <h2>你的四柱八字</h2>
+  <table class="pillars"><thead><tr><th></th><th>年柱</th><th>月柱</th><th>日柱</th><th>時柱</th></tr></thead><tbody>
+    <tr><th>十神</th><td>正財</td><td>正官</td><td>日主</td><td>劫財</td></tr>
+    <tr><th>天干</th><td><b class="big"><span class="e e-金">庚</span></b></td><td><b class="big"><span class="e e-水">壬</span></b></td><td><b class="big"><span class="e e-火">丁</span></b></td><td><b class="big"><span class="e e-火">丙</span></b></td></tr>
+    <tr><th>地支</th><td><b class="big"><span class="e e-火">午</span></b></td><td><b class="big"><span class="e e-火">午</span></b></td><td><b class="big"><span class="e e-火">巳</span></b></td><td><b class="big"><span class="e e-火">午</span></b></td></tr>
+    <tr><th>藏干</th><td><span class="e e-火">丁</span><small>火</small> <span class="e e-土">己</span><small>土</small></td><td><span class="e e-火">丁</span><small>火</small> <span class="e e-土">己</span><small>土</small></td><td><span class="e e-火">丙</span><small>火</small> <span class="e e-金">庚</span><small>金</small> <span class="e e-土">戊</span><small>土</small></td><td><span class="e e-火">丁</span><small>火</small> <span class="e e-土">己</span><small>土</small></td></tr>
+    <tr><th>副星</th><td>比肩、食神</td><td>比肩、食神</td><td>劫財、正財、傷官</td><td>比肩、食神</td></tr>
+    <tr><th>納音</th><td>路旁土</td><td>楊柳木</td><td>沙中土</td><td>天河水</td></tr>
+    <tr><th>神煞</th><td><span class="stars">福星貴人、天廚貴人、祿神、桃花</span></td><td><span class="stars">福星貴人、天廚貴人、祿神、將星、桃花</span></td><td><span class="stars">天醫、羊刃、亡神、孤鸞煞、天羅地網</span></td><td><span class="stars">福星貴人、天廚貴人、祿神、月德貴人、將星、桃花</span></td></tr>
+  </tbody></table>
+  <div class="two">
+    <div>
+      <h3>五行力量</h3>
+      <div class="bars"><div class="bar"><span class="bl"><span class="e e-undefined">火</span><small>忌神</small></span><span class="track"><i class="f-火" style="width:56%"></i></span><span class="bv">56%</span></div><div class="bar"><span class="bl"><span class="e e-undefined">土</span><small>喜神</small></span><span class="track"><i class="f-土" style="width:15.9%"></i></span><span class="bv">15.9%</span></div><div class="bar"><span class="bl"><span class="e e-undefined">金</span><small>喜神</small></span><span class="track"><i class="f-金" style="width:15.6%"></i></span><span class="bv">15.6%</span></div><div class="bar"><span class="bl"><span class="e e-undefined">水</span><small>用神</small></span><span class="track"><i class="f-水" style="width:12.5%"></i></span><span class="bv">12.5%</span></div><div class="bar"><span class="bl"><span class="e e-undefined">木</span><small>仇神</small></span><span class="track"><i class="f-木" style="width:0.6%"></i></span><span class="bv">0%</span></div></div>
+      <p class="fine">連同地支藏干與月令的分量計算。火佔一半以上，木完全不見。</p>
+    </div>
+    <div>
+      <h3>排盤依據</h3>
+      <dl class="basis">
+        <dt>節氣</dt><dd>芒種後 15 天 5 小時（芒種 1990/6/6 06:46）</dd>
+        <dt>人元司令</dt><dd>己土用事</dd>
+        <dt>起運</dt><dd>出生後 5 年 26 天，1995/7/17 交運，大運逆行</dd>
+        <dt>命宮・身宮</dt><dd>辛巳（白蠟金）・己丑（霹靂火）</dd>
+        <dt>胎元・胎息</dt><dd>癸酉（劍鋒金）・壬申（劍鋒金）</dd>
+        <dt>干支關係</dt><dd>午午自刑三組、丁壬合、丙壬沖</dd>
+      </dl>
+      <div class="edge"><b>出生時間的邊界</b>
+        <p>你的時柱是丙午。實際出生如果晚了 56 分鐘以上，時柱會變成丁未；早了 65 分鐘以上，會變成乙巳。日柱、月柱、年柱離交界都很遠。出生證明上的時間如果是整點估計，這兩個邊界值得留意。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="page chapter">
+  <p class="kicker">第一章</p>
+  <h2>命格：熱度很夠，缺的是方向</h2>
+  <h3>日主丁火，身強</h3>
+  <p>你生在午月，正是火當令的季節；年支、月支、時支三個午，日支一個巳，四個地支全都是火的根，時干丙火又在旁邊幫忙。傳統的四項判斷（得令、得地、得生、得助）你占了三項，生扶日主的力量約佔全局 56%（一般命盤約四成），判為<b>身強</b>，而且是「比劫身強」：力量來自同類的火，代表自我、行動力和好勝心都很強。</p>
+  <h3>建祿格，格局清純</h3>
+  <p>月令午火的本氣丁火就是你自己的祿位，所以取<b>建祿格</b>。建祿格的人多半靠自己打天下：祖上給的不多，但根基穩、韌性強。這個格局成不成，要看有沒有東西約束和疏導那股力量。你的月干透出壬水正官（規範、職位、伴侶），年干透出庚金正財（收入、實務），引擎判定「建祿用官、財星得用」，沒有破格之處，<b>屬於成格</b>。</p>
+  <div class="why"><b>為什麼用神是水？</b>
+    <p>三個看法剛好一致：扶抑一派看強弱，身強要被剋、被洩、被耗，喜水、金、土；調候一派依《窮通寶鑑》，丁火生在午月要用壬、庚、癸來降溫；格局一派看建祿格，喜官殺制祿。三派都喜金與水，所以取<b>水為用神</b>，取其「水火既濟」；金、土為喜神，火為忌神，木為仇神。</p>
+  </div>
+  <h3>這張命盤最需要知道的一件事</h3>
+  <p>你的用神壬水雖然透在月干，卻有兩個牽制：它和日主丁火相合（丁壬合木），又和時干丙火相沖；地支也沒有水的根。意思是：你很清楚規則與方向的重要，但常常被人情、被自己的衝勁拉走。所以一生之中，<b>地支遇到亥、子的年份與大運</b>（例如 2031、2032 年，以及 56–75 歲的丙子、乙亥大運），是用神最有力、最容易被肯定的時候。</p>
+</section>
+
+<section class="page chapter">
+  <p class="kicker">第二章</p>
+  <h2>性格與天賦</h2>
+  <p>《滴天髓》論丁火說「丁火柔中，內性昭融」：外表溫和，內心明亮。你細心、觀察力敏銳，對認定的人和事很長情；同時，命中比肩最重、日坐劫財，又有羊刃，內在其實很有主見、不服輸，遇到不公平的事會挺身而出。</p>
+  <div class="cols">
+    <div><h3>你的長處</h3><ul>
+      <li><b>獨立。</b>建祿格加比肩重，習慣靠自己，越難的事越激起鬥志。</li>
+      <li><b>帶人。</b>月、時兩柱見將星，有威望，適合帶團隊、做決策。</li>
+      <li><b>人緣。</b>年、月、時三柱見桃花，給人的第一印象好，容易被記住。</li>
+      <li><b>照顧人。</b>日柱見天醫，對身心照護、助人的工作有天分。</li>
+      <li><b>務實又重名譽。</b>財星與正官相生，在組織裡容易被重用。</li>
+    </ul></div>
+    <div><h3>你的盲點</h3><ul>
+      <li><b>想太多。</b>三組午午自刑，傳統上主「自己和自己拉扯」，容易反覆推翻自己的決定。</li>
+      <li><b>衝太快。</b>羊刃與劫財讓你行動快，有時快過溝通。</li>
+      <li><b>不好意思拒絕。</b>丁壬合，重情也被人情牽絆，答應太多再自己扛。</li>
+    </ul></div>
+  </div>
+  <h3>在工作上的你</h3>
+  <p>你做事快、標準高，喜歡把事情掌握在自己手上。這讓你成為團隊裡最可靠的人，也讓你很難把工作交出去。命中比肩重，你重視公平：分工不清、功勞被拿走，是最容易讓你心寒的事。最適合你的主管，是給你明確目標、然後放手讓你做的人。</p>
+  <h3>在感情裡的你</h3>
+  <p>丁火長情，認定了就很投入；但日坐劫財、羊刃，你在感情裡也有很強的自我。你需要的不是被照顧，而是被理解、被尊重。吵架的時候你容易先把話說滿，之後又在心裡反覆檢討，這就是「午午自刑」最常出現的樣子。</p>
+  <div class="why"><b>給你的使用說明</b>
+    <p>壓力大的時候，你的火會先往自己身上燒：失眠、急躁、對自己太嚴格。最有效的不是逼自己更努力，而是給熱度一個出口：寫下來、說出來、動起來（這三件事分別對應金、土、水的方向）。做決定時，給自己一晚的冷卻時間，第二天早上再確認。</p>
+  </div>
+</section>
+
+<section class="page chapter">
+  <p class="kicker">第三章</p>
+  <h2>事業：先在組織裡站穩，再走向自主</h2>
+  <p>建祿格靠自己打天下，比劫透出代表適合自主性高、靠人脈與團隊打拚的工作；財星庚金透出年干，讓你對市場、數字與實務敏感。月干的正官壬水是用神，代表你其實需要一個有制度、有舞台的環境，才能把力量用對地方。最適合的路線是：<b>前期在組織裡累積實力與名聲，等資源成熟再考慮自立或半自立</b>（接案、顧問、副業）。</p>
+  <h3>適合的方向（依用神與喜神）</h3>
+  <div class="tags">
+    <span class="e-水">貿易・物流</span><span class="e-水">業務・行銷</span><span class="e-水">媒體・傳播</span><span class="e-水">旅遊・飲品</span>
+    <span class="e-金">金融・保險</span><span class="e-金">法律・合規</span><span class="e-金">精密・科技製造</span>
+    <span class="e-土">不動產・營建</span><span class="e-土">行政管理</span><span class="e-土">顧問・仲介</span>
+    <span class="e-火">照護・諮商（天醫）</span>
+  </div>
+  <h3>時機</h3>
+  <ul>
+    <li><b>2025–2029（戊寅大運前半）：</b>戊土傷官透出，是才華與表現被看見的時期。適合把專長做成作品、方案或個人品牌。</li>
+    <li><b>2028–2033：</b>流年連續財官雙美，是十年裡升遷、加薪、承擔更大責任的窗口；2029、2033 年最強。</li>
+    <li><b>2032：</b>子水沖月令（沖提綱），轉換跑道的機會出現，適合主動評估。</li>
+    <li><b>2026、2034：</b>宜守不宜攻，不辭職創業、不擴張。</li>
+  </ul>
+  <h3>適合的角色</h3>
+  <p>比起單純執行，你更適合「有決定權的專業角色」：專案負責人、業務或客戶經理、顧問、品牌或產品的負責人。將星主帶人，天醫主照顧人，兩者加在一起，管理與培育人才也是你的長處。</p>
+  <div class="why"><b>要留意的一件事：傷官見官</b>
+    <p>戊寅大運的戊土傷官，會一再碰到你月干的壬水正官。這在工作上是「很有想法，但和主管、制度容易起衝突」。你的想法多半是對的，但說的時機和方式決定結果：先寫下來、帶著數據、在對方方便的時候說。好在大運寅木正印能制傷官，願意學習與調整，就能把衝突變成升級。</p>
+  </div>
+</section>
+
+<section class="page chapter">
+  <p class="kicker">第四章</p>
+  <h2>財運：正財型，靠本業與紀律累積</h2>
+  <p>你的財星是金：正財庚金透出年干，偏財只藏不透，屬於<b>正財重於偏財</b>的命盤，適合靠薪資、本業與長期投資累積，而不是靠投機。日主有力而財星偏弱（庚金在午月處於「死」地），代表你有能力，但財源要自己主動開創：越主動談薪水、報價、爭取機會，收穫越多。</p>
+  <p>金的財庫在丑，命中沒有，所以<b>存錢要靠制度，不能靠本能</b>：設定自動轉帳、分帳戶管理，比意志力可靠。</p>
+  <div class="warn"><b>這張命盤最重要的財務提醒</b>
+    <p>比劫（火）透出又是忌神，流年一再出現「比劫奪財」：2026、2027、2028、2029、2030、2031 年都有。最常見的形式是合夥分錢不清、借錢給朋友、替人作保，或在競爭中花太多錢。<b>和朋友的財務最好分開，任何金錢往來都白紙黑字。</b></p>
+  </div>
+  <h3>三個適合你的理財習慣</h3>
+  <ul>
+    <li><b>先存再花：</b>薪水一入帳就自動轉出固定比例，金庫不在命中，就自己做一個。</li>
+    <li><b>只投資看得懂的東西：</b>正財型的人，長期、分散、定期投入，比追逐短線更適合你。</li>
+    <li><b>為「人情支出」設上限：</b>比劫重的人常在朋友、手足身上花錢，先決定一年的上限。</li>
+  </ul>
+  <h3>十年財運節奏</h3>
+  <ul>
+    <li><b>守：</b>2026（丙午）、2034（甲寅），開銷與競爭都多，不做高風險投資。</li>
+    <li><b>累積：</b>2028、2029、2033，財官相生、食傷生財，適合定期投入、提高儲蓄比例。</li>
+    <li><b>保守：</b>2032 歲破之年，投資不追高；2035 交運，大額決定延後。</li>
+  </ul>
+</section>
+
+<section class="page chapter">
+  <p class="kicker">第五章</p>
+  <h2>感情與婚姻：伴侶是助力，課題在相處</h2>
+  <p>女命看官殺為夫星，你的夫星是水，正好是用神：<b>另一半本身能帶給你實質的幫助</b>，適合有主見、講道理、聰明靈活的人。月干壬水正官透出但地支無根，代表感情緣分清楚，只是需要時間與經營才會穩。</p>
+  <p>配偶宮（日支）巳火坐劫財、星運帝旺，屬於忌神：兩個人個性都強，金錢觀要早點溝通。日柱又帶孤鸞，傳統上主感情需要多經營，晚一點結婚或多花心力在相處上，較能圓滿。三柱見桃花，人緣與異性緣都好，婚後保持分寸，就是最好的守護。</p>
+  <h3>感情較有進展的年份</h3>
+  <table class="mini"><tbody>
+    <tr><td>2028 戊申</td><td>申合日支巳火，夫妻宮逢合，利交往、論及婚嫁</td></tr>
+    <tr><td>2029 己酉</td><td>紅鸞星動，酉巳半合：容易遇到認真的對象</td></tr>
+    <tr><td>2032 壬子</td><td>壬水正官合日主，夫星合身，利戀愛與婚姻</td></tr>
+    <tr><td>2033 癸丑</td><td>丑巳拱合，感情容易有進展</td></tr>
+  </tbody></table>
+  <h3>單身的你</h3>
+  <p>你的異性緣好，問題常常不是遇不到人，而是太快把對方放進自己的標準裡打分數。2028–2029 年是十年裡感情最容易有進展的時候，讓自己出現在新的場合：課程、旅行、朋友的聚會。</p>
+  <h3>已有伴侶的你</h3>
+  <p>你和伴侶最需要的是「各自的空間」加上「固定的兩人時間」。配偶宮坐劫財，金錢觀要早點談清楚：共同帳戶放多少、各自保留多少，講好了反而少吵架。</p>
+  <h3>需要多包容的年份</h3>
+  <table class="mini"><tbody>
+    <tr><td>2030 庚戌</td><td>傷官見官又逢華蓋，容易冷戰：主動約會，比悶著好</td></tr>
+    <tr><td>2031 辛亥</td><td>與日柱天剋地沖，搬家、換城市或相處模式會調整</td></tr>
+    <tr><td>2034 甲寅</td><td>寅刑日支巳火，容易互相挑剔：多說謝謝、多換位思考</td></tr>
+  </tbody></table>
+</section>
+
+<section class="page chapter">
+  <p class="kicker">第六章</p>
+  <h2>健康與作息（傳統說法）</h2>
+  <p>傳統命理以五行對應臟腑。你的命盤<b>火最旺（約 56%）</b>，火主心、血液循環、小腸與眼睛，過旺時最容易反映在睡眠、情緒與用眼過度；<b>木完全不見</b>，木主肝膽、筋骨與四肢，平時多伸展、少熬夜。</p>
+  <ul>
+    <li><b>每年夏天（5–7 月）</b>是火最旺的季節，工作量放慢、補充水分、睡眠排在第一位。</li>
+    <li><b>秋天</b>金旺剋木，換季時多注意筋骨與作息。</li>
+    <li>2026、2031、2034 年的流年提醒身體要多照顧，健康檢查不要拖。</li>
+  </ul>
+  <p class="fine">以上是傳統命理的說法，只談作息與保養；身體狀況請以醫師診斷為準。</p>
+
+  <p class="kicker" style="margin-top:28px">第七章</p>
+  <h2>家人與人際</h2>
+  <p>十神論六親只看得出傾向，不能代替真實的家庭經驗；被收養、在重組家庭長大、選擇不生，或親人已不在身邊，都請以自己的實際情況為準。</p>
+  <ul>
+    <li><b>父母：</b>父親星庚金透出年干、地支有根，父親在你成長中的角色鮮明，也有實質的支持。命中不見印星，傳統上解讀為很早就學會靠自己。</li>
+    <li><b>手足與朋友：</b>比劫透出，兄弟姊妹或朋友在生命中份量不輕；但比劫是忌神，金錢往來先講清楚。</li>
+    <li><b>子女：</b>子女星（土）藏而不透，是喜用：親子緣分需要時間經營，日後是你的助力。要不要生、何時生，仍是自己的選擇。</li>
+  </ul>
+</section>
+
+<section class="page chapter">
+  <p class="kicker">第八章</p>
+  <h2>大運：一生的十年節奏</h2>
+  <svg class="timeline" viewBox="0 0 680 92" role="img" aria-label="大運時間軸">
+    <g><rect x="10" y="22" width="79" height="30" rx="4" fill="var(--ink-3)" opacity="0.78"/>
+      <text x="49.5" y="42" text-anchor="middle" class="tl-name">辛巳</text>
+      <text x="49.5" y="68" text-anchor="middle" class="tl-sub">1995–04</text>
+      <text x="49.5" y="84" text-anchor="middle" class="tl-sub">6–15 歲</text></g><g><rect x="93" y="22" width="79" height="30" rx="4" fill="var(--jade)" opacity="0.78"/>
+      <text x="132.5" y="42" text-anchor="middle" class="tl-name">庚辰</text>
+      <text x="132.5" y="68" text-anchor="middle" class="tl-sub">2005–14</text>
+      <text x="132.5" y="84" text-anchor="middle" class="tl-sub">16–25 歲</text></g><g><rect x="176" y="22" width="79" height="30" rx="4" fill="var(--ink-3)" opacity="0.78"/>
+      <text x="215.5" y="42" text-anchor="middle" class="tl-name">己卯</text>
+      <text x="215.5" y="68" text-anchor="middle" class="tl-sub">2015–24</text>
+      <text x="215.5" y="84" text-anchor="middle" class="tl-sub">26–35 歲</text></g><g><rect x="259" y="22" width="79" height="30" rx="4" fill="var(--ink-3)" opacity="1"/>
+      <text x="298.5" y="42" text-anchor="middle" class="tl-name">戊寅</text>
+      <text x="298.5" y="68" text-anchor="middle" class="tl-sub">2025–34</text>
+      <text x="298.5" y="84" text-anchor="middle" class="tl-sub">36–45 歲</text></g><g><rect x="342" y="22" width="79" height="30" rx="4" fill="var(--ink-3)" opacity="0.78"/>
+      <text x="381.5" y="42" text-anchor="middle" class="tl-name">丁丑</text>
+      <text x="381.5" y="68" text-anchor="middle" class="tl-sub">2035–44</text>
+      <text x="381.5" y="84" text-anchor="middle" class="tl-sub">46–55 歲</text></g><g><rect x="425" y="22" width="79" height="30" rx="4" fill="var(--ink-3)" opacity="0.78"/>
+      <text x="464.5" y="42" text-anchor="middle" class="tl-name">丙子</text>
+      <text x="464.5" y="68" text-anchor="middle" class="tl-sub">2045–54</text>
+      <text x="464.5" y="84" text-anchor="middle" class="tl-sub">56–65 歲</text></g><g><rect x="508" y="22" width="79" height="30" rx="4" fill="var(--ink-3)" opacity="0.78"/>
+      <text x="547.5" y="42" text-anchor="middle" class="tl-name">乙亥</text>
+      <text x="547.5" y="68" text-anchor="middle" class="tl-sub">2055–64</text>
+      <text x="547.5" y="84" text-anchor="middle" class="tl-sub">66–75 歲</text></g><g><rect x="591" y="22" width="79" height="30" rx="4" fill="var(--ink-3)" opacity="0.78"/>
+      <text x="630.5" y="42" text-anchor="middle" class="tl-name">甲戌</text>
+      <text x="630.5" y="68" text-anchor="middle" class="tl-sub">2065–74</text>
+      <text x="630.5" y="84" text-anchor="middle" class="tl-sub">76–85 歲</text></g>
+    <line x1="265.3" x2="265.3" y1="14" y2="56" stroke="var(--ink)" stroke-width="2"/>
+    <text x="265.3" y="11" text-anchor="middle" class="tl-now">2026 你在這裡</text>
+  </svg>
+  <table class="decades"><thead><tr><th>大運</th><th>年份</th><th>虛歲</th><th></th><th>主題</th></tr></thead><tbody>
+    <tr><td><b><span class="e e-金">辛</span><span class="e e-火">巳</span></b></td><td>1995–2004</td><td>6–15</td><td><span class="tone t-平">平</span></td><td>求學與成長，辛金偏財為喜、巳火劫財為忌：家中經濟與手足關係是早年的課題。</td></tr><tr><td><b><span class="e e-金">庚</span><span class="e e-土">辰</span></b></td><td>2005–2014</td><td>16–25</td><td><span class="tone t-順">順</span></td><td>庚金正財、辰土傷官都是喜用：學業、打工與第一份工作都較順，打下獨立的底子。</td></tr><tr><td><b><span class="e e-土">己</span><span class="e e-木">卯</span></b></td><td>2015–2024</td><td>26–35</td><td><span class="tone t-平">平</span></td><td>己土食神為喜，才華被看見；卯木偏印為仇，想法多、容易猶豫。</td></tr><tr class="now"><td><b><span class="e e-土">戊</span><span class="e e-木">寅</span></b></td><td>2025–2034</td><td>36–45</td><td><span class="tone t-平">平</span></td><td>前五年（2025–2029）重天干戊土傷官，順；後五年（2030–2034）重地支寅木正印，宜守成。本書的重點十年。</td></tr><tr><td><b><span class="e e-火">丁</span><span class="e e-土">丑</span></b></td><td>2035–2044</td><td>46–55</td><td><span class="tone t-平">平</span></td><td>丁火比肩先難（2035–2039，防比劫奪財），丑土食神後易（2040–2044），又有天乙貴人。</td></tr><tr><td><b><span class="e e-火">丙</span><span class="e e-水">子</span></b></td><td>2045–2054</td><td>56–65</td><td><span class="tone t-平">平</span></td><td>丙火劫財與子水七殺同到：子水是用神，事業與名望在這一步仍有發揮。</td></tr><tr><td><b><span class="e e-木">乙</span><span class="e e-水">亥</span></b></td><td>2055–2064</td><td>66–75</td><td><span class="tone t-平">平</span></td><td>亥水正官是用神，晚運有依靠；乙木偏印為仇，宜多動、多與人往來。</td></tr><tr><td><b><span class="e e-木">甲</span><span class="e e-土">戌</span></b></td><td>2065–2074</td><td>76–85</td><td><span class="tone t-平">平</span></td><td>戌土傷官為喜，興趣與分享讓生活有重心。</td></tr>
+  </tbody></table>
+  <div class="why"><b>現在這一步：戊寅大運（2025–2034）</b>
+    <p>天干戊土是傷官、地支寅木是正印：十年的主軸是「才華與表現」加上「學習與貴人」。傳統看法前五年重天干，所以 2025–2029 較順，適合衝刺；後五年重地支，2030–2034 宜守成。這十年要特別留意兩件事：一是傷官見官（和主管、伴侶的溝通）；二是 2031 辛亥年與日柱天剋地沖、2032 壬子年與時柱天剋地沖，是十年裡變動最大的兩年。</p>
+  </div>
+</section>
+
+<section class="page chapter">
+  <p class="kicker">第九章</p>
+  <h2>2026–2035：逐年運勢</h2>
+  <svg class="years-chart" viewBox="0 0 680 236" role="img" aria-label="2026 到 2035 年的流年起伏">
+    <line x1="20" x2="660" y1="100" y2="100" stroke="var(--rule)" />
+    <text x="22" y="28" class="axis">順</text><text x="22" y="176" class="axis">守</text>
+    <g><rect x="20" y="100" width="40" height="76" rx="3" fill="var(--seal)"/>
+        <text x="40" y="214" text-anchor="middle" class="axis-y">2026</text>
+        <text x="40" y="230" text-anchor="middle" class="axis-p">丙午</text></g><g><rect x="86.66666666666667" y="100" width="40" height="8.36" rx="3" fill="var(--ink-3)"/>
+        <text x="106.66666666666667" y="214" text-anchor="middle" class="axis-y">2027</text>
+        <text x="106.66666666666667" y="230" text-anchor="middle" class="axis-p">丁未</text></g><g><rect x="153.33333333333334" y="71.88" width="40" height="28.12" rx="3" fill="var(--jade)"/>
+        <text x="173.33333333333334" y="214" text-anchor="middle" class="axis-y">2028</text>
+        <text x="173.33333333333334" y="230" text-anchor="middle" class="axis-p">戊申</text></g><g><rect x="220" y="53.64" width="40" height="46.36" rx="3" fill="var(--jade)"/>
+        <text x="240" y="214" text-anchor="middle" class="axis-y">2029</text>
+        <text x="240" y="230" text-anchor="middle" class="axis-p">己酉</text></g><g><rect x="286.6666666666667" y="95.44" width="40" height="4.56" rx="3" fill="var(--ink-3)"/>
+        <text x="306.6666666666667" y="214" text-anchor="middle" class="axis-y">2030</text>
+        <text x="306.6666666666667" y="230" text-anchor="middle" class="axis-p">庚戌</text></g><g><rect x="353.33333333333337" y="64.28" width="40" height="35.72" rx="3" fill="var(--jade)"/>
+        <text x="373.33333333333337" y="214" text-anchor="middle" class="axis-y">2031</text>
+        <text x="373.33333333333337" y="230" text-anchor="middle" class="axis-p">辛亥</text></g><g><rect x="420" y="63.52" width="40" height="36.48" rx="3" fill="var(--jade)"/>
+        <text x="440" y="214" text-anchor="middle" class="axis-y">2032</text>
+        <text x="440" y="230" text-anchor="middle" class="axis-p">壬子</text></g><g><rect x="486.6666666666667" y="65.03999999999999" width="40" height="34.96" rx="3" fill="var(--jade)"/>
+        <text x="506.6666666666667" y="214" text-anchor="middle" class="axis-y">2033</text>
+        <text x="506.6666666666667" y="230" text-anchor="middle" class="axis-p">癸丑</text></g><g><rect x="553.3333333333334" y="100" width="40" height="51.68000000000001" rx="3" fill="var(--seal)"/>
+        <text x="573.3333333333334" y="214" text-anchor="middle" class="axis-y">2034</text>
+        <text x="573.3333333333334" y="230" text-anchor="middle" class="axis-p">甲寅</text></g><g><rect x="620" y="100" width="40" height="36.48" rx="3" fill="var(--seal)"/>
+        <text x="640" y="214" text-anchor="middle" class="axis-y">2035</text>
+        <text x="640" y="230" text-anchor="middle" class="axis-p">乙卯</text></g>
+  </svg>
+  <p class="fine">長條往上表示這一年干支多為喜用，往下表示多為忌神；依流年（六成）與大運（四成）綜合。</p>
+  <h3>十年 × 七個領域</h3>
+  <table class="heat"><thead><tr><th></th><th>2026<small>丙午</small></th><th>2027<small>丁未</small></th><th>2028<small>戊申</small></th><th>2029<small>己酉</small></th><th>2030<small>庚戌</small></th><th>2031<small>辛亥</small></th><th>2032<small>壬子</small></th><th>2033<small>癸丑</small></th><th>2034<small>甲寅</small></th><th>2035<small>乙卯</small></th></tr></thead><tbody>
+    <tr><th>事業</th><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:var(--jade);color:#fff">旺</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:var(--jade);color:#fff">旺</td><td style="background:#7fb39c;color:var(--ink-2)">順</td><td style="background:var(--jade);color:#fff">旺</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:var(--jade);color:#fff">旺</td><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:#d99a8f;color:var(--ink-2)">慎</td></tr><tr><th>財運</th><td style="background:var(--seal);color:#fff">守</td><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:var(--jade);color:#fff">旺</td><td style="background:var(--jade);color:#fff">旺</td><td style="background:#7fb39c;color:var(--ink-2)">順</td><td style="background:#7fb39c;color:var(--ink-2)">順</td><td style="background:#7fb39c;color:var(--ink-2)">順</td><td style="background:var(--jade);color:#fff">旺</td><td style="background:var(--seal);color:#fff">守</td><td style="background:#e6e1d6;color:var(--ink-2)"></td></tr><tr><th>感情</th><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#7fb39c;color:var(--ink-2)">順</td><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#7fb39c;color:var(--ink-2)">順</td><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:#7fb39c;color:var(--ink-2)">順</td></tr><tr><th>身心</th><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:#7fb39c;color:var(--ink-2)">順</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:#d99a8f;color:var(--ink-2)">慎</td></tr><tr><th>學習</th><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:var(--jade);color:#fff">旺</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#7fb39c;color:var(--ink-2)">順</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#7fb39c;color:var(--ink-2)">順</td><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:#e6e1d6;color:var(--ink-2)"></td></tr><tr><th>家庭</th><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:#7fb39c;color:var(--ink-2)">順</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#7fb39c;color:var(--ink-2)">順</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:#e6e1d6;color:var(--ink-2)"></td></tr><tr><th>變動</th><td style="background:#d99a8f;color:var(--ink-2)">慎</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:var(--jade);color:#fff">旺</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:var(--jade);color:#fff">旺</td><td style="background:#7fb39c;color:var(--ink-2)">順</td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#e6e1d6;color:var(--ink-2)"></td><td style="background:#d99a8f;color:var(--ink-2)">慎</td></tr>
+  </tbody></table>
+  <p class="fine">綠色越深越順，紅色越深越要保守；空白表示平穩。</p>
+  <h3>時機表：想做這件事，哪幾年比較好？</h3>
+  <table class="timing"><tbody>
+    <tr><th>換工作・轉跑道</th><td><b>2032</b><small>子水沖月令（沖提綱），轉換的機會最多</small></td><td><b>2028</b><small>驛馬加歲運相沖，換環境的機會多</small></td><td><b>2031</b><small>驛馬，又是用神亥水之年</small></td></tr><tr><th>升遷・加薪・接大案</th><td><b>2029</b><small>財官雙美加將星，最有主導權</small></td><td><b>2033</b><small>財滋七殺，承擔更大責任</small></td><td><b>2031</b><small>亥水正官，考核容易受肯定</small></td></tr><tr><th>感情・婚姻</th><td><b>2029</b><small>紅鸞星動，酉巳半合</small></td><td><b>2028</b><small>申合日支，夫妻宮逢合</small></td><td><b>2032</b><small>壬水正官合日主，夫星合身</small></td></tr><tr><th>進修・考證照</th><td><b>2029</b><small>文昌與學堂同到</small></td><td><b>2031</b><small>文昌與太極貴人</small></td><td><b>2033</b><small>食神坐支，學習興趣高</small></td></tr><tr><th>搬家・出國・遠行</th><td><b>2028</b><small>驛馬</small></td><td><b>2031</b><small>驛馬，日支逢沖、住處易動</small></td><td><b>2032</b><small>子水沖年支，離家的機會多</small></td></tr><tr><th>置產・長期理財</th><td><b>2029</b><small>財運最旺、比劫干擾較少</small></td><td><b>2033</b><small>丑為財庫，食傷生財</small></td><td><b>2028</b><small>財官相生，開始定期投入</small></td></tr><tr><th>宜保守・放慢</th><td><b>2026</b><small>本命年，干支皆忌</small></td><td><b>2034</b><small>印星過重，火局再起</small></td><td><b>2035</b><small>交運之年，計畫易生變</small></td></tr>
+  </tbody></table>
+  <div class="years"><article class="year">
+  <header><span class="yy">2026</span><span class="yp"><span class="e e-火">丙</span><span class="e e-火">午</span>年</span><span class="tone t-守">守</span></header>
+  <h4>本命年，火上加火：守住錢與脾氣的一年</h4>
+  <dl><dt>事業</dt><dd>午火與月令自刑，工作上多摩擦。合約、規章看兩遍，與其爭一時，不如把基本功做扎實。</dd><dt>財運</dt><dd>丙火劫財爭年干庚金正財，錢易進易出。不合夥、不借貸、不作保；這一年的目標是守住，而不是賺更多。</dd><dt>感情</dt><dd>流年逢桃花，人緣變好。單身的人容易遇到對象，有伴的人宜守分寸、把時間留給伴侶。</dd><dt>身心</dt><dd>全年火旺，睡眠與情緒是重點：少熬夜，給自己固定的放空時間。</dd></dl>
+  <p class="todo"><b>這一年做三件事</b><span>列出所有固定支出，砍掉一項</span><span>推掉一個沒把握的合作邀約</span><span>每週固定一晚完全不工作</span></p>
+</article><article class="year">
+  <header><span class="yy">2027</span><span class="yp"><span class="e e-火">丁</span><span class="e e-土">未</span>年</span><span class="tone t-平">平</span></header>
+  <h4>先難後易：合作與接案的機會回來了</h4>
+  <dl><dt>事業</dt><dd>未土合月令午火，工作上容易有合作、貴人與穩定的機會；食傷生財，適合接案、副業或把專長產品化。</dd><dt>財運</dt><dd>丁火比肩仍在，又引動巳午未三會火局，競爭和開銷都多。賺得到，也要存得住：收入一進來就先轉一部分到儲蓄帳戶。</dd><dt>感情</dt><dd>流年逢紅艷，魅力強、感情豐富，也容易為情所困。重要的感情決定，等到秋天以後再做。</dd><dt>身心</dt><dd>上半年（5–7 月）火氣最旺，作息宜規律；下半年轉順。</dd></dl>
+  <p class="todo"><b>這一年做三件事</b><span>把專長整理成一份作品集或服務方案</span><span>5–7 月不做大額消費</span><span>秋天安排一次加薪或報價調整</span></p>
+</article><article class="year">
+  <header><span class="yy">2028</span><span class="yp"><span class="e e-土">戊</span><span class="e e-金">申</span>年</span><span class="tone t-順">順</span></header>
+  <h4>財官雙美：升遷、加薪與搬遷的機會</h4>
+  <dl><dt>事業</dt><dd>申金正財、月干壬水正官都是喜用，利升遷、加薪；但戊土傷官遇壬水正官（傷官見官），和主管意見不同時，先寫下來、再找時機說。</dd><dt>財運</dt><dd>財星與官星相生，收入隨職位成長。這是累積的好年，適合開始長期、定期的投資計畫。</dd><dt>感情</dt><dd>申金合日支巳火，夫妻宮逢合，感情容易有進展，交往中的容易論及婚嫁；傷官見官也提醒你，說話別太直。</dd><dt>身心</dt><dd>寅巳申三刑俱全，出門、開車、運動多注意安全；行程排鬆一點。</dd></dl>
+  <p class="todo"><b>這一年做三件事</b><span>主動爭取一個更有責任的角色</span><span>開始每月固定投入的長期計畫</span><span>旅行或出差前把行程排鬆</span></p>
+</article><article class="year">
+  <header><span class="yy">2029</span><span class="yp"><span class="e e-土">己</span><span class="e e-金">酉</span>年</span><span class="tone t-順">順</span></header>
+  <h4>十年裡最順的一年：事業、財運、感情、學習都亮</h4>
+  <dl><dt>事業</dt><dd>財官雙美又逢將星，有主導權與威望，適合帶團隊、接下更大的專案。</dd><dt>財運</dt><dd>己土食神生財、酉金偏財都是喜用，專業與口碑都能變現；比劫奪財的提醒仍在，合夥要白紙黑字。</dd><dt>感情</dt><dd>紅鸞星動，酉金與日支巳火半合：單身的人容易遇到認真的對象，有伴的人適合談長遠的規劃。</dd><dt>身心</dt><dd>天乙貴人與食神，身心都較舒坦，是調整生活習慣的好時機。</dd></dl>
+  <p class="todo"><b>這一年做三件事</b><span>報名一張證照或一門進修（文昌、學堂同到）</span><span>把想做很久的計畫正式啟動</span><span>和伴侶或家人談一次未來五年的規劃</span></p>
+</article><article class="year">
+  <header><span class="yy">2030</span><span class="yp"><span class="e e-金">庚</span><span class="e e-土">戌</span>年</span><span class="tone t-平">平</span></header>
+  <h4>收入平穩，感情要多花心思</h4>
+  <dl><dt>事業</dt><dd>財官雙美仍在，食傷生財，適合接案與副業；戌土傷官讓你想法多、不耐規矩，換工作前先想清楚。</dd><dt>財運</dt><dd>庚金正財透出，收入平穩，適合整理資產、提高儲蓄比例。</dd><dt>感情</dt><dd>傷官見官，伴侶之間容易口角；流年逢華蓋，人會變得較獨立、想一個人待著。主動約對方出門，比悶在心裡好。</dd><dt>身心</dt><dd>開車、運動多小心，行程別排太滿。</dd></dl>
+  <p class="todo"><b>這一年做三件事</b><span>固定每月一次兩個人的約會</span><span>把副業收入獨立記帳</span><span>重新檢視保險與退休規劃</span></p>
+</article><article class="year">
+  <header><span class="yy">2031</span><span class="yp"><span class="e e-金">辛</span><span class="e e-水">亥</span>年</span><span class="tone t-順">順</span></header>
+  <h4>事業被肯定，但家與感情有變動</h4>
+  <dl><dt>事業</dt><dd>亥水正官坐支，亥是你的用神：利升遷、考核，容易受上司肯定。</dd><dt>財運</dt><dd>財官相生，收入隨職位成長；比劫奪財仍在，借錢給朋友前想三次。</dd><dt>感情</dt><dd>辛亥與日柱丁巳天剋地沖（反吟），夫妻宮動盪：搬家、換城市或兩人相處模式都可能調整，多包容、多溝通。</dd><dt>身心</dt><dd>反吟之年，身體要多照顧，定期健康檢查不要拖。</dd></dl>
+  <p class="todo"><b>這一年做三件事</b><span>爭取升遷或考核</span><span>搬家、換工作地點前和家人充分討論</span><span>安排一次完整的健康檢查</span></p>
+</article><article class="year">
+  <header><span class="yy">2032</span><span class="yp"><span class="e e-水">壬</span><span class="e e-水">子</span>年</span><span class="tone t-順">順</span></header>
+  <h4>用神之年：轉換跑道的機會與好姻緣</h4>
+  <dl><dt>事業</dt><dd>子水沖月令午火（沖提綱），換工作、調職、轉換跑道的機會多；財官雙美，往上走的方向是對的。</dd><dt>財運</dt><dd>收入隨職位成長；但歲破主破耗，投資宜保守，不追高。</dd><dt>感情</dt><dd>壬水正官合日主丁火，女命夫星合身，利戀愛與婚姻；傷官見官的提醒仍在，吵架時先冷靜。</dd><dt>身心</dt><dd>出入交通、運動多注意安全。</dd></dl>
+  <p class="todo"><b>這一年做三件事</b><span>評估轉職或內部調動的機會</span><span>投資以分散、長期為原則</span><span>多陪陪父母（子午沖父母宮）</span></p>
+</article><article class="year">
+  <header><span class="yy">2033</span><span class="yp"><span class="e e-水">癸</span><span class="e e-土">丑</span>年</span><span class="tone t-順">順</span></header>
+  <h4>財滋七殺：事業與財運並進</h4>
+  <dl><dt>事業</dt><dd>財滋七殺，利升遷、加薪，適合承擔更大的責任；丑土害月令，要防小人暗中掣肘，重要的事留紀錄。</dd><dt>財運</dt><dd>丑土食神生年干庚金正財，又是財庫之地，靠專業、手藝與創意賺錢，也是存下一筆錢的好年。</dd><dt>感情</dt><dd>丑土與日支巳火拱合，感情容易有進展；七殺代表的對象可能較強勢，看清楚再投入。</dd><dt>身心</dt><dd>癸水沖日主，壓力直接衝著自己，給自己留休息的空檔。</dd></dl>
+  <p class="todo"><b>這一年做三件事</b><span>把收入的一部分固定存成「十年後的自己」</span><span>承接一個能代表你的大專案</span><span>重要協作都留書面紀錄</span></p>
+</article><article class="year">
+  <header><span class="yy">2034</span><span class="yp"><span class="e e-木">甲</span><span class="e e-木">寅</span>年</span><span class="tone t-守">守</span></header>
+  <h4>印星過重：守成、整理、為下一步大運做準備</h4>
+  <dl><dt>事業</dt><dd>流年逢官符，口舌與合約糾紛要防，簽約、開車都守規矩；國印貴人也讓你受信任，適合做穩定、需要信用的事。</dd><dt>財運</dt><dd>寅木與命中午火半合火局，競爭與開銷都變多，這一年不擴張、不做高風險投資。</dd><dt>感情</dt><dd>寅木刑日支巳火，伴侶之間容易互相挑剔；換位思考，多說謝謝。</dd><dt>身心</dt><dd>刑也主小傷，出入小心；作息規律。</dd></dl>
+  <p class="todo"><b>這一年做三件事</b><span>檢查所有合約與保單</span><span>暫停新的大筆投資</span><span>為 2035 交運規劃生活重心</span></p>
+</article><article class="year">
+  <header><span class="yy">2035</span><span class="yp"><span class="e e-木">乙</span><span class="e e-木">卯</span>年</span><span class="tone t-守">守</span></header>
+  <h4>交入丁丑大運：生活重心轉換的一年</h4>
+  <dl><dt>事業</dt><dd>梟神奪食，計畫容易臨時生變，凡事留備案；流年逢勾絞，承諾要白紙黑字。</dd><dt>財運</dt><dd>印也代表房產與文書，買房、簽約前把條款看清楚。</dd><dt>感情</dt><dd>流年逢天喜、桃花，家中容易有喜事，人緣也好。</dd><dt>身心</dt><dd>胃口與睡眠容易受影響，飲食定時、多走路。</dd></dl>
+  <p class="todo"><b>這一年做三件事</b><span>交運前後不做重大財務決定</span><span>把下一個十年的目標寫下來</span><span>留意飲食與睡眠的規律</span></p>
+</article></div>
+</section>
+
+<section class="page chapter">
+  <p class="kicker">第十章</p>
+  <h2>逐月重點：2026 年底到 2027 年</h2>
+  <p>流月以節氣為界，例如「立春 2/4–3/5」是壬寅月。顏色表示那個月的干支和你的喜忌：綠色較順、灰色平穩、紅色宜守。</p>
+  <h3>2026 年底</h3>
+  <table class="months"><tbody>
+    <tr><td class="mt"><b>立冬</b><small>2026 11/7–12/6</small></td><td class="mp"><span class="e e-土">己</span><span class="e e-水">亥</span><span class="tone t-順">順</span></td><td>亥水是你的用神，年底工作上容易被肯定；但亥沖日支巳火，伴侶或家裡會有調整。本命年最後兩個月，適合收尾，不急著開新局。</td></tr><tr><td class="mt"><b>大雪</b><small>12/7–1/4</small></td><td class="mp"><span class="e e-金">庚</span><span class="e e-水">子</span><span class="tone t-順">順</span></td><td>庚金正財透出，年終獎金、收款與報價都順；子水沖命中三個午，年底容易有人事或環境的變動，保持彈性。</td></tr><tr><td class="mt"><b>小寒</b><small>2027 1/5–2/3</small></td><td class="mp"><span class="e e-金">辛</span><span class="e e-土">丑</span><span class="tone t-順">順</span></td><td>辛金偏財、丑土食神都是喜用，適合整理全年收支、寫下 2027 的計畫；丑也是財庫，這個月開始的存錢習慣最容易持續。</td></tr>
+  </tbody></table>
+  <h3>2027 丁未年</h3>
+  <div class="strip"><span style="background:var(--ink-3)">寅</span><span style="background:var(--ink-3)">卯</span><span style="background:var(--ink-3)">辰</span><span style="background:var(--seal)">巳</span><span style="background:var(--seal)">午</span><span style="background:var(--ink-3)">未</span><span style="background:var(--jade)">申</span><span style="background:var(--jade)">酉</span><span style="background:var(--jade)">戌</span><span style="background:var(--jade)">亥</span><span style="background:var(--jade)">子</span><span style="background:var(--jade)">丑</span></div>
+  <table class="months"><tbody>
+    <tr><td class="mt"><b>立春</b><small>2/4–3/5</small></td><td class="mp"><span class="e e-水">壬</span><span class="e e-木">寅</span><span class="tone t-平">平</span></td><td>開春有新計畫，壬水正官帶來機會與規範；但寅木刑日支巳火、又與午火半合成火局，容易一口氣答應太多。先選一件最重要的事做好。</td></tr><tr><td class="mt"><b>驚蟄</b><small>3/6–4/4</small></td><td class="mp"><span class="e e-水">癸</span><span class="e e-木">卯</span><span class="tone t-平">平</span></td><td>癸水七殺是壓力也是推力，主管或客戶的要求變多。卯木與午火相破，計畫容易被打斷，重要的提案多留一週緩衝。</td></tr><tr><td class="mt"><b>清明</b><small>4/5–5/5</small></td><td class="mp"><span class="e e-木">甲</span><span class="e e-土">辰</span><span class="tone t-平">平</span></td><td>辰土是傷官，表達與創意的好月份，適合寫提案、做作品集、上課進修；甲木正印讓你想得多，給自己訂截止日期。</td></tr><tr><td class="mt"><b>立夏</b><small>5/6–6/5</small></td><td class="mp"><span class="e e-木">乙</span><span class="e e-火">巳</span><span class="tone t-守">守</span></td><td>巳火遇上流年未土、命中午火，巳午未三會南方火，火上加火。開銷、競爭與脾氣都容易升高，不借錢、不作保，大額消費延後。</td></tr><tr><td class="mt"><b>芒種</b><small>6/6–7/6</small></td><td class="mp"><span class="e e-火">丙</span><span class="e e-火">午</span><span class="tone t-守">守</span></td><td>全年最燥的一個月：丙火劫財、午火比肩，又與命中三個午字自刑。工作量放慢、睡眠排在第一位，簽約與投資避開這個月。</td></tr><tr><td class="mt"><b>小暑</b><small>7/7–8/7</small></td><td class="mp"><span class="e e-火">丁</span><span class="e e-土">未</span><span class="tone t-平">平</span></td><td>未土食神和午火相合，人緣回來了，適合合作、團隊專案與接案；丁火比肩仍在，分工與分錢先講清楚再開始。</td></tr><tr><td class="mt"><b>立秋</b><small>8/8–9/7</small></td><td class="mp"><span class="e e-土">戊</span><span class="e e-金">申</span><span class="tone t-順">順</span></td><td>申金正財是喜用，收入與業務機會變多；申又合日支巳火，感情和伴侶關係升溫。申也是驛馬，適合安排出差或旅行。</td></tr><tr><td class="mt"><b>白露</b><small>9/8–10/7</small></td><td class="mp"><span class="e e-土">己</span><span class="e e-金">酉</span><span class="tone t-順">順</span></td><td>己土食神、酉金偏財都是喜用，靠專業與口碑賺錢的好時機。酉與日支巳半合金局，適合談加薪、調整價格。</td></tr><tr><td class="mt"><b>寒露</b><small>10/8–11/6</small></td><td class="mp"><span class="e e-金">庚</span><span class="e e-土">戌</span><span class="tone t-順">順</span></td><td>庚金正財透出，財務規劃、儲蓄計畫最容易落實；戌土傷官和午火半合，說話直的時候要記得收一點。</td></tr><tr><td class="mt"><b>立冬</b><small>11/7–12/6</small></td><td class="mp"><span class="e e-金">辛</span><span class="e e-水">亥</span><span class="tone t-順">順</span></td><td>亥水是你的用神，事業上容易得到肯定。但亥沖日支巳火，伴侶、家中或住處會有調整，多溝通、別在情緒上做決定。</td></tr><tr><td class="mt"><b>大雪</b><small>12/7–1/5</small></td><td class="mp"><span class="e e-水">壬</span><span class="e e-水">子</span><span class="tone t-順">順</span></td><td>水最旺的月份，壬水正官合日主，貴人與感情緣都強；子水沖命中三個午，年底容易有工作或環境的變動，順勢調整就好。</td></tr><tr><td class="mt"><b>小寒</b><small>1/6–2/3</small></td><td class="mp"><span class="e e-水">癸</span><span class="e e-土">丑</span><span class="tone t-順">順</span></td><td>丑土食神是財庫之地，適合結算全年、存下一筆錢、做下一年的計畫；癸水七殺帶來新的責任，量力接下。</td></tr>
+  </tbody></table>
+</section>
+
+<section class="page chapter">
+  <p class="kicker">第十一章</p>
+  <h2>行動清單</h2>
+  <div class="cols">
+    <div><h3>現在到 2027 年夏天</h3><ul>
+      <li>守住現金流：列出固定支出，建立三到六個月的緊急預備金。</li>
+      <li>不合夥、不借貸、不作保。</li>
+      <li>把專長整理成作品集或服務方案，為 2028 年做準備。</li>
+    </ul></div>
+    <div><h3>2027 秋天到 2029 年</h3><ul>
+      <li>主動爭取升遷、加薪或更大的專案。</li>
+      <li>開始每月固定投入的長期投資。</li>
+      <li>2029 年報名一張證照或進修課程。</li>
+    </ul></div>
+    <div><h3>2030 到 2033 年</h3><ul>
+      <li>每月固定兩人的約會時間，度過 2030–2031 的感情調整期。</li>
+      <li>2031 搬家或換城市前，和家人充分討論。</li>
+      <li>2032 評估轉換跑道；2033 存下一筆「十年後的自己」。</li>
+    </ul></div>
+    <div><h3>2034 到 2035 年</h3><ul>
+      <li>檢查合約與保單，暫停新的大筆投資。</li>
+      <li>為 2035 交入丁丑大運寫下下一個十年的目標。</li>
+    </ul></div>
+  </div>
+  <h3>生活裡的小習慣（依用神水、喜神金與土）</h3>
+  <dl class="luck">
+    <dt>顏色</dt><dd>黑、藍、灰為主，白、金、銀與米、咖啡為輔；紅、紫、橙不宜大面積使用。</dd>
+    <dt>方位</dt><dd>北方為主，西方、西北與中央為輔；書桌、工作位置可往這些方向。</dd>
+    <dt>習慣</dt><dd>多喝水、游泳或親近水邊；整理環境、斷捨離；規律飲食、踏實儲蓄。</dd>
+  </dl>
+  <p class="fine">這些是傳統五行的生活建議，不需要購買任何開運商品。</p>
+</section>
+
+<section class="page appendix">
+  <p class="kicker">附錄</p>
+  <h2>名詞小辭典</h2>
+  <dl class="gloss"><dt>日主</dt><dd>出生那一天的天干，代表你自己。你的日主是丁火。</dd><dt>身強／身弱</dt><dd>日主得到的支持多寡。你的命盤火佔全局約 56%，屬於身強。</dd><dt>格局</dt><dd>以出生月份（月令）為主的整體架構。你是建祿格：月令是日主自己的祿位。</dd><dt>用神、喜神</dt><dd>命盤最需要的五行（水）和輔助的五行（金、土）。</dd><dt>忌神、仇神</dt><dd>最不利的五行（火）和次要不利的五行（木）。</dd><dt>十神</dt><dd>其他干支和日主的關係，例如正官（規範、伴侶）、正財（穩定收入）、食神與傷官（才華、表達）。</dd><dt>大運</dt><dd>每十年換一次的環境主題，你從 6 歲起運，大運逆行。</dd><dt>流年</dt><dd>每一年的干支，和命盤、大運一起看吉凶。</dd><dt>合、沖、刑</dt><dd>干支之間的牽動。合是牽絆與合作，沖是變動，刑是摩擦與自我拉扯。</dd></dl>
+  <h2>這本命書怎麼算的</h2>
+  <ul class="method">
+    <li><b>排盤：</b>年柱、月柱與起運用出生的精確時刻比對節氣（天文演算法，誤差在秒級）；日柱、時柱用出生地的真太陽時（經度與均時差）。臺灣歷年的日光節約時間與戰時時區自動校正。</li>
+    <li><b>喜忌：</b>扶抑、調候（《窮通寶鑑》）、格局三派分開計算再加權綜合；三派一致的地方在書中特別標明。</li>
+    <li><b>流年：</b>每一年從十神、喜忌、干支刑沖合害、神煞與太歲整理訊號，流年佔六成、大運佔四成。</li>
+    <li><b>文字：</b>依上述命盤資料撰寫；干支、年份、喜忌與格局都和排盤結果逐項核對。</li>
+  </ul>
+  <p class="fine">命理是傳統文化與自我觀察的工具，說的是傾向與時機，不是注定。本書不提供醫療、法律或投資建議；健康請以醫師診斷為準，重大決定請諮詢專業人士。不需要也不建議購買任何改運商品。</p>
+</section>
+</main>
